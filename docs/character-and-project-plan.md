@@ -171,12 +171,28 @@ MyComic/
       thumbnail.png                # LFS
   poses/
     <id>-wave.json                 # bone rotations, angle-agnostic
+  props/
+    <id>-round-table/               # reusable set-piece, no skeleton/angles
+      prop.json                     # pivot point, variant catalogue
+      variants/
+        default/
+          art.svg
+    <id>-door/                      # prop with state variants
+      prop.json
+      variants/
+        closed/
+          art.svg
+        open/
+          art.svg
   backgrounds/
     <id>-alices-apartment/
       background.json
+      backdrops/
+        <id>-wall-and-floor.svg     # flat base art, referenced by revisions
       revisions/
-        <id>-before-renovation.json   # each revision: back layer + optional
-                                       # front (occlusion) layer
+        <id>-before-renovation.json   # each revision: back layer (backdrop +
+                                       # ordered prop placements) + optional
+                                       # front (occlusion) layer, same shape
   issues/
     <id>-issue-01/
       issue.json                  # number, title, ordered page ID list,
@@ -191,8 +207,8 @@ MyComic/
 ```
 
 ### Multi-issue projects
-- `characters/`, `poses/`, and `backgrounds/` are shared across the whole
-  series; `issues/` holds per-issue content only.
+- `characters/`, `poses/`, `props/`, and `backgrounds/` are shared across the
+  whole series; `issues/` holds per-issue content only.
 - Character/background **revisions live at project level**, are user-named,
   and are picked per issue (`issue.json`'s `characterRevisions` map) — not
   auto-generated or locked per issue. A redesign for issue #5 is just a new
@@ -205,8 +221,9 @@ MyComic/
 ### Git-friendliness rules
 - JSON, 2-space indent, alphabetically sorted keys, trailing newline — a
   no-op save produces an empty diff.
-- Every entity (character, revision, sticker, background, issue, page, panel,
-  pose) has a stable ID used for all cross-references; **ordering is always
+- Every entity (character, revision, sticker, background, prop, prop
+  placement, issue, page, panel, pose) has a stable ID used for all
+  cross-references; **ordering is always
   an explicit ID array** in the parent file, never inferred from filename or
   folder position — inserting a page/panel/issue is a one-line array edit,
   not a cascade of renames.
@@ -236,14 +253,35 @@ MyComic/
   reference — no shared scene graph spanning panels.
 
 ### Backgrounds
-- Two tiers: an **inline** background (a panel points straight at one image,
-  no library entry — the default/simple path) or a **library entry** under
-  `backgrounds/` for recurring locations, referenced as
-  `backgroundId + revisionId + crop` (pan/zoom window into the art).
-- Each background revision has a required **back** layer and an optional
-  **front/occlusion** layer, built into the model from the start. Render
-  order: **background back → character stickers → background front →
-  bubbles**.
+- Two tiers, same as before: an **inline** background (a panel points
+  straight at one image, no library entry — the default/simple path) or a
+  **library entry** under `backgrounds/` for recurring locations, referenced
+  as `backgroundId + revisionId + crop` (pan/zoom window into the art).
+- Each background revision still has a required **back** layer and an
+  optional **front/occlusion** layer. What changed: each layer is no longer
+  necessarily one flat painted image — it's an optional flat **backdrop**
+  (the base image, e.g. wall/floor) plus an **ordered list of prop
+  placements** (prop ID + variant + position/scale/rotation + z-order within
+  the layer) on top of it. A layer with zero prop placements behaves exactly
+  like the old single-flat-image model, so nothing is lost for a background
+  that's just one painting.
+- **Props are the background equivalent of stickers**: a shared,
+  project-level library (`props/`) of reusable set pieces (furniture,
+  windows, signage), each carrying one or more named **variants** for state
+  (a door's `open`/`closed`, a lamp's `on`/`off`) — the same variant
+  mechanism used for character expressions and build breakpoints, minus the
+  per-view-angle axis, since backgrounds aren't rigged and don't switch
+  camera angle. Composing a location means placing props from the library
+  into a background revision's back/front layers, the same mental model as
+  placing character instances into a panel.
+- Render order stays: **background back (backdrop + props) → character
+  stickers → background front (backdrop + props) → bubbles**.
+- Escape hatch: a background can still be authored as pure flat art with no
+  props at all — composability is available, not mandatory, matching the
+  "sensible default, no leaking complexity" priority. Flattening a
+  prop-composed background down to one baked image (for export or
+  performance) is a reasonable later escape hatch, same idea as flattening a
+  character to editable layers.
 
 ### Open questions (ask the user before deciding)
 - Lettering/text rendering (deferred, same as the bubble POC).
@@ -251,3 +289,8 @@ MyComic/
 - Whether an "extract inline background to a reusable library entry" action
   is worth building, or manual promotion (copy the file, add
   `background.json`) is good enough.
+- Whether a shipped starter prop library is needed alongside the shipped
+  character-component library, and how it's scoped (furniture/interiors
+  first? exteriors? props tied to a specific art style?).
+- Whether props need their own recolour/tint-mask support (matching
+  character colour slots) or start as fixed-colour art only.
