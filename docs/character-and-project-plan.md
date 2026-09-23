@@ -26,9 +26,10 @@ plan unless the user says otherwise.
 - **Revision**: a named, **project-level** snapshot of a character's *look* —
   which stickers are active per slot (slots are **stackable**: multiple
   simultaneously-active stickers per slot, ordered), colour slot values, and
-  optional skeleton proportion overrides (aging up, redesigns). Revisions are
-  user-named ("Post-Haircut", "Winter Arc") and reused freely across issues —
-  not auto-generated per issue, not locked to one issue.
+  optional skeleton proportion overrides (aging up, redesigns, **build** — see
+  "Body type / build" below). Revisions are user-named ("Post-Haircut",
+  "Winter Arc") and reused freely across issues — not auto-generated per
+  issue, not locked to one issue.
 - **Pose / Expression**: pure data — bone rotations relative to parent, view
   angle, and an **expression preset** (a mapping of face slot -> active
   sticker variant, e.g. "surprised" = wide eyes + open mouth). Independent of
@@ -45,7 +46,9 @@ plan unless the user says otherwise.
 ### Rendering approach
 - **Version 1:** a 2D layered cutout rig (Spine/Moho/Pixton-style), rendered
   with SkiaSharp. Stickers are **rigidly attached to a single bone** — no
-  mesh deformation (Live2D-style) — matching the still-image use case.
+  mesh deformation (Live2D-style) — matching the still-image use case. The
+  one constrained exception is build-driven stretch (see below), which is a
+  bounded, declared non-uniform scale, not free-form mesh weighting.
 - **Skeleton:** VRM humanoid bone set, with a rest layout stored **per view
   angle** since stickers need per-angle art from the start.
 - **Sticker z-order**: each slot has a fixed z-order number; stacking within
@@ -57,6 +60,30 @@ plan unless the user says otherwise.
   without rewriting the pose or document model.
 - AI pose-conditioned generation is at most a later optional plugin, never the
   core. Its output isn't repeatable and characters drift between panels.
+
+### Body type / build
+- **`build`** is a continuous character parameter (0–1, slim → heavy),
+  stored as a skeleton proportion override at the **Revision** level —
+  same tier as aging/redesigns — with a sparse per-instance override
+  available for a one-off panel (e.g. a bloat gag) without creating a new
+  named revision.
+- **Hybrid rendering, stretch by default:** a sticker that touches the
+  body silhouette (shirt, jacket) declares a stretch-safe region (fixed
+  margins around a stretchable centre, like a 9-slice image) and is scaled
+  non-uniformly to the current `build` value at render time — one asset
+  covers the whole slider, no extra art needed for the common case.
+- **Variants as the escape hatch:** a sticker can instead opt out of
+  stretching and declare **build breakpoint variants** (e.g. `slim` = 0.0,
+  `average` = 0.5, `heavy` = 1.0) for garments where stretching would
+  visibly break (printed logos, fitted seams, patterns) — this reuses the
+  same variant mechanism as expressions, just keyed by build breakpoint
+  instead of expression name. The renderer snaps to the **nearest**
+  declared breakpoint rather than cross-fading between two images; a
+  visible snap at the midpoint is the accepted trade-off for not needing a
+  blending/deformation pipeline. Crossfading is a possible later refinement,
+  not required for V1.
+- Stickers that don't touch the affected region (a hat, glasses) declare no
+  build response and render unaffected by the slider.
 
 ### UX expectations
 - Pose by dragging, with inverse kinematics and pinnable feet or hands. Users
@@ -88,6 +115,12 @@ plan unless the user says otherwise.
 - How much camera-angle freedom is needed beyond front/three-quarter/profile —
   any extra angle means new per-angle art for every existing sticker
   (and every existing variant).
+- Whether `build` should also drive skeleton bone-width scaling (so the
+  overall silhouette — arms, neck — widens, not just torso stickers), or
+  stay a sticker-only effect for V1.
+- Whether the visible snap between build-breakpoint variants is acceptable
+  long-term, or a later crossfade/blend pass is worth the added rendering
+  complexity.
 
 ## Project & data model (proposed, not final)
 
@@ -121,6 +154,19 @@ MyComic/
             closed/
               front.svg  three-quarter.svg  profile.svg
             surprised/
+              front.svg  three-quarter.svg  profile.svg
+        <id>-shirt-plain/                # build-responsive: stretch (default)
+          stretch.json                    # declares the 9-slice-style safe region
+          variants/
+            default/
+              front.svg  three-quarter.svg  profile.svg
+        <id>-shirt-logo/                  # build-responsive: breakpoint variants
+          variants/
+            slim/                          # build 0.0
+              front.svg  three-quarter.svg  profile.svg
+            average/                       # build 0.5
+              front.svg  three-quarter.svg  profile.svg
+            heavy/                         # build 1.0
               front.svg  three-quarter.svg  profile.svg
       thumbnail.png                # LFS
   poses/
