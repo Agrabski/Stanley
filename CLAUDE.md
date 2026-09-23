@@ -83,18 +83,25 @@ plan unless the user says otherwise.
   set) with a **per-view-angle rest layout** (front/three-quarter/profile are
   genuinely different 2D bone arrangements, not one rig viewed from different
   cameras), named colour slots, and the full catalogue of **stickers** ever
-  available per slot (hair, torso, accessories, ...). Nothing here is
-  issue-specific; it only grows as the series goes.
+  available per slot (hair, torso, accessories, ...). Face-related stickers
+  (eyes, mouth, eyebrows) additionally carry **variants** — alternate art for
+  the same sticker identity, used for expression state (e.g. eyes: neutral /
+  closed / wide; mouth: neutral / smile / open) — each variant still needs
+  its own per-view-angle art set. Nothing here is issue-specific; it only
+  grows as the series goes.
 - **Revision**: a named, **project-level** snapshot of a character's *look* —
   which stickers are active per slot (slots are **stackable**: multiple
   simultaneously-active stickers per slot, ordered), colour slot values, and
   optional skeleton proportion overrides (aging up, redesigns). Revisions are
   user-named ("Post-Haircut", "Winter Arc") and reused freely across issues —
   not auto-generated per issue, not locked to one issue.
-- **Pose / Expression**: pure data (bone rotations relative to parent,
-  expression preset, view angle), independent of artwork and
-  **angle-agnostic** — a pose rotates from whichever angle's rest layout is
-  active, so the pose library doesn't need per-angle duplicates.
+- **Pose / Expression**: pure data — bone rotations relative to parent, view
+  angle, and an **expression preset** (a mapping of face slot -> active
+  sticker variant, e.g. "surprised" = wide eyes + open mouth). Independent of
+  artwork identity and **angle-agnostic** — poses rotate from whichever
+  angle's rest layout is active and expressions just pick a variant, so
+  neither the pose nor expression library needs per-angle or per-character
+  duplicates as long as slot/variant names line up.
 - **CharacterInstance** (per panel): references a definition + a revision
   (defaults to the issue's chosen revision for that character), plus pose,
   view angle, and sparse per-panel overrides (e.g. sunglasses for one shot).
@@ -124,6 +131,12 @@ plan unless the user says otherwise.
   and an angle control.
 - Recolour through named colour slots (vector fills, or tint masks for bitmaps),
   not free-form recolouring.
+- **Character creation has a ready-made-component path**: assemble a new
+  character by picking from a shipped library of eyes/mouth/hair/etc.
+  stickers — each already carrying its expression variants and per-angle art
+  — as the fast default on-ramp, no drawing required. Full custom
+  sticker/variant authoring and import stays available as the escape hatch
+  for a fully bespoke character.
 - Skeleton/proportion editing (bone lengths, per-angle rest layout) is a
   **full rig editor**, not a simplified slider UI — it's the advanced/escape
   hatch surface, not part of the default per-issue flow. A thin convenience
@@ -134,10 +147,13 @@ plan unless the user says otherwise.
 
 ### Open questions (ask the user before deciding)
 - Target art style (Western cartoon, manga, semi-realistic, user's choice?).
-- Whether characters come from a shipped sticker library or users author them
-  fully.
+- A shipped component library is confirmed as one character-creation
+  on-ramp; still open how large/opinionated that starter library needs to
+  be, and whether custom-authored stickers can be mixed into its slot/variant
+  naming conventions so expressions still transfer.
 - How much camera-angle freedom is needed beyond front/three-quarter/profile —
-  any extra angle means new per-angle art for every existing sticker.
+  any extra angle means new per-angle art for every existing sticker
+  (and every existing variant).
 
 ## Project & data model (proposed, not final)
 
@@ -160,8 +176,18 @@ MyComic/
         <id>-default.json
         <id>-winter-arc.json
       stickers/
-        <id>-jacket-a/
-          front.svg  three-quarter.svg  profile.svg
+        <id>-jacket-a/                  # non-face sticker: single variant
+          variants/
+            default/
+              front.svg  three-quarter.svg  profile.svg
+        <id>-eyes-almond/                # face sticker: expression variants
+          variants/
+            neutral/
+              front.svg  three-quarter.svg  profile.svg
+            closed/
+              front.svg  three-quarter.svg  profile.svg
+            surprised/
+              front.svg  three-quarter.svg  profile.svg
       thumbnail.png                # LFS
   poses/
     <id>-wave.json                 # bone rotations, angle-agnostic
