@@ -65,6 +65,34 @@ public sealed class BubbleOutline
         return CubicPoint(p0.Point, p0.OutHandle, p1.InHandle, p1.Point, local);
     }
 
+    /// <summary>
+    /// The outline's own anchor points whose parametric position lies strictly between
+    /// <paramref name="fromT"/> and <paramref name="toT"/>, walking forward (wrapping if
+    /// <paramref name="toT"/> is "before" <paramref name="fromT"/>), ordered along that
+    /// walk. Lets a tail whose base spans one or more outline vertices (e.g. a Shout
+    /// preset's zigzag teeth) absorb that geometry into its own polygon instead of
+    /// chording straight across it and leaving a sliver for the boolean union to
+    /// reconcile on its own.
+    /// </summary>
+    public List<SKPoint> AnchorsBetween(float fromT, float toT)
+    {
+        var n = Anchors.Count;
+        var from = Wrap01(fromT) * n;
+        var to = Wrap01(toT) * n;
+        if (to <= from)
+            to += n;
+
+        var found = new List<(float Pos, SKPoint Point)>();
+        for (var i = 0; i < n; i++)
+        {
+            var pos = i <= from ? i + n : i;
+            if (pos < to)
+                found.Add((pos, Anchors[i].Point));
+        }
+        found.Sort((a, b) => a.Pos.CompareTo(b.Pos));
+        return found.ConvertAll(f => f.Point);
+    }
+
     /// <summary>Brute-force nearest-point search: the t whose <see cref="PointAt"/> is closest to <paramref name="target"/>.</summary>
     public float NearestT(SKPoint target, int samples = 200)
     {
