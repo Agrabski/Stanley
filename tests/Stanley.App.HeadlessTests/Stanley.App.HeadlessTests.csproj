@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Avalonia.Headless.XUnit 12.x is built on xunit v3, which runs as an executable
+         (Microsoft.Testing.Platform), unlike the xunit v2 template used by the other
+         test project. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.3" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Stanley.App\Stanley.App.csproj" />
+    <ProjectReference Include="..\..\src\Stanley.Bubbles\Stanley.Bubbles.csproj" />
+  </ItemGroup>
+
+</Project>

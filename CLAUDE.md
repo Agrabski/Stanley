@@ -15,10 +15,63 @@ Stanley is a .NET comic editor. Priorities, in order:
 
 ## Current state
 
-No code, solution or build system exists yet. The only files are `LICENSE`, the
-`README.md` and this file. The UI stack (Avalonia / WPF / MAUI) has not been
-chosen; do not assume one. Before starting implementation, confirm the stack with
-the user, then update this file with build, test and lint commands.
+Stack: **Avalonia** on **.NET 10** (`net10.0`; retarget to net11.0 once that
+ships — .NET 11 doesn't exist as a stable release yet), rendering via
+**SkiaSharp** (Avalonia's built-in Skia backend). Shared MSBuild settings live
+in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
+(the newer XML-free format).
+
+Only the speech-bubble POC exists so far (see below) — no character system,
+no document/page model, no persistence.
+
+```
+src/Stanley.Bubbles/    # bubble geometry model, no Avalonia dependency (SkiaSharp only)
+src/Stanley.App/        # Avalonia POC host (single-bubble editor)
+tests/Stanley.Bubbles.Tests/     # xunit v2, geometry unit tests
+tests/Stanley.App.HeadlessTests/ # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
+```
+
+Build/test/run:
+```
+dotnet build Stanley.slnx
+dotnet test tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj
+dotnet test tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
+dotnet run --project src/Stanley.App
+```
+No linter is configured yet.
+
+Environment notes: on a fresh Linux container, `apt-get install dotnet-sdk-10.0`
+works when `dot.net`/`builds.dotnet.microsoft.com` is egress-blocked (the
+official dotnet-install script host). SkiaSharp needs an explicit
+`SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per platform —
+the base `SkiaSharp` package alone throws `DllNotFoundException` at runtime.
+Avalonia's headless test host needs `.UseSkia()` even though it's not
+rendering to a real window, or any `TextBlock` measurement throws
+(`Unable to locate 'Avalonia.Platform.IFontManagerImpl'`).
+
+## Speech bubble system (POC)
+
+Implemented in `Stanley.Bubbles` + `Stanley.App`, demonstrating: resizing,
+switching between style presets, and adding/moving any number of tails.
+
+- **`BubbleOutline`**: an arbitrary closed bezier shape (ordered `BubbleAnchor`
+  ring, each with absolute in/out handle points and a corner-vs-smooth type).
+  `Rescale(from, to)` affine-maps every anchor for resizing.
+- **Tails are independent, not part of the outline.** Each `BubbleTail` has an
+  `AttachmentT` (0–1 fraction along the outline) and a free `Target` point.
+  `SpeechBubble.BuildRenderPath()` unions the outline with every tail's own
+  polygon via `SKPath.Op(..., SKPathOp.Union)` — this is why adding another
+  tail needs no special case, and why any number of tails works.
+- **Style presets** (`BubbleStylePreset`: Speech/Shout/Whisper) are pure
+  `bounds -> anchors` generator functions plus a default tail shape/stroke —
+  the "ease of use" default path. The anchor model itself is the escape
+  hatch for arbitrary hand-edited shapes later.
+- Deferred: text/lettering rendering, thought-bubble style (disjoint circle
+  chain — breaks the single-polygon-per-tail union model), colour slots,
+  character-bound tail targets, persistence, NativeAOT publish validation.
+  See the design discussion in this repo's history for the full reasoning
+  (bezier outlines, boolean-union tails, Avalonia+AOT tradeoffs, AGPL
+  licensing check on the dependency stack).
 
 ## Character system design (proposed, not final)
 

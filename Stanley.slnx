@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Stanley.App/Stanley.App.csproj" />
+    <Project Path="src/Stanley.Bubbles/Stanley.Bubbles.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj" />
+    <Project Path="tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj" />
+  </Folder>
+</Solution>
