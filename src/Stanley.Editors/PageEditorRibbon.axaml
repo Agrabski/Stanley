@@ -205,6 +205,16 @@
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Split panel" />
         </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <ToggleButton Name="LockLayoutButton" Classes="tool" IsChecked="{Binding IsLayoutLocked}" ToolTip.Tip="Prevent panels on this page from being moved, resized, split, deleted or re-tiled - bubbles and characters are unaffected">
+              <StackPanel><PathIcon Data="{StaticResource LockIcon}" /><TextBlock Text="Lock layout" /></StackPanel>
+            </ToggleButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Protect" />
+        </DockPanel>
       </StackPanel>
     </TabItem>
 
@@ -233,6 +243,7 @@
           <StackPanel VerticalAlignment="Center" Spacing="4" Margin="0,6,0,0">
             <CheckBox Name="MarginGuidesCheck" IsChecked="{Binding ShowMarginGuides}" Focusable="False" FontSize="12" Content="Margin guides" />
             <CheckBox IsChecked="{Binding SnapEnabled}" Focusable="False" FontSize="12" Content="Snap to margins and gutters" />
+            <CheckBox IsChecked="{Binding IsLayoutLocked}" Focusable="False" FontSize="12" Content="Lock layout" />
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Show" />
         </DockPanel>
