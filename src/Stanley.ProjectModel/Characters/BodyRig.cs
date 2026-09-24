@@ -22,6 +22,8 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY,
 /// <param name="Torso">A closed outline (clockwise from the neck), meant to be drawn smoothed.</param>
 /// <param name="Limbs">Unioned with the torso and <paramref name="Blobs"/> into the body's one silhouette.</param>
 /// <param name="NearLimbs">The parts nearest the viewer in a side view (the near arm, with <paramref name="NearBlobs"/> its hand and foot): drawn on top as their own outlined shape, so they still read against the body behind them. Empty in the front view.</param>
+/// <param name="Layers">The same shapes sorted into depth layers, back to front - what the renderer paints (docs/sticker-system.md §4.2).</param>
+/// <param name="Regions">Where each body region is, for attaching sticker parts.</param>
 public sealed record BodyFigure(
     ViewAngle Angle,
     ViewAngleRestLayout RestLayout,
@@ -32,7 +34,33 @@ public sealed record BodyFigure(
     IReadOnlyList<BodyEllipse> Blobs,
     IReadOnlyList<BodyCapsule> NearLimbs,
     IReadOnlyList<BodyEllipse> NearBlobs,
-    Rect2D Extent);
+    Rect2D Extent,
+    IReadOnlyList<FigureLayer> Layers,
+    FigureRegions Regions)
+{
+    /// <summary>
+    /// The layer a region is painted in: front view - legs and feet behind the torso (and
+    /// neck, and skirt), then the head, then the arms and hands in front; side view - the
+    /// far arm behind everything, then the body (torso, neck, legs, far foot), the head,
+    /// the near foot and the near arm. The character's right side is the near one.
+    /// </summary>
+    public FigureLayerKind LayerOf(BodyRegion region, LimbSide side = LimbSide.Left) =>
+        Angle == ViewAngle.Profile
+            ? region switch
+            {
+                BodyRegion.Head => FigureLayerKind.Head,
+                BodyRegion.Arm or BodyRegion.Hand => side == LimbSide.Right ? FigureLayerKind.NearArm : FigureLayerKind.FarArm,
+                BodyRegion.Foot => side == LimbSide.Right ? FigureLayerKind.NearFoot : FigureLayerKind.Body,
+                _ => FigureLayerKind.Body
+            }
+            : region switch
+            {
+                BodyRegion.Head => FigureLayerKind.Head,
+                BodyRegion.Arm or BodyRegion.Hand => FigureLayerKind.Arms,
+                BodyRegion.Leg or BodyRegion.Foot => FigureLayerKind.Legs,
+                _ => FigureLayerKind.Torso
+            };
+}
 
 /// <summary>
 /// Turns a <see cref="BodyShape"/> into a skeleton rest layout and a set of simple shapes
@@ -267,7 +295,7 @@ public static class BodyRig
         var layout = ApplyPose(baseLayout, pose?.BoneRotations);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
-        var torso = new List<Point2D>
+        var restTorso = new List<Point2D>
         {
             new(m.NeckHalf, m.ShoulderY - m.NeckLength * 0.3),
             new(shoulderHalf * 0.72, m.ShoulderY + w * 0.02),
@@ -278,34 +306,55 @@ public static class BodyRig
             new(hipHalf * 0.9, m.HipY + m.Below * 0.04),
             new(0, m.HipY + m.Below * 0.05),
         };
-        for (var i = torso.Count - 2; i >= 0; i--)
-            torso.Add(Mirror(torso[i], -1));
-        torso = torso.Select(trunk.Upper).ToList();
+        for (var i = restTorso.Count - 2; i >= 0; i--)
+            restTorso.Add(Mirror(restTorso[i], -1));
+        var torso = restTorso.Select(trunk.Upper).ToList();
 
-        var limbs = new List<BodyCapsule> { new(At(HumanoidBone.Head), At(HumanoidBone.Neck), m.NeckHalf, m.NeckHalf) };
+        var neck = new BodyCapsule(At(HumanoidBone.Head), At(HumanoidBone.Neck), m.NeckHalf, m.NeckHalf);
+        var limbs = new List<BodyCapsule> { neck };
         var headPoint = At(HumanoidBone.Head);
         var headTurn = trunk.Lean + trunk.Tilt;
-        var blobs = new List<BodyEllipse>
-        {
-            new(Offset(headPoint, Rotate(new Point2D(0, -m.Head / 2), headTurn)), m.Head * 0.42 * (1 + 0.1 * build), m.Head / 2, headTurn)
-        };
+        var head = new BodyEllipse(Offset(headPoint, Rotate(new Point2D(0, -m.Head / 2), headTurn)), m.Head * 0.42 * (1 + 0.1 * build), m.Head / 2, headTurn);
+        var blobs = new List<BodyEllipse> { head };
 
+        var arms = new Dictionary<Side, LimbFrame>();
+        var legs = new Dictionary<Side, LimbFrame>();
+        var hands = new Dictionary<Side, BodyEllipse>();
+        var feet = new Dictionary<Side, BodyEllipse>();
         foreach (var side in new[] { Side.Left, Side.Right })
         {
             var (s, e, h) = (At(side.UpperArm), At(side.LowerArm), At(side.Hand));
-            limbs.Add(new BodyCapsule(s, e, m.ArmTop, m.ArmElbow));
-            limbs.Add(new BodyCapsule(e, h, m.ArmElbow, m.ArmWrist));
-            blobs.Add(m.HandAt(e, h, armDir));
+            arms[side] = new LimbFrame(new BodyCapsule(s, e, m.ArmTop, m.ArmElbow), new BodyCapsule(e, h, m.ArmElbow, m.ArmWrist));
+            limbs.Add(arms[side].Upper);
+            limbs.Add(arms[side].Lower);
+            blobs.Add(hands[side] = m.HandAt(e, h, armDir));
 
             var (hp, kp, ap) = (At(side.UpperLeg), At(side.LowerLeg), At(side.Foot));
-            limbs.Add(new BodyCapsule(hp, kp, m.Thigh, m.Knee));
-            limbs.Add(new BodyCapsule(kp, ap, m.Knee, m.Ankle));
+            legs[side] = new LimbFrame(new BodyCapsule(hp, kp, m.Thigh, m.Knee), new BodyCapsule(kp, ap, m.Knee, m.Ankle));
+            limbs.Add(legs[side].Upper);
+            limbs.Add(legs[side].Lower);
             var outward = Math.Sign(At(side.UpperLeg).X - At(HumanoidBone.Hips).X) * w * 0.06;
             var footTurn = FootTilt(m, rest, kp, ap, side.LowerLeg, side.Foot);
-            blobs.Add(new BodyEllipse(Offset(ap, Rotate(new Point2D(outward, m.AnkleHeight - m.FootHalfHeight), footTurn)), w * 0.26, m.FootHalfHeight, footTurn));
+            blobs.Add(feet[side] = new BodyEllipse(Offset(ap, Rotate(new Point2D(outward, m.AnkleHeight - m.FootHalfHeight), footTurn)), w * 0.26, m.FootHalfHeight, footTurn));
         }
 
-        return new BodyFigure(ViewAngle.Front, rest, baseLayout, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]));
+        var both = new[] { Side.Left, Side.Right };
+        var layers = new List<FigureLayer>
+        {
+            FigureLayer.Empty(FigureLayerKind.Back),
+            new(FigureLayerKind.Legs, null, both.SelectMany(s => new[] { legs[s].Upper, legs[s].Lower }).ToList(), both.Select(s => feet[s]).ToList(), []),
+            // The torso covers the tops of the thighs; at the hips its ink stops where it lies over them.
+            new(FigureLayerKind.Torso, torso, [neck], [], both.Select(s => Seam(At(s.UpperLeg), m.Thigh * 1.5)).ToList()),
+            new(FigureLayerKind.Head, null, [], [head], [Seam(headPoint, m.NeckHalf * 1.2)]),
+            new(FigureLayerKind.Arms, null, both.SelectMany(s => new[] { arms[s].Upper, arms[s].Lower }).ToList(), both.Select(s => hands[s]).ToList(),
+                both.Select(s => Seam(At(s.UpperArm), m.ArmTop * 1.4)).ToList()),
+            FigureLayer.Empty(FigureLayerKind.Front),
+        };
+        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Pivot, trunk.Lean, trunk.Shift),
+            arms[Side.Left], arms[Side.Right], hands[Side.Left], hands[Side.Right],
+            legs[Side.Left], legs[Side.Right], feet[Side.Left], feet[Side.Right]);
+
+        return new BodyFigure(ViewAngle.Front, rest, baseLayout, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]), layers, regions);
     }
 
     // ---------------------------------------------------------------- side (profile)
@@ -363,7 +412,7 @@ public static class BodyRig
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
         var t = m.TorsoLength;
-        var torso = new List<Point2D>
+        var restTorso = new List<Point2D>
         {
             new(m.NeckHalf * 0.9, m.ShoulderY - m.NeckLength * 0.3),
             new(chestFront * 0.8, m.ShoulderY + w * 0.15),
@@ -379,42 +428,62 @@ public static class BodyRig
             new(-backDepth * 0.8, m.ShoulderY + w * 0.1),
             new(-m.NeckHalf * 0.9, m.ShoulderY - m.NeckLength * 0.3),
         };
-        torso = torso.Select(trunk.Upper).ToList();
+        var torso = restTorso.Select(trunk.Upper).ToList();
 
         var headPoint = At(HumanoidBone.Head);
         var headTurn = trunk.Lean + trunk.Tilt;
         var headCenter = Offset(headPoint, Rotate(new Point2D(m.Head * 0.04, -m.Head / 2), headTurn));
         var headRx = m.Head * 0.47 * (1 + 0.08 * build);
-        var limbs = new List<BodyCapsule> { new(headPoint, At(HumanoidBone.Neck), m.NeckHalf * 1.05, m.NeckHalf * 1.05) };
-        var blobs = new List<BodyEllipse>
-        {
-            new(headCenter, headRx, m.Head / 2, headTurn),
-            // The nose: the one detail that says which way a flat side view is facing.
-            new(Offset(headCenter, Rotate(new Point2D(headRx * 0.93, m.Head * 0.07), headTurn)), m.Head * 0.09, m.Head * 0.07, headTurn),
-        };
+        var neck = new BodyCapsule(headPoint, At(HumanoidBone.Neck), m.NeckHalf * 1.05, m.NeckHalf * 1.05);
+        var limbs = new List<BodyCapsule> { neck };
+        var head = new BodyEllipse(headCenter, headRx, m.Head / 2, headTurn);
+        // The nose: the one detail that says which way a flat side view is facing.
+        var nose = new BodyEllipse(Offset(headCenter, Rotate(new Point2D(headRx * 0.93, m.Head * 0.07), headTurn)), m.Head * 0.09, m.Head * 0.07, headTurn);
+        var blobs = new List<BodyEllipse> { head, nose };
         var nearLimbs = new List<BodyCapsule>();
         var nearBlobs = new List<BodyEllipse>();
 
+        var arms = new Dictionary<Side, LimbFrame>();
+        var legs = new Dictionary<Side, LimbFrame>();
+        var hands = new Dictionary<Side, BodyEllipse>();
+        var feet = new Dictionary<Side, BodyEllipse>();
         var footLength = m.Below * 0.17;
         foreach (var (side, near) in new[] { (Side.Left, false), (Side.Right, true) })
         {
             var (targetLimbs, targetBlobs) = near ? (nearLimbs, nearBlobs) : (limbs, blobs);
             var (s, e, h) = (At(side.UpperArm), At(side.LowerArm), At(side.Hand));
-            targetLimbs.Add(new BodyCapsule(s, e, m.ArmTop, m.ArmElbow));
-            targetLimbs.Add(new BodyCapsule(e, h, m.ArmElbow, m.ArmWrist));
-            targetBlobs.Add(m.HandAt(e, h, armDir));
+            arms[side] = new LimbFrame(new BodyCapsule(s, e, m.ArmTop, m.ArmElbow), new BodyCapsule(e, h, m.ArmElbow, m.ArmWrist));
+            targetLimbs.Add(arms[side].Upper);
+            targetLimbs.Add(arms[side].Lower);
+            targetBlobs.Add(hands[side] = m.HandAt(e, h, armDir));
 
             // Legs merge into the body (a separate near thigh reads as a bowling pin over
             // the hips); only the near foot is drawn on top, so the feet read as two.
             var (hp, kp, ap) = (At(side.UpperLeg), At(side.LowerLeg), At(side.Foot));
-            limbs.Add(new BodyCapsule(hp, kp, m.Thigh * 0.9, m.Knee));
-            limbs.Add(new BodyCapsule(kp, ap, m.Knee, m.Ankle));
+            legs[side] = new LimbFrame(new BodyCapsule(hp, kp, m.Thigh * 0.9, m.Knee), new BodyCapsule(kp, ap, m.Knee, m.Ankle));
+            limbs.Add(legs[side].Upper);
+            limbs.Add(legs[side].Lower);
             var footTurn = FootTilt(m, rest, kp, ap, side.LowerLeg, side.Foot);
-            targetBlobs.Add(new BodyEllipse(Offset(ap, Rotate(new Point2D(footLength * 0.3, m.AnkleHeight - m.FootHalfHeight), footTurn)), footLength / 2, m.FootHalfHeight, footTurn));
+            targetBlobs.Add(feet[side] = new BodyEllipse(Offset(ap, Rotate(new Point2D(footLength * 0.3, m.AnkleHeight - m.FootHalfHeight), footTurn)), footLength / 2, m.FootHalfHeight, footTurn));
         }
 
+        var (far, nearSide) = (Side.Left, Side.Right);
+        var layers = new List<FigureLayer>
+        {
+            FigureLayer.Empty(FigureLayerKind.Back),
+            new(FigureLayerKind.FarArm, null, [arms[far].Upper, arms[far].Lower], [hands[far]], []),
+            new(FigureLayerKind.Body, torso, [neck, legs[far].Upper, legs[far].Lower, legs[nearSide].Upper, legs[nearSide].Lower], [feet[far]], []),
+            new(FigureLayerKind.Head, null, [], [head, nose], [Seam(headPoint, m.NeckHalf * 1.25)]),
+            new(FigureLayerKind.NearFoot, null, [], [feet[nearSide]], []),
+            new(FigureLayerKind.NearArm, null, [arms[nearSide].Upper, arms[nearSide].Lower], [hands[nearSide]], [Seam(At(nearSide.UpperArm), m.ArmTop * 1.4)]),
+            FigureLayer.Empty(FigureLayerKind.Front),
+        };
+        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Pivot, trunk.Lean, trunk.Shift),
+            arms[Side.Left], arms[Side.Right], hands[Side.Left], hands[Side.Right],
+            legs[Side.Left], legs[Side.Right], feet[Side.Left], feet[Side.Right]);
+
         return new BodyFigure(ViewAngle.Profile, rest, baseLayout, layout, torso, limbs, blobs, nearLimbs, nearBlobs,
-            ExtentOf(torso, [limbs, nearLimbs], [blobs, nearBlobs]));
+            ExtentOf(torso, [limbs, nearLimbs], [blobs, nearBlobs]), layers, regions);
     }
 
     /// <summary>The joints down the body's centre line, shared by both views.</summary>
@@ -476,6 +545,9 @@ public static class BodyRig
         }
         return Rect2D.FromEdges(left, top, right, bottom);
     }
+
+    /// <summary>A round seam zone (see <see cref="FigureLayer.Seams"/>).</summary>
+    private static BodyEllipse Seam(Point2D at, double radius) => new(at, radius, radius);
 
     private static Point2D Along(Point2D from, Point2D direction, double distance) =>
         new(from.X + direction.X * distance, from.Y + direction.Y * distance);

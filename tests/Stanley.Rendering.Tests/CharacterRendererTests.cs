@@ -94,3 +94,84 @@ public class CharacterRendererTests
         PageRenderer.Draw(canvas, new Rect2D(0, 0, 100, 100), [panel]);
     }
 }
+
+public class FigureLayerRenderingTests
+{
+    private const float Unit = 400;
+
+    private static SKBitmap Render(CharacterDefinition character, PoseData pose)
+    {
+        var bitmap = new SKBitmap(400, 440);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(new Point2D(200, 420), Unit, false), 2f, pose.ViewAngle, pose);
+        return bitmap;
+    }
+
+    private static SKPoint ToPixel(Point2D figure) => new((float)(200 + figure.X * Unit), (float)(420 + figure.Y * Unit));
+
+    private static bool IsInk(SKColor c) => c.Red < 90 && c.Green < 90 && c.Blue < 90;
+
+    [Fact]
+    public void A_forearm_folded_across_the_chest_keeps_its_outline()
+    {
+        var character = CharacterDefinition.Create("A");
+        // The left forearm turned a quarter turn in towards the body: level across the front of the torso.
+        var pose = new PoseData(ViewAngle.Front, [new BoneRotation(HumanoidBone.LeftLowerArm, 90)], []);
+        var figure = BodyRig.Build(character.Body, ViewAngle.Front, null, pose);
+        var forearm = figure.Regions.LeftArm.Lower;
+        var mid = new Point2D((forearm.From.X + forearm.To.X) / 2, (forearm.From.Y + forearm.To.Y) / 2);
+        var radius = (forearm.FromRadius + forearm.ToRadius) / 2;
+
+        using var bitmap = Render(character, pose);
+        var centre = ToPixel(mid);
+        var edge = ToPixel(new Point2D(mid.X, mid.Y + radius));
+        using var torso = FigureGeometry.SmoothClosed(figure.Torso);
+
+        Assert.True(torso.Contains((float)mid.X, (float)(mid.Y + radius)), "the forearm's lower edge lies over the torso");
+        Assert.False(IsInk(bitmap.GetPixel((int)centre.X, (int)centre.Y)));
+        Assert.Contains(Enumerable.Range(-3, 7), dy => IsInk(bitmap.GetPixel((int)edge.X, (int)edge.Y + dy)));
+    }
+
+    [Theory]
+    [InlineData(ViewAngle.Front, HumanoidBone.LeftUpperArm)]
+    [InlineData(ViewAngle.Profile, HumanoidBone.RightUpperArm)]
+    public void At_rest_the_shoulder_is_seamless(ViewAngle angle, HumanoidBone shoulder)
+    {
+        var character = CharacterDefinition.Create("A");
+        var pose = new PoseData(angle, [], []);
+        var figure = BodyRig.Build(character.Body, angle);
+        var joint = figure.Layout.Bones.Single(b => b.Bone == shoulder).Position;
+        var arm = shoulder == HumanoidBone.LeftUpperArm ? figure.Regions.LeftArm : figure.Regions.RightArm;
+        using var torso = FigureGeometry.SmoothClosed(figure.Torso);
+
+        using var bitmap = Render(character, pose);
+        // The arm's round top, where it lies over the torso: without the seam, its outline
+        // would draw an arc there.
+        var inked = 0;
+        var checkedPoints = 0;
+        for (var a = 0; a < 360; a += 5)
+        {
+            var r = a * Math.PI / 180;
+            var p = new Point2D(joint.X + Math.Cos(r) * arm.Upper.FromRadius, joint.Y + Math.Sin(r) * arm.Upper.FromRadius);
+            if (!torso.Contains((float)p.X, (float)p.Y) || DistanceToOutline(figure.Torso, p) < 0.02)
+                continue;
+            checkedPoints++;
+            var px = ToPixel(p);
+            if (IsInk(bitmap.GetPixel((int)Math.Round(px.X), (int)Math.Round(px.Y))))
+                inked++;
+        }
+        Assert.True(checkedPoints > 3);
+        Assert.Equal(0, inked);
+    }
+
+    private static double DistanceToOutline(IReadOnlyList<Point2D> outline, Point2D p) =>
+        Enumerable.Range(0, outline.Count).Min(i =>
+        {
+            var (a, b) = (outline[i], outline[(i + 1) % outline.Count]);
+            var (dx, dy) = (b.X - a.X, b.Y - a.Y);
+            var t = Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / Math.Max(dx * dx + dy * dy, 1e-12), 0, 1);
+            var (x, y) = (a.X + dx * t - p.X, a.Y + dy * t - p.Y);
+            return Math.Sqrt(x * x + y * y);
+        });
+}

@@ -383,7 +383,7 @@ public sealed class PageCanvasControl : Control
             return false;
         if (!vm.CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
             return true; // a missing character's placeholder box
-        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement, instance.Pose.ViewAngle);
+        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement, instance.Pose.ViewAngle, instance.Pose);
         return path.Contains((float)p.X, (float)p.Y);
     }
 
