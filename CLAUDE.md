@@ -322,6 +322,22 @@ point at a temp folder):
   suit one theme. The page (paper), thumbnails and the inline text editor
   (`ThemeVariantScope` forced Light) stay white; only the canvas pasteboard darkens
   (`PageCanvasScene.DarkChrome`).
+- *Auto-update* (`Stanley.App.Updates`, File › Options › Updates): backed by
+  **Velopack** (MIT), wired in via `VelopackApp.Build().Run()` as the first
+  line of `Program.Main`, before the no-args-vs-CLI dispatch. Stanley is a
+  private repository, so each user supplies their own GitHub personal
+  access token (read access to this repo is enough) rather than one being
+  baked into the build; kept in its own owner-only-permissioned file
+  (`GithubTokenStore`, separate from `settings.txt`). `AppSettings.UpdateChannel`
+  (Stable/Nightly) picks the release track; `VelopackUpdateService.ResolveChannel`
+  maps it to the channel a build was packed under (`linux`/`linux-nightly` —
+  see "Builds, versioning & releases" below) so the two tracks never
+  cross-update. `IUpdateService` is the seam that keeps
+  `MainWindowViewModel` testable without a real Velopack install (a dev/test
+  build is never `IsInstalled`). Installing an update goes through the same
+  Save/Don't Save/Cancel gate as Close. An automatic startup check
+  (`AppSettings.AutoCheckForUpdates`, off by default) runs through
+  `IDelayScheduler`. See `docs/auto-update.md`.
 - *Logging* (`Diagnostics/AppLog`): `Logs/stanley-yyyy-MM-dd.log`, append-and-close
   per line (nothing lost in a crash), pruned after 14 days, a no-op until
   `Initialize` (so the CLI and tests don't log). Records startup environment,
@@ -447,22 +463,28 @@ automatic back-merge) are plumbing and never appear in release notes.
   every test project (`dotnet test --project … -c Release --no-build`), and a
   notice (never a failure) naming the issues the PR closes and the bump that
   implies. Nothing is published.
+- **Linux only** (`linux-x64`) — Windows and macOS aren't supported build/release
+  targets.
 - **Nightly** (daily 02:00 UTC schedule; at most once a day, and skipped when
   `develop` hasn't moved since the last nightly; a manual run always builds):
   builds and tests `develop`, then a self-contained `dotnet publish` of
-  `src/Stanley.App` for linux-x64, win-x64 and osx-arm64
-  (`stanley-<version>-<rid>.tar.gz`, `.zip` on Windows; ~44 MB on Linux), kept as
-  workflow artifacts for 30 days and replacing the rolling pre-release tagged
-  `nightly` (**Releases › nightly**).
+  `src/Stanley.App` for linux-x64 (`stanley-<version>-linux-x64.tar.gz`, ~44 MB),
+  kept as a workflow artifact for 30 days. It's also packed with **Velopack**
+  (`vpk pack`, channel `linux-nightly`) and uploaded to the rolling pre-release
+  tagged `nightly` (**Releases › nightly**) for File › Options › Updates to pick
+  up — see `docs/auto-update.md` for why that release is pruned per-run rather
+  than deleted and recreated (Velopack's update feed needs the release/tag to
+  persist across runs).
 - **Push to `main`**: build + test, and keep **one draft GitHub Release `vX.Y.Z`**
   up to date: the next version and notes (New features / Bug fixes / Breaking
   changes / Other changes, one line per closed issue) for every change PR merged
   since the last published release that `main` now contains.
 - **Releasing = pressing Publish on the draft** (notes can be edited first). That
   creates the `vX.Y.Z` tag; the `release: published` run builds and tests that
-  tag, attaches the builds, and merges the tag back into `develop` (if that fails
-  — protected branch, conflict — it warns; merge `main` into `develop` by hand).
-  The repo is private, so only collaborators can download releases or nightlies.
+  tag, attaches the `tar.gz` and its Velopack package (channel `linux`), and
+  merges the tag back into `develop` (if that fails — protected branch, conflict
+  — it warns; merge `main` into `develop` by hand). The repo is private, so only
+  collaborators can download releases or nightlies.
 - **Version numbers are never written by hand.** MinVer (`Stanley.App.csproj`)
   derives the binaries' version from git tags: a `vX.Y.Z` commit is `X.Y.Z`,
   anything after it is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag

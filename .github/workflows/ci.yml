@@ -5,9 +5,9 @@
 #   issues the PR closes and how that bumps the next version.
 # - nightly (schedule, at most once a day; or workflow_dispatch): if `develop`
 #   changed since the last nightly, build + test + publish it. Publishing packs
-#   each platform build with Velopack (vpk) and uploads it to the rolling
-#   "nightly" release/tag on the Nightly channel - see velopack-release below
-#   and docs/auto-update.md. A manual run always builds.
+#   the Linux build with Velopack (vpk) and uploads it to the rolling "nightly"
+#   release/tag on the Nightly channel - see velopack-release below and
+#   docs/auto-update.md. A manual run always builds.
 # - push to main: build + test, and keep the draft release "vX.Y.Z" up to date
 #   (version and notes from the issues closed by the PRs main now contains, see
 #   .github/scripts/release-notes.js).
@@ -17,14 +17,17 @@
 #   after it).
 # The binaries' version comes from MinVer (git tags), see Stanley.App.csproj.
 #
-# velopack-release (the job that uploads packed builds): unlike a stable
+# Linux (linux-x64) is the only build/release target - Windows and macOS
+# aren't supported.
+#
+# velopack-release (the job that uploads the packed build): unlike a stable
 # vX.Y.Z release (a new tag every time, never reused), the "nightly" release/
 # tag is reused every run. Velopack's GitHub feed is designed to accumulate -
 # delta updates diff against whatever earlier packages are still attached to
 # the release - so that job never deletes/recreates the nightly release the
-# way earlier versions of this workflow did; it prunes each channel's
-# previous packages first instead, so the feed survives across runs without
-# growing without bound. See docs/auto-update.md.
+# way earlier versions of this workflow did; it prunes the previous nightly
+# package first instead, so the feed survives across runs without growing
+# without bound. See docs/auto-update.md.
 name: CI
 
 on:
@@ -186,22 +189,14 @@ jobs:
           done
 
   # Only nightlies and releases ship builds; PRs and pushes to main just test.
+  # Linux only (linux-x64) - Windows and macOS aren't supported targets.
   publish:
     needs: build-and-test
     if: ${{ !cancelled() && needs.build-and-test.result == 'success' && contains(fromJSON('["schedule","workflow_dispatch","release"]'), github.event_name) }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rid: linux-x64
-            os: ubuntu-latest
-          - rid: win-x64
-            os: windows-latest
-          - rid: osx-arm64
-            os: macos-latest
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.build-and-test.outputs.version }}
+      RID: linux-x64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -215,28 +210,24 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ matrix.rid }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          key: nuget-${{ runner.os }}-${{ env.RID }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
           restore-keys: |
-            nuget-${{ runner.os }}-${{ matrix.rid }}-
+            nuget-${{ runner.os }}-${{ env.RID }}-
             nuget-${{ runner.os }}-
 
       - name: Publish
         shell: bash
-        run: >
-          dotnet publish src/Stanley.App -c Release -r ${{ matrix.rid }} --self-contained
-          -o "out/stanley-$VERSION-${{ matrix.rid }}"
+        run: dotnet publish src/Stanley.App -c Release -r "$RID" --self-contained -o "out/stanley-$VERSION-$RID"
 
       - name: Smoke test (CLI)
         shell: bash
         run: |
-          exe="out/stanley-$VERSION-${{ matrix.rid }}/stanley"
-          [ -f "$exe.exe" ] && exe="$exe.exe"
+          exe="out/stanley-$VERSION-$RID/stanley"
           "$exe" --version
           "$exe" --help
 
-      # mksquashfs isn't guaranteed to be preinstalled; vpk needs it to build the Linux AppImage.
-      - name: Install squashfs-tools (Linux only)
-        if: runner.os == 'Linux'
+      # vpk needs mksquashfs to build the Linux AppImage.
+      - name: Install squashfs-tools
         run: sudo apt-get update && sudo apt-get install -y squashfs-tools
 
       - name: Install vpk
@@ -245,66 +236,53 @@ jobs:
           dotnet tool install --global vpk --version 1.2.158
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      # The OS half of the Velopack channel name (win/osx/linux); "-nightly" is
-      # appended for a schedule/workflow_dispatch run so the two tracks never
-      # cross-update into each other (Stanley.App.Updates.VelopackUpdateService
-      # computes the same name on the client side from the same two inputs).
+      # "-nightly" is appended for a schedule/workflow_dispatch run so the two
+      # tracks never cross-update into each other
+      # (Stanley.App.Updates.VelopackUpdateService computes the same name on
+      # the client side from the same input).
       - name: Determine the Velopack channel
         id: channel
         shell: bash
         run: |
-          case "${{ matrix.rid }}" in
-            win-x64) os=win ;;
-            osx-arm64) os=osx ;;
-            linux-x64) os=linux ;;
-          esac
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
-            echo "channel=$os" >> "$GITHUB_OUTPUT"
+            echo "channel=linux" >> "$GITHUB_OUTPUT"
           else
-            echo "channel=${os}-nightly" >> "$GITHUB_OUTPUT"
+            echo "channel=linux-nightly" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Pack (Velopack)
         shell: bash
         run: |
-          mainExe=stanley
-          [ "${{ runner.os }}" = "Windows" ] && mainExe=stanley.exe
           vpk pack --packId Stanley --packVersion "$VERSION" \
-            --packDir "out/stanley-$VERSION-${{ matrix.rid }}" --mainExe "$mainExe" \
+            --packDir "out/stanley-$VERSION-$RID" --mainExe stanley \
             --packTitle Stanley --channel "${{ steps.channel.outputs.channel }}" \
             --delta None --outputDir Releases
 
       - uses: actions/upload-artifact@v7
         with:
-          name: velopack-${{ matrix.rid }}
+          name: velopack
           path: Releases
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
 
+      # tar keeps the executable bit; the artifact zip around it doesn't matter.
       - name: Archive (tar.gz)
-        if: runner.os != 'Windows'
         shell: bash
-        # tar keeps the executable bit; the artifact zip around it doesn't matter.
-        run: tar -czf "stanley-$VERSION-${{ matrix.rid }}.tar.gz" -C out "stanley-$VERSION-${{ matrix.rid }}"
-
-      - name: Archive (zip)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path "out/stanley-$env:VERSION-${{ matrix.rid }}" -DestinationPath "stanley-$env:VERSION-${{ matrix.rid }}.zip"
+        run: tar -czf "stanley-$VERSION-$RID.tar.gz" -C out "stanley-$VERSION-$RID"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: stanley-${{ matrix.rid }}
-          path: stanley-${{ env.VERSION }}-${{ matrix.rid }}.*
+          name: stanley-${{ env.RID }}
+          path: stanley-${{ env.VERSION }}-${{ env.RID }}.tar.gz
           if-no-files-found: error
           retention-days: 30
           # Already compressed.
           compression-level: 0
 
-  # Packs each platform's publish output with Velopack and uploads it: a release
-  # was just published from the draft (Stable channel, its own never-reused
-  # vX.Y.Z tag), or this is a nightly build (Nightly channel, the "nightly"
+  # Uploads the Linux build's packed Velopack output: a release was just
+  # published from the draft (Stable channel, its own never-reused vX.Y.Z
+  # tag), or this is a nightly build (Nightly channel, the "nightly"
   # tag/release reused every run). See the file header and docs/auto-update.md
   # for why the nightly release is pruned in place rather than replaced.
   velopack-release:
@@ -324,9 +302,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
+          name: velopack
           path: Releases
-          pattern: velopack-*
-          merge-multiple: true
 
       - name: Install vpk
         shell: bash
@@ -334,7 +311,7 @@ jobs:
           dotnet tool install --global vpk --version 1.2.158
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      - name: Determine the tag and track
+      - name: Determine the tag, track and channel
         id: release
         shell: bash
         run: |
@@ -342,44 +319,36 @@ jobs:
             echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
             echo "pre=" >> "$GITHUB_OUTPUT"
             echo "nightly=false" >> "$GITHUB_OUTPUT"
+            echo "channel=linux" >> "$GITHUB_OUTPUT"
           else
             echo "tag=nightly" >> "$GITHUB_OUTPUT"
             echo "pre=--pre" >> "$GITHUB_OUTPUT"
             echo "nightly=true" >> "$GITHUB_OUTPUT"
+            echo "channel=linux-nightly" >> "$GITHUB_OUTPUT"
           fi
 
       # The nightly release/tag is never deleted (unlike before - see the file
-      # header), so without this its assets would grow by three packages every
+      # header), so without this its assets would grow by one package every
       # single night forever. Only ever touches the "nightly" release: a stable
       # vX.Y.Z release is a fresh tag every time, so there's nothing to prune.
-      - name: Prune yesterday's nightly packages, per channel
+      - name: Prune yesterday's nightly package
         if: steps.release.outputs.nightly == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          for os in win osx linux; do
-            channel="${os}-nightly"
-            for name in $(gh release view nightly --json assets --jq ".assets[].name" 2>/dev/null || true); do
-              case "$name" in
-                *"-$channel"*|*".$channel."*|"RELEASES-$channel")
-                  gh release delete-asset nightly "$name" --yes || true ;;
-              esac
-            done
+          for name in $(gh release view nightly --json assets --jq ".assets[].name" 2>/dev/null || true); do
+            case "$name" in
+              *-linux-nightly*|*.linux-nightly.*|RELEASES-linux-nightly)
+                gh release delete-asset nightly "$name" --yes || true ;;
+            esac
           done
 
       - name: Upload (Velopack)
         shell: bash
         run: |
-          set -euo pipefail
-          suffix=""
-          [ "${{ steps.release.outputs.nightly }}" = "true" ] && suffix="-nightly"
-          for os in win osx linux; do
-            channel="${os}${suffix}"
-            [ -f "Releases/RELEASES-$channel" ] || continue
-            vpk upload github --outputDir Releases --channel "$channel" \
-              --repoUrl "$GITHUB_SERVER_URL/$GH_REPO" --token "$GH_TOKEN" \
-              --tag "${{ steps.release.outputs.tag }}" --merge --publish ${{ steps.release.outputs.pre }}
-          done
+          vpk upload github --outputDir Releases --channel "${{ steps.release.outputs.channel }}" \
+            --repoUrl "$GITHUB_SERVER_URL/$GH_REPO" --token "$GH_TOKEN" \
+            --tag "${{ steps.release.outputs.tag }}" --merge --publish ${{ steps.release.outputs.pre }}
 
       - name: Update the nightly release notes
         if: steps.release.outputs.nightly == 'true'

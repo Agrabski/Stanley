@@ -37,23 +37,19 @@ enough) to download anything.
 | **A stable release** | *Releases* › the newest `vX.Y.Z` | When the owner publishes one |
 | **The build of one exact commit** | *Actions* › a run › *Artifacts* | Every nightly and release run; kept for 30 days |
 
-Each release has one file per platform:
+Each release has one file, Linux only — Windows and macOS aren't supported:
 
 - `stanley-<version>-linux-x64.tar.gz`
-- `stanley-<version>-win-x64.zip`
-- `stanley-<version>-osx-arm64.tar.gz`
 
-Unpack it and run `stanley` (`stanley.exe` on Windows). Nothing needs
-installing, because the .NET runtime is included. Run `stanley --version` to
-see which build you have.
+Unpack it and run `stanley`. Nothing needs installing, because the .NET
+runtime is included. Run `stanley --version` to see which build you have.
 
 Stanley can also update itself: File › Options › Updates, backed by Velopack
-(each of these releases carries a matching set of Velopack packages
-alongside the archives above). It needs your own GitHub personal access
-token, since the repository is private — see [`docs/auto-update.md`](auto-update.md)
-for how that's stored and how CI publishes the feed it reads. Without a
-token configured, or on the Windows/macOS legs before their first verified
-run (see that doc), download the file again from the same place instead.
+(each of these releases carries a matching Velopack package alongside the
+archive above). It needs your own GitHub personal access token, since the
+repository is private — see [`docs/auto-update.md`](auto-update.md) for how
+that's stored and how CI publishes the feed it reads. Without a token
+configured, download the file again from the same place instead.
 
 ## Day to day
 
@@ -78,8 +74,8 @@ run (see that doc), download the file again from the same place instead.
      release `vX.Y.Z` up to date under *Releases*. The draft lists the closed
      issues under New features, Bug fixes, Breaking changes and Other changes.
   2. Edit the notes if you like, then press **Publish release**. CI builds that
-     exact version, attaches the three platform files and merges the release
-     back into `develop`.
+     exact version, attaches the Linux archive and its Velopack package, and
+     merges the release back into `develop`.
   3. If the merge back fails (a conflict or branch protection), the run shows a
      warning. Merge `main` into `develop` by hand.
 - **Urgent fix:** open a PR straight into `main`. It gets counted in the next
