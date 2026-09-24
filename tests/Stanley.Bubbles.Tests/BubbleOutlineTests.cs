@@ -29,7 +29,7 @@ public class BubbleOutlineTests
     public void Rescale_MapsAnchorsAffinelyAndPreservesCount(BubbleStylePreset preset)
     {
         var from = new SKRect(0, 0, 200, 120);
-        var to = new SKRect(50, 30, 350, 330); // different position and size
+        var to = new SKRect(50, 30, 350, 330);
 
         var outline = new BubbleOutline(BubbleStylePresets.GenerateOutline(preset, from));
         var originalCount = outline.Anchors.Count;

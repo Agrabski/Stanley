@@ -19,7 +19,6 @@ public class ProjectJsonTests : IDisposable
         Assert.EndsWith("\n", json);
         Assert.False(json.EndsWith("\n\n"));
 
-        // Top-level keys must appear in alphabetical order: defaultPageTrim, issueIds, title.
         var defaultPageTrimIndex = json.IndexOf("\"defaultPageTrim\"", StringComparison.Ordinal);
         var issueIdsIndex = json.IndexOf("\"issueIds\"", StringComparison.Ordinal);
         var titleIndex = json.IndexOf("\"title\"", StringComparison.Ordinal);

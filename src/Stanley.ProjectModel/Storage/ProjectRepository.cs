@@ -46,15 +46,11 @@ public sealed class ProjectRepository
         return repository;
     }
 
-    // --- Series manifest ---
-
     public SeriesManifest LoadManifest() => ProjectJson.Read<SeriesManifest>(ManifestPath);
 
     public void SaveManifest(SeriesManifest manifest) => ProjectJson.Write(ManifestPath, manifest);
 
     private string ManifestPath => Path.Combine(RootDirectory, ProjectPaths.ManifestFileName);
-
-    // --- Characters ---
 
     private string CharactersDir => Path.Combine(RootDirectory, ProjectPaths.CharactersDirName);
 
@@ -72,8 +68,6 @@ public sealed class ProjectRepository
         ProjectJson.Write(Path.Combine(dir, ProjectPaths.CharacterFileName), character);
     }
 
-    // --- Character revisions ---
-
     public CharacterRevision LoadCharacterRevision(CharacterId characterId, CharacterRevisionId revisionId)
     {
         var dir = Path.Combine(CharacterDirOrThrow(characterId), ProjectPaths.RevisionsDirName);
@@ -88,8 +82,6 @@ public sealed class ProjectRepository
         var path = ProjectPaths.ResolveOrCreateEntityFilePath(dir, revision.Id, revision.Name, ProjectPaths.JsonExtension);
         ProjectJson.Write(path, revision);
     }
-
-    // --- Stickers ---
 
     private string StickersDir(CharacterId characterId) => Path.Combine(CharacterDirOrThrow(characterId), ProjectPaths.StickersDirName);
 
@@ -113,8 +105,6 @@ public sealed class ProjectRepository
     public void SaveStretchRegion(CharacterId characterId, StickerId stickerId, StretchRegion region) =>
         ProjectJson.Write(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StretchFileName), region);
 
-    // --- Poses ---
-
     private string PosesDir => Path.Combine(RootDirectory, ProjectPaths.PosesDirName);
 
     public Pose LoadPose(PoseId id)
@@ -128,8 +118,6 @@ public sealed class ProjectRepository
         var path = ProjectPaths.ResolveOrCreateEntityFilePath(PosesDir, pose.Id, pose.Name, ProjectPaths.JsonExtension);
         ProjectJson.Write(path, pose);
     }
-
-    // --- Props ---
 
     private string PropsDir => Path.Combine(RootDirectory, ProjectPaths.PropsDirName);
 
@@ -145,8 +133,6 @@ public sealed class ProjectRepository
         Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.VariantsDirName));
         ProjectJson.Write(Path.Combine(dir, ProjectPaths.PropFileName), prop);
     }
-
-    // --- Backgrounds ---
 
     private string BackgroundsDir => Path.Combine(RootDirectory, ProjectPaths.BackgroundsDirName);
 
@@ -178,8 +164,6 @@ public sealed class ProjectRepository
         var path = ProjectPaths.ResolveOrCreateEntityFilePath(dir, revision.Id, revision.Name, ProjectPaths.JsonExtension);
         ProjectJson.Write(path, revision);
     }
-
-    // --- Issues, pages, panels ---
 
     private string IssuesDir => Path.Combine(RootDirectory, ProjectPaths.IssuesDirName);
 
