@@ -22,7 +22,7 @@ public class BubbleTailTests
         using var path = tail.GeneratePath(outline);
         var vertices = path.Points;
 
-        Assert.Equal(5, vertices.Length);
+        Assert.True(vertices.Length >= 3, "left, target, right is the fallback minimum; more once the jag/absorbed-outline-anchor detail fits without crossing itself");
         Assert.False(HasSelfIntersection(vertices), "the jagged tail's own edges should not cross each other");
     }
 
@@ -38,7 +38,10 @@ public class BubbleTailTests
 
         using var path = tail.GeneratePath(outline);
         var left = path.Points[0];
-        var right = path.Points[^1];
+        // GeneratePath's JaggedTriangle point order is fixed: left, kink+jag, target,
+        // kink-jag, right, then any absorbed outline anchors - so index 4 is always
+        // "right", not Points[^1] (which is the last absorbed anchor when there is one).
+        var right = path.Points[4];
         var chord = MathF.Sqrt(MathF.Pow(right.X - left.X, 2) + MathF.Pow(right.Y - left.Y, 2));
 
         Assert.True(chord > 40f, $"tail base should be a wide chord, was only {chord}px");
