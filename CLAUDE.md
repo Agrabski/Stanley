@@ -426,6 +426,23 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 that file is the plan, not implemented yet; this section stays the short
 summary.
 
+## Builds & CI
+
+`.github/workflows/nightly.yml`:
+- **Pull requests to `main`**: Release build of `Stanley.slnx` plus every test
+  project (`dotnet test --project … -c Release --no-build`). Nothing is published.
+- **Push to `main` / manual run**: the same, then a self-contained
+  `dotnet publish` of `src/Stanley.App` for linux-x64, win-x64 and osx-arm64
+  (`stanley-<version>-<rid>.tar.gz`, or `.zip` on Windows), kept as workflow
+  artifacts for 30 days. On `main` these also replace the rolling pre-release
+  tagged `nightly` (**Releases › nightly**). The repo is private, so only
+  collaborators can download them. A linux-x64 build is about 106 MB unpacked
+  and 44 MB as a tar.gz.
+- **The version is a placeholder** (`0.0.0-nightly.<run number>`, with the short
+  SHA as build metadata in InformationalVersion) until a versioning scheme is
+  chosen. It is computed in one step ("Compute version", marked
+  `TODO(versioning)`), so changing the scheme is a one-place edit.
+
 ## Licensing constraint
 
 The project is **AGPL-3.0**. Check the licence of every dependency before adding

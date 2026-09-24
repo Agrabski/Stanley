@@ -1,0 +1,195 @@
+# Test builds for Stanley.
+#
+# - pull_request to main: build + test only.
+# - push to main / workflow_dispatch: build + test, publish self-contained
+#   builds for each platform (workflow artifacts, 30 days), and on main replace
+#   the rolling "nightly" pre-release (Releases > nightly).
+name: Nightly
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Supersede in-flight runs for the same PR; never cancel main/dispatch runs.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  AVALONIA_TELEMETRY_OPTOUT: "1"
+  # global.json only selects the test runner (no sdk.version), so pin the SDK here.
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      informational_version: ${{ steps.version.outputs.informational_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # ------------------------------------------------------------------
+      # The ONE place the build version is decided. Every later job reads
+      # needs.build-and-test.outputs.version / .informational_version.
+      # TODO(versioning): placeholder scheme until a versioning scheme is
+      # chosen (e.g. tag-driven SemVer, MinVer/GitVersion). Change only this.
+      # ------------------------------------------------------------------
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          version="0.0.0-nightly.${{ github.run_number }}"
+          sha7="${GITHUB_SHA::7}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "informational_version=$version+$sha7" >> "$GITHUB_OUTPUT"
+          echo "Version: $version+$sha7"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # No packages.lock.json in the repo, so cache on the project files.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build Stanley.slnx -c Release
+
+      - name: Test
+        shell: bash
+        run: |
+          set -euo pipefail
+          for proj in \
+            tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj \
+            tests/Stanley.App.Tests/Stanley.App.Tests.csproj \
+            tests/Stanley.Editing.Tests/Stanley.Editing.Tests.csproj \
+            tests/Stanley.EditorFramework.Tests/Stanley.EditorFramework.Tests.csproj \
+            tests/Stanley.Editors.Tests/Stanley.Editors.Tests.csproj \
+            tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj \
+            tests/Stanley.Rendering.Tests/Stanley.Rendering.Tests.csproj
+          do
+            echo "::group::$proj"
+            dotnet test --project "$proj" -c Release --no-build
+            echo "::endgroup::"
+          done
+
+  publish:
+    needs: build-and-test
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: win-x64
+            os: windows-latest
+          - rid: osx-arm64
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.build-and-test.outputs.version }}
+      INFORMATIONAL_VERSION: ${{ needs.build-and-test.outputs.informational_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ matrix.rid }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ matrix.rid }}-
+            nuget-${{ runner.os }}-
+
+      - name: Publish
+        shell: bash
+        run: >
+          dotnet publish src/Stanley.App -c Release -r ${{ matrix.rid }} --self-contained
+          -p:Version="$VERSION"
+          -p:InformationalVersion="$INFORMATIONAL_VERSION"
+          -p:IncludeSourceRevisionInInformationalVersion=false
+          -o "out/stanley-$VERSION-${{ matrix.rid }}"
+
+      - name: Smoke test (CLI)
+        shell: bash
+        run: |
+          exe="out/stanley-$VERSION-${{ matrix.rid }}/stanley"
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe" --version
+          "$exe" --help
+
+      - name: Archive (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        # tar keeps the executable bit; the artifact zip around it doesn't matter.
+        run: tar -czf "stanley-$VERSION-${{ matrix.rid }}.tar.gz" -C out "stanley-$VERSION-${{ matrix.rid }}"
+
+      - name: Archive (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "out/stanley-$env:VERSION-${{ matrix.rid }}" -DestinationPath "stanley-$env:VERSION-${{ matrix.rid }}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: stanley-${{ matrix.rid }}
+          path: stanley-${{ env.VERSION }}-${{ matrix.rid }}.*
+          if-no-files-found: error
+          retention-days: 30
+          # Already compressed.
+          compression-level: 0
+
+  nightly-release:
+    needs: [build-and-test, publish]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: nightly-release
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.build-and-test.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: stanley-*
+          merge-multiple: true
+
+      - name: Replace the rolling nightly pre-release
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la dist
+          gh release delete nightly --cleanup-tag --yes || echo "No previous nightly release."
+          # Deleting via the API can leave the tag briefly; make sure it's gone.
+          gh api -X DELETE "repos/$GH_REPO/git/refs/tags/nightly" 2>/dev/null || true
+          notes="Automated build of \`main\`, not a stable release.
+
+          - Version: \`$VERSION\`
+          - Commit: $GITHUB_SERVER_URL/$GH_REPO/commit/$GITHUB_SHA
+          - Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          gh release create nightly dist/* \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Nightly $VERSION" \
+            --notes "$notes"
