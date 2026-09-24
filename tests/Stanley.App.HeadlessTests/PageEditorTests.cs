@@ -386,7 +386,8 @@ public class PageEditorTests
     {
         var window = new MainWindow();
         window.Show();
-        GetPageCanvasControl(window);
+        var canvas = GetPageCanvasControl(window)!;
+        canvas.Focus(); // the page keeps focus under the File view, and handles Escape itself
         var file = window.RibbonBarControl.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FileButton");
 
         file.Command!.Execute(file.CommandParameter);
