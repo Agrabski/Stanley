@@ -337,7 +337,9 @@ point at a temp folder):
   build is never `IsInstalled`). Installing an update goes through the same
   Save/Don't Save/Cancel gate as Close. An automatic startup check
   (`AppSettings.AutoCheckForUpdates`, off by default) runs through
-  `IDelayScheduler`. See `docs/auto-update.md`.
+  `IDelayScheduler`. Not code-signed (fine on Linux, no SmartScreen/Gatekeeper
+  equivalent). No delta chains yet (`vpk pack --delta None` in CI) — would
+  need downloading the previous package before packing.
 - *Logging* (`Diagnostics/AppLog`): `Logs/stanley-yyyy-MM-dd.log`, append-and-close
   per line (nothing lost in a crash), pruned after 14 days, a no-op until
   `Initialize` (so the CLI and tests don't log). Records startup environment,
@@ -472,7 +474,8 @@ automatic back-merge) are plumbing and never appear in release notes.
   channel `linux-nightly`) into a `.AppImage` — the only thing uploaded, as
   the `stanley-linux-x64` workflow artifact (30 days) and, from there, to the
   rolling pre-release tagged `nightly` (**Releases › nightly**). No separate
-  plain archive. See `docs/auto-update.md`.
+  plain archive — a bare `dotnet publish` build never reports `IsInstalled`,
+  so it could never self-update anyway.
 - **Push to `main`**: build + test, and keep **one draft GitHub Release `vX.Y.Z`**
   up to date: the next version and notes (New features / Bug fixes / Breaking
   changes / Other changes, one line per closed issue) for every change PR merged
@@ -492,6 +495,14 @@ automatic back-merge) are plumbing and never appear in release notes.
   out with `fetch-depth: 0` so MinVer can see the tags. The first release is 0.1.0.
 - Stay on 0.x until the project file format is stable. A project-file format
   version (in `stanley.json`), separate from the app version, is still to do.
+
+**One-time GitHub repo setup** (done already, note in case it's ever needed
+again): `develop` set as default branch (Settings › General); `breaking`
+label created (Issues › Labels); Settings › Actions › General › Workflow
+permissions set so the workflow can write (jobs request write only where
+needed — check this first on a release/nightly `403`); branch protection on
+`develop`/`main` requiring `build-and-test`, with Actions allowed to push to
+`develop` (every release merges itself back into it).
 
 ## Licensing constraint
 

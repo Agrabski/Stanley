@@ -6,8 +6,8 @@
 # - nightly (schedule, at most once a day; or workflow_dispatch): if `develop`
 #   changed since the last nightly, build + test + publish it. Publishing packs
 #   the Linux build with Velopack (vpk) and uploads it to the rolling "nightly"
-#   release/tag on the Nightly channel - see velopack-release below and
-#   docs/auto-update.md. A manual run always builds.
+#   release/tag on the Nightly channel - see velopack-release below. A manual
+#   run always builds.
 # - push to main: build + test, and keep the draft release "vX.Y.Z" up to date
 #   (version and notes from the issues closed by the PRs main now contains, see
 #   .github/scripts/release-notes.js).
@@ -27,7 +27,7 @@
 # the release - so that job never deletes/recreates the nightly release the
 # way earlier versions of this workflow did; it prunes the previous nightly
 # package first instead, so the feed survives across runs without growing
-# without bound. See docs/auto-update.md.
+# without bound.
 name: CI
 
 on:
@@ -274,8 +274,8 @@ jobs:
   # Uploads the Linux build's packed Velopack output: a release was just
   # published from the draft (Stable channel, its own never-reused vX.Y.Z
   # tag), or this is a nightly build (Nightly channel, the "nightly"
-  # tag/release reused every run). See the file header and docs/auto-update.md
-  # for why the nightly release is pruned in place rather than replaced.
+  # tag/release reused every run). See the file header for why the nightly
+  # release is pruned in place rather than replaced.
   velopack-release:
     needs: [build-and-test, publish]
     if: ${{ !cancelled() && needs.publish.result == 'success' && contains(fromJSON('["schedule","workflow_dispatch","release"]'), github.event_name) }}
