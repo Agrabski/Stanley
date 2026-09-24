@@ -57,8 +57,7 @@ internal static class InitCommand
             var path = parseResult.GetRequiredValue(pathArgument);
             var title = parseResult.GetValue(titleOption) ?? DefaultTitle(path);
             var trim = new PageTrim(
-                parseResult.GetRequiredValue(widthOption),
-                parseResult.GetRequiredValue(heightOption),
+                new PageSize(parseResult.GetRequiredValue(widthOption), parseResult.GetRequiredValue(heightOption)),
                 parseResult.GetRequiredValue(bleedOption));
 
             if (!parseResult.GetRequiredValue(forceOption) && ProjectRepository.IsInitialized(path))

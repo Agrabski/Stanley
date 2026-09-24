@@ -16,7 +16,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Initialize_creates_the_manifest_top_level_folders_and_gitattributes()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
 
         Assert.True(File.Exists(Path.Combine(_root, "stanley.json")));
         Assert.True(File.Exists(Path.Combine(_root, ".gitattributes")));
@@ -31,7 +31,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Character_definition_revision_sticker_and_stretch_region_round_trip_and_land_on_the_documented_layout()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
 
         var characterId = CharacterId.New();
         var stickerId = StickerId.New();
@@ -79,7 +79,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Saving_again_after_a_rename_keeps_the_original_folder_slug()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
         var characterId = CharacterId.New();
         var skeleton = new Skeleton([]);
 
@@ -96,7 +96,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Pose_prop_and_background_round_trip()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
 
         var pose = new Pose(
             PoseId.New(),
@@ -127,7 +127,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Issue_page_and_panel_round_trip_and_panel_file_has_no_slug()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
 
         var characterId = CharacterId.New();
         var revisionId = CharacterRevisionId.New();
@@ -164,7 +164,7 @@ public class ProjectRepositoryTests : IDisposable
     [Fact]
     public void Loading_an_unknown_id_throws()
     {
-        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(210, 297, 3));
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
         Assert.Throws<DirectoryNotFoundException>(() => repository.LoadCharacter(CharacterId.New()));
         Assert.Throws<FileNotFoundException>(() => repository.LoadPose(PoseId.New()));
     }

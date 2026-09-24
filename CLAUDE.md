@@ -123,6 +123,13 @@ features will read and write.
   poses/rotations are `IReadOnlyList<(bone, value)>`, not
   `Dictionary<HumanoidBone, T>`, to sidestep enum-as-dictionary-key edge
   cases entirely.
+- **`PageTrim` = `PageSize` (width/height) + a bleed margin, kept as two
+  types.** Bleed is a print-production choice, not part of a paper size, so
+  it isn't baked into presets. `MetricPaperSize`/`MetricPaperSizes` give the
+  ISO 216 "A" series (A0–A6) as portrait `PageSize`s — the same
+  enum-plus-static-lookup shape as `BubbleStylePreset`/`BubbleStylePresets`.
+  No US/imperial preset table exists yet; `stanley init`'s US-comic-trim
+  default is just inlined constants in `InitCommand`.
 - **Not yet designed**: bubble persistence (`Panel.Bubbles` is a placeholder
   `IReadOnlyList<BubbleId>` — Stanley.Bubbles has no JSON format yet),
   `sticker.json`'s exact schema beyond what's implemented here (the design

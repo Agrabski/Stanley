@@ -39,8 +39,8 @@ public class InitCommandTests : IDisposable
         Assert.Equal(0, Run(path));
 
         var trim = new ProjectRepository(path).LoadManifest().DefaultPageTrim;
-        Assert.Equal(168.275, trim.WidthMm);
-        Assert.Equal(260.35, trim.HeightMm);
+        Assert.Equal(168.275, trim.Size.WidthMm);
+        Assert.Equal(260.35, trim.Size.HeightMm);
         Assert.Equal(3.175, trim.BleedMm);
     }
 
@@ -52,8 +52,8 @@ public class InitCommandTests : IDisposable
         Assert.Equal(0, Run(path, "--page-width-mm", "210", "--page-height-mm", "297", "--page-bleed-mm", "5"));
 
         var trim = new ProjectRepository(path).LoadManifest().DefaultPageTrim;
-        Assert.Equal(210, trim.WidthMm);
-        Assert.Equal(297, trim.HeightMm);
+        Assert.Equal(210, trim.Size.WidthMm);
+        Assert.Equal(297, trim.Size.HeightMm);
         Assert.Equal(5, trim.BleedMm);
     }
 
