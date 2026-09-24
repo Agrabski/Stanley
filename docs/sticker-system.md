@@ -3,10 +3,11 @@
 **Status: proposed, not implemented.** This follows the character authoring POC
 (`docs/character-authoring-poc.md`) and revises the sticker parts of
 `docs/character-and-project-plan.md`. Where the two disagree, this document wins.
-§17 lists the decisions that need the user's sign-off before implementation starts.
+§17 lists what has been decided since the first draft and what is still open.
 
 Scope: how a character gets hair, a face, clothes and accessories. That covers
-choosing, wearing, recolouring, expressions, drawing your own and importing art. It
+choosing, wearing, recolouring, patterned and textured fabrics, expressions, drawing
+your own and importing art. It
 also covers how all of that follows the body sliders, the posing and the two views
 that already exist. Named looks (revisions) are covered only as far as stickers need
 them.
@@ -66,6 +67,10 @@ and glasses work well as drawn art.
    T-shirt for a sweater keeps that colour. Drawn art tags its fills with
    `class="slot-hair"`. Each tagged shade keeps its offset from the sticker's default
    colour, so recolouring keeps the artist's shading.
+   **A colour slot can also carry a pattern and a texture** (stripes, plaid, denim,
+   knit, …; §9). They follow the same rules as the colour, so a plaid top stays plaid
+   when the T-shirt becomes a hoodie. They are laid out on the body part they cover,
+   so they move with the pose.
 6. **Expressions are variants picked by slot name.** `PoseData.Expression` (already
    stored) maps a slot to a variant (`eyes → happy`). There is one standard variant
    vocabulary (§7), so every expression preset works on every character. A sticker
@@ -75,9 +80,11 @@ and glasses work well as drawn art.
    character's folder. A later Stanley release that changes its library never repaints
    an existing comic. A library copy that is unmodified and no longer worn anywhere is
    dropped on save, so trying things on leaves no files behind.
-8. **SVG is read through Stanley's own subset parser, not an SVG library** (§6.1).
-   The subset is the contract: it guarantees that recolouring and mapping work, it is
-   AOT-clean, and it avoids a licence question (§17 Q4).
+8. **SVG is read with VectSharp.SVG (LGPL-3.0), behind one adapter** (§6.1). It is
+   a ready-made, pure-managed reader whose licence is compatible with the AGPL. The
+   better-known Svg.Skia is not, because it is built on MS-PL code.
+9. **The starter library's art is CC0**, not AGPL, so comics made with it carry no
+   licence obligations (§17).
 
 ### Cover vs. drawn clothing
 
@@ -101,7 +108,8 @@ escape hatch for garments that covers can't express.
 | **Part** | One piece of a sticker: a cover or an art layer, on one region. A T-shirt has a body part and a sleeves part. Hair has a back part and a front part. |
 | **Region** | A named piece of the generated body that parts attach to (§4.1). |
 | **Wardrobe** | Every sticker in the character's folder, worn or not. |
-| **Look** | What is worn and in which colours. The definition carries the default look. Named looks are revisions (the UI says "look", the code keeps `CharacterRevision`). |
+| **Fabric** | A colour slot's optional pattern and texture, on top of its colour (§9). |
+| **Look** | What is worn and in which colours and fabrics. The definition carries the default look. Named looks are revisions (the UI says "look", the code keeps `CharacterRevision`). |
 | **Library** | The starter stickers shipped with Stanley, copied into a character when worn. |
 | **Template** | The default body drawn as an SVG guide for one view. Art is drawn over it. |
 
@@ -159,10 +167,10 @@ side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foo
   inside the group's **attachment zones**: a disc at each joint where the group joins
   its parent (shoulders, hips, neck), computed by the rig. Shoulders and hips stay
   seamless, and an arm that crosses the chest gets a full outline.
-- The side view currently puts the character's **left** limbs nearest the viewer
-  when facing right. Anatomically, the right side would be the near one. This does
-  not matter for a bare mannequin, but it will for a watch on one wrist. Decide
-  before side-specific stickers ship (§17 Q7).
+- Facing right, the character's own **right** limbs are the near ones, as for a
+  real person (fixed alongside this design, §17). A watch on the right wrist is
+  therefore in front, side on. A mirrored placement is a mirror image, not the
+  character turned around.
 
 ## 5. Parts
 
@@ -225,31 +233,73 @@ write: `offset`, `scale`, `rotation` (in template units, applied before mapping)
 
 ## 6. Drawn art
 
-### 6.1 The SVG profile
+### 6.1 Reading SVG
 
-Stanley reads a subset of SVG with its own parser: `System.Xml.Linq` for the file,
-and `SKPath.ParseSvgPathData` for the shapes in the renderer. The parsed form
-(`StickerArt`) is plain data in ProjectModel. On save the file is **written back
-byte for byte**, never re-serialised, so Inkscape metadata survives and an unchanged
-save produces an empty diff.
+**Reader: [VectSharp.SVG](https://github.com/arklumpus/VectSharp)** (`VectSharp.SVG`
+on NuGet), wrapped by one Stanley adapter, `StickerSvg` in Stanley.Rendering.
+- **Licence**: LGPL-3.0-only. It is compatible with Stanley's AGPL-3.0: LGPLv3 is
+  GPLv3 with extra permissions, and AGPLv3 §13 allows combining with GPLv3 code.
+  Its dependencies are ExCSS (MIT), VectSharp (LGPL-3.0-only, with bundled
+  Arimo/Tinos/Cousine fonts under Apache-2.0) and System.Collections.Immutable (MIT).
+- **Why it**: it is pure managed code (netstandard2.0, no native library), so it runs
+  on Linux as is. It reads everything stickers need: `path` and the basic shapes,
+  `g`, `use`/`symbol`, transforms, inline styles and `<style>` sheets (via ExCSS),
+  linear and radial gradients, clip paths and `text`. Each drawn element comes out as
+  a drawing action tagged with the element's `id`.
+- **Rejected**:
+  - **Svg.Skia** (MIT) sits on `Svg.Custom`, a build of SVG.NET, which is MS-PL.
+    The FSF lists MS-PL as GPL-incompatible.
+  - **SharpVectors** (BSD-3) targets Windows only.
+  - **resvg/usvg** (Apache-2.0 OR MIT) has the best SVG normaliser, but it is Rust.
+    Its C API only renders and returns bounding boxes, with no access to the element
+    tree, and the .NET wrapper does the same.
+  - **Skia's own SVG module** is not exposed by SkiaSharp
+    ([mono/SkiaSharp#2689](https://github.com/mono/SkiaSharp/issues/2689), still open).
+  - **SkiaSharp.Extended.Svg** (MIT) is deprecated.
 
-- **Supported**: `svg` (viewBox), `g` (transform, class), `path`, `rect`, `circle`,
-  `ellipse`, `line`, `polyline`, `polygon`; `fill`, `stroke`, `stroke-width`,
-  `stroke-linecap`/`-linejoin`, `opacity`, `fill-opacity`, `fill-rule`, `transform`;
-  inline `style="…"` (Inkscape) and simple `.class { … }` rules in `<style>`
-  (Illustrator's default export).
-- **Not supported**: gradients, filters, masks, clip paths, `text`, embedded images
-  and CSS beyond the above. Import lists what it skipped or approximated ("2
-  gradients drawn as their first colour; 1 text skipped: convert it to a path"), so
-  nothing is dropped silently.
+How the adapter uses it:
+1. With `System.Xml.Linq`, it finds the top-level layers (`inkscape:label` or `id`),
+   skips the guide layer, reads the root's `data-stanley-*` metadata, and resolves
+   each element's `slot-*` class (its own or an ancestor's). Each drawable element
+   gets a unique `id`, which VectSharp passes through as the action's tag, and the
+   adapter maps that tag back to (layer, slot).
+2. It parses **one layer at a time** (the root, `defs` and styles plus that layer)
+   with `Parser.FromString`, so every part gets its own drawing.
+3. It walks the actions: transforms are accumulated, path segments (arcs turned into
+   curves) become `SKPath`s in viewBox space, solid and gradient brushes become Skia
+   paints (gradient stops are recoloured by slot too), and stroke width, caps, joins
+   and dashes are kept. Text arrives as text actions, which the adapter turns into
+   outlines with VectSharp's fonts. Fonts VectSharp doesn't have are substituted and
+   reported ("convert text to paths in Inkscape to keep the font").
+4. Anything it doesn't map (blur and colour-matrix filters, masks, embedded images)
+   is **reported at import** ("1 blur ignored; 1 embedded image skipped"), so
+   nothing is dropped silently.
+
+Risks, and why the adapter exists:
+- The author calls its SVG input "limited".
+- It has one maintainer. The last stable release is 1.10.2 (Dec 2024), with 1.10.3
+  alphas on master.
+- Its project declares no trimming or AOT compatibility (`IsTrimmable` /
+  `IsAotCompatible`).
+
+Slice 4 therefore starts with a spike: real Inkscape and Illustrator files, plus a
+trimmed publish with the AOT analyzers on. If VectSharp falls short, only
+`StickerSvg` changes. The fallback is the small subset parser the first draft
+proposed (System.Xml plus `SKPath.ParseSvgPathData`).
+
+Conventions that hold whichever reader is behind the adapter:
+- **The file is kept as written.** The bundle holds the file text; parsing is
+  derived and cached. On save the file is written back byte for byte, so Inkscape
+  metadata survives and an unchanged save produces an empty diff.
 - **Parts are top-level layers**, matched by `inkscape:label` or `id` to the
   sticker's part names. A file with no layers is the whole of a single-part sticker.
 - **Colour slots**: `class="slot-<name>"` on an element (or an ancestor) makes its
-  fill and stroke follow that colour slot. The colour written in the file is the
-  sticker's default for the slot. Other shades of it tagged with the same class keep
-  their lightness and saturation offset (OKLCH) and take the new hue. An artist
-  paints with ordinary colours and tags them, with no extra syntax, and the file
-  looks right in any viewer.
+  fill and stroke follow that colour slot, including its pattern and texture (§9).
+  Add `solid` (`class="slot-top solid"`) for the colour only. The colour written in
+  the file is the sticker's default for the slot. Other shades of it tagged with the
+  same class keep their lightness and saturation offset (OKLCH) and take the new
+  hue. An artist paints with ordinary colours and tags them, with no extra syntax,
+  and the file looks right in any viewer.
 - **Line weight is relative**: the template's body outline is 3 units wide. A 3-unit
   stroke in any sticker draws at the character's ink width
   (`PageRenderer.CharacterStrokeMm`), whatever size the character is on the page,
@@ -350,13 +400,103 @@ other slot name is allowed and behaves like `accessory`.
   is allowed and looks like leggings, and the Look tab's "None" removes the trousers.
 - A per-part z override stays deferred, as in the plan.
 
-## 9. Colours
+## 9. Colours and fabrics
+
+### 9.1 Colours
 
 Resolution, lowest to highest priority: the sticker's `colors` default → the
 definition's `ColorSlots` → the revision's `ColorSlotValues` → the instance's
 `ColorSlotOverrides`. The sticker's default is only a fallback. A slot is written
 into `ColorSlots` only when the user picks a colour, and from then on it survives
 outfit changes. `skin` already works this way.
+
+### 9.2 Fabrics: pattern and texture on top of the colour
+
+A colour slot's **fabric** is its colour plus an optional **pattern** and an
+optional **texture**. Each fabric is stored per slot, next to the colour, and
+resolves through the same chain as §9.1: sticker default → definition → revision →
+instance. The consequences:
+- A plaid top stays plaid when the T-shirt is swapped for a hoodie.
+- The library's *Jeans* comes with denim as its default, and a user-picked fabric
+  replaces it.
+- One panel can override a fabric (a muddy shirt) like any colour.
+
+**Patterns** are repeating motifs. The slot's colour is the ground, and the pattern
+adds one or two colours of its own.
+
+| Pattern | Generated from | Parameters |
+|---|---|---|
+| Stripes, Pinstripes | code | colour, stripe width, angle, size |
+| Checks (gingham) | code | colour, size, angle |
+| Plaid (tartan) | code | two colours, size, angle |
+| Dots | code | colour, dot size, size |
+| Chevron | code | colour, size, angle |
+| Floral, Camo, Leopard, … | CC0 SVG tiles in the library | colours via classes, size, angle |
+| Custom | the user's SVG or PNG tile (§9.4) | size, angle |
+
+The built-in patterns are code, like `BodyPresets`, so they need no files. In an SVG
+tile, the classes `slot-ground`, `slot-1` and `slot-2` take the slot's colour and the
+pattern's two colours, with the same shade-offset recolouring as §6.1. The rest of a
+tile keeps its own colours. PNG tiles are fixed-colour.
+
+**Textures** are greyscale tiles multiplied over the colour and pattern at a chosen
+strength (0 to 1), so they survive any recolour: Denim, Knit, Corduroy, Wool,
+Leather, Canvas and Felt. They are generated procedurally, using Skia's
+Perlin-noise shaders combined with fine line tiles, so they need no art files. A
+custom texture is a greyscale PNG.
+
+### 9.3 How fabrics sit on the body
+
+- **They are laid out in each part's region frame** (§4.1): the torso, each limb
+  segment, the skirt and the head. Stripes on a sleeve turn with the arm, and the
+  shirt's pattern leans with the torso. Where regions meet (shoulder, elbow) the
+  pattern breaks, as it does at the seams of real clothes.
+- **They are rigid within a frame.** They rotate and scale with the region but don't
+  bend around a belly: flat, as the art style is. A Warp-style fabric that follows
+  the outline is listed under §16.
+- **Size is relative to the character's own height**, like `ease`, so a shirt has
+  about the same number of stripes on a toddler as on an adult. `size` and `angle`
+  are per slot.
+- **Mirroring** flips fabrics with the character, since the placement is a mirror
+  image.
+- **Cover parts** fill with the fabric. **Art elements** tagged with the slot get it
+  too, unless tagged `solid`.
+
+### 9.4 Storage
+
+```csharp
+public sealed record Fabric(PatternFill? Pattern = null, TextureFill? Texture = null);
+public sealed record PatternFill(PatternKind Kind, IReadOnlyList<ColorValue> Colors,
+    double? Size = null, double? Angle = null,
+    double? Weight = null,                      // stripe width or dot size, as a fraction of one repeat
+    PatternId? Tile = null);                    // Kind == Tile: a project-level tile (patterns/)
+public sealed record TextureFill(TextureKind Kind, double? Strength = null, double? Size = null, PatternId? Tile = null);
+public enum PatternKind { Stripes, Pinstripes, Checks, Plaid, Dots, Chevron, Tile }
+public enum TextureKind { Denim, Knit, Corduroy, Wool, Leather, Canvas, Felt, Tile }
+```
+
+- `CharacterDefinition.Fabrics`, `CharacterRevision.FabricValues`,
+  `CharacterInstanceOverrides.FabricOverrides` and `Sticker.Fabrics` are all
+  `SortedDictionary<string, Fabric>?`, keyed by colour slot. Each is absent (null)
+  when there are no fabrics, so existing files read unchanged.
+- **Tiles are project-level**: `patterns/<id>-slug/pattern.json` (name, and whether
+  it is a pattern or a texture) plus `tile.svg` or `tile.png`. The SVG's viewBox is
+  one repeat. They are shared by every character, so a school's tartan is defined
+  once. Library tiles are copied in when first used and tidied on save when unused,
+  under the same rule as library stickers (§11). A slot whose tile is missing draws
+  its plain colour, and the Look tab flags it.
+
+### 9.5 Drawing
+
+Each fabric is a Skia shader, filled inside the part's path:
+- A generated pattern is an `SKPicture` tile, drawn with a repeating picture shader.
+- An SVG tile is its parsed picture. A PNG tile is an image shader.
+- The texture is multiplied on top.
+- The shader's local matrix is the region frame × size × angle.
+
+PDF export must keep vector patterns as vector tiling patterns. If Skia's PDF
+backend rasterises picture shaders, export renders them at the export resolution
+instead. Check this in the fabrics slice.
 
 ## 10. Data model
 
@@ -370,7 +510,8 @@ missing `stickers` loads as empty (the same way `LoadCharacter` fills in a missi
 public sealed record CharacterDefinition(
     CharacterId Id, string Name, BodyShape Body, Skeleton Skeleton,
     SortedDictionary<string, ColorValue> ColorSlots,
-    SortedDictionary<string, IReadOnlyList<StickerId>> Stickers);   // was StickerSlots: slot -> worn by default, bottom to top
+    SortedDictionary<string, IReadOnlyList<StickerId>> Stickers,    // was StickerSlots: slot -> worn by default, bottom to top
+    SortedDictionary<string, Fabric>? Fabrics = null);              // colour slot -> pattern/texture (§9.4)
 
 // Characters/Stickers/Sticker.cs (replaces Sticker/StickerKind; StretchRegion and stretch.json go)
 public sealed record Sticker(
@@ -379,6 +520,7 @@ public sealed record Sticker(
     SortedDictionary<string, ColorValue> Colors,
     IReadOnlyList<string> Variants,
     string? Source = null,                                  // "library:<key>" while an unmodified library copy
+    SortedDictionary<string, Fabric>? Fabrics = null,        // default fabric per colour slot (Jeans: denim)
     SortedDictionary<string, double>? BuildBreakpoints = null);
 
 public sealed record StickerPart(
@@ -413,17 +555,19 @@ public sealed record CharacterBundle(
     IReadOnlyDictionary<StickerId, StickerAsset> Wardrobe,
     IReadOnlyDictionary<CharacterRevisionId, CharacterRevision> Revisions);
 
-public sealed record StickerAsset(Sticker Sticker, IReadOnlyDictionary<(string Variant, ViewAngle View), StickerArt> Art);
+public sealed record StickerAsset(Sticker Sticker, IReadOnlyDictionary<(string Variant, ViewAngle View), ArtFile> Art);
 
-// Parsed SVG (plain data, ProjectModel). Source is the file text, written back verbatim.
-public sealed record StickerArt(string Source, Rect2D ViewBox, IReadOnlyList<ArtLayer> Layers, IReadOnlyList<string> Skipped);
-public sealed record ArtLayer(string Name, IReadOnlyList<ArtPath> Paths);
-public sealed record ArtPath(string Data, ArtPaint? Fill, ArtPaint? Stroke, double StrokeWidth, double Opacity, bool EvenOdd);
-public sealed record ArtPaint(ColorValue Color, string? Slot);
+/// A sticker's art exactly as on disk (SVG text, or PNG bytes), written back verbatim on save.
+public sealed record ArtFile(string? Svg, byte[]? Png);
 ```
 
-`ICharacterCatalog.Characters` becomes `CharacterId → CharacterBundle`, and the page
-renderer's character dictionary does the same.
+- Parsing is derived, so it lives in Stanley.Rendering. `StickerSvg.Parse(ArtFile)`
+  returns the layers as Skia paths and paints, with each element's slot and a report
+  of anything skipped. The result is cached by file content.
+- Custom pattern and texture tiles (`patterns/`) are loaded into the open comic next
+  to the characters. They are project-level, not part of any one bundle.
+- `ICharacterCatalog.Characters` becomes `CharacterId → CharacterBundle`, and the page
+  renderer's character dictionary does the same.
 
 ## 11. Files on disk
 
@@ -443,9 +587,13 @@ characters/<id>-alice/
       variants/neutral/front.svg   variants/neutral/profile.svg
       variants/happy/front.svg     variants/happy/profile.svg
       …
+patterns/                        # project-level, shared by every character
+  <id>-school-tartan/
+    pattern.json                 # name; pattern or texture
+    tile.svg                     # one repeat (or tile.png, LFS)
 ```
 
-- This is the plan's layout without `stretch.json`.
+- This is the plan's layout without `stretch.json`, plus `patterns/`.
 - `ProjectRepository` gains `ListStickers`, `DeleteSticker` and `Read/WriteStickerArt`.
   Paths still come only from `ProjectPaths`.
 - `ComicProject.Save` writes each bundle and deletes the stickers removed since the
@@ -463,7 +611,7 @@ issue's revision for that character and one instance, and returns a
 1. **Body**: definition → revision → instance (the POC's chain, unchanged).
 2. **Worn stickers per slot**: definition → revision → instance override. They are
    then ordered by slot z-order and stacking order.
-3. **Colours** (§9) and, for each sticker, a **variant** (§7).
+3. **Colours and fabrics** (§9) and, for each sticker, a **variant** (§7).
 4. The **view** and **pose** come from `instance.Pose`.
 
 The renderer (`ICharacterRenderer` now takes a `ResolvedCharacter`) then:
@@ -490,19 +638,28 @@ Ribbon groups, left to right:
 
 | Group | Contents |
 |---|---|
-| Look | *Look ▾* (Default or a named look; slice 6) |
+| Look | *Look ▾* (Default or a named look; slice 7) |
 | Hair | gallery |
 | Face | Eyes, Brows, Mouth, Nose, Facial hair galleries; *Preview expression ▾* |
 | Clothes | Top, Outer, Bottom, Shoes galleries |
 | Accessories | Hat, Glasses, Other galleries |
-| Colours | a swatch dropdown for each colour slot in use (Skin, Hair, Eyes, Top, …) |
+| Colours | a swatch dropdown for each colour slot in use (Skin, Hair, Eyes, Top, …), with the slot's fabric |
 | Art | *Draw your own…*, *Import…* |
 
 - Each gallery starts with **None**, then this character's wardrobe, then the
   library. Every item is **previewed on this character**, the way the Pose gallery
   previews on the selected character. Clicking wears the item, as one undo step.
 - **Colours** shows only the colour slots the worn stickers use. Each is a swatch
-  dropdown like Skin.
+  dropdown like Skin. For a clothing slot, the same dropdown continues below the
+  colours:
+  - a **Pattern** gallery: None, Stripes, Checks, Plaid, Dots, Chevron, the library
+    tiles, and *Custom…*, each previewed on this character in its current colour.
+  - the pattern's own colour swatches.
+  - a **Texture** gallery: None, Denim, Knit, Corduroy, …
+  - *Size*, *Angle* and *Strength* sliders, one undo step per drag.
+
+  The swatch button itself shows the fabric, so a plaid top reads as plaid on the
+  ribbon.
 - Clicking a worn sticker on the character in the pane selects it and shows a
   contextual **Sticker** tab:
   - covers: *Length*, *Sleeves* and *Fit* sliders (the parts' `to` and `ease`, one
@@ -539,14 +696,16 @@ Ribbon groups, left to right:
 
 | Project | New / changed |
 |---|---|
-| ProjectModel | `Sticker`/`StickerPart`/… (§10), `StickerSlots`, `CharacterDefinition.Stickers`, `CharacterBundle`, `StickerArt` + `StickerSvg.Parse`, `BodyFigure` groups/regions/inflate, `ProjectRepository` sticker listing/art I/O; drop `StickerKind`, `StretchRegion`, `StickerSlotDefinition` |
-| Rendering | `CharacterResolver`, `ResolvedCharacter`, `RegionMapping` (Pin/Warp), `StickerRenderer` (cover/art paths, recolour, cut/clip), group painting + attachment-zone ink in the renderer (the mannequin becomes "a figure with no stickers") |
-| Editing | `ExpressionPresets`, `LookEditing` (wear/take off/stack/recolour, per slot), `StickerFitting` (cover sliders, art offset/scale/rotation) |
-| Editors | Look tab, contextual Sticker tab, galleries, colour swatches, Expression gallery on the page's Character tab, `CharacterEditorViewModel : EditorViewModel<CharacterBundle>`, `ComicProject` bundle load/save/prune/tidy, external-edit file watch |
-| Library (new, Avalonia-free) | `Stanley.StickerLibrary`: the starter stickers as embedded resources in the project format itself, plus `StickerTemplates` |
+| ProjectModel | `Sticker`/`StickerPart`/… (§10), `Fabric`/`PatternFill`/`TextureFill` (§9.4), `PatternId`, `StickerSlots`, `CharacterDefinition.Stickers`/`Fabrics`, `CharacterBundle`, `ArtFile`, `BodyFigure` groups/regions/inflate, `ProjectRepository` sticker and pattern listing, art/tile I/O; drop `StickerKind`, `StretchRegion`, `StickerSlotDefinition` |
+| Rendering | `StickerSvg` (the one adapter over VectSharp.SVG, §6.1), `CharacterResolver`, `ResolvedCharacter`, `RegionMapping` (Pin/Warp), `StickerRenderer` (cover/art paths, recolour, cut/clip), `FabricShaders` (generated patterns, procedural textures, tiles), group painting + attachment-zone ink in the renderer (the mannequin becomes "a figure with no stickers") |
+| Editing | `ExpressionPresets`, `LookEditing` (wear/take off/stack/recolour/set fabric, per slot), `StickerFitting` (cover sliders, art offset/scale/rotation) |
+| Editors | Look tab, contextual Sticker tab, galleries, colour and fabric dropdowns, Expression gallery on the page's Character tab, `CharacterEditorViewModel : EditorViewModel<CharacterBundle>`, `ComicProject` bundle and pattern load/save/prune/tidy, external-edit file watch |
+| Library (new, Avalonia-free) | `Stanley.StickerLibrary`: the starter stickers and pattern tiles as embedded resources in the project format itself, plus `StickerTemplates`. Its art is **CC0-1.0** (its own `LICENSE` file). Art contributed to it must be original or already CC0 |
 
 ## 15. Delivery slices (each a PR, each green on its own)
 
+0. **Side view faces the right way.** Done alongside this design: facing right, the
+   right limbs are the near ones, and the side-on presets are unchanged.
 1. **Layered figure.** `BodyFigure` groups, regions and inflate. The renderer paints
    groups with attachment-zone ink. No stickers yet. Visible: arms crossing the body
    now read. Tests: region frames (template regions map onto themselves for the
@@ -556,57 +715,66 @@ Ribbon groups, left to right:
    rendering, the Look tab with the clothing galleries and colours. The starter
    garments need no art: T-shirt, long sleeve, tank top, shirt, hoodie, jacket,
    dress, skirt, shorts, trousers, shoes, boots. V-necks and open fronts (cut art)
-   follow in slice 3. Tests: JSON shape, the
-   fallback chain, a pixel probe for chest = `top` and bare forearm = skin, a sleeve
-   bending with the elbow, a wear = one undo step, save/open/prune/tidy.
-3. **Drawn stickers.** The SVG profile parser, templates, Pin/Warp, recolouring, view
-   fallback. Starter hair (six styles) and faces (three eye/brow/mouth sets, neutral
-   only), front and side. Tests: the parser on real Inkscape and Illustrator files,
-   the skipped-element report, the recolour shade offset, Warp keeping the template's
+   follow in slice 4. Tests: JSON shape, the fallback chain, a pixel probe for
+   chest = `top` and bare forearm = skin, a sleeve bending with the elbow, a wear =
+   one undo step, save/open/prune/tidy.
+3. **Fabrics.** `Fabric` storage and resolution, the generated patterns and
+   procedural textures, `FabricShaders`, and the fabric part of the colour dropdowns.
+   Jeans come in denim. No tiles yet. Tests: stripes turn with a posed sleeve (pixel
+   probes along the arm), a fabric survives swapping the garment, a texture keeps its
+   recolour, and PDF export keeps patterns (vector, or rasterised at export
+   resolution).
+4. **Drawn stickers.** It starts with the VectSharp.SVG spike (real Inkscape and
+   Illustrator files; a trimmed publish with the AOT analyzers on). Then the
+   `StickerSvg` adapter, templates, Pin/Warp, recolouring and view fallback. Then
+   the starter hair (six styles), faces (three eye/brow/mouth sets, neutral only),
+   front and side, and the library's SVG pattern tiles, plus *Custom…* pattern and
+   texture tiles. Tests: layer and slot mapping through the adapter, the
+   skipped-feature report, the recolour shade offset, Warp keeping the template's
    outline on the character's outline, relative stroke width, verbatim save.
-4. **Expressions.** Variant selection, `ExpressionPresets`, the Expression gallery on
+5. **Expressions.** Variant selection, `ExpressionPresets`, the Expression gallery on
    the page, and the starter face variants. Tests: preset → variant per slot, missing
    variant → neutral.
-5. **Draw your own and import.** Template export, the external edit round trip, and
+6. **Draw your own and import.** Template export, the external edit round trip, and
    arbitrary SVG/PNG placement handles. Tests: a template file imports with no
    questions, a re-import is one history entry.
-6. **Looks.** Named revisions in the Look tab, the issue default, the per-panel look,
-   and put on/take off for one panel only.
+7. **Looks.** Named revisions in the Look tab, the issue default, the per-panel look,
+   put on/take off for one panel only, and per-panel fabric overrides.
 
-Slices 1 and 2 give a dressed character with no art pipeline at all. Slice 3 is the
-first that needs SVG.
+Slices 1 to 3 give a dressed character, patterns and textures included, with no
+art pipeline at all. Slice 4 is the first that needs SVG.
 
 ## 16. Later
 
-Build breakpoints (§7), PNG tint masks and warped rasters, three-quarter art (covers
+Build breakpoints (§7), PNG tint masks and warped rasters, fabrics that bend with
+the outline (Warp) or stay fixed to the page (a printed-paper look), three-quarter art (covers
 get it free once the rig does), per-part z overrides, arms behind the body, "turn
 around" as distinct from mirror, gaze (the VRM `LeftEye`/`RightEye` bones moving the
 pupils), a talking mouth when a bubble's tail points at the character (after
 character-bound tails), a user library shared across projects, flatten to editable
 layers, and `stanley sticker import` on the CLI.
 
-## 17. Open questions (please confirm)
+## 17. Decisions and open questions
 
+Decided (answers to the first draft):
+- **Side view: fixed.** Facing right, the character's right side is near (slice 0).
+- **Clothing gets patterns and textures**: fabrics (§9.2 to §9.5, slice 3).
+- **Starter library art is CC0-1.0.** Only the art is CC0; the code stays AGPL. It
+  gets its own `LICENSE` in `Stanley.StickerLibrary`. Library contributions must be
+  original or already CC0.
+- **SVG is read with a ready-made, AGPL-compatible reader: VectSharp.SVG**
+  (LGPL-3.0-only; §6.1 has the candidates and why the others were ruled out).
+
+Still open. Each has a recommendation, which the design assumes until told otherwise:
 1. **Covers as the default for clothing**, instead of drawn per-bone art as the plan
    had. *Recommended*: yes (§1, §2). This is the one real change of direction.
-2. **Licence for the starter library art.** Worn stickers are copied into users'
-   comics. If the art were AGPL like the code, every comic using it would arguably
-   contain AGPL material. *Recommended*: release the library art (not the code) as
-   **CC0**, so comics made with it carry no obligations.
-3. **Size of the starter library for V1.** *Recommended*: the garments in slice 2,
-   about six hairstyles, and three face sets with the full expression vocabulary, in
-   front and side, all simple flat vector art in the POC's style.
-4. **SVG rendering: our own subset, or Svg.Skia?** Svg.Skia is MIT, but it is built
-   on a fork of SVG.NET, which is MS-PL. The FSF lists MS-PL as GPL-incompatible, so
-   it is a risky dependency for an AGPL app (re-check this at whatever version we'd
-   pin). It is also reflection-heavy for NativeAOT. *Recommended*: our own subset
-   (§6.1).
-5. **Drop `stretch.json` and 9-slice** in favour of Warp, and leave build breakpoints
+2. **Size of the starter library for V1.** *Recommended*: the garments in slice 2,
+   the built-in patterns and textures, about six hairstyles, a handful of SVG pattern
+   tiles, and three face sets with the full expression vocabulary, in front and side,
+   all simple flat vector art in the POC's style.
+3. **Drop `stretch.json` and 9-slice** in favour of Warp, and leave build breakpoints
    unbuilt until a real case needs them. *Recommended*: yes.
-6. **Tidy unused library copies on save** (§11), rather than keeping everything ever
-   clicked. *Recommended*: yes.
-7. **Which side faces the viewer in the side view.** The rig shows the left side of
-   a right-facing character; anatomically it's the right. Fix it in slice 1 (it
-   touches the rig, posing and mirror pose), or keep it and treat Flip as a pure
-   mirror image? *Recommended*: fix it in slice 1, while the only thing that notices
-   is an unclothed mannequin.
+4. **Tidy unused library copies on save** (stickers and pattern tiles, §11), rather
+   than keeping everything ever clicked. *Recommended*: yes.
+5. **Fabric size relative to the character** (a toddler's shirt has as many stripes
+   as an adult's) rather than absolute. *Recommended*: relative (§9.3).

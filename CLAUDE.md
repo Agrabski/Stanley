@@ -475,9 +475,12 @@ implemented, and it wins over the plan where they differ): stickers are made
 of parts that either *cover* a body region (generated from the rig, so clothing
 follows every slider, pose and view with no art) or place SVG *art* drawn over
 a region template (Pin = rigid, Warp = hugs the outline); the figure draws in
-depth groups; colours are character-owned slots referenced by name; expressions
-are per-slot variants from a standard vocabulary. Its §17 lists the decisions
-awaiting sign-off.
+depth groups; colours are character-owned slots referenced by name, and each can
+carry a **fabric** (a generated or tiled pattern plus a procedural or tiled
+texture, laid out per body region so it moves with the pose); expressions are
+per-slot variants from a standard vocabulary. SVG is read with **VectSharp.SVG**
+(LGPL-3.0) behind one adapter (`StickerSvg`). Starter library art is **CC0**. Its
+§17 lists what's decided and what's still open.
 
 ### Characters (POC, implemented)
 
@@ -617,6 +620,11 @@ needed — check this first on a release/nightly `403`); branch protection on
 ## Licensing constraint
 
 The project is **AGPL-3.0**. Check the licence of every dependency before adding
-it. Some character-animation runtimes need proprietary or per-user licences (for
-example the Spine runtimes and the Live2D Cubism SDK). Prefer open formats
-(glTF, VRM, DragonBones, SVG) and libraries compatible with the AGPL.
+it — including its transitive dependencies (e.g. Svg.Skia is MIT but sits on
+MS-PL SVG.NET code, which the FSF lists as GPL-incompatible; VectSharp.SVG,
+LGPL-3.0, is the chosen SVG reader instead). The starter sticker/pattern library's
+*art* is **CC0-1.0**, not AGPL, so comics made with it carry no obligations —
+only add original or already-CC0 art to it. Some character-animation runtimes
+need proprietary or per-user licences (for example the Spine runtimes and the
+Live2D Cubism SDK). Prefer open formats (glTF, VRM, DragonBones, SVG) and
+libraries compatible with the AGPL.
