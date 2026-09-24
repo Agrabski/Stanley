@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Stanley.Cli\Stanley.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Stanley.App\Stanley.App.csproj" />
   </ItemGroup>
 
 </Project>

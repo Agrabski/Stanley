@@ -2,7 +2,7 @@ using System.CommandLine;
 using Stanley.ProjectModel;
 using Stanley.ProjectModel.Storage;
 
-namespace Stanley.Cli.Commands;
+namespace Stanley.App.Commands;
 
 /// <summary>The <c>stanley init &lt;path&gt;</c> command: creates a brand-new, empty Stanley project.</summary>
 internal static class InitCommand

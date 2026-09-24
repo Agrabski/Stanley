@@ -1,11 +1,11 @@
-using Stanley.Cli.Commands;
+using Stanley.App.Commands;
 using Stanley.ProjectModel.Storage;
 
-namespace Stanley.Cli.Tests;
+namespace Stanley.App.Tests;
 
 public class InitCommandTests : IDisposable
 {
-    private readonly string _root = Directory.CreateTempSubdirectory("stanley-cli-tests").FullName;
+    private readonly string _root = Directory.CreateTempSubdirectory("stanley-init-command-tests").FullName;
 
     private static int Run(params string[] args) => InitCommand.Build().Parse(args).Invoke();
 
