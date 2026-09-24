@@ -59,9 +59,9 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageBounds = pageBounds;
         PropertyChanged += OnSelfPropertyChanged;
 
-        DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelection);
-        SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel);
-        SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel);
+        DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelectedBubble || HasSelectedCharacter || (HasSelectedPanel && !Working.LayoutLocked));
+        SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel && !Working.LayoutLocked);
+        SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel && !Working.LayoutLocked);
         AddBubbleCommand = new RelayCommand(AddBubbleToSelectedPanel, () => Working.PanelOrder.Count > 0);
         EditTextCommand = new RelayCommand(() => RequestTextEdit(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
         AddTailCommand = new RelayCommand(() => AddBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
@@ -103,7 +103,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             if (preset != null)
                 ApplyLayoutPreset(preset);
-        });
+        }, _ => !Working.LayoutLocked);
         ZoomInCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomIn));
         ZoomOutCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomOut));
         FitPageCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.FitPage));
@@ -205,6 +205,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         DeleteSelectionCommand.NotifyCanExecuteChanged();
         SplitColumnsCommand.NotifyCanExecuteChanged();
         SplitRowsCommand.NotifyCanExecuteChanged();
+        ApplyLayoutCommand.NotifyCanExecuteChanged();
         AddBubbleCommand.NotifyCanExecuteChanged();
         InsertBubbleCommand.NotifyCanExecuteChanged();
         EditTextCommand.NotifyCanExecuteChanged();
@@ -359,6 +360,24 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         set => SetProperty(ref _snapEnabled, value);
     }
 
+    /// <summary>
+    /// A Word-style "protect this layout" switch: while true, panels on this page can't be
+    /// moved, resized, split, deleted, drawn or re-tiled from a layout preset. Bubbles and
+    /// characters are unaffected. Persisted per page and undoable, like the panel content
+    /// itself - so it reads/writes through <see cref="EditorViewModel{T}.Working"/> rather
+    /// than being a plain session-only flag.
+    /// </summary>
+    public bool IsLayoutLocked
+    {
+        get => Working.LayoutLocked;
+        set
+        {
+            if (value == Working.LayoutLocked)
+                return;
+            Apply(EditResult<PageDocument>.Success(Working with { LayoutLocked = value }));
+        }
+    }
+
     /// <summary>The lines the current drag snapped to, for the canvas to draw. Empty outside a snapping drag.</summary>
     public IReadOnlyList<SnapGuide> ActiveGuides
     {
@@ -480,6 +499,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 Select(id);
         }
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
+        OnPropertyChanged(nameof(IsLayoutLocked));
+        OnPropertyChanged(nameof(Hint));
         RaiseCharacterViewChanged();
         RaiseBubbleDerivedChanged();
         NotifyCommands();
@@ -526,6 +547,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
+        _ when IsPanelContext && Working.LayoutLocked => "Layout is locked - unlock it on the Layout tab to move, resize, split or delete panels.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
     };
@@ -557,7 +579,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     // ---------------------------------------------------------------- panel layout
 
-    public void BeginResizePanel(PanelId id) => BeginGesture();
+    public void BeginResizePanel(PanelId id)
+    {
+        if (Working.LayoutLocked)
+            return;
+        BeginGesture();
+    }
 
     public void UpdateResizePanel(PanelId id, Rect2D newBounds) =>
         UpdateGesture(EditPanel(Committed, id, p => PanelLayoutEditing.Resize(p, newBounds, PageBounds)));
@@ -575,7 +602,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         UpdateResizePanel(id, bounds);
     }
 
-    public void BeginMovePanel(PanelId id) => BeginGesture();
+    public void BeginMovePanel(PanelId id)
+    {
+        if (Working.LayoutLocked)
+            return;
+        BeginGesture();
+    }
 
     public void UpdateMovePanel(PanelId id, double dx, double dy, double snapTolerance)
     {
@@ -594,7 +626,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         UpdateGesture(EditPanel(Committed, id, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
     }
 
-    public void BeginDragBoundary(PanelBoundaryDrag boundary) => BeginGesture();
+    public void BeginDragBoundary(PanelBoundaryDrag boundary)
+    {
+        if (Working.LayoutLocked)
+            return;
+        BeginGesture();
+    }
 
     public void UpdateDragBoundary(PanelBoundaryDrag boundary, double newPosition)
     {
@@ -630,6 +667,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Starts drawing a brand-new panel; <see cref="UpdateCreatePanel"/> sizes it, commit adds it and selects it.</summary>
     public void BeginCreatePanel()
     {
+        if (Working.LayoutLocked)
+            return;
         _pendingPanelId = PanelId.New();
         BeginGesture();
     }
@@ -653,14 +692,14 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         }
 
         var panels = new Dictionary<PanelId, Panel>(Committed.Panels) { [_pendingPanelId] = validated.Value };
-        UpdateGesture(EditResult<PageDocument>.Success(new PageDocument(ReadingOrder(panels), panels)));
+        UpdateGesture(EditResult<PageDocument>.Success(new PageDocument(ReadingOrder(panels), panels, Committed.LayoutLocked)));
     }
 
     /// <summary>Commits a panel drawn with <see cref="BeginCreatePanel"/> and selects it; returns false if it ended up too small to keep.</summary>
     public bool CommitCreatePanel()
     {
         EndGesture(commit: true);
-        if (!Working.Panels.ContainsKey(_pendingPanelId))
+        if (Working.LayoutLocked || !Working.Panels.ContainsKey(_pendingPanelId))
             return false;
         Select(_pendingPanelId);
         return true;
@@ -668,6 +707,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public void SplitPanel(PanelId id, BoundaryOrientation orientation, double fraction)
     {
+        if (Working.LayoutLocked)
+        {
+            Apply(EditResult<PageDocument>.Failure("Layout is locked."));
+            return;
+        }
+
         if (!Working.Panels.TryGetValue(id, out var panel))
         {
             Apply(EditResult<PageDocument>.Failure($"Unknown panel '{id}'."));
@@ -696,18 +741,18 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         newPanels[first.Id] = first;
         newPanels[second.Id] = second;
 
-        Apply(EditResult<PageDocument>.Success(new PageDocument(newOrder, newPanels)));
+        Apply(EditResult<PageDocument>.Success(new PageDocument(newOrder, newPanels, Working.LayoutLocked)));
         if (_selectedPanelId is { } selected && selected.Equals(id))
             Select(first.Id);
     }
 
     public void DeletePanel(PanelId id)
     {
-        if (!Working.Panels.ContainsKey(id))
+        if (Working.LayoutLocked || !Working.Panels.ContainsKey(id))
             return;
 
         var panels = Working.Panels.Where(kvp => !kvp.Key.Equals(id)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-        Apply(EditResult<PageDocument>.Success(new PageDocument(Working.PanelOrder.Where(p => !p.Equals(id)).ToList(), panels)));
+        Apply(EditResult<PageDocument>.Success(new PageDocument(Working.PanelOrder.Where(p => !p.Equals(id)).ToList(), panels, Working.LayoutLocked)));
     }
 
     /// <summary>
@@ -717,6 +762,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// </summary>
     public void ApplyLayoutPreset(PanelLayoutPreset preset)
     {
+        if (Working.LayoutLocked)
+        {
+            Apply(EditResult<PageDocument>.Failure("Layout is locked."));
+            return;
+        }
+
         var layout = PanelLayoutEditing.GridLayout(PageBounds, Grid, preset.ColumnsPerRow);
         if (!layout.IsValid)
         {
@@ -749,7 +800,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             order.Add(panel.Id);
         }
 
-        Apply(EditResult<PageDocument>.Success(new PageDocument(order, panels)));
+        Apply(EditResult<PageDocument>.Success(new PageDocument(order, panels, Working.LayoutLocked)));
     }
 
     /// <summary>Western reading order: rows top to bottom (panels whose tops are within a few mm share a row), left to right within a row.</summary>
@@ -854,7 +905,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             Apply(EditBubbleInPanel(Working, panelId, _selectedBubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy)));
         else if (HasSelectedCharacter)
             Apply(EditCharacterInPanel(Working, panelId, _selectedCharacterIndex, c => CharacterPlacementEditing.Move(c, dx, dy)));
-        else
+        else if (!Working.LayoutLocked)
             Apply(EditPanel(Working, panelId, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
     }
 

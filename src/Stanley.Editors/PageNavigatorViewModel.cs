@@ -166,7 +166,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
         var newIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToDictionary(id => id, _ => PanelId.New());
         var copy = new PageDocument(
             newIds.Values.ToList(),
-            newIds.ToDictionary(kvp => kvp.Value, kvp => document.Panels[kvp.Key] with { Id = kvp.Value }));
+            newIds.ToDictionary(kvp => kvp.Value, kvp => document.Panels[kvp.Key] with { Id = kvp.Value }),
+            document.LayoutLocked);
 
         var id = PageId.New();
         var item = new PageItem(id, CreateEditor(id, source.Editor.PageBounds, copy, source.Editor));

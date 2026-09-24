@@ -103,7 +103,7 @@ public sealed class ComicProject
         {
             var page = repository.LoadPage(issue.Id, pageId);
             var panels = page.PanelIds.ToDictionary(id => id, id => repository.LoadPanel(issue.Id, page.Id, id));
-            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels)));
+            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels, page.LayoutLocked)));
             records[page.Id] = page;
             saved[page.Id] = [.. page.PanelIds];
         }
@@ -211,7 +211,7 @@ public sealed class ComicProject
             var (id, document) = pages[i];
             var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
             var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, $"Page {i + 1}", TrimOverride: null, []))
-                with { PanelIds = panelIds };
+                with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked };
             repository.SavePage(issue.Id, record);
             foreach (var panelId in panelIds)
                 repository.SavePanel(issue.Id, id, document.Panels[panelId]);
