@@ -16,9 +16,9 @@ namespace Stanley.Rendering;
 public interface ICharacterRenderer
 {
     /// <summary>The character's whole outline in page millimetres, seen from <paramref name="angle"/> - what a click hit-tests against. The caller disposes it.</summary>
-    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null);
+    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null);
 
-    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null);
+    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null);
 }
 
 public static class CharacterRenderers
@@ -30,7 +30,7 @@ public static class CharacterRenderers
     {
         if (characters != null && characters.TryGetValue(instance.CharacterId, out var character))
         {
-            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose.BoneRotations);
+            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose);
             return;
         }
 
@@ -66,7 +66,7 @@ public sealed class MannequinRenderer : ICharacterRenderer
     /// <summary>A figure's outlines in figure space: the body, the near arm and foot drawn over it (side view; empty otherwise), and the two unioned - the whole outline, for hit-testing.</summary>
     public sealed record FigurePaths(SKPath Body, SKPath Near, SKPath Outline);
 
-    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null)
+    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null)
     {
         var matrix = ToPage(placement);
         using var builder = new SKPathBuilder();
@@ -77,7 +77,7 @@ public sealed class MannequinRenderer : ICharacterRenderer
         return builder.Detach();
     }
 
-    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null)
+    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null)
     {
         var matrix = ToPage(placement);
         SKPath body, near;
@@ -110,10 +110,10 @@ public sealed class MannequinRenderer : ICharacterRenderer
         }
     }
 
-    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle, IReadOnlyList<BoneRotation>? pose)
+    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle, PoseData? pose)
     {
         var cache = _figures.GetValue(character, _ => []);
-        var key = angle + ":" + string.Join(";", (pose ?? []).Select(r => $"{r.Bone}={r.Degrees:R}"));
+        var key = angle + ":" + pose?.HipsShift + ":" + string.Join(";", (pose?.BoneRotations ?? []).Select(r => $"{r.Bone}={r.Degrees:R}"));
         if (!cache.TryGetValue(key, out var paths))
         {
             if (cache.Count >= MaxPosesPerCharacter)
@@ -236,7 +236,11 @@ public sealed class MannequinRenderer : ICharacterRenderer
         builder.AddOval(new SKRect(
             (float)(e.Center.X - e.RadiusX), (float)(e.Center.Y - e.RadiusY),
             (float)(e.Center.X + e.RadiusX), (float)(e.Center.Y + e.RadiusY)));
-        return builder.Detach();
+        var oval = builder.Detach();
+        if (e.RotationDegrees == 0)
+            return oval;
+        using (oval)
+            return Transformed(oval, SKMatrix.CreateRotationDegrees((float)e.RotationDegrees, (float)e.Center.X, (float)e.Center.Y));
     }
 
     private static SKColor ToSk(ColorValue color) =>

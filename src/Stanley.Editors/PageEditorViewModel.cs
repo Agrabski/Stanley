@@ -84,6 +84,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         BiggerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1.1), () => HasSelectedCharacter);
         SmallerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1 / 1.1), () => HasSelectedCharacter);
         MatchCharacterSizeCommand = new RelayCommand(() => MatchCharacterSize(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterHasOddScale);
+        ApplyPosePresetCommand = new RelayCommand<PosePresetChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                ApplyPosePreset(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
+        });
+        MirrorPoseCommand = new RelayCommand(() => MirrorCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
         DrawPanelCommand = new RelayCommand(() => Tool = PageEditorTool.Panel);
@@ -518,7 +524,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
-        _ when HasSelectedCharacter => "Drag a hand or foot (the dots) to pose · drag the body to move · a top corner resizes the panel's characters together (Shift: just this one) · S side, F front.",
+        _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
@@ -1027,6 +1033,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(CharacterChoices));
         OnPropertyChanged(nameof(HasCharacterChoices));
         OnPropertyChanged(nameof(SelectedCharacterName));
+        OnPropertyChanged(nameof(PoseChoices));
         NotifyCommands();
     }
 
@@ -1151,6 +1158,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     // ---------------------------------------------------------------- posing (drag a hand or foot)
 
     private int _bendSign = 1;
+    private (CharacterId, ViewAngle) _poseChoicesKey;
 
     /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
@@ -1167,6 +1175,60 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
     }
 
+    /// <summary>The hips, chest and head handles of a placed character, on the page.</summary>
+    public IReadOnlyList<(TrunkPart Part, Point2D Point)> TrunkHandles(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? Enum.GetValues<TrunkPart>().Select(part => (part, CharacterPosing.TrunkPoint(character, instance, part))).ToList()
+            : [];
+
+    public void BeginPoseTrunk(PanelId panelId, int index, TrunkPart part) => BeginGesture();
+
+    /// <summary>
+    /// Drags a trunk handle, computed from the drag's starting pose: the hips by
+    /// (<paramref name="pointer"/> - <paramref name="pressedAt"/>) with the feet staying
+    /// planted; the chest and head towards <paramref name="pointer"/> (lean, tilt).
+    /// </summary>
+    public void UpdatePoseTrunk(PanelId panelId, int index, TrunkPart part, Point2D pointer, Point2D pressedAt)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => part switch
+        {
+            TrunkPart.Hips => CharacterPosing.MoveHips(character, c, new Point2D(pointer.X - pressedAt.X, pointer.Y - pressedAt.Y)),
+            TrunkPart.Chest => CharacterPosing.Lean(character, c, pointer),
+            _ => CharacterPosing.TiltHead(character, c, pointer)
+        }));
+    }
+
+    public void MirrorCharacterPose(PanelId panelId, int index) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, CharacterPosing.MirrorPose));
+
+    /// <summary>Poses the character as <paramref name="preset"/> (turning it side on if the preset needs that), in one undo step.</summary>
+    public void ApplyPosePreset(PanelId panelId, int index, PosePresetDefinition preset)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => PosePresets.Apply(character, c, preset)));
+        RaiseCharacterViewChanged();
+    }
+
+    /// <summary>The Character tab's pose gallery: every preset, previewed on the selected character.</summary>
+    public IReadOnlyList<PosePresetChoice> PoseChoices
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+                return [];
+            var standing = new CharacterInstance(character.Id, new CharacterPlacement(default, 1, false), null,
+                new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>()), null);
+            return PosePresets.All
+                .Select(p => new PosePresetChoice(p, character, PosePresets.Apply(character, standing, p).Pose))
+                .ToList();
+        }
+    }
+
     /// <summary>Reaches the hand or foot towards <paramref name="target"/> (page mm) - inverse kinematics, computed from the drag's starting pose.</summary>
     public void UpdatePoseLimb(PanelId panelId, int index, Limb limb, Point2D target)
     {
@@ -1179,7 +1241,10 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public void ResetCharacterPose(PanelId panelId, int index) =>
         Apply(EditCharacterInPanel(Working, panelId, index, CharacterPosing.ResetPose));
 
-    public bool SelectedCharacterIsPosed => SelectedCharacter is { Pose.BoneRotations.Count: > 0 };
+    public bool SelectedCharacterIsPosed => SelectedCharacter is { } instance && CharacterPosing.IsPosed(instance.Pose);
+
+    public IRelayCommand<PosePresetChoice> ApplyPosePresetCommand { get; }
+    public IRelayCommand MirrorPoseCommand { get; }
 
     /// <summary>The selected character's view, for the ribbon's Front/Side toggle.</summary>
     public ViewAngle? SelectedCharacterView => SelectedCharacter?.Pose.ViewAngle;
@@ -1207,6 +1272,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     {
         OnPropertyChanged(nameof(SelectedCharacterIsPosed));
         ResetPoseCommand.NotifyCanExecuteChanged();
+        MirrorPoseCommand.NotifyCanExecuteChanged();
+        var key = SelectedCharacter is { } selected ? (selected.CharacterId, selected.Pose.ViewAngle) : default;
+        if (!Equals(key, _poseChoicesKey))
+        {
+            _poseChoicesKey = key;
+            OnPropertyChanged(nameof(PoseChoices));
+        }
         OnPropertyChanged(nameof(SelectedCharacterView));
         OnPropertyChanged(nameof(IsSelectedCharacterFront));
         OnPropertyChanged(nameof(IsSelectedCharacterSide));

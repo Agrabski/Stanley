@@ -147,6 +147,57 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Pose_presets_are_previewed_on_the_selected_character_and_apply_in_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A", BodyPresets.Shape(BodyPreset.Child));
+        page.InsertCharacter(item.Id, left);
+
+        var choices = page.PoseChoices;
+        Assert.Equal(PosePresets.All.Count, choices.Count);
+        Assert.All(choices, c => Assert.Same(page.CharacterSnapshot[item.Id], c.Character));
+
+        page.ApplyPosePresetCommand.Execute(choices.Single(c => c.Preset.Preset == PosePreset.Walk));
+        var walking = page.Working.Panels[left].CharacterInstances[0];
+        Assert.Equal(ViewAngle.Profile, walking.Pose.ViewAngle); // walking reads side on
+        Assert.True(page.IsSelectedCharacterSide);
+        Assert.True(page.MirrorPoseCommand.CanExecute(null));
+
+        page.MirrorPoseCommand.Execute(null);
+        Assert.NotEqual(walking.Pose.BoneRotations, page.Working.Panels[left].CharacterInstances[0].Pose.BoneRotations);
+
+        session.Workspace.History.Undo();
+        session.Workspace.History.Undo();
+        Assert.False(page.SelectedCharacterIsPosed);
+        Assert.Equal(ViewAngle.Front, page.Working.Panels[left].CharacterInstances[0].Pose.ViewAngle);
+    }
+
+    [Fact]
+    public void Dragging_the_hips_ring_crouches_with_the_feet_planted_in_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+        var instance = page.Working.Panels[left].CharacterInstances[0];
+        var hips = page.TrunkHandles(instance).Single(h => h.Part == TrunkPart.Hips).Point;
+        var feet = page.LimbHandles(instance).Where(h => h.Limb is Limb.LeftLeg or Limb.RightLeg).Select(h => h.Point).ToList();
+
+        page.BeginPoseTrunk(left, 0, TrunkPart.Hips);
+        page.UpdatePoseTrunk(left, 0, TrunkPart.Hips, new Point2D(hips.X, hips.Y + 4), hips);
+        page.UpdatePoseTrunk(left, 0, TrunkPart.Hips, new Point2D(hips.X, hips.Y + 9), hips);
+        page.EndGesture(commit: true);
+
+        var crouched = page.Working.Panels[left].CharacterInstances[0];
+        Assert.Equal(hips.Y + 9, page.TrunkHandles(crouched).Single(h => h.Part == TrunkPart.Hips).Point.Y, 3);
+        var after = page.LimbHandles(crouched).Where(h => h.Limb is Limb.LeftLeg or Limb.RightLeg).Select(h => h.Point).ToList();
+        for (var i = 0; i < 2; i++)
+            Assert.True(Math.Abs(after[i].X - feet[i].X) < 0.05 && Math.Abs(after[i].Y - feet[i].Y) < 0.05);
+
+        session.Workspace.History.Undo();
+        Assert.False(page.SelectedCharacterIsPosed);
+    }
+
+    [Fact]
     public void Moving_a_character_snaps_its_feet_to_the_others_floor()
     {
         var (session, page, left, _) = NewSession();

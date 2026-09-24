@@ -177,6 +177,33 @@ public class CharacterTests
     }
 
     [Fact]
+    public void The_pose_gallery_on_the_Character_tab_poses_the_selected_character()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId);
+        var ribbon = Single<PageEditorRibbon>(window.RibbonBarControl);
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "CharacterTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var buttons = ribbon.GetVisualDescendants().OfType<Button>().Where(b => b.DataContext is PosePresetChoice).ToList();
+        Assert.Equal(Editing.PosePresets.All.Count, buttons.Count);
+        Assert.All(buttons, b => Assert.True(b.GetVisualDescendants().OfType<CharacterFigure>().Single().Pose is not null));
+
+        var cheer = buttons.Single(b => ((PosePresetChoice)b.DataContext!).Preset.Preset == Editing.PosePreset.Cheer);
+        cheer.Command!.Execute(cheer.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(page.SelectedCharacterIsPosed);
+        var instance = page.Working.Panels[panelId].CharacterInstances[0];
+        var head = page.TrunkHandles(instance).Single(h => h.Part == Editing.TrunkPart.Head).Point;
+        Assert.All(page.LimbHandles(instance).Where(h => h.Limb is Editing.Limb.LeftArm or Editing.Limb.RightArm),
+            h => Assert.True(h.Point.Y < head.Y + 5, "both hands up"));
+    }
+
+    [Fact]
     public void The_character_editor_ribbon_applies_a_body_type_and_renames()
     {
         var (window, characters) = Open();

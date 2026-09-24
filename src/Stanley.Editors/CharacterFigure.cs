@@ -34,9 +34,19 @@ public sealed class CharacterFigure : Control
     public static readonly StyledProperty<ViewAngle> AngleProperty =
         AvaloniaProperty.Register<CharacterFigure, ViewAngle>(nameof(Angle));
 
+    public static readonly StyledProperty<ProjectModel.Poses.PoseData?> PoseProperty =
+        AvaloniaProperty.Register<CharacterFigure, ProjectModel.Poses.PoseData?>(nameof(Pose));
+
     static CharacterFigure()
     {
-        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty);
+        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty);
+    }
+
+    /// <summary>The pose to show the main character in (its view wins over <see cref="Angle"/>); null stands at rest.</summary>
+    public ProjectModel.Poses.PoseData? Pose
+    {
+        get => GetValue(PoseProperty);
+        set => SetValue(PoseProperty, value);
     }
 
     /// <summary>Front or side view, for every figure drawn (the line-up too).</summary>
@@ -69,10 +79,11 @@ public sealed class CharacterFigure : Control
         if (Character is not { } character || Bounds.Width < 2 || Bounds.Height < 2)
             return;
         var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
-        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Angle));
+        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose));
     }
 
-    private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle)
+    private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
+        ProjectModel.Poses.PoseData? pose)
         : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
@@ -94,7 +105,7 @@ public sealed class CharacterFigure : Control
 
             // Everyone to one scale: the tallest fills most of the height, and the widths
             // must fit side by side.
-            var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: BodyRig.Extent(c.Body, angle, c.Skeleton))).ToList();
+            var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: BodyRig.Extent(c.Body, angle, c.Skeleton, ReferenceEquals(c, main) ? pose : null))).ToList();
             var tallest = extents.Max(e => e.Extent.Height);
             var padTop = guides ? 18.0 : 3.0;
             var padBottom = guides ? 10.0 : 3.0;
@@ -129,7 +140,7 @@ public sealed class CharacterFigure : Control
                     canvas.SaveLayer(alpha);
                 }
                 CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(ground, unit, Mirrored: false),
-                    (float)Math.Clamp(unit * 0.004, 0.8, 2), angle);
+                    (float)Math.Clamp(unit * 0.004, 0.8, 2), angle, faded ? null : pose);
                 if (faded)
                 {
                     canvas.Restore();

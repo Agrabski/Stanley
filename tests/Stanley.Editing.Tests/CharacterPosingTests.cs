@@ -96,3 +96,115 @@ public class CharacterPosingTests
         Assert.True(elbow.X < hand.X - 3, "the elbow goes back");
     }
 }
+
+public class TrunkPosingAndPresetTests
+{
+    private static readonly CharacterDefinition Alice = CharacterDefinition.Create("Alice");
+
+    private static CharacterInstance Placed(ViewAngle angle = ViewAngle.Front, bool mirrored = false, CharacterDefinition? character = null) =>
+        new((character ?? Alice).Id, new CharacterPlacement(new Point2D(100, 200), 100, mirrored), null, new PoseData(angle, [], []), null);
+
+    private static double Distance(Point2D a, Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+    [Theory]
+    [InlineData(ViewAngle.Front, false)]
+    [InlineData(ViewAngle.Profile, false)]
+    [InlineData(ViewAngle.Profile, true)]
+    public void Dragging_the_hips_down_crouches_with_both_feet_staying_exactly_where_they_were(ViewAngle angle, bool mirrored)
+    {
+        var start = Placed(angle, mirrored);
+        var feet = new[] { Limb.LeftLeg, Limb.RightLeg }.Select(l => CharacterPosing.EndPoint(Alice, start, l)).ToList();
+        var hips = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Hips);
+        var head = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Head);
+
+        var crouched = CharacterPosing.MoveHips(Alice, start, new Point2D(0, 15));
+
+        Assert.Equal(hips.Y + 15, CharacterPosing.TrunkPoint(Alice, crouched, TrunkPart.Hips).Y, 3);
+        Assert.Equal(head.Y + 15, CharacterPosing.TrunkPoint(Alice, crouched, TrunkPart.Head).Y, 3);
+        var after = new[] { Limb.LeftLeg, Limb.RightLeg }.Select(l => CharacterPosing.EndPoint(Alice, crouched, l)).ToList();
+        for (var i = 0; i < 2; i++)
+            Assert.True(Distance(feet[i], after[i]) < 0.05, $"foot {i} moved from {feet[i]} to {after[i]}");
+        Assert.Equal(start.Placement, crouched.Placement);
+    }
+
+    [Fact]
+    public void Leaning_moves_the_chest_head_and_arms_but_not_the_feet_and_stops_at_the_limit()
+    {
+        var start = Placed(ViewAngle.Profile);
+        var hips = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Hips);
+        var chest = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Chest);
+        var hand = CharacterPosing.EndPoint(Alice, start, Limb.LeftArm);
+        var foot = CharacterPosing.EndPoint(Alice, start, Limb.LeftLeg);
+
+        var forward = CharacterPosing.Lean(Alice, start, new Point2D(chest.X + 20, chest.Y + 5));
+        Assert.True(CharacterPosing.TrunkPoint(Alice, forward, TrunkPart.Chest).X > chest.X + 10);
+        Assert.True(Distance(CharacterPosing.EndPoint(Alice, forward, Limb.LeftArm), hand) > 5, "the arm rides along with the chest");
+        Assert.Equal(foot, CharacterPosing.EndPoint(Alice, forward, Limb.LeftLeg));
+        Assert.Equal(hips.X, CharacterPosing.TrunkPoint(Alice, forward, TrunkPart.Hips).X, 6);
+
+        var tooFar = CharacterPosing.Lean(Alice, start, new Point2D(hips.X + 50, hips.Y + 10));
+        Assert.Equal(BodyRig.MaxLean, tooFar.Pose.BoneRotations.Single(r => r.Bone == HumanoidBone.Spine).Degrees, 6);
+    }
+
+    [Fact]
+    public void Tilting_the_head_turns_it_about_the_neck_within_its_limit()
+    {
+        var start = Placed();
+        var top = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Head);
+
+        var tilted = CharacterPosing.TiltHead(Alice, start, new Point2D(top.X + 5, top.Y));
+        Assert.True(CharacterPosing.TrunkPoint(Alice, tilted, TrunkPart.Head).X > top.X + 1);
+        Assert.Equal(CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Chest), CharacterPosing.TrunkPoint(Alice, tilted, TrunkPart.Chest));
+
+        var extreme = CharacterPosing.TiltHead(Alice, start, new Point2D(top.X + 100, top.Y + 100));
+        Assert.Equal(BodyRig.MaxHeadTilt, extreme.Pose.BoneRotations.Single(r => r.Bone == HumanoidBone.Head).Degrees, 6);
+    }
+
+    [Fact]
+    public void Mirroring_a_front_view_wave_waves_with_the_other_hand_and_mirroring_twice_is_the_same_pose()
+    {
+        var wave = PosePresets.Apply(Alice, Placed(), PosePresets.Get(PosePreset.Wave));
+        var raised = CharacterPosing.EndPoint(Alice, wave, Limb.RightArm);
+        var hips = CharacterPosing.TrunkPoint(Alice, wave, TrunkPart.Hips);
+
+        var mirrored = CharacterPosing.MirrorPose(wave);
+        var other = CharacterPosing.EndPoint(Alice, mirrored, Limb.LeftArm);
+        Assert.Equal(raised.Y, other.Y, 3);
+        Assert.Equal(hips.X - raised.X, other.X - hips.X, 3);
+
+        var back = CharacterPosing.MirrorPose(mirrored);
+        Assert.Equal(CharacterPosing.EndPoint(Alice, wave, Limb.RightArm).X, CharacterPosing.EndPoint(Alice, back, Limb.RightArm).X, 6);
+    }
+
+    public static TheoryData<PosePreset, BodyPreset, ViewAngle> PresetCases()
+    {
+        var data = new TheoryData<PosePreset, BodyPreset, ViewAngle>();
+        foreach (var preset in Enum.GetValues<PosePreset>())
+            foreach (var body in new[] { BodyPreset.Adult, BodyPreset.Child, BodyPreset.Heavy, BodyPreset.Chibi })
+                foreach (var angle in new[] { ViewAngle.Front, ViewAngle.Profile })
+                    data.Add(preset, body, angle);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(PresetCases))]
+    public void Every_preset_fits_every_body_keeps_its_place_and_plants_feet_it_doesnt_move(PosePreset preset, BodyPreset body, ViewAngle angle)
+    {
+        var character = CharacterDefinition.Create("A", BodyPresets.Shape(body));
+        var start = Placed(angle, character: character);
+        var definition = PosePresets.Get(preset);
+
+        var posed = PosePresets.Apply(character, start, definition);
+
+        Assert.Equal(start.Placement, posed.Placement);
+        Assert.Equal(definition.View ?? angle, posed.Pose.ViewAngle);
+        Assert.Equal(preset != PosePreset.Stand, CharacterPosing.IsPosed(posed.Pose));
+        var standing = start with { Pose = start.Pose with { ViewAngle = posed.Pose.ViewAngle } };
+        foreach (var leg in new[] { Limb.LeftLeg, Limb.RightLeg }.Where(l => definition.Goals.All(g => g.Limb != l)))
+            Assert.True(Distance(CharacterPosing.EndPoint(character, standing, leg), CharacterPosing.EndPoint(character, posed, leg)) < 0.05,
+                $"{preset}: the {leg} should stay planted");
+        var extent = CharacterPosing.Figure(character, posed).Extent;
+        Assert.True(extent.Bottom <= 0.001, "nothing sinks into the floor");
+        Assert.True(extent.Top < -0.2 * character.Body.Height, "still a figure, not collapsed");
+    }
+}

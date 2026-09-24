@@ -6,8 +6,8 @@ namespace Stanley.ProjectModel.Characters;
 /// <summary>A tapered limb segment: two circles and everything between them.</summary>
 public sealed record BodyCapsule(Point2D From, Point2D To, double FromRadius, double ToRadius);
 
-/// <summary>An axis-aligned ellipse - head, hands, feet.</summary>
-public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY);
+/// <summary>An ellipse - head, hands, feet - turned <paramref name="RotationDegrees"/> clockwise about its centre.</summary>
+public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY, double RotationDegrees = 0);
 
 /// <summary>
 /// A generated body in <b>figure space</b>: the unit is <see cref="BodyShape.Height"/>
@@ -17,6 +17,7 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY)
 /// exact bounding box of every shape.
 /// </summary>
 /// <param name="RestLayout">The joints standing at rest (after any skeleton override) - what pose rotations are measured from.</param>
+/// <param name="BaseLayout">The joints with only the trunk posed (hips shifted, spine leaned, head tilted) and the limbs still at rest relative to it - what limb rotations, and so inverse kinematics, are measured from.</param>
 /// <param name="Layout">The joints as posed - where the shapes are actually drawn. Equal to <paramref name="RestLayout"/> with no pose.</param>
 /// <param name="Torso">A closed outline (clockwise from the neck), meant to be drawn smoothed.</param>
 /// <param name="Limbs">Unioned with the torso and <paramref name="Blobs"/> into the body's one silhouette.</param>
@@ -24,6 +25,7 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY)
 public sealed record BodyFigure(
     ViewAngle Angle,
     ViewAngleRestLayout RestLayout,
+    ViewAngleRestLayout BaseLayout,
     ViewAngleRestLayout Layout,
     IReadOnlyList<Point2D> Torso,
     IReadOnlyList<BodyCapsule> Limbs,
@@ -50,11 +52,82 @@ public static class BodyRig
 {
     public static BodyFigure Build(BodyShape body, Skeleton? overrides = null) => Build(body, ViewAngle.Front, overrides);
 
-    /// <param name="pose">Bone rotations (degrees, clockwise on the page, each relative to its parent) - see <see cref="ApplyPose"/>. Null or empty stands at rest.</param>
-    public static BodyFigure Build(BodyShape body, ViewAngle angle, Skeleton? overrides = null, IReadOnlyList<BoneRotation>? pose = null)
+    /// <param name="pose">
+    /// The pose (its <see cref="PoseData.ViewAngle"/> is ignored - <paramref name="angle"/> decides):
+    /// <see cref="PoseData.HipsShift"/> moves the hips; a <see cref="HumanoidBone.Spine"/>
+    /// rotation leans everything above them, a <see cref="HumanoidBone.Head"/> rotation
+    /// tilts the head, and limb rotations turn the arms and legs (<see cref="ApplyPose"/>).
+    /// Degrees, clockwise on the page, each relative to its parent. Null stands at rest.
+    /// </param>
+    public static BodyFigure Build(BodyShape body, ViewAngle angle, Skeleton? overrides = null, PoseData? pose = null)
     {
         var m = new Measures(body.Normalized());
         return angle == ViewAngle.Profile ? BuildProfile(m, overrides, pose) : BuildFront(m, overrides, pose);
+    }
+
+    /// <summary>How far the spine may lean, and the head tilt, either way (degrees).</summary>
+    public const double MaxLean = 60;
+    public const double MaxHeadTilt = 50;
+
+    /// <summary>How far the hips may move, as a fraction of the character's height (y: up / down).</summary>
+    public static Rect2D HipsShiftRange { get; } = Rect2D.FromEdges(-0.3, -0.05, 0.3, 0.45);
+
+    /// <summary>The trunk part of a pose: the hips shifted, everything above them leaned about the hips, the head tilted.</summary>
+    private sealed class Trunk
+    {
+        public Trunk(Measures m, ViewAngleRestLayout rest, PoseData? pose)
+        {
+            var rotations = pose?.BoneRotations ?? [];
+            Lean = Math.Clamp(Degrees(rotations, HumanoidBone.Spine), -MaxLean, MaxLean);
+            Tilt = Math.Clamp(Degrees(rotations, HumanoidBone.Head), -MaxHeadTilt, MaxHeadTilt);
+            var shift = pose?.HipsShift ?? default;
+            Shift = new Point2D(
+                Math.Clamp(shift.X, HipsShiftRange.Left, HipsShiftRange.Right) * m.Height,
+                Math.Clamp(shift.Y, HipsShiftRange.Top, HipsShiftRange.Bottom) * m.Height);
+            Pivot = rest.Bones.FirstOrDefault(b => b.Bone == HumanoidBone.Hips)?.Position ?? new Point2D(0, m.HipY);
+        }
+
+        public double Lean { get; }
+        public double Tilt { get; }
+        public Point2D Shift { get; }
+        public Point2D Pivot { get; }
+
+        /// <summary>A point of the upper body (torso, neck, head, arms): leaned about the hips, then moved with them.</summary>
+        public Point2D Upper(Point2D p) => Offset(RotateAbout(p, Pivot, Lean), Shift);
+
+        /// <summary>A point of the legs: moved with the hips (the limb rotations do the rest).</summary>
+        public Point2D Lower(Point2D p) => Offset(p, Shift);
+
+        public ViewAngleRestLayout Apply(ViewAngleRestLayout rest) =>
+            Lean == 0 && Shift == default
+                ? rest
+                : rest with { Bones = rest.Bones.Select(b => b with { Position = IsLeg(b.Bone) ? Lower(b.Position) : Upper(b.Position) }).ToList() };
+
+        private static bool IsLeg(HumanoidBone bone) => LimbChains.Skip(2).Any(c => c.Root == bone || c.Middle == bone || c.End == bone);
+    }
+
+    private static double Degrees(IReadOnlyList<BoneRotation> rotations, HumanoidBone bone) =>
+        rotations.LastOrDefault(r => r.Bone == bone)?.Degrees ?? 0;
+
+    private static Point2D RotateAbout(Point2D p, Point2D pivot, double degrees) =>
+        degrees == 0 ? p : Offset(pivot, Rotate(new Point2D(p.X - pivot.X, p.Y - pivot.Y), degrees));
+
+    private static double AngleOf(Point2D from, Point2D to) => Math.Atan2(to.Y - from.Y, to.X - from.X) * 180 / Math.PI;
+
+    /// <summary>
+    /// How much a foot tips with its shin: a foot on the floor stays flat (a crouch keeps
+    /// the soles down); a lifted one turns with the shin, as feet do mid-step.
+    /// </summary>
+    private static double FootTilt(Measures m, ViewAngleRestLayout rest, Point2D knee, Point2D ankle, HumanoidBone kneeBone, HumanoidBone ankleBone)
+    {
+        var restAnkle = rest.Bones.First(b => b.Bone == ankleBone).Position;
+        var lifted = restAnkle.Y - ankle.Y; // figure space: y grows downwards
+        if (lifted < m.Height * 0.02)
+            return 0;
+        var restKnee = rest.Bones.First(b => b.Bone == kneeBone).Position;
+        var turn = Math.IEEERemainder(AngleOf(knee, ankle) - AngleOf(restKnee, restAnkle), 360);
+        // Ease in over the first few centimetres of lift so the foot doesn't snap.
+        return turn * Math.Min(1, lifted / (m.Height * 0.06));
     }
 
     /// <summary>The four limbs a pose moves, each a root joint, a middle joint and an end joint.</summary>
@@ -84,7 +157,7 @@ public static class BodyRig
         foreach (var (root, middle, end) in LimbChains)
         {
             var (a1, a2) = (Degrees(root), Degrees(middle));
-            if (a1 == 0 && a2 == 0 || !positions.TryGetValue(root, out var s) || !positions.TryGetValue(middle, out var e0) || !positions.TryGetValue(end, out var w0))
+            if ((a1 == 0 && a2 == 0) || !positions.TryGetValue(root, out var s) || !positions.TryGetValue(middle, out var e0) || !positions.TryGetValue(end, out var w0))
                 continue;
             var e = Offset(s, Rotate(new Point2D(e0.X - s.X, e0.Y - s.Y), a1));
             var w = Offset(e, Rotate(new Point2D(w0.X - e0.X, w0.Y - e0.Y), a1 + a2));
@@ -145,13 +218,18 @@ public static class BodyRig
         public double ArmTop, ArmElbow, ArmWrist, UpperArm, Forearm, Hand;
         public double Thigh, Knee, Ankle, AnkleHeight, FootHalfHeight;
 
-        public BodyEllipse HandAt(Point2D elbow, Point2D wrist, Point2D fallbackDirection) =>
-            new(Along(wrist, Normalize(new Point2D(wrist.X - elbow.X, wrist.Y - elbow.Y), fallbackDirection), Hand * 0.45), ArmWrist * 1.45, Hand * 0.6);
+        /// <summary>The hand, lying along the forearm (so it turns as the arm does).</summary>
+        public BodyEllipse HandAt(Point2D elbow, Point2D wrist, Point2D fallbackDirection)
+        {
+            var direction = Normalize(new Point2D(wrist.X - elbow.X, wrist.Y - elbow.Y), fallbackDirection);
+            var turn = Math.Atan2(direction.Y, direction.X) * 180 / Math.PI - 90;
+            return new(Along(wrist, direction, Hand * 0.45), ArmWrist * 1.45, Hand * 0.6, turn);
+        }
     }
 
     // ---------------------------------------------------------------- front
 
-    private static BodyFigure BuildFront(Measures m, Skeleton? overrides, IReadOnlyList<BoneRotation>? pose)
+    private static BodyFigure BuildFront(Measures m, Skeleton? overrides, PoseData? pose)
     {
         var (w, build, muscle, frame) = (m.W, m.Build, m.Muscle, m.Frame);
         var shoulderHalf = w * (1.0 - 0.3 * frame + 0.12 * build + 0.3 * muscle);
@@ -184,7 +262,9 @@ public static class BodyRig
             bones.Add(new(side.Foot, Mirror(ankleJoint, sign)));
         }
         var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Front, bones), overrides);
-        var layout = ApplyPose(rest, pose);
+        var trunk = new Trunk(m, rest, pose);
+        var baseLayout = trunk.Apply(rest);
+        var layout = ApplyPose(baseLayout, pose?.BoneRotations);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
         var torso = new List<Point2D>
@@ -200,10 +280,15 @@ public static class BodyRig
         };
         for (var i = torso.Count - 2; i >= 0; i--)
             torso.Add(Mirror(torso[i], -1));
+        torso = torso.Select(trunk.Upper).ToList();
 
         var limbs = new List<BodyCapsule> { new(At(HumanoidBone.Head), At(HumanoidBone.Neck), m.NeckHalf, m.NeckHalf) };
         var headPoint = At(HumanoidBone.Head);
-        var blobs = new List<BodyEllipse> { new(new Point2D(headPoint.X, headPoint.Y - m.Head / 2), m.Head * 0.42 * (1 + 0.1 * build), m.Head / 2) };
+        var headTurn = trunk.Lean + trunk.Tilt;
+        var blobs = new List<BodyEllipse>
+        {
+            new(Offset(headPoint, Rotate(new Point2D(0, -m.Head / 2), headTurn)), m.Head * 0.42 * (1 + 0.1 * build), m.Head / 2, headTurn)
+        };
 
         foreach (var side in new[] { Side.Left, Side.Right })
         {
@@ -215,11 +300,12 @@ public static class BodyRig
             var (hp, kp, ap) = (At(side.UpperLeg), At(side.LowerLeg), At(side.Foot));
             limbs.Add(new BodyCapsule(hp, kp, m.Thigh, m.Knee));
             limbs.Add(new BodyCapsule(kp, ap, m.Knee, m.Ankle));
-            var outward = Math.Sign(ap.X) * w * 0.06;
-            blobs.Add(new BodyEllipse(new Point2D(ap.X + outward, ap.Y + m.AnkleHeight - m.FootHalfHeight), w * 0.26, m.FootHalfHeight));
+            var outward = Math.Sign(At(side.UpperLeg).X - At(HumanoidBone.Hips).X) * w * 0.06;
+            var footTurn = FootTilt(m, rest, kp, ap, side.LowerLeg, side.Foot);
+            blobs.Add(new BodyEllipse(Offset(ap, Rotate(new Point2D(outward, m.AnkleHeight - m.FootHalfHeight), footTurn)), w * 0.26, m.FootHalfHeight, footTurn));
         }
 
-        return new BodyFigure(ViewAngle.Front, rest, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]));
+        return new BodyFigure(ViewAngle.Front, rest, baseLayout, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]));
     }
 
     // ---------------------------------------------------------------- side (profile)
@@ -230,7 +316,7 @@ public static class BodyRig
     /// drawn on top of the body as their own shape; the legs merge into it, the far one
     /// set back a little so both feet show.
     /// </summary>
-    private static BodyFigure BuildProfile(Measures m, Skeleton? overrides, IReadOnlyList<BoneRotation>? pose)
+    private static BodyFigure BuildProfile(Measures m, Skeleton? overrides, PoseData? pose)
     {
         var (w, build, muscle, frame) = (m.W, m.Build, m.Muscle, m.Frame);
         var chestFront = w * (0.5 + 0.15 * build + 0.3 * muscle - 0.12 * frame);
@@ -269,7 +355,9 @@ public static class BodyRig
         bones.Add(new(HumanoidBone.RightLowerLeg, Offset(nearKnee, farLeg)));
         bones.Add(new(HumanoidBone.RightFoot, Offset(nearAnkle, farLeg)));
         var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Profile, bones), overrides);
-        var layout = ApplyPose(rest, pose);
+        var trunk = new Trunk(m, rest, pose);
+        var baseLayout = trunk.Apply(rest);
+        var layout = ApplyPose(baseLayout, pose?.BoneRotations);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
         var t = m.TorsoLength;
@@ -289,16 +377,18 @@ public static class BodyRig
             new(-backDepth * 0.8, m.ShoulderY + w * 0.1),
             new(-m.NeckHalf * 0.9, m.ShoulderY - m.NeckLength * 0.3),
         };
+        torso = torso.Select(trunk.Upper).ToList();
 
         var headPoint = At(HumanoidBone.Head);
-        var headCenter = new Point2D(headPoint.X + m.Head * 0.04, headPoint.Y - m.Head / 2);
+        var headTurn = trunk.Lean + trunk.Tilt;
+        var headCenter = Offset(headPoint, Rotate(new Point2D(m.Head * 0.04, -m.Head / 2), headTurn));
         var headRx = m.Head * 0.47 * (1 + 0.08 * build);
         var limbs = new List<BodyCapsule> { new(headPoint, At(HumanoidBone.Neck), m.NeckHalf * 1.05, m.NeckHalf * 1.05) };
         var blobs = new List<BodyEllipse>
         {
-            new(headCenter, headRx, m.Head / 2),
+            new(headCenter, headRx, m.Head / 2, headTurn),
             // The nose: the one detail that says which way a flat side view is facing.
-            new(new Point2D(headCenter.X + headRx * 0.93, headCenter.Y + m.Head * 0.07), m.Head * 0.09, m.Head * 0.07),
+            new(Offset(headCenter, Rotate(new Point2D(headRx * 0.93, m.Head * 0.07), headTurn)), m.Head * 0.09, m.Head * 0.07, headTurn),
         };
         var nearLimbs = new List<BodyCapsule>();
         var nearBlobs = new List<BodyEllipse>();
@@ -317,10 +407,11 @@ public static class BodyRig
             var (hp, kp, ap) = (At(side.UpperLeg), At(side.LowerLeg), At(side.Foot));
             limbs.Add(new BodyCapsule(hp, kp, m.Thigh * 0.9, m.Knee));
             limbs.Add(new BodyCapsule(kp, ap, m.Knee, m.Ankle));
-            targetBlobs.Add(new BodyEllipse(new Point2D(ap.X + footLength * 0.3, ap.Y + m.AnkleHeight - m.FootHalfHeight), footLength / 2, m.FootHalfHeight));
+            var footTurn = FootTilt(m, rest, kp, ap, side.LowerLeg, side.Foot);
+            targetBlobs.Add(new BodyEllipse(Offset(ap, Rotate(new Point2D(footLength * 0.3, m.AnkleHeight - m.FootHalfHeight), footTurn)), footLength / 2, m.FootHalfHeight, footTurn));
         }
 
-        return new BodyFigure(ViewAngle.Profile, rest, layout, torso, limbs, blobs, nearLimbs, nearBlobs,
+        return new BodyFigure(ViewAngle.Profile, rest, baseLayout, layout, torso, limbs, blobs, nearLimbs, nearBlobs,
             ExtentOf(torso, [limbs, nearLimbs], [blobs, nearBlobs]));
     }
 
@@ -338,7 +429,7 @@ public static class BodyRig
     public static Rect2D Extent(BodyShape body, Skeleton? overrides = null) => Build(body, overrides).Extent;
 
     /// <summary>The body's bounding box in figure space, seen from <paramref name="angle"/>.</summary>
-    public static Rect2D Extent(BodyShape body, ViewAngle angle, Skeleton? overrides = null, IReadOnlyList<BoneRotation>? pose = null) =>
+    public static Rect2D Extent(BodyShape body, ViewAngle angle, Skeleton? overrides = null, PoseData? pose = null) =>
         Build(body, angle, overrides, pose).Extent;
 
     private static ViewAngleRestLayout ApplyOverrides(ViewAngleRestLayout generated, Skeleton? overrides)
@@ -373,7 +464,14 @@ public static class BodyRig
             Include(c.To.X, c.To.Y, c.ToRadius, c.ToRadius);
         }
         foreach (var e in blobGroups.SelectMany(g => g))
-            Include(e.Center.X, e.Center.Y, e.RadiusX, e.RadiusY);
+        {
+            // A turned ellipse's half-widths along x and y.
+            var r = e.RotationDegrees * Math.PI / 180;
+            var (cos, sin) = (Math.Cos(r), Math.Sin(r));
+            Include(e.Center.X, e.Center.Y,
+                Math.Sqrt(e.RadiusX * e.RadiusX * cos * cos + e.RadiusY * e.RadiusY * sin * sin),
+                Math.Sqrt(e.RadiusX * e.RadiusX * sin * sin + e.RadiusY * e.RadiusY * cos * cos));
+        }
         return Rect2D.FromEdges(left, top, right, bottom);
     }
 

@@ -347,8 +347,22 @@ at the target when not). The result is stored as ordinary `PoseData.BoneRotation
 the rest layout), so a pose survives body edits and could later move between
 characters or into a pose library. The elbow/knee bend side is fixed for a drag;
 in side view knees bend forward and elbows back. One drag = one undo step; Reset
-pose on the Character tab. Not yet: moving the hips/torso (so no crouching with
-pinned feet), head tilt, rotating hands/feet, mirror pose, pose library.
+pose on the Character tab.
+
+**Whole-body movement and pose presets (added next).** Hollow rings on the hips,
+chest and head: dragging the hips moves the body with both feet pinned (legs
+re-solved each move; crouching is limited to about half the leg so a chibi can't
+sink through the floor), the chest leans the upper body about the hips (arms ride
+along), the head tilts about the neck. The pose carries a `HipsShift` (a fraction
+of the character's height, so it transfers between bodies). Hands now lie along
+the forearm and a lifted foot tips with the shin. Mirror pose swaps sides. The
+Character tab has a Pose gallery of eleven presets, previewed on the selected
+character: each is a set of hand/foot goals relative to that limb's own root and
+length (plus lean, head tilt, hips drop, and the view it needs - Walk, Run and Sit
+turn the character side on), solved with the same IK - so one preset fits a
+toddler, a chibi and a heavy adult alike, and the result is ordinary pose data to
+keep adjusting. Not yet: a saved/user pose library, hand/foot rotation handles,
+arms that hang with gravity when leaning (they turn rigidly with the torso).
 
 Known limits of the POC: the torso ignores skeleton overrides (limbs, head and
 neck follow them); no three-quarter view; front-view Flip shows no difference

@@ -115,10 +115,10 @@ public class BodyRigTests
     public void A_pose_turns_each_limb_rigidly_about_its_joint_and_no_pose_is_the_rest_layout()
     {
         var rest = BodyRig.Build(BodyShape.Default).Layout;
-        Assert.Equal(rest.Bones, BodyRig.Build(BodyShape.Default, ViewAngle.Front, null, []).Layout.Bones);
+        Assert.Equal(rest.Bones, BodyRig.Build(BodyShape.Default, ViewAngle.Front, null, new Poses.PoseData(ViewAngle.Front, [], [])).Layout.Bones);
 
-        var posed = BodyRig.Build(BodyShape.Default, ViewAngle.Front, null,
-            [new Poses.BoneRotation(HumanoidBone.LeftUpperArm, -90), new Poses.BoneRotation(HumanoidBone.LeftLowerArm, 30)]);
+        var posed = BodyRig.Build(BodyShape.Default, ViewAngle.Front, null, new Poses.PoseData(ViewAngle.Front,
+            [new Poses.BoneRotation(HumanoidBone.LeftUpperArm, -90), new Poses.BoneRotation(HumanoidBone.LeftLowerArm, 30)], []));
         Point2D R(HumanoidBone b) => rest.Bones.Single(p => p.Bone == b).Position;
         Point2D P(HumanoidBone b) => posed.Layout.Bones.Single(p => p.Bone == b).Position;
         double Len(Point2D a, Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
@@ -201,5 +201,70 @@ public sealed class CharacterListingTests : IDisposable
 
         Assert.Contains("\"body\": {\n    \"build\": 0.2,\n    \"frame\": 0.6,\n    \"headsTall\": 7,\n    \"height\": 0.9,\n    \"muscle\": 0.4\n  }", text.Replace("\r\n", "\n"));
         Assert.Contains("\"skin\": \"#f2c9a4\"", text);
+    }
+}
+
+public class BodyRigTrunkTests
+{
+    [Fact]
+    public void Shifting_the_hips_moves_the_upper_body_by_that_fraction_of_the_height()
+    {
+        var body = BodyShape.Default with { Height = 1.2 };
+        var rest = BodyRig.Build(body, ViewAngle.Front);
+        var shifted = BodyRig.Build(body, ViewAngle.Front, null, new Poses.PoseData(ViewAngle.Front, [], [], new Point2D(0.1, 0.25)));
+
+        Assert.Equal(rest.Extent.Top + 0.25 * 1.2, shifted.Extent.Top, 9);
+        var restHead = rest.Layout.Bones.Single(b => b.Bone == HumanoidBone.Head).Position;
+        var head = shifted.Layout.Bones.Single(b => b.Bone == HumanoidBone.Head).Position;
+        Assert.Equal(restHead.X + 0.12, head.X, 9);
+        Assert.Equal(rest.RestLayout.Bones, shifted.RestLayout.Bones);
+    }
+
+    [Fact]
+    public void Hands_lie_along_the_forearm_and_a_lifted_foot_tips_with_its_shin_while_a_planted_one_stays_flat()
+    {
+        var pose = new Poses.PoseData(ViewAngle.Profile,
+            [new Poses.BoneRotation(HumanoidBone.LeftUpperArm, -90), new Poses.BoneRotation(HumanoidBone.LeftUpperLeg, -40), new Poses.BoneRotation(HumanoidBone.LeftLowerLeg, 60)], []);
+        var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Profile, null, pose);
+
+        var hand = figure.NearBlobs[0];
+        var elbow = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.LeftLowerArm).Position;
+        var wrist = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.LeftHand).Position;
+        var forearm = Math.Atan2(wrist.Y - elbow.Y, wrist.X - elbow.X) * 180 / Math.PI;
+        Assert.Equal(forearm - 90, hand.RotationDegrees, 6);
+
+        var liftedFoot = figure.NearBlobs[1];
+        Assert.NotEqual(0, liftedFoot.RotationDegrees);
+        var plantedFoot = figure.Blobs.Last();
+        Assert.Equal(0, plantedFoot.RotationDegrees);
+    }
+
+    [Fact]
+    public void A_pose_without_a_hips_shift_leaves_it_out_of_the_file_and_one_with_it_round_trips()
+    {
+        var root = Directory.CreateTempSubdirectory("stanley-pose").FullName;
+        try
+        {
+            var repository = Storage.ProjectRepository.Initialize(root, "C", new PageTrim(new PageSize(210, 297), 3));
+            var issue = new Issues.Issue(Ids.IssueId.New(), "1", "", [], new SortedDictionary<Ids.CharacterId, Ids.CharacterRevisionId>());
+            repository.SaveIssue(issue);
+            var page = new Issues.Page(Ids.PageId.New(), "p", null, []);
+            repository.SavePage(issue.Id, page);
+            Issues.CharacterInstance Instance(Point2D? shift) => new(Ids.CharacterId.New(), new Issues.CharacterPlacement(new Point2D(1, 2), 3, false), null,
+                new Poses.PoseData(ViewAngle.Front, [new Poses.BoneRotation(HumanoidBone.Spine, 12.5)], [], shift), null);
+            var panel = new Issues.Panel(Ids.PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 50, 50)), null,
+                [Instance(null), Instance(new Point2D(0.05, 0.2))], []);
+            repository.SavePanel(issue.Id, page.Id, panel);
+
+            var loaded = repository.LoadPanel(issue.Id, page.Id, panel.Id);
+            Assert.Null(loaded.CharacterInstances[0].Pose.HipsShift);
+            Assert.Equal(new Point2D(0.05, 0.2), loaded.CharacterInstances[1].Pose.HipsShift);
+            var file = File.ReadAllText(Directory.GetFiles(root, $"{panel.Id.Value}.json", SearchOption.AllDirectories).Single());
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(file, "hipsShift"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 }

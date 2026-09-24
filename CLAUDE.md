@@ -28,8 +28,8 @@ concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
 snapping, page navigator) all exist. The GUI opens/saves real project folders (the
 pages of one issue for now — see "Documents" below). Characters exist as a
 **POC** (sliders + a generated flat mannequin, front or side view, placed on
-panels, limbs posed by dragging hands/feet with two-bone IK — see "Characters
-(POC, implemented)" below); no stickers, torso/head posing or three-quarter view yet.
+panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
+see "Characters (POC, implemented)" below); no stickers or three-quarter view yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -448,15 +448,26 @@ body and placement only.
   arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
   Heights depend only on `Height`/`HeadsTall`, identical in both views;
   `ThreeQuarter` falls back to front. Skeleton overrides are per view.
-  `BodyFigure.RestLayout` is the unposed layout, `Layout` the posed one; the pose
-  (`PoseData.BoneRotations`: degrees, clockwise, relative to the parent) turns the
-  four `BodyRig.LimbChains` (upper arm/forearm, thigh/shin) via `ApplyPose`.
-- **Posing** (`CharacterPosing`, Stanley.Editing): drag a selected character's
-  green hand/foot dot → `Reach` solves two-bone IK exactly (out of reach: points
-  the limb at the target), writing only that limb's two rotations. The bend side is
-  read once per drag (`BendSign`) so joints never flip mid-drag; side view is
-  anatomical (knees forward, elbows back). Hips don't move yet, so feet stay
-  planted. Reset pose on the Character tab / right-click.
+  `BodyFigure.RestLayout` is the unposed layout, `BaseLayout` the trunk-posed one
+  (limb rotations and IK are measured from it), `Layout` the fully posed one. A pose
+  is `PoseData.BoneRotations` (degrees, clockwise, relative to the parent) plus
+  `PoseData.HipsShift` (fraction of the character's height, null = standing): the
+  trunk step shifts the hips, leans everything above them (`Spine`, ±`MaxLean`) and
+  tilts the head (`Head`, ±`MaxHeadTilt`); then `ApplyPose` turns the four
+  `BodyRig.LimbChains`. Hands lie along the forearm; a lifted foot tips with its
+  shin, a planted one stays flat (`BodyEllipse.RotationDegrees`).
+- **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
+  character's handles: green hand/foot dots → `Reach` (two-bone IK, exact in reach,
+  pointing at the target out of reach; bend side held per drag via `BendSign`,
+  anatomical side on); hollow rings → `MoveHips` (feet pinned by re-solving both
+  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest), `TiltHead`.
+  `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
+  (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
+  Walk, Run, Sit) are hand/foot *goals relative to each limb's own root and length*
+  (+ lean/tilt/hips shift, optional required view), solved with the same IK, so
+  they fit any body and produce ordinary pose data; feet without a goal stay
+  planted and never go below the floor. Character tab: Pose gallery (previews on
+  the selected character), Mirror, Reset; right-click › Pose.
 - **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
   `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
   figure path per definition, view and pose — bounded, since a limb drag makes a new

@@ -32,7 +32,8 @@ public sealed record PageCanvasScene(
     IReadOnlyDictionary<CharacterId, CharacterDefinition>? Characters = null,
     int SelectedCharacterIndex = -1,
     Rect2D? SelectedCharacterBounds = null,
-    IReadOnlyList<Point2D>? LimbHandles = null);
+    IReadOnlyList<Point2D>? LimbHandles = null,
+    IReadOnlyList<Point2D>? TrunkHandles = null);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -248,6 +249,18 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
                 var p = Screen(handle);
                 canvas.DrawCircle(p, 5.5f, limbFill);
                 canvas.DrawCircle(p, 5.5f, limbRing);
+            }
+        }
+
+        // Hips, chest, head: hollow rings, so they read apart from the hand/foot dots.
+        using (var trunkFill = new SKPaint { Color = SKColors.White, IsAntialias = true })
+        using (var trunkRing = Stroke(PoseHandle, 2.5f))
+        {
+            foreach (var handle in _scene.TrunkHandles ?? [])
+            {
+                var p = Screen(handle);
+                canvas.DrawCircle(p, 5.5f, trunkFill);
+                canvas.DrawCircle(p, 5.5f, trunkRing);
             }
         }
 

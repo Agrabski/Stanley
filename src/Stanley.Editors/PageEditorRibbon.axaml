@@ -295,11 +295,41 @@
             <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}" ToolTip.Tip="Face the other way">
               <StackPanel><PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Flip" /></StackPanel>
             </Button>
-            <Button Name="ResetPoseButton" Classes="tool" Command="{Binding ResetPoseCommand}" ToolTip.Tip="Stand at rest again (pose by dragging the green dots on the hands and feet)">
-              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Reset pose" /></StackPanel>
-            </Button>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="View and pose" />
+          <TextBlock Classes="groupLabel" Text="View" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ScrollViewer MaxWidth="480" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <ItemsControl Name="PoseGallery" ItemsSource="{Binding PoseChoices}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="local:PosePresetChoice">
+                    <Button Classes="small" Width="41" Height="66" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyPosePresetCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='{}{0} - then adjust by dragging the green dots'}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" />
+                      </DockPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="MirrorPoseButton" Classes="small" Command="{Binding MirrorPoseCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="The same pose the other way round - wave with the other hand">Mirror</Button>
+              <Button Name="ResetPoseButton" Classes="small" Command="{Binding ResetPoseCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Stand at rest again">Reset</Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Pose" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
