@@ -223,6 +223,7 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedCharacterIndex,
             _viewModel.SelectedCharacter is { } selectedCharacter ? _viewModel.CharacterBounds(selectedCharacter) : null,
             _viewModel.SelectedCharacter is { } posed ? _viewModel.LimbHandles(posed).Select(h => h.Point).ToList() : null,
+            _viewModel.SelectedCharacter is { } bent ? _viewModel.BendHandles(bent).Select(h => h.Point).ToList() : null,
             _viewModel.SelectedCharacter is { } trunk ? _viewModel.TrunkHandles(trunk).Select(h => h.Point).ToList() : null)));
     }
 
@@ -248,6 +249,7 @@ public sealed class PageCanvasControl : Control
         TailBase,
         BubbleHandle,
         LimbHandle,
+        BendHandle,
         TrunkHandle,
         CharacterHandle,
         PanelCorner,
@@ -271,9 +273,10 @@ public sealed class PageCanvasControl : Control
 
     /// <summary>
     /// What's under a point, in priority order: the selected bubble's own handles first
-    /// (they sit on top), then the selected character's resize handles, panel corners and
-    /// gutters, then bubble bodies (so a bubble flush against a panel edge is still
-    /// grabbable), then characters (bubbles draw over them), then panel edges and bodies.
+    /// (they sit on top), then the selected character's pose handles (hand/foot, then
+    /// elbow/knee, then trunk) and resize handles, panel corners and gutters, then bubble
+    /// bodies (so a bubble flush against a panel edge is still grabbable), then characters
+    /// (bubbles draw over them), then panel edges and bodies.
     /// </summary>
     private Hit HitTest(Point2D p)
     {
@@ -304,6 +307,11 @@ public sealed class PageCanvasControl : Control
             {
                 if (Dist(point, p) <= tol)
                     return new Hit(HitKind.LimbHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Limb: limb);
+            }
+            foreach (var (limb, point) in vm.BendHandles(character))
+            {
+                if (Dist(point, p) <= tol)
+                    return new Hit(HitKind.BendHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Limb: limb);
             }
             foreach (var (part, point) in vm.TrunkHandles(character))
             {
@@ -558,6 +566,12 @@ public sealed class PageCanvasControl : Control
                 StartDrag(e, DragKind.PoseLimb);
                 break;
 
+            case HitKind.BendHandle:
+                _dragLimb = hit.Limb;
+                vm.BeginPoseBend(hit.PanelId!.Value, hit.CharacterIndex, hit.Limb);
+                StartDrag(e, DragKind.PoseBend);
+                break;
+
             case HitKind.TrunkHandle:
                 _dragTrunk = hit.Trunk;
                 vm.BeginPoseTrunk(hit.PanelId!.Value, hit.CharacterIndex, hit.Trunk);
@@ -642,6 +656,10 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.PoseLimb:
                 _viewModel.UpdatePoseLimb(_dragPanelId!.Value, _dragCharacterIndex, _dragLimb, page);
+                break;
+
+            case DragKind.PoseBend:
+                _viewModel.UpdatePoseBend(_dragPanelId!.Value, _dragCharacterIndex, _dragLimb, page);
                 break;
 
             case DragKind.PoseTrunk:
@@ -753,7 +771,7 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
                 or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
-                or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseTrunk:
+                or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk:
                 vm.EndGesture(commit);
                 break;
         }
@@ -1022,7 +1040,7 @@ public sealed class PageCanvasControl : Control
         else
             type = hit.Kind switch
             {
-                HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
+                HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
                 HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.BubbleBody or HitKind.PanelBody or HitKind.CharacterBody => StandardCursorType.SizeAll,
@@ -1108,6 +1126,7 @@ public sealed class PageCanvasControl : Control
         MoveCharacter,
         ResizeCharacter,
         PoseLimb,
+        PoseBend,
         PoseTrunk
     }
 }

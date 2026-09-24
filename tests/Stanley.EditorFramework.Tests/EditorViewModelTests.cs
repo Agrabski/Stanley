@@ -1,3 +1,4 @@
+using Dock.Model.Core;
 using Stanley.Editing.Abstractions;
 using Xunit;
 
@@ -149,5 +150,72 @@ public class EditorWorkspaceTests
         workspace.Activate(first);
         Assert.Same(first, workspace.ActiveEditor);
         Assert.Contains(nameof(EditorWorkspace.ActiveEditor), changes);
+    }
+
+    private static IReadOnlyList<IDockable> ShownTabs(EditorWorkspace workspace)
+    {
+        var pending = new Stack<IDockable>([workspace.Layout]);
+        while (pending.Count > 0)
+        {
+            var next = pending.Pop();
+            if (next is not IDock dock)
+                continue;
+            if (dock.Id == EditorDockHost.EditorsDockId)
+                return dock.VisibleDockables?.ToList() ?? [];
+            foreach (var child in dock.VisibleDockables ?? [])
+                pending.Push(child);
+        }
+        throw new InvalidOperationException("no editors dock in this layout");
+    }
+
+    [Fact]
+    public void Show_AddsATabAlongsideWhatsAlreadyOpen()
+    {
+        var history = new EditorHistory();
+        var first = new TestEditor(history, new TestDocument(0));
+        var second = new TestEditor(history, new TestDocument(1));
+        var workspace = new EditorWorkspace(history, first);
+
+        workspace.Show(second);
+
+        Assert.Same(second, workspace.ActiveEditor);
+        Assert.Equal([first, second], ShownTabs(workspace));
+    }
+
+    [Fact]
+    public void Replace_ClosesOnlyTheGivenTab_LeavingOtherOpenTabsAlone()
+    {
+        var history = new EditorHistory();
+        var first = new TestEditor(history, new TestDocument(0));
+        var second = new TestEditor(history, new TestDocument(1));
+        var third = new TestEditor(history, new TestDocument(2));
+        var workspace = new EditorWorkspace(history, first);
+        workspace.Show(second);
+
+        workspace.Replace(first, third);
+
+        Assert.Same(third, workspace.ActiveEditor);
+        var shown = ShownTabs(workspace);
+        Assert.DoesNotContain(first, shown);
+        Assert.Contains(second, shown);
+        Assert.Contains(third, shown);
+    }
+
+    [Fact]
+    public void Close_RemovesATabEvenWhenItIsntActive_AndFallsBackWhenItWas()
+    {
+        var history = new EditorHistory();
+        var first = new TestEditor(history, new TestDocument(0));
+        var second = new TestEditor(history, new TestDocument(1));
+        var workspace = new EditorWorkspace(history, first);
+        workspace.Show(second);
+
+        workspace.Close(first);
+        Assert.Same(second, workspace.ActiveEditor);
+        Assert.DoesNotContain(first, ShownTabs(workspace));
+
+        workspace.Close(second);
+        Assert.Null(workspace.ActiveEditor);
+        Assert.Empty(ShownTabs(workspace));
     }
 }

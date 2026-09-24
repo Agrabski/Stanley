@@ -13,8 +13,9 @@ public static class PageEditorHost
     /// A fresh editing session for <paramref name="project"/>: one undo history (clean,
     /// i.e. "saved") shared by every page and character, the Pages and Characters panes
     /// docked on the left, and the first page's editor in the editor area. Picking a page
-    /// or a character swaps which editor is shown; the ribbon follows the shown editor,
-    /// never the side panes.
+    /// swaps the page tab; opening a character adds its own tab alongside it (and alongside
+    /// any other character already open) instead of replacing anything. The ribbon follows
+    /// whichever tab is active, never the side panes.
     /// </summary>
     public static EditorSession CreateWorkspace(ComicProject project)
     {
@@ -23,13 +24,16 @@ public static class PageEditorHost
         var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters);
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
 
+        IEditorPane shownPage = navigator.CurrentPage.Editor;
         navigator.CurrentPageChanged += page =>
         {
             characters.Deselect();
-            workspace.SwitchTo(page.Editor);
+            workspace.Replace(shownPage, page.Editor);
+            shownPage = page.Editor;
         };
-        characters.CharacterShown += item => workspace.SwitchTo(item.Editor);
-        characters.PageRequested += () => workspace.SwitchTo(navigator.CurrentPage.Editor);
+        characters.CharacterShown += item => workspace.Show(item.Editor);
+        characters.PageRequested += closed => workspace.Replace(closed?.Editor, navigator.CurrentPage.Editor);
+        characters.CharacterDeleted += item => workspace.Close(item.Editor);
         characters.PlaceRequested += id =>
         {
             navigator.Reveal(navigator.CurrentPage);

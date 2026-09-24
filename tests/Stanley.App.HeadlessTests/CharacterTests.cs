@@ -90,6 +90,26 @@ public class CharacterTests
         Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
     }
 
+    [Fact]
+    public void ClickingTheAlreadyCurrentPage_WhileACharacterEditorIsShowing_BringsThePageBack()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        characters.OpenCharacter(created.Id);
+        Dispatcher.UIThread.RunJobs();
+        Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
+
+        var navigatorPane = window.GetVisualDescendants().OfType<PageNavigatorView>().Single();
+        var container = (Control)navigatorPane.List.ContainerFromIndex(0)!;
+        var point = container.TranslatePoint(new Point(container.Bounds.Width / 2, container.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+    }
+
     private static (CharacterLibraryView Pane, Point ItemCenter) ShowPane(MainWindow window, CharacterLibraryViewModel characters)
     {
         window.Workspace.Factory.SetActiveDockable(characters);
@@ -173,6 +193,33 @@ public class CharacterTests
         Assert.Equal(instance.Placement, posed.Placement); // posed, not moved
         Assert.NotEmpty(posed.Pose.BoneRotations);
         Assert.True(page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point.Y < hand.Y - 20);
+        Assert.True(window.Workspace.History.CanUndo);
+    }
+
+    [Fact]
+    public void Dragging_a_selected_characters_elbow_or_knee_dot_bends_the_limb_without_moving_the_hand_or_foot()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId); // selected
+        Dispatcher.UIThread.RunJobs();
+        var canvas = Single<PageCanvasControl>(window);
+        var instance = page.Working.Panels[panelId].CharacterInstances[0];
+        var hand = page.LimbHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        var elbow = page.BendHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        Point ToWindow(ProjectModel.Geometry.Point2D p) => canvas.TranslatePoint(canvas.PageToControl(p), window)!.Value;
+
+        window.MouseDown(ToWindow(elbow), MouseButton.Left);
+        window.MouseMove(ToWindow(new ProjectModel.Geometry.Point2D(2 * hand.X - elbow.X, 2 * hand.Y - elbow.Y)));
+        window.MouseUp(ToWindow(new ProjectModel.Geometry.Point2D(2 * hand.X - elbow.X, 2 * hand.Y - elbow.Y)), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var posed = page.Working.Panels[panelId].CharacterInstances[0];
+        var movedHand = page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        Assert.True(Math.Abs(movedHand.X - hand.X) < 0.1 && Math.Abs(movedHand.Y - hand.Y) < 0.1, "the hand stays put");
+        Assert.NotEmpty(posed.Pose.BoneRotations);
         Assert.True(window.Workspace.History.CanUndo);
     }
 

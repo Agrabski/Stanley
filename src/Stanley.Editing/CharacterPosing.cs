@@ -42,6 +42,10 @@ public static class CharacterPosing
     public static Point2D EndPoint(CharacterDefinition character, CharacterInstance instance, Limb limb) =>
         instance.Placement.ToPage(Joint(Figure(character, instance).Layout, Chain(limb).End));
 
+    /// <summary>Where the limb's elbow or knee joint is on the page - a second drag handle for the bend itself, independent of the hand/foot one.</summary>
+    public static Point2D BendPoint(CharacterDefinition character, CharacterInstance instance, Limb limb) =>
+        instance.Placement.ToPage(Joint(Figure(character, instance).Layout, Chain(limb).Middle));
+
     /// <summary>Where a trunk handle is on the page: the hips joint, the base of the neck, the top of the head.</summary>
     public static Point2D TrunkPoint(CharacterDefinition character, CharacterInstance instance, TrunkPart part)
     {
@@ -85,6 +89,23 @@ public static class CharacterPosing
     {
         var solved = Solve(character, instance, limb, instance.Placement.ToFigure(pageTarget), bendSign);
         return solved is { } angles ? WithLimb(instance, limb, angles.Upper, angles.Lower) : instance;
+    }
+
+    /// <summary>
+    /// Drags the limb's elbow or knee handle directly: the hand or foot stays exactly
+    /// where it already is, and only which side the joint bends towards changes - whichever
+    /// side of the straight root-to-end line <paramref name="pageTarget"/> is on. Lets a
+    /// user draw the elbow/knee itself instead of only inferring the bend from a hand/foot
+    /// drag's approach angle.
+    /// </summary>
+    public static CharacterInstance Bend(CharacterDefinition character, CharacterInstance instance, Limb limb, Point2D pageTarget)
+    {
+        var (root, _, end) = Chain(limb);
+        var layout = Figure(character, instance).Layout;
+        var rootPoint = Joint(layout, root);
+        var endPoint = Joint(layout, end);
+        var sign = Side(rootPoint, endPoint, instance.Placement.ToFigure(pageTarget));
+        return Reach(character, instance, limb, instance.Placement.ToPage(endPoint), sign != 0 ? sign : BendSign(character, instance, limb));
     }
 
     /// <summary>

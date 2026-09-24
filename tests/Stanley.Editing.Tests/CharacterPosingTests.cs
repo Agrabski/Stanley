@@ -79,6 +79,38 @@ public class CharacterPosingTests
         Assert.Equal(ViewAngle.Front, reset.Pose.ViewAngle);
     }
 
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void Dragging_the_elbow_or_knee_handle_keeps_the_hand_or_foot_put_and_can_flip_which_way_it_bends(Limb limb, ViewAngle angle, bool mirrored)
+    {
+        var instance = Placed(angle, mirrored);
+        var start = CharacterPosing.EndPoint(Alice, instance, limb);
+        var reached = CharacterPosing.Reach(Alice, instance, limb, new Point2D(start.X + 8, start.Y - 10), CharacterPosing.BendSign(Alice, instance, limb));
+        var hand = CharacterPosing.EndPoint(Alice, reached, limb);
+        var elbow = CharacterPosing.BendPoint(Alice, reached, limb);
+        var originalSign = CharacterPosing.BendSign(Alice, reached, limb);
+
+        // The point straight through the hand from the elbow is on the line's other side (a point reflection through a point on the line always is).
+        var bent = CharacterPosing.Bend(Alice, reached, limb, new Point2D(2 * hand.X - elbow.X, 2 * hand.Y - elbow.Y));
+
+        Assert.True(Distance(hand, CharacterPosing.EndPoint(Alice, bent, limb)) < 0.05, "the hand/foot doesn't move");
+        Assert.NotEqual(originalSign, CharacterPosing.BendSign(Alice, bent, limb));
+        Assert.Equal(instance.Placement, bent.Placement);
+    }
+
+    [Fact]
+    public void Dragging_the_elbow_towards_where_it_already_is_leaves_the_bend_unchanged()
+    {
+        var instance = Placed();
+        var start = CharacterPosing.EndPoint(Alice, instance, Limb.LeftArm);
+        var reached = CharacterPosing.Reach(Alice, instance, Limb.LeftArm, new Point2D(start.X + 8, start.Y - 10), CharacterPosing.BendSign(Alice, instance, Limb.LeftArm));
+        var elbow = CharacterPosing.BendPoint(Alice, reached, Limb.LeftArm);
+
+        var same = CharacterPosing.Bend(Alice, reached, Limb.LeftArm, elbow);
+
+        Assert.Equal(reached.Pose.BoneRotations, same.Pose.BoneRotations);
+    }
+
     [Fact]
     public void In_a_side_view_knees_bend_forward_and_elbows_back()
     {
