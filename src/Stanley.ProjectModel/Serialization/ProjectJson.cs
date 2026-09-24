@@ -22,6 +22,12 @@ public static class ProjectJson
         File.WriteAllText(path, json + "\n", Utf8NoBom);
     }
 
+    /// <summary>The value as the project format writes it (sorted keys, no trailing newline) - for embedded files and cache keys.</summary>
+    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, TypeInfo<T>());
+
+    public static T Deserialize<T>(string json) =>
+        JsonSerializer.Deserialize(json, TypeInfo<T>()) ?? throw new JsonException($"JSON deserialized to null; expected a {typeof(T).Name}.");
+
     public static T Read<T>(string path)
     {
         using var stream = File.OpenRead(path);
