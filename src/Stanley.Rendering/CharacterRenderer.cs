@@ -42,11 +42,13 @@ public static class CharacterRenderers
     public static ICharacterRenderer Default { get; } = new FigureRenderer();
 
     /// <summary>Draws one instance, or - when its character is missing from <paramref name="characters"/> (a hand-edited or half-copied project) - a dashed placeholder the size of a default body, instead of failing the whole page.</summary>
-    public static void DrawInstance(SKCanvas canvas, CharacterInstance instance, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, float strokeMm)
+    /// <param name="issueLooks">The issue's look per character, for an instance without a look of its own.</param>
+    public static void DrawInstance(SKCanvas canvas, CharacterInstance instance, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, float strokeMm,
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         if (characters != null && characters.TryGetValue(instance.CharacterId, out var character))
         {
-            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, instance.RevisionOverride);
+            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, CharacterLooks.LookOf(instance, issueLooks));
             return;
         }
 

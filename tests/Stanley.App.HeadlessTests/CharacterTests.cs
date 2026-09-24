@@ -231,6 +231,47 @@ public class CharacterTests
     }
 
     [Fact]
+    public void A_character_with_named_looks_gets_a_Look_dropdown_and_a_this_panel_only_menu()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var editor = characters.Items.Single(i => i.Id == created.Id).Editor;
+        editor.NewLookCommand.Execute(null);
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Headwear).Choices.Single(c => c.Label == "Beanie"));
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId);
+        var ribbon = Single<PageEditorRibbon>(window.RibbonBarControl);
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "CharacterTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var looks = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "LookGallery");
+        Assert.True(looks.IsEffectivelyVisible);
+        looks.Flyout!.ShowAt(looks);
+        Dispatcher.UIThread.RunJobs();
+        LookTabTests.Snapshot(window, "page-look-gallery");
+        var content = (Control)((Flyout)looks.Flyout!).Content!;
+        var named = content.GetLogicalDescendants().OfType<Button>().First(b => b.DataContext is LookChoice { Look: { } id } && id == editor.CurrentLook);
+        named.Command!.Execute(named.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(editor.CurrentLook, page.Working.Panels[panelId].CharacterInstances[0].RevisionOverride);
+        looks.Flyout!.Hide();
+
+        // Right-click › This panel only › Take off › Beanie.
+        var canvas = Single<PageCanvasControl>(window);
+        var bounds = page.CharacterBounds(page.Working.Panels[panelId].CharacterInstances[0]);
+        var items = canvas.ContextMenuItems(new ProjectModel.Geometry.Point2D(bounds.MidX, bounds.Top + bounds.Height * 0.35));
+        var panelOnly = items.OfType<MenuItem>().Single(m => (string?)m.Header == "This panel only");
+        var takeOff = panelOnly.ItemsSource!.OfType<MenuItem>().Single(m => (string?)m.Header == "Take off");
+        var beanie = takeOff.ItemsSource!.OfType<MenuItem>().Single(m => (string?)m.Header == "Beanie");
+        beanie.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(page.Working.Panels[panelId].CharacterInstances[0].Overrides?.ActiveStickerOverrides);
+        Assert.Contains(items.OfType<MenuItem>(), m => (string?)m.Header == "Look");
+    }
+
+    [Fact]
     public void The_character_editor_ribbon_applies_a_body_type_and_renames()
     {
         var (window, characters) = Open();

@@ -197,6 +197,48 @@
       <TabItem.Header><TextBlock Classes="characterHeader" Text="Look" /></TabItem.Header>
       <StackPanel Classes="tabContent">
         <DockPanel Classes="group">
+          <DropDownButton Name="LookPicker" Classes="slotGallery" ToolTip.Tip="Named looks - winter clothes, after the haircut... Everything on this tab changes the look shown here">
+            <StackPanel Spacing="1">
+              <TextBlock Text="Look" FontSize="12" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding CurrentLookName}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="6" MaxWidth="440">
+                  <ItemsControl Name="LookItems" ItemsSource="{Binding Looks}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:LookItem">
+                        <Button Classes="small choice sticker" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowLookCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Preview}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Name="NewLookButton" Classes="small" Command="{Binding NewLookCommand}"
+                            ToolTip.Tip="A new look, starting as a copy of this one">New look</Button>
+                    <TextBox Name="LookNameBox" Width="150" FontSize="12" Text="{Binding CurrentLookName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding IsNamedLook}" ToolTip.Tip="The look's name" />
+                    <Button Name="DeleteLookButton" Classes="small" Command="{Binding DeleteLookCommand}" ToolTip.Tip="{Binding DeleteLookTip}">Delete</Button>
+                  </StackPanel>
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Look" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <ItemsControl Name="HairGalleries" ItemsSource="{Binding HairGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}" />
             <ItemsControl Name="FaceGalleries" ItemsSource="{Binding FaceGalleries}" ItemTemplate="{StaticResource CompactSlotGalleryTemplate}" Width="148">

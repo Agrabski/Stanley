@@ -65,7 +65,8 @@ public sealed partial class CharacterEditorViewModel
         {
             asset = StickerImport.NewDrawn(slot, UniqueName($"My {StickerSlots.Get(slot).Label.ToLowerInvariant()}"), view);
             ShowMessage(null);
-            Apply(EditResult<CharacterDefinition>.Success(LookEditing.Wear(Committed, asset)));
+            var drawn = asset;
+            ApplyLook(c => LookEditing.Wear(c, drawn));
             SelectSticker(asset.Id);
         }
         var id = asset.Id;
@@ -115,7 +116,7 @@ public sealed partial class CharacterEditorViewModel
             ShowMessage($"Couldn't import {fileName}: {result.Error}.");
             return false;
         }
-        Apply(EditResult<CharacterDefinition>.Success(LookEditing.Wear(Committed, asset)));
+        ApplyLook(c => LookEditing.Wear(c, asset));
         SelectSticker(asset.Id);
         ShowMessage(result.Report.Count > 0
             ? $"{fileName}: {string.Join("; ", result.Report)}."

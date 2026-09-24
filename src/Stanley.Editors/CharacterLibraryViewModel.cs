@@ -152,6 +152,9 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         }
     }
 
+    /// <summary>How many panels (and issues) show a character in a named look - set by the session, which sees the pages; a look in use can't be deleted.</summary>
+    public Func<CharacterId, CharacterRevisionId, int>? LookUsageCounter { get; set; }
+
     /// <summary>How "Draw your own" reaches the user's SVG editor; the app points it at its data folder, tests at a fake.</summary>
     public IArtEditing ArtEditing { get; set; } = new SystemArtEditing(Path.Combine(Path.GetTempPath(), "stanley-drawing"));
 

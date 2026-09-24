@@ -26,6 +26,21 @@ public sealed record CharacterLook(
 public static class CharacterLooks
 {
     /// <summary>
+    /// A look id meaning "the character's own default look", for a panel that wants it
+    /// even though its issue uses a named look. Never a real revision's id (those are
+    /// minted), so resolving it finds no revision - the default.
+    /// </summary>
+    public static CharacterRevisionId DefaultLook { get; } = CharacterRevisionId.FromValue("default");
+
+    /// <summary>The look an instance is drawn in: its own, else its issue's for that character (<paramref name="issueLooks"/>), else none (the default).</summary>
+    public static CharacterRevisionId? LookOf(CharacterInstance instance, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks) =>
+        instance.RevisionOverride ?? (issueLooks is not null && issueLooks.TryGetValue(instance.CharacterId, out var look) ? look : null);
+
+    /// <summary>The named look <paramref name="look"/> names on <paramref name="character"/>, or null for the default (or a look that's gone).</summary>
+    public static CharacterRevision? Revision(CharacterDefinition character, CharacterRevisionId? look) =>
+        look is { } id && character.Revisions.TryGetValue(id, out var revision) ? revision : null;
+
+    /// <summary>
     /// Resolves what <paramref name="character"/> wears: its own default stickers per slot,
     /// replaced slot by slot by <paramref name="revision"/>, then by <paramref name="overrides"/>
     /// (one panel). Colours and fabrics go stickers' defaults → character → revision → panel.

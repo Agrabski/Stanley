@@ -375,6 +375,60 @@
           <TextBlock Classes="groupLabel" Text="Expression" />
         </DockPanel>
         <Rectangle Classes="divider" />
+        <DockPanel Classes="group" IsVisible="{Binding SelectedCharacterHasLooks}">
+          <DropDownButton Name="LookGallery" Classes="slotGallery" ToolTip.Tip="Which of the character's looks: for this panel, or for the whole issue">
+            <StackPanel Spacing="1">
+              <TextBlock Text="Look" FontSize="12" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding SelectedLookName}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="4" MaxWidth="440">
+                  <TextBlock Text="This panel" FontSize="11" FontWeight="SemiBold" />
+                  <ItemsControl Name="PanelLooks" ItemsSource="{Binding PanelLookChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:LookChoice">
+                        <Button Classes="small choice sticker" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).SetPanelLookCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Preview}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="The whole issue" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0" />
+                  <ItemsControl Name="IssueLooks" ItemsSource="{Binding IssueLookChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:LookChoice">
+                        <Button Classes="small choice sticker" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).SetIssueLookCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Preview}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Look" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding SelectedCharacterHasLooks}" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <StackPanel VerticalAlignment="Center" Spacing="1">

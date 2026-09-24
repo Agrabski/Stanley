@@ -256,7 +256,7 @@ public sealed partial class CharacterEditorViewModel
             if (choice != null)
                 SetSlotColor(choice.Slot, choice.Color);
         });
-        TakeOffSelectedCommand = new RelayCommand(() => EditSelected(id => LookEditing.TakeOff(Committed, id)), () => SelectedStickerIsWorn);
+        TakeOffSelectedCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.TakeOff(c, id)), () => SelectedStickerIsWorn);
         RemoveSelectedCommand = new RelayCommand(() =>
         {
             if (_selectedSticker is { } id)
@@ -265,8 +265,8 @@ public sealed partial class CharacterEditorViewModel
                 Apply(EditResult<CharacterDefinition>.Success(LookEditing.RemoveFromWardrobe(Committed, id)));
             }
         }, () => HasSelectedSticker);
-        MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => LookEditing.MoveInStack(Committed, id, +1)), () => SelectedStickerIsWorn);
-        MoveSelectedDownCommand = new RelayCommand(() => EditSelected(id => LookEditing.MoveInStack(Committed, id, -1)), () => SelectedStickerIsWorn);
+        MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, +1)), () => SelectedStickerIsWorn);
+        MoveSelectedDownCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, -1)), () => SelectedStickerIsWorn);
         DeselectStickerCommand = new RelayCommand(() => SelectSticker(null));
         PreviewExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
         {
@@ -299,7 +299,7 @@ public sealed partial class CharacterEditorViewModel
     public SlotGallery Gallery(string slot)
     {
         var info = StickerSlots.Get(slot);
-        var character = Working;
+        var character = LookWorking;
         var worn = character.Stickers.TryGetValue(slot, out var ids) ? ids : [];
         var pose = StagePose;
         var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0, pose) };
@@ -315,15 +315,15 @@ public sealed partial class CharacterEditorViewModel
 
     private void Wear(StickerChoice choice)
     {
-        var character = Committed;
-        CharacterDefinition next;
         if (choice.IsNone)
-            next = LookEditing.ClearSlot(character, choice.Slot);
+            ApplyLook(c => LookEditing.ClearSlot(c, choice.Slot));
         else if (choice.Asset is { } asset)
-            next = choice.IsWorn && StickerSlots.Get(choice.Slot).Stacks ? LookEditing.TakeOff(character, asset.Id) : LookEditing.Wear(character, asset);
+            ApplyLook(c => choice.IsWorn && StickerSlots.Get(choice.Slot).Stacks ? LookEditing.TakeOff(c, asset.Id) : LookEditing.Wear(c, asset));
         else
-            next = LookEditing.Wear(character, choice.Library!.Instantiate());
-        Apply(EditResult<CharacterDefinition>.Success(next));
+        {
+            var copy = choice.Library!.Instantiate();
+            ApplyLook(c => LookEditing.Wear(c, copy));
+        }
     }
 
     // ---------------------------------------------------------------- preview expression
@@ -367,7 +367,7 @@ public sealed partial class CharacterEditorViewModel
         get
         {
             var rest = new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new SortedDictionary<string, string>());
-            return ExpressionPresets.All.Select(p => new ExpressionPresetChoice(p, Working, ExpressionPresets.Apply(rest, p), p == _previewExpression)).ToList();
+            return ExpressionPresets.All.Select(p => new ExpressionPresetChoice(p, LookWorking, ExpressionPresets.Apply(rest, p), p == _previewExpression)).ToList();
         }
     }
 
@@ -376,7 +376,7 @@ public sealed partial class CharacterEditorViewModel
     {
         get
         {
-            var missing = CharacterLooks.Resolve(Working).Stickers
+            var missing = CharacterLooks.Resolve(LookWorking).Stickers
                 .Where(w => _previewExpression.Variants.TryGetValue(w.Slot, out var v) && v != ExpressionPresets.Neutral && !w.Asset.Sticker.Variants.Contains(v))
                 .Select(w => $"{w.Asset.Sticker.Name} ({StickerSlots.Get(w.Slot).Label.ToLowerInvariant()}) has no \"{_previewExpression.Variants[w.Slot]}\"")
                 .ToList();
@@ -411,7 +411,7 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>Brings the editors up to date: the same objects while the slots stay the same (so an open dropdown stays open), a new list when they change. True if the list changed.</summary>
     private bool RefreshColorEditors()
     {
-        var character = Working;
+        var character = LookWorking;
         var look = CharacterLooks.Resolve(character);
         var slots = LookEditing.ColorSlotsInUse(character);
         var changed = !slots.SequenceEqual(_colorEditors.Select(e => e.Slot));
@@ -422,18 +422,17 @@ public sealed partial class CharacterEditorViewModel
         return changed;
     }
 
-    internal void SetSlotColor(string slot, ColorValue color) =>
-        Apply(EditResult<CharacterDefinition>.Success(LookEditing.SetColor(Committed, slot, color)));
+    internal void SetSlotColor(string slot, ColorValue color) => ApplyLook(c => LookEditing.SetColor(c, slot, color));
 
     /// <summary>Changes a colour slot's fabric, starting from what it wears now: a live preview inside a slider drag, otherwise one undo step.</summary>
     internal void EditFabric(string slot, Func<Fabric, Fabric> edit)
     {
         var baseline = IsGestureActive ? Working : Committed;
-        var current = CharacterLooks.Resolve(baseline).FabricOf(slot) ?? new Fabric();
+        var current = CharacterLooks.Resolve(ProjectLook(baseline)).FabricOf(slot) ?? new Fabric();
         var next = edit(current);
         if (Equals(next, current))
             return;
-        var result = EditResult<CharacterDefinition>.Success(LookEditing.SetFabric(baseline, slot, next));
+        var result = EditResult<CharacterDefinition>.Success(StoreLookEdit(baseline, c => LookEditing.SetFabric(c, slot, next)));
         if (IsGestureActive)
             UpdateGesture(result);
         else
@@ -475,12 +474,12 @@ public sealed partial class CharacterEditorViewModel
         var character = Committed;
         if (!character.Wardrobe.Tiles.TryGetValue(name, out var existing) || !existing.SameContent(file))
             character = character with { Wardrobe = character.Wardrobe.WithTile(name, file) };
-        var current = CharacterLooks.Resolve(character).FabricOf(slot) ?? new Fabric();
+        var current = CharacterLooks.Resolve(ProjectLook(character)).FabricOf(slot) ?? new Fabric();
         var next = texture
             ? current with { Texture = new TextureFill(TextureKind.Tile, current.Texture?.Strength, current.Texture?.Size, name) }
             : current with { Pattern = new PatternFill(PatternKind.Tile, current.Pattern?.Colors ?? [], current.Pattern?.Size, current.Pattern?.Angle, Tile: name) };
         ShowMessage(null);
-        Apply(EditResult<CharacterDefinition>.Success(LookEditing.SetFabric(character, slot, next)));
+        Apply(EditResult<CharacterDefinition>.Success(StoreLookEdit(character, c => LookEditing.SetFabric(c, slot, next))));
     }
 
     /// <summary>
@@ -515,7 +514,7 @@ public sealed partial class CharacterEditorViewModel
         _ => slot.Length == 0 ? slot : char.ToUpperInvariant(slot[0]) + slot[1..]
     };
 
-    private static IReadOnlyList<(string Name, ColorValue Color)> Palette(string slot) => slot switch
+    internal static IReadOnlyList<(string Name, ColorValue Color)> Palette(string slot) => slot switch
     {
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
         "hair" or "brows" => HairColors,
@@ -549,7 +548,7 @@ public sealed partial class CharacterEditorViewModel
 
     /// <summary>The worn stickers, for the Sticker tab's picker - in paint order.</summary>
     public IReadOnlyList<WornStickerItem> WornStickers =>
-        CharacterLooks.Resolve(Working).Stickers.Select(w => new WornStickerItem(w.Asset.Id, w.Asset.Sticker.Name, StickerSlots.Get(w.Slot).Label)).ToList();
+        CharacterLooks.Resolve(LookWorking).Stickers.Select(w => new WornStickerItem(w.Asset.Id, w.Asset.Sticker.Name, StickerSlots.Get(w.Slot).Label)).ToList();
 
     /// <summary>The sticker the Sticker tab works on (picked on the stage or in its list), or null.</summary>
     public StickerId? SelectedStickerId => _selectedSticker;
@@ -558,7 +557,7 @@ public sealed partial class CharacterEditorViewModel
 
     public bool HasSelectedSticker => SelectedSticker is not null;
 
-    public bool SelectedStickerIsWorn => _selectedSticker is { } id && Working.Stickers.Values.Any(v => v.Contains(id));
+    public bool SelectedStickerIsWorn => _selectedSticker is { } id && LookWorking.Stickers.Values.Any(v => v.Contains(id));
 
     /// <summary>The picker's selection - two-way.</summary>
     public WornStickerItem? SelectedWorn
@@ -646,10 +645,10 @@ public sealed partial class CharacterEditorViewModel
             Apply(result);
     }
 
-    private void EditSelected(Func<StickerId, CharacterDefinition> edit)
+    private void EditSelected(Func<StickerId, Func<CharacterDefinition, CharacterDefinition>> edit)
     {
         if (_selectedSticker is { } id)
-            Apply(EditResult<CharacterDefinition>.Success(edit(id)));
+            ApplyLook(edit(id));
     }
 
     private void RaiseSelectedStickerChanged()
@@ -680,6 +679,11 @@ public sealed partial class CharacterEditorViewModel
     {
         if (_selectedSticker is { } id && Working.Wardrobe.Find(id) is null)
             _selectedSticker = null;
+        if (_currentLook is { } look && !Working.Revisions.ContainsKey(look))
+            _currentLook = null; // deleted (or undone away)
+        _lookWorking = null;
+        OnPropertyChanged(nameof(LookWorking));
+        RaiseLooksChanged();
         OnPropertyChanged(nameof(HairGalleries));
         OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));

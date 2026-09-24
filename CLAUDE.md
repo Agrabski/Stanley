@@ -572,9 +572,8 @@ body and placement only.
 
 ### Stickers (implemented)
 
-Slices 1–6 of `docs/sticker-system.md` §15 (layered figure, cover stickers,
-fabrics, drawn stickers, expressions, draw your own and import); named looks are
-still to come.
+All slices of `docs/sticker-system.md` §15: layered figure, cover stickers,
+fabrics, drawn stickers, expressions, draw your own and import, named looks.
 
 - **Model** (ProjectModel/Characters): `Sticker` (slot, `Parts`, default `Colors`
   and `Fabrics` per colour slot, `Variants`, `Source` = `library:<key>` while an
@@ -662,6 +661,23 @@ still to come.
   on the stage to move it (`BeginArtDrag`/`UpdateArtDrag`, figure delta →
   `RegionMapping.ToTemplate`, one undo step; a 3 px threshold keeps clicks from
   nudging it).
+- **Named looks** (`CharacterRevision`; the UI says "look"): `LookEditing.Project`
+  flattens a character as a look (and then a panel's overrides) dress it into a plain
+  definition, every look edit runs on that, and `StoreLook` / `StorePanel` keep only
+  the differences (a look vs the default, a panel vs its look; a fabric taken off is
+  stored as a plain one). Character editor: Look tab › *Look* picker (Default, named
+  looks with previews, New look — a copy of the current one —, rename, Delete — only
+  when no panel or issue uses it, `CharacterLibraryViewModel.LookUsageCounter`); the
+  whole Look tab and the stage show and edit `CurrentLook` (`LookWorking`). Issue
+  default: `Issue.CharacterRevisions`, owned by the navigator (`IIssueLooksHost`,
+  undoable, saved by `ComicProject.Save(…, issueLooks)`), pushed to every page editor
+  (`IssueLooks`) and drawn through `PageRenderer`/`CharacterRenderers.DrawInstance`
+  (`CharacterLooks.LookOf`: the panel's `RevisionOverride`, else the issue's; the
+  reserved `CharacterLooks.DefaultLook` id means "default look for this panel").
+  Page: Character tab › *Look* dropdown when the character has named looks (this
+  panel / the whole issue), right-click › Look, and right-click › *This panel only*
+  (take off, put on, colour, pattern, back to the look — `EditPanelLook`, one undo
+  step each).
 - **Expressions** (`ExpressionPresets`, Stanley.Editing, beside `PosePresets`):
   twelve presets (Neutral, Happy, Laughing, Sad, Angry, Surprised, Scared,
   Skeptical, Wink, Talking, Shouting, Asleep), each a variant for eyes, brows and

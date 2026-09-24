@@ -100,3 +100,38 @@ public class StickerImportTests
         Assert.Null(StickerImport.WithArt(drawn, ViewAngle.Front, "<svg").Asset);
     }
 }
+
+public class LookRenderingTests
+{
+    [Fact]
+    public void An_instance_is_drawn_in_its_issue_look_unless_it_picks_its_own()
+    {
+        var sticker = new Sticker(StickerId.New(), "Top", StickerSlots.Top, [new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 0.9))],
+            new SortedDictionary<string, ColorValue> { ["top"] = ColorValue.FromHex("#0000ff") }, ["default"]);
+        var character = CharacterDefinition.Create("A") with { Stickers = new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Top] = [sticker.Id] } };
+        var red = new CharacterRevision(CharacterRevisionId.New(), character.Id, "Red", new SortedDictionary<string, IReadOnlyList<StickerId>>(),
+            new SortedDictionary<string, ColorValue> { ["top"] = ColorValue.FromHex("#ff0000") }, null, null);
+        character = character with
+        {
+            Wardrobe = character.Wardrobe.With(new StickerAsset(sticker, new Dictionary<string, ArtFile>())),
+            Revisions = new Dictionary<CharacterRevisionId, CharacterRevision> { [red.Id] = red },
+        };
+        var characters = new Dictionary<CharacterId, CharacterDefinition> { [character.Id] = character };
+        var issue = new Dictionary<CharacterId, CharacterRevisionId> { [character.Id] = red.Id };
+        var instance = new CharacterInstance(character.Id, new CharacterPlacement(new Point2D(200, 420), 400, false), null, new PoseData(ViewAngle.Front, [], []), null);
+
+        SKColor Chest(CharacterInstance i)
+        {
+            using var bitmap = new SKBitmap(400, 440);
+            using (var canvas = new SKCanvas(bitmap))
+            {
+                canvas.Clear(SKColors.White);
+                CharacterRenderers.DrawInstance(canvas, i, characters, 2, issue);
+            }
+            return bitmap.GetPixel(200, 420 - (int)(0.7 * 400));
+        }
+
+        Assert.Equal(new SKColor(255, 0, 0), Chest(instance));
+        Assert.Equal(new SKColor(0, 0, 255), Chest(instance with { RevisionOverride = CharacterLooks.DefaultLook }));
+    }
+}

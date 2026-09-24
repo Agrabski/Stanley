@@ -30,6 +30,7 @@ public sealed record PageCanvasScene(
     PageFolio? Folio = null,
     bool DarkChrome = false,
     IReadOnlyDictionary<CharacterId, CharacterDefinition>? Characters = null,
+    IReadOnlyDictionary<CharacterId, CharacterRevisionId>? IssueLooks = null,
     int SelectedCharacterIndex = -1,
     Rect2D? SelectedCharacterBounds = null,
     IReadOnlyList<Point2D>? LimbHandles = null,
@@ -123,7 +124,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
             .Where(_scene.Document.Panels.ContainsKey)
             .Select(id => _scene.Document.Panels[id])
-            .ToList(), _scene.Characters);
+            .ToList(), _scene.Characters, _scene.IssueLooks);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }

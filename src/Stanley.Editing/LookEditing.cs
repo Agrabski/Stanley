@@ -188,6 +188,123 @@ public static class LookEditing
         return character with { Wardrobe = wardrobe };
     }
 
+    // ---------------------------------------------------------------- named looks and one panel
+
+    /// <summary>
+    /// The character as <paramref name="revision"/> (a named look) and then
+    /// <paramref name="overrides"/> (one panel) dress it, flattened into a plain
+    /// definition: what's worn per slot, colours and fabrics. Every edit above works on
+    /// it; <see cref="StoreLook"/> and <see cref="StorePanel"/> write the result back as
+    /// the sparse changes a look or a panel keeps.
+    /// </summary>
+    public static CharacterDefinition Project(CharacterDefinition character, CharacterRevision? revision = null, CharacterInstanceOverrides? overrides = null)
+    {
+        if (revision is null && (overrides is null || overrides.IsEmpty))
+            return character;
+        var stickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(character.Stickers, StringComparer.Ordinal);
+        var colors = new SortedDictionary<string, ColorValue>(character.ColorSlots, StringComparer.Ordinal);
+        var fabrics = new SortedDictionary<string, Fabric>(character.Fabrics ?? new SortedDictionary<string, Fabric>(), StringComparer.Ordinal);
+        Overlay(stickers, revision?.ActiveStickers);
+        Overlay(colors, revision?.ColorSlotValues);
+        Overlay(fabrics, revision?.FabricValues);
+        Overlay(stickers, overrides?.ActiveStickerOverrides);
+        Overlay(colors, overrides?.ColorSlotOverrides);
+        Overlay(fabrics, overrides?.FabricOverrides);
+        return character with { Stickers = stickers, ColorSlots = colors, Fabrics = fabrics.Count == 0 ? null : fabrics };
+    }
+
+    /// <summary>
+    /// Writes an edited projection of the named look <paramref name="look"/> back: the look
+    /// keeps only where it differs from the default look, the wardrobe takes any sticker
+    /// the edit added, and everything else stays the character's own.
+    /// </summary>
+    public static CharacterDefinition StoreLook(CharacterDefinition character, CharacterRevisionId look, CharacterDefinition edited)
+    {
+        if (!character.Revisions.TryGetValue(look, out var revision))
+            return character with { Wardrobe = edited.Wardrobe };
+        var (stickers, colors, fabrics) = Differences(character, edited);
+        var updated = revision with { ActiveStickers = stickers, ColorSlotValues = colors, FabricValues = fabrics.Count == 0 ? null : fabrics };
+        var revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions) { [look] = updated };
+        return character with { Revisions = revisions, Wardrobe = edited.Wardrobe };
+    }
+
+    /// <summary>
+    /// <paramref name="instance"/> dressed as an edited projection of its look says - kept
+    /// as its panel overrides, only where it differs from the look (<paramref name="revision"/>,
+    /// or the default look). No differences, no overrides.
+    /// </summary>
+    public static CharacterInstance StorePanel(CharacterDefinition character, CharacterRevision? revision, CharacterInstance instance, CharacterDefinition edited)
+    {
+        var (stickers, colors, fabrics) = Differences(Project(character, revision), edited);
+        var overrides = new CharacterInstanceOverrides(stickers.Count == 0 ? null : stickers, colors.Count == 0 ? null : colors, fabrics.Count == 0 ? null : fabrics);
+        return instance with { Overrides = overrides.IsEmpty ? null : overrides };
+    }
+
+    /// <summary>A new named look, called <paramref name="name"/>, starting as a copy of <paramref name="from"/> (or of the default look).</summary>
+    public static (CharacterDefinition Character, CharacterRevisionId Id) NewLook(CharacterDefinition character, string name, CharacterRevisionId? from = null)
+    {
+        var id = CharacterRevisionId.New();
+        var source = from is { } f && character.Revisions.TryGetValue(f, out var existing) ? existing : null;
+        var look = new CharacterRevision(id, character.Id, name,
+            new SortedDictionary<string, IReadOnlyList<StickerId>>(source?.ActiveStickers ?? new SortedDictionary<string, IReadOnlyList<StickerId>>(), StringComparer.Ordinal),
+            new SortedDictionary<string, ColorValue>(source?.ColorSlotValues ?? new SortedDictionary<string, ColorValue>(), StringComparer.Ordinal),
+            null, null,
+            source?.FabricValues is { } fabrics ? new SortedDictionary<string, Fabric>(fabrics, StringComparer.Ordinal) : null);
+        var revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions) { [id] = look };
+        return (character with { Revisions = revisions }, id);
+    }
+
+    public static CharacterDefinition RenameLook(CharacterDefinition character, CharacterRevisionId look, string name) =>
+        character.Revisions.TryGetValue(look, out var revision) && revision.Name != name && name.Trim().Length > 0
+            ? character with { Revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions) { [look] = revision with { Name = name.Trim() } } }
+            : character;
+
+    public static CharacterDefinition DeleteLook(CharacterDefinition character, CharacterRevisionId look)
+    {
+        if (!character.Revisions.ContainsKey(look))
+            return character;
+        var revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions);
+        revisions.Remove(look);
+        return character with { Revisions = revisions };
+    }
+
+    /// <summary>Where <paramref name="edited"/> dresses differently from <paramref name="baseline"/>: slots, colours, fabrics (a fabric taken off is a plain one, so it wins over what's underneath).</summary>
+    private static (SortedDictionary<string, IReadOnlyList<StickerId>> Stickers, SortedDictionary<string, ColorValue> Colors, SortedDictionary<string, Fabric> Fabrics) Differences(
+        CharacterDefinition baseline, CharacterDefinition edited)
+    {
+        var stickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(StringComparer.Ordinal);
+        foreach (var slot in baseline.Stickers.Keys.Union(edited.Stickers.Keys))
+        {
+            var before = baseline.Stickers.TryGetValue(slot, out var b) ? b : [];
+            var after = edited.Stickers.TryGetValue(slot, out var a) ? a : [];
+            if (!before.SequenceEqual(after))
+                stickers[slot] = after;
+        }
+        var colors = new SortedDictionary<string, ColorValue>(StringComparer.Ordinal);
+        foreach (var (slot, color) in edited.ColorSlots)
+        {
+            if (!baseline.ColorSlots.TryGetValue(slot, out var before) || before != color)
+                colors[slot] = color;
+        }
+        var fabrics = new SortedDictionary<string, Fabric>(StringComparer.Ordinal);
+        var baseFabrics = baseline.Fabrics ?? new SortedDictionary<string, Fabric>();
+        var editedFabrics = edited.Fabrics ?? new SortedDictionary<string, Fabric>();
+        foreach (var slot in baseFabrics.Keys.Union(editedFabrics.Keys))
+        {
+            var before = baseFabrics.GetValueOrDefault(slot);
+            var after = editedFabrics.TryGetValue(slot, out var f) ? f : new Fabric();
+            if (!Equals(before, after))
+                fabrics[slot] = after;
+        }
+        return (stickers, colors, fabrics);
+    }
+
+    private static void Overlay<T>(SortedDictionary<string, T> into, IReadOnlyDictionary<string, T>? values)
+    {
+        foreach (var (key, value) in values ?? new Dictionary<string, T>())
+            into[key] = value;
+    }
+
     private static SortedDictionary<string, IReadOnlyList<StickerId>> WithSlot(SortedDictionary<string, IReadOnlyList<StickerId>> stickers, string slot, IReadOnlyList<StickerId> ids) =>
         new(stickers, StringComparer.Ordinal) { [slot] = ids };
 }

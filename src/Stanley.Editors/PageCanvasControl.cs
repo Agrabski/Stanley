@@ -189,7 +189,8 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.SelectedPanelId) or nameof(PageEditorViewModel.SelectedBubbleIndex)
             or nameof(PageEditorViewModel.ActiveGuides) or nameof(PageEditorViewModel.Grid)
             or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio)
-            or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot))
+            or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
+            or nameof(PageEditorViewModel.IssueLooks))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -220,6 +221,7 @@ public sealed class PageCanvasControl : Control
             _viewModel.Folio,
             ActualThemeVariant == ThemeVariant.Dark,
             _viewModel.CharacterSnapshot,
+            _viewModel.IssueLooks,
             _viewModel.SelectedCharacterIndex,
             _viewModel.SelectedCharacter is { } selectedCharacter ? _viewModel.CharacterBounds(selectedCharacter) : null,
             _viewModel.SelectedCharacter is { } posed ? _viewModel.LimbHandles(posed).Select(h => h.Point).ToList() : null,
@@ -375,6 +377,69 @@ public sealed class PageCanvasControl : Control
         return new Hit(HitKind.None);
     }
 
+    /// <summary>
+    /// Right-click › This panel only: take something off or put something on, recolour or
+    /// re-pattern a colour slot - for this one panel (sunglasses for one shot) - or go
+    /// back to the look.
+    /// </summary>
+    private MenuItem PanelOnlyMenu(PageEditorViewModel vm, ProjectModel.Ids.PanelId panelId, int index)
+    {
+        var menu = new MenuItem { Header = "This panel only" };
+        var items = new List<object>();
+        if (vm.PanelView(panelId, index) is { } shown)
+        {
+            var worn = ProjectModel.Characters.CharacterLooks.Resolve(shown).Stickers;
+            if (worn.Count > 0)
+                items.Add(new MenuItem
+                {
+                    Header = "Take off",
+                    ItemsSource = worn.Select(w => Item(w.Asset.Sticker.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.TakeOff(c, w.Asset.Id)))).ToList()
+                });
+            var spare = shown.Wardrobe.Stickers.Values.Where(a => worn.All(w => w.Asset.Id != a.Id)).OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            if (spare.Count > 0)
+                items.Add(new MenuItem
+                {
+                    Header = "Put on",
+                    ItemsSource = spare.Select(a => Item(a.Sticker.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.Wear(c, a)))).ToList()
+                });
+            var slots = LookEditing.ColorSlotsInUse(shown);
+            items.Add(new MenuItem
+            {
+                Header = "Colour",
+                ItemsSource = slots.Select(slot => new MenuItem
+                {
+                    Header = CharacterEditorViewModel.ColorSlotLabel(slot),
+                    ItemsSource = CharacterEditorViewModel.Palette(slot)
+                        .Select(p => Item(p.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.SetColor(c, slot, p.Color)))).ToList()
+                }).ToList()
+            });
+            var fabricSlots = slots.Where(slot => slot is not (ProjectModel.Characters.CharacterDefinition.SkinSlot or "eyes")).ToList();
+            if (fabricSlots.Count > 0)
+                items.Add(new MenuItem
+                {
+                    Header = "Pattern",
+                    ItemsSource = fabricSlots.Select(slot => new MenuItem
+                    {
+                        Header = CharacterEditorViewModel.ColorSlotLabel(slot),
+                        ItemsSource = new (string Name, ProjectModel.Characters.PatternKind? Kind)[]
+                            {
+                                ("Plain", null), ("Stripes", ProjectModel.Characters.PatternKind.Stripes), ("Checks", ProjectModel.Characters.PatternKind.Checks),
+                                ("Plaid", ProjectModel.Characters.PatternKind.Plaid), ("Dots", ProjectModel.Characters.PatternKind.Dots),
+                            }
+                            .Select(p => Item(p.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.SetFabric(c, slot,
+                                p.Kind is { } kind ? new ProjectModel.Characters.Fabric(new ProjectModel.Characters.PatternFill(kind, [])) : new ProjectModel.Characters.Fabric()))))
+                            .ToList()
+                    }).ToList()
+                });
+        }
+        var clear = Item("Back to the look", () => vm.ClearPanelLook(panelId, index));
+        clear.IsEnabled = vm.Working.Panels.TryGetValue(panelId, out var panel) && index < panel.CharacterInstances.Count && panel.CharacterInstances[index].Overrides is not null;
+        items.Add(new Separator());
+        items.Add(clear);
+        menu.ItemsSource = items;
+        return menu;
+    }
+
     /// <summary>The figure's actual silhouette, not its box - characters stand close together and overlap.</summary>
     private bool HitsCharacter(ProjectModel.Issues.CharacterInstance instance, Point2D p)
     {
@@ -383,7 +448,7 @@ public sealed class PageCanvasControl : Control
             return false;
         if (!vm.CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
             return true; // a missing character's placeholder box
-        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, instance.RevisionOverride);
+        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, vm.LookOf(instance));
         return path.Contains((float)p.X, (float)p.Y);
     }
 
@@ -910,6 +975,13 @@ public sealed class PageCanvasControl : Control
 
     private void ShowContextMenu(Point2D page)
     {
+        var menu = new ContextMenu { ItemsSource = ContextMenuItems(page) };
+        menu.Open(this);
+    }
+
+    /// <summary>The right-click menu for what's at <paramref name="page"/> (page mm) - selecting it first. Public for headless UI tests.</summary>
+    public IReadOnlyList<Control> ContextMenuItems(Point2D page)
+    {
         var vm = _viewModel!;
         var hit = HitTest(page);
         var items = new List<Control>();
@@ -957,6 +1029,13 @@ public sealed class PageCanvasControl : Control
             var expressions = new MenuItem { Header = "Expression" };
             expressions.ItemsSource = ExpressionPresets.All.Select(preset => Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset))).ToList();
             items.Add(expressions);
+            if (vm.PanelLookChoices is { Count: > 2 } looks)
+            {
+                var look = new MenuItem { Header = "Look" };
+                look.ItemsSource = looks.Select(choice => Item((choice.IsCurrent ? "✓ " : "") + choice.Name, () => vm.SetPanelLook(characterPanel, index, choice.Look))).ToList();
+                items.Add(look);
+            }
+            items.Add(PanelOnlyMenu(vm, characterPanel, index));
             if (vm.SelectedCharacterIsPosed)
             {
                 items.Add(Item("Mirror pose", () => vm.MirrorCharacterPose(characterPanel, index)));
@@ -993,9 +1072,7 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Fit page", FitPage, "Ctrl+0"));
             items.Add(Item("Actual size", ActualSize, "Ctrl+1"));
         }
-
-        var menu = new ContextMenu { ItemsSource = items };
-        menu.Open(this);
+        return items;
     }
 
     private static MenuItem Item(string header, Action action, string? gesture = null)

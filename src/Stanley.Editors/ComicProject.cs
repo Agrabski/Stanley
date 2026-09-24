@@ -75,6 +75,9 @@ public sealed class ComicProject
     /// <summary>The issue's printed page numbers, as opened.</summary>
     public PageNumbering PageNumbering => _issue.PageNumbering ?? PageNumbering.Off;
 
+    /// <summary>The issue's look per character (<see cref="Issue.CharacterRevisions"/>): what its panels show a character in unless a panel picks its own.</summary>
+    public IReadOnlyDictionary<CharacterId, CharacterRevisionId> IssueLooks => _issue.CharacterRevisions;
+
     /// <summary>A brand-new, unsaved comic with one page: either one panel filling the live area or tiled with <paramref name="layout"/>.</summary>
     public static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout = null, PanelGrid? grid = null)
     {
@@ -126,8 +129,9 @@ public sealed class ComicProject
     /// <paramref name="characters"/>, writes every character too and deletes the ones
     /// removed since; without, leaves the characters on disk alone.
     /// </summary>
+    /// <param name="issueLooks">The issue's look per character; null leaves the issue's as it was.</param>
     public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -136,7 +140,7 @@ public sealed class ComicProject
             ? new ProjectRepository(Location)
             : ProjectRepository.Initialize(Location, Title, Trim);
 
-        (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: true);
+        (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: true);
         if (characters != null)
             _savedCharacters = WriteCharacters(repository, Tidied(characters, pages), prune: true);
     }
@@ -180,10 +184,10 @@ public sealed class ComicProject
     /// can line it back up with the original folder.
     /// </summary>
     public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim);
-        WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: false);
+        WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: false);
         WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
     }
 
@@ -209,6 +213,7 @@ public sealed class ComicProject
         ProjectRepository repository,
         IReadOnlyList<(PageId Id, PageDocument Document)> pages,
         PageNumbering pageNumbering,
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks,
         bool prune)
     {
         var manifest = repository.LoadManifest();
@@ -219,7 +224,8 @@ public sealed class ComicProject
         {
             PageIds = pages.Select(p => p.Id).ToList(),
             // "Off" is stored as absent, so turning numbers off leaves the file as it was before they existed.
-            PageNumbering = pageNumbering is { Position: not PageNumberPosition.None } ? pageNumbering : null
+            PageNumbering = pageNumbering is { Position: not PageNumberPosition.None } ? pageNumbering : null,
+            CharacterRevisions = issueLooks is null ? _issue.CharacterRevisions : new SortedDictionary<CharacterId, CharacterRevisionId>(issueLooks.ToDictionary())
         };
         repository.SaveIssue(issue);
 
@@ -261,7 +267,7 @@ public sealed class ComicProject
     /// Returns the folder actually saved to.
     /// </summary>
     public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
@@ -274,24 +280,24 @@ public sealed class ComicProject
             CopyProject(source, target);
 
         Location = target;
-        Save(pages, pageNumbering, characters);
+        Save(pages, pageNumbering, characters, issueLooks);
         return target;
     }
 
     /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
     public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters);
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks);
     }
 
     /// <summary>One page as a PNG.</summary>
     public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters);
+        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>

@@ -1,7 +1,7 @@
 # Sticker system — design
 
-**Status: being implemented** — slices 0–6 are built (§15), and §18 records where
-the code differs from this text. This follows the character authoring POC
+**Status: implemented** — every slice in §15 is built, and §18 records where the
+code differs from this text. This follows the character authoring POC
 (`docs/character-authoring-poc.md`) and revises the sticker parts of
 `docs/character-and-project-plan.md`. Where the two disagree, this document wins.
 §17 lists what has been decided since the first draft and what is still open.
@@ -830,3 +830,12 @@ open:
   under the app's data folder (`Drawing/`), not in the project, until a save brings
   them in. "Draw your own" on a drawn sticker that's selected edits it (the stage's
   view), so the side view is drawn by switching to Side and choosing it again.
+- **Looks**: every look edit (in the character editor, and a panel's "this panel
+  only") works on a flattened view of the character and is stored back as the
+  differences only — a named look against the default look, a panel against its
+  look. A panel can ask for the default look even when its issue uses a named one,
+  through a reserved look id (`default`). Per-panel changes are reached by
+  right-click › *This panel only* (take off, put on, colour, pattern); a look that a
+  panel or the issue uses can't be deleted. Proportion overrides and build on a look
+  (`ProportionOverride`, `Build`) stay unused: body edits always change the
+  character.
