@@ -2,29 +2,68 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Stanley.Editors;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
-using Xunit;
 
 namespace Stanley.App.HeadlessTests;
+
+/// <summary>
+/// Ensures the Avalonia headless platform is initialized for all tests in the collection.
+/// </summary>
+public class HeadlessPlatformSetup
+{
+    private static bool _initialized;
+    private static readonly object _lock = new();
+
+    static HeadlessPlatformSetup()
+    {
+        // Static initializer ensures platform is initialized exactly once
+        lock (_lock)
+        {
+            if (!_initialized)
+            {
+                // BuildAvaloniaApp() only constructs an AppBuilder - SetupWithoutStarting()
+                // is what actually runs Initialize() and registers the headless platform
+                // (IWindowingPlatform etc.) with AvaloniaLocator. Without this call nothing
+                // is ever wired up, which surfaced as "Unable to locate IWindowingPlatform"
+                // on the first Window construction below.
+                TestAppBuilder.BuildAvaloniaApp().SetupWithoutStarting();
+                _initialized = true;
+            }
+        }
+    }
+
+    // Public constructor ensures static initializer runs
+    public HeadlessPlatformSetup()
+    {
+    }
+}
+
+/// <summary>
+/// Collection definition for page editor tests with Avalonia headless platform initialization.
+/// </summary>
+[CollectionDefinition("Page Editor Tests")]
+public class PageEditorTestCollection : ICollectionFixture<HeadlessPlatformSetup>
+{
+}
 
 /// <summary>
 /// Headless smoke tests for the page/panel editor, verifying Avalonia-specific wiring:
 /// pointer→gesture handling, DataTemplate resolution, and KeyBindings. Higher-level
 /// editing logic is already tested at the ViewModel level in PageEditorViewModelTests.
 /// </summary>
+[Collection("Page Editor Tests")]
 public class PageEditorTests
 {
-    static PageEditorTests()
-    {
-        // Initialize Avalonia once for all tests in this class
-        TestAppBuilder.BuildAvaloniaApp().SetupInProcessDesktopPlatform();
-    }
     /// <summary>
-    /// Verifies that dragging a panel's bottom-right corner outward increases its bounds,
-    /// and that the gesture commits so Working == Committed after release.
+    /// Verifies that dragging a panel's bottom-right corner inward shrinks its bounds,
+    /// and that the gesture commits so Working == Committed after release. Inward, not
+    /// outward: the demo page starts with one panel filling the entire A4 page, so any
+    /// outward drag would exceed the page bounds and be correctly rejected by
+    /// PanelLayoutEditing.Resize's validation - there'd be nothing to grow into.
     /// </summary>
     [Fact]
     public void DraggingPanelCorner_ResizesThePanelAndCommits()
@@ -39,20 +78,23 @@ public class PageEditorTests
         var canvas = GetPageCanvasControl(window);
         Assert.NotNull(canvas);
 
-        // Drag the bottom-right corner outward
+        // Drag the bottom-right corner inward
         var cornerWorldPoint = new Point(boundsBefore.Right, boundsBefore.Bottom);
         var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
-        var newCornerWindowPoint = new Point(cornerWindowPoint.X + 50, cornerWindowPoint.Y + 40);
+        var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
         window.MouseMove(newCornerWindowPoint);
+        Dispatcher.UIThread.RunJobs();
         window.MouseUp(newCornerWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
 
-        // Verify the panel is larger
+        // Verify the panel is smaller
         var panelAfter = window.Editor.Working.Panels[panelId];
         var boundsAfter = AnchorRing.BoundingBox(panelAfter.Shape.Anchors);
-        Assert.True(boundsAfter.Right > boundsBefore.Right, "right edge should move outward");
-        Assert.True(boundsAfter.Bottom > boundsBefore.Bottom, "bottom edge should move outward");
+        Assert.True(boundsAfter.Right < boundsBefore.Right, "right edge should move inward");
+        Assert.True(boundsAfter.Bottom < boundsBefore.Bottom, "bottom edge should move inward");
 
         // Verify gesture committed (Working == Committed)
         Assert.Equal(window.Editor.Working, window.Editor.Committed);
@@ -75,13 +117,20 @@ public class PageEditorTests
         var canvas = GetPageCanvasControl(window);
         Assert.NotNull(canvas);
 
-        // Start dragging the bottom-right corner
+        // Start dragging the bottom-right corner inward (see DraggingPanelCorner_ResizesThePanelAndCommits for why inward)
         var cornerWorldPoint = new Point(boundsBefore.Right, boundsBefore.Bottom);
         var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
-        var newCornerWindowPoint = new Point(cornerWindowPoint.X + 50, cornerWindowPoint.Y + 40);
+        var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
         window.MouseMove(newCornerWindowPoint);
+        Dispatcher.UIThread.RunJobs();
+
+        // Confirm the drag actually changed something before cancelling - otherwise
+        // "bounds are unchanged after Escape" would trivially hold even if Escape did nothing.
+        var boundsMidDrag = AnchorRing.BoundingBox(window.Editor.Working.Panels[panelId].Shape.Anchors);
+        Assert.True(boundsMidDrag.Right < boundsBefore.Right, "drag should have shrunk the panel before Escape is pressed");
 
         // Press Escape to cancel
         var keyEventArgs = new KeyEventArgs
@@ -120,20 +169,24 @@ public class PageEditorTests
         var canvas = GetPageCanvasControl(window);
         Assert.NotNull(canvas);
 
-        // Perform a resize gesture to create an undo entry
+        // Perform a resize gesture to create an undo entry (inward - see
+        // DraggingPanelCorner_ResizesThePanelAndCommits for why not outward)
         var cornerWorldPoint = new Point(boundsOriginal.Right, boundsOriginal.Bottom);
         var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
-        var newCornerWindowPoint = new Point(cornerWindowPoint.X + 50, cornerWindowPoint.Y + 40);
+        var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
         window.MouseMove(newCornerWindowPoint);
+        Dispatcher.UIThread.RunJobs();
         window.MouseUp(newCornerWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
 
         // Verify resize happened
         var panelAfterResize = window.Editor.Working.Panels[panelId];
         var boundsAfterResize = AnchorRing.BoundingBox(panelAfterResize.Shape.Anchors);
-        Assert.True(boundsAfterResize.Right > boundsOriginal.Right);
-        Assert.True(boundsAfterResize.Bottom > boundsOriginal.Bottom);
+        Assert.True(boundsAfterResize.Right < boundsOriginal.Right);
+        Assert.True(boundsAfterResize.Bottom < boundsOriginal.Bottom);
         Assert.True(window.History.CanUndo, "should have undo available after resize");
 
         // Execute Undo via the command directly (more reliable than key chord in headless mode)
@@ -175,6 +228,14 @@ public class PageEditorTests
     /// <summary>
     /// Helper: finds the PageCanvasControl in the window's visual tree.
     /// </summary>
-    private static PageCanvasControl? GetPageCanvasControl(MainWindow window) =>
-        window.GetVisualDescendants().OfType<PageCanvasControl>().FirstOrDefault();
+    /// <summary>
+    /// Headless mode has no real message pump, so a DockControl's templated content
+    /// (resolved from its Layout/DataTemplate) doesn't materialize into the visual tree
+    /// until pending layout/dispatcher work is actually run.
+    /// </summary>
+    private static PageCanvasControl? GetPageCanvasControl(MainWindow window)
+    {
+        Dispatcher.UIThread.RunJobs();
+        return window.GetVisualDescendants().OfType<PageCanvasControl>().FirstOrDefault();
+    }
 }
