@@ -30,6 +30,7 @@ public sealed record SkinSwatch(string Name, ColorValue Color)
 public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefinition>
 {
     private bool _showLineUp = true;
+    private ViewAngle _previewAngle = ViewAngle.Front;
 
     public CharacterEditorViewModel(EditorHistory history, CharacterDefinition initial, CharacterLibraryViewModel? library = null)
         : base(history, initial.Name, initial)
@@ -200,6 +201,21 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
                 OnPropertyChanged(nameof(ShownLineUp));
         }
     }
+
+    /// <summary>Which way the stage shows the character (and the line-up): only a preview, not part of the character.</summary>
+    public ViewAngle PreviewAngle
+    {
+        get => _previewAngle;
+        set
+        {
+            SetProperty(ref _previewAngle, value);
+            OnPropertyChanged(nameof(IsFrontPreview));
+            OnPropertyChanged(nameof(IsSidePreview));
+        }
+    }
+
+    public bool IsFrontPreview { get => PreviewAngle == ViewAngle.Front; set => PreviewAngle = value ? ViewAngle.Front : PreviewAngle; }
+    public bool IsSidePreview { get => PreviewAngle == ViewAngle.Profile; set => PreviewAngle = value ? ViewAngle.Profile : PreviewAngle; }
 
     /// <summary>What the stage draws beside the character: the line-up, or nobody.</summary>
     public IReadOnlyList<CharacterDefinition> ShownLineUp => ShowLineUp ? LineUp : [];

@@ -29,6 +29,38 @@ public class CharacterRendererTests
         Assert.True(path.Contains(100, 200 - 40), "the torso is solid");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_side_view_faces_right_and_mirrored_faces_left(bool mirrored)
+    {
+        var character = CharacterDefinition.Create("A");
+        var placement = new CharacterPlacement(new Point2D(100, 200), 80, mirrored);
+
+        using var path = CharacterRenderers.Default.BuildSilhouette(character, placement, ViewAngle.Profile);
+        var expected = placement.ToPage(BodyRig.Extent(character.Body, ViewAngle.Profile));
+        var bounds = path.TightBounds;
+
+        Assert.Equal(expected.Left, bounds.Left, 1);
+        Assert.Equal(expected.Right, bounds.Right, 1);
+        var frontReach = mirrored ? 100 - bounds.Left : bounds.Right - 100;
+        var backReach = mirrored ? bounds.Right - 100 : 100 - bounds.Left;
+        Assert.True(frontReach > backReach, "the nose and toes lead");
+    }
+
+    [Fact]
+    public void A_side_view_is_solid_where_the_near_arm_crosses_the_body()
+    {
+        var character = CharacterDefinition.Create("A");
+        var placement = new CharacterPlacement(new Point2D(100, 200), 80, false);
+        var nearArm = BodyRig.Build(character.Body, ViewAngle.Profile).NearLimbs[0];
+        var onArm = placement.ToPage(new Point2D((nearArm.From.X + nearArm.To.X) / 2, (nearArm.From.Y + nearArm.To.Y) / 2));
+
+        using var path = CharacterRenderers.Default.BuildSilhouette(character, placement, ViewAngle.Profile);
+
+        Assert.True(path.Contains((float)onArm.X, (float)onArm.Y));
+    }
+
     [Fact]
     public void A_page_draws_its_characters_in_skin_colour_clipped_to_their_panel_and_behind_bubbles()
     {

@@ -76,6 +76,17 @@ public class CharacterPlacementEditingTests
     }
 
     [Fact]
+    public void Turn_changes_only_the_view()
+    {
+        var c = At(10, 10, 10, mirrored: true);
+        var side = CharacterPlacementEditing.Turn(c, ViewAngle.Profile);
+
+        Assert.Equal(ViewAngle.Profile, side.Pose.ViewAngle);
+        Assert.Equal(c.Placement, side.Placement);
+        Assert.Same(side, CharacterPlacementEditing.Turn(side, ViewAngle.Profile));
+    }
+
+    [Fact]
     public void Flip_toggles_mirroring()
     {
         var c = At(10, 10, 10);

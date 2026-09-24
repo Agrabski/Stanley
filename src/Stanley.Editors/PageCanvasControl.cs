@@ -365,7 +365,7 @@ public sealed class PageCanvasControl : Control
             return false;
         if (!vm.CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
             return true; // a missing character's placeholder box
-        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement);
+        using var path = CharacterRenderers.Default.BuildSilhouette(character, instance.Placement, instance.Pose.ViewAngle);
         return path.Contains((float)p.X, (float)p.Y);
     }
 
@@ -845,6 +845,12 @@ public sealed class PageCanvasControl : Control
             case Key.H when !ctrl:
                 vm.Tool = PageEditorTool.Pan;
                 break;
+            case Key.S when !ctrl && vm.HasSelectedCharacter:
+                vm.IsSelectedCharacterSide = true;
+                break;
+            case Key.F when !ctrl && vm.HasSelectedCharacter:
+                vm.IsSelectedCharacterFront = true;
+                break;
             default:
                 return;
         }
@@ -899,7 +905,10 @@ public sealed class PageCanvasControl : Control
             vm.SelectCharacter(characterPanel, index);
             if (vm.EditCharacterCommand.CanExecute(null))
                 items.Add(Item("Edit character…", () => vm.EditCharacterCommand.Execute(null)));
-            items.Add(Item("Flip", () => vm.FlipCharacter(characterPanel, index)));
+            var side = vm.SelectedCharacterView == ProjectModel.Geometry.ViewAngle.Profile;
+            items.Add(Item(side ? "Front view" : "Side view",
+                () => vm.SetCharacterView(characterPanel, index, side ? ProjectModel.Geometry.ViewAngle.Front : ProjectModel.Geometry.ViewAngle.Profile), side ? "F" : "S"));
+            items.Add(Item(side ? "Face the other way" : "Flip", () => vm.FlipCharacter(characterPanel, index)));
             items.Add(Item("Bigger", () => vm.ScaleCharacter(characterPanel, index, 1.1)));
             items.Add(Item("Smaller", () => vm.ScaleCharacter(characterPanel, index, 1 / 1.1)));
             if (vm.SelectedCharacterHasOddScale)

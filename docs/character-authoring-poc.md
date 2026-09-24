@@ -61,10 +61,12 @@ authoring surface, and page-editor interactions for instances.
    and per-instance body overrides are designed-for (§3.3) but not built. Every
    instance references the definition, so editing a character updates every panel
    (the Figma component/instance behaviour the plan asks for).
-6. **Rest pose, front view only.** `PoseData` is stored as `Front` with no bone
-   rotations. The generator takes a `ViewAngle` so three-quarter/profile are an
-   additive follow-up; mirroring *is* in (it's one bool and a comic staple:
-   characters facing each other).
+6. **Rest pose, front and side views.** Each placed character's view is its
+   existing `Pose.ViewAngle` (`Front` or `Profile`; no bone rotations yet). The
+   side view is generated from the same body numbers - same heights, with the
+   width sliders becoming depth (chest, belly, seat) - faces right, and mirrors to
+   face left, so two characters can face each other in conversation. Three-quarter
+   isn't generated yet (it draws as the front).
 
 ## 3. Data model
 
@@ -326,7 +328,18 @@ sharing, resize together/alone, floor snap, one-undo-step slider drags, presets,
 open/close, delete rules, save/open/prune), `CharacterTests` (headless UI: pane,
 editor ribbon, click/double-click on the page).
 
+**Side view (added after the first pass, as a priority).** `BodyRig.Build(body,
+angle, overrides)` generates a profile facing +x: head with a nose (the cue for
+which way a flat figure faces), chest/belly/seat depths from muscle, weight and
+frame, legs merged into the body with the far one set back, feet pointing
+forward. The near arm, hand and foot are a second layer (`BodyFigure.NearLimbs` /
+`NearBlobs`) drawn over the body with their own outline so they read on a flat
+fill; hit-testing uses the true union of both. On the page: the Character tab's
+View group (Front / Side / Flip), S and F keys, right-click. The character editor
+has a Front/Side preview toggle (the line-up turns too). Skeleton overrides are
+per view.
+
 Known limits of the POC: the torso ignores skeleton overrides (limbs, head and
-neck follow them); mirroring shows no difference until the body is asymmetric
-(posing, stickers, profile view); a new character is placed from the page but
-creating one from the Insert tab takes two undo steps (create, place).
+neck follow them); no three-quarter view; front-view Flip shows no difference
+until the body is asymmetric (posing, stickers); creating a character from the
+Insert tab takes two undo steps (create, place).

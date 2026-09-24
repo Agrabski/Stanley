@@ -70,6 +70,17 @@ public class CharacterTests
         var ribbon = Single<PageEditorRibbon>(window.RibbonBarControl);
         Assert.True(ribbon.FindControl<TabItem>("CharacterTab")!.IsVisible);
 
+        // S turns it side on; the ribbon's toggle follows.
+        canvas.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.S });
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(ProjectModel.Geometry.ViewAngle.Profile, page.Working.Panels[panelId].CharacterInstances[0].Pose.ViewAngle);
+        Assert.True(ribbon.FindControl<RadioButton>("SideViewButton")!.IsChecked);
+        page.ClearSelection();
+        window.MouseDown(chest, MouseButton.Left);
+        window.MouseUp(chest, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, page.SelectedCharacterIndex); // a side-on character is still clickable through its near arm
+
         window.MouseDown(chest, MouseButton.Left, RawInputModifiers.None);
         window.MouseUp(chest, MouseButton.Left);
         window.MouseDown(chest, MouseButton.Left, RawInputModifiers.None);

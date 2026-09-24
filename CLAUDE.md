@@ -27,8 +27,9 @@ transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
 snapping, page navigator) all exist. The GUI opens/saves real project folders (the
 pages of one issue for now — see "Documents" below). Characters exist as a
-**body-only POC** (sliders + a generated flat mannequin, placed on panels — see
-"Characters (POC, implemented)" below); no stickers, posing or view angles yet.
+**body-only POC** (sliders + a generated flat mannequin, front or side view,
+placed on panels — see "Characters (POC, implemented)" below); no stickers,
+posing or three-quarter view yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -440,17 +441,22 @@ body and placement only.
   sparse joint *override* on the generated rest layout (empty from the UI).
   `CharacterDefinition.Create(name)` makes a default one; `Skin` reads the `skin`
   colour slot.
-- **`BodyRig.Build(body, overrides)`**: pure math → `BodyFigure` (VRM rest layout
-  + torso outline, limb capsules, head/hand/foot ellipses) in *figure space* (unit
-  = relative height, y down, origin = ground between the feet; head top at
-  `-Height`). Heights depend only on `Height`/`HeadsTall`.
+- **`BodyRig.Build(body, angle, overrides)`**: pure math → `BodyFigure` (VRM rest
+  layout + torso outline, limb capsules, head/hand/foot ellipses) in *figure space*
+  (unit = relative height, y down, origin = ground between the feet; head top at
+  `-Height`), for `ViewAngle.Front` or `Profile` (faces +x, has a nose; the near
+  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
+  Heights depend only on `Height`/`HeadsTall`, identical in both views;
+  `ThreeQuarter` falls back to front. Skeleton overrides are per view.
 - **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
   `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
   figure path per definition). `PageRenderer.Draw/DrawPanels/Export*` take an
   optional character dictionary and draw background → characters → bubbles inside
   the panel clip; a missing character draws a dashed placeholder.
 - **Placement**: `CharacterInstance.Placement` = `CharacterPlacement(Ground,
-  UnitHeightMm, Mirrored)` (page mm; `ToPage` maps figure space). One scale per
+  UnitHeightMm, Mirrored)` (page mm; `ToPage` maps figure space); the view is the
+  instance's `Pose.ViewAngle` (page: Character tab Front/Side, S/F keys; mirrored
+  side views face left). One scale per
   panel by default: `CharacterPlacementEditing` (Stanley.Editing) places new ones
   at the panel's scale/floor, resizes "together" (everyone sharing the scale) or
   alone, keeps them reachable (may hang out of the panel — cropping is fine), and

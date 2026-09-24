@@ -54,6 +54,10 @@ public static class CharacterPlacementEditing
     public static CharacterInstance Move(CharacterInstance instance, double dx, double dy) =>
         instance with { Placement = instance.Placement with { Ground = new Point2D(instance.Placement.Ground.X + dx, instance.Placement.Ground.Y + dy) } };
 
+    /// <summary>Shows the character from <paramref name="angle"/> (front or side), standing where it was.</summary>
+    public static CharacterInstance Turn(CharacterInstance instance, ViewAngle angle) =>
+        instance.Pose.ViewAngle == angle ? instance : instance with { Pose = instance.Pose with { ViewAngle = angle } };
+
     public static CharacterInstance Flip(CharacterInstance instance) =>
         instance with { Placement = instance.Placement with { Mirrored = !instance.Placement.Mirrored } };
 

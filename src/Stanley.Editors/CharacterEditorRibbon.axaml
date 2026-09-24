@@ -105,6 +105,21 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Name="FrontPreviewButton" Classes="tool" GroupName="PreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsFrontPreview}" ToolTip.Tip="Look at the character from the front">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="SidePreviewButton" Classes="tool" GroupName="PreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSidePreview}" ToolTip.Tip="Look at the character from the side - the same body, seen side on">
+              <StackPanel><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="View" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <Button Name="BackToPageButton" Classes="tool" Command="{Binding BackToPageCommand}" ToolTip.Tip="Back to the page (the Pages pane works too)">
             <StackPanel><PathIcon Data="{StaticResource CloseIcon}" /><TextBlock Text="Close" /></StackPanel>
           </Button>

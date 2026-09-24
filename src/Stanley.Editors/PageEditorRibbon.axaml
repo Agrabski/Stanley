@@ -284,9 +284,23 @@
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
+            <RadioButton Name="FrontViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSelectedCharacterFront}" ToolTip.Tip="Facing the reader (F)">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="SideViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSelectedCharacterSide}" ToolTip.Tip="Seen from the side (S) - Flip to face the other way">
+              <StackPanel><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
+            </RadioButton>
             <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}" ToolTip.Tip="Face the other way">
               <StackPanel><PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Flip" /></StackPanel>
             </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="View" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
             <StackPanel VerticalAlignment="Center" Spacing="1">
               <Button Name="BiggerCharacterButton" Classes="small" Command="{Binding BiggerCharacterCommand}" HorizontalAlignment="Stretch"
                       ToolTip.Tip="Closer to camera - every character in this panel at the same distance grows too, keeping their relative heights">Bigger</Button>
@@ -296,7 +310,7 @@
                       ToolTip.Tip="Back to the same scale as the panel's other characters (after resizing it on its own with Shift)">Match size</Button>
             </StackPanel>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Size and facing" />
+          <TextBlock Classes="groupLabel" Text="Size" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">

@@ -14,10 +14,10 @@ namespace Stanley.Rendering;
 /// </summary>
 public interface ICharacterRenderer
 {
-    /// <summary>The character's outline in page millimetres - what gets filled, and what a click hit-tests against. The caller disposes it.</summary>
-    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement);
+    /// <summary>The character's whole outline in page millimetres, seen from <paramref name="angle"/> - what a click hit-tests against. The caller disposes it.</summary>
+    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front);
 
-    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm);
+    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front);
 }
 
 public static class CharacterRenderers
@@ -29,11 +29,11 @@ public static class CharacterRenderers
     {
         if (characters != null && characters.TryGetValue(instance.CharacterId, out var character))
         {
-            Default.Draw(canvas, character, instance.Placement, strokeMm);
+            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle);
             return;
         }
 
-        var box = instance.Placement.ToPage(BodyRig.Extent(BodyShape.Default));
+        var box = instance.Placement.ToPage(BodyRig.Extent(BodyShape.Default, instance.Pose.ViewAngle));
         using var dashed = new SKPaint
         {
             Color = new SKColor(0x80, 0x80, 0x80),
@@ -55,45 +55,95 @@ public static class CharacterRenderers
 public sealed class MannequinRenderer : ICharacterRenderer
 {
     // Building the union is the expensive part; definitions are immutable, so the
-    // figure-space outline is cached per definition value and only transformed per draw.
-    private readonly ConditionalWeakTable<CharacterDefinition, SKPath> _figures = new();
+    // figure-space outlines are cached per definition value (and view) and only
+    // transformed per draw.
+    private readonly ConditionalWeakTable<CharacterDefinition, Dictionary<ViewAngle, FigurePaths>> _figures = new();
     private readonly Lock _lock = new();
 
-    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement)
+    /// <summary>A figure's outlines in figure space: the body, the near arm and foot drawn over it (side view; empty otherwise), and the two unioned - the whole outline, for hit-testing.</summary>
+    public sealed record FigurePaths(SKPath Body, SKPath Near, SKPath Outline);
+
+    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front)
     {
-        var matrix = SKMatrix.CreateScale((float)(placement.Mirrored ? -placement.UnitHeightMm : placement.UnitHeightMm), (float)placement.UnitHeightMm)
-            .PostConcat(SKMatrix.CreateTranslation((float)placement.Ground.X, (float)placement.Ground.Y));
+        var matrix = ToPage(placement);
         using var builder = new SKPathBuilder();
         lock (_lock)
-            builder.AddPath(_figures.GetValue(character, c => FigurePath(BodyRig.Build(c.Body, c.Skeleton))), in matrix);
+        {
+            builder.AddPath(Figure(character, angle).Outline, in matrix);
+        }
         return builder.Detach();
     }
 
-    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm)
+    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front)
     {
-        using var path = BuildSilhouette(character, placement);
-        using var fill = new SKPaint { Color = ToSk(character.Skin), Style = SKPaintStyle.Fill, IsAntialias = true };
-        using var ink = new SKPaint
+        var matrix = ToPage(placement);
+        SKPath body, near;
+        lock (_lock)
+        {
+            var paths = Figure(character, angle);
+            body = Transformed(paths.Body, matrix);
+            near = Transformed(paths.Near, matrix);
+        }
+
+        using (body)
+        using (near)
+        using (var fill = new SKPaint { Color = ToSk(character.Skin), Style = SKPaintStyle.Fill, IsAntialias = true })
+        using (var ink = new SKPaint
         {
             Color = SKColors.Black,
             Style = SKPaintStyle.Stroke,
             StrokeWidth = strokeMm,
             StrokeJoin = SKStrokeJoin.Round,
             IsAntialias = true
-        };
-        canvas.DrawPath(path, fill);
-        canvas.DrawPath(path, ink);
+        })
+        {
+            canvas.DrawPath(body, fill);
+            canvas.DrawPath(body, ink);
+            if (!near.IsEmpty)
+            {
+                canvas.DrawPath(near, fill);
+                canvas.DrawPath(near, ink);
+            }
+        }
     }
 
-    /// <summary>The figure's outline in figure space (see <see cref="BodyFigure"/>).</summary>
-    public static SKPath FigurePath(BodyFigure figure)
+    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle)
     {
-        var result = SmoothClosed(figure.Torso);
+        var byAngle = _figures.GetValue(character, _ => []);
+        if (!byAngle.TryGetValue(angle, out var paths))
+            byAngle[angle] = paths = BuildPaths(BodyRig.Build(character.Body, angle, character.Skeleton));
+        return paths;
+    }
+
+    private static SKMatrix ToPage(CharacterPlacement placement) =>
+        SKMatrix.CreateScale((float)(placement.Mirrored ? -placement.UnitHeightMm : placement.UnitHeightMm), (float)placement.UnitHeightMm)
+            .PostConcat(SKMatrix.CreateTranslation((float)placement.Ground.X, (float)placement.Ground.Y));
+
+    private static SKPath Transformed(SKPath path, SKMatrix matrix)
+    {
+        using var builder = new SKPathBuilder();
+        builder.AddPath(path, in matrix);
+        return builder.Detach();
+    }
+
+    /// <summary>The figure's outlines in figure space (see <see cref="BodyFigure"/>).</summary>
+    public static FigurePaths BuildPaths(BodyFigure figure)
+    {
+        var body = SmoothClosed(figure.Torso);
         foreach (var limb in figure.Limbs)
-            result = Union(result, Capsule(limb));
+            body = Union(body, Capsule(limb));
         foreach (var blob in figure.Blobs)
-            result = Union(result, Oval(blob));
-        return result;
+            body = Union(body, Oval(blob));
+
+        using var empty = new SKPathBuilder();
+        var near = empty.Detach();
+        foreach (var limb in figure.NearLimbs)
+            near = Union(near, Capsule(limb));
+        foreach (var blob in figure.NearBlobs)
+            near = Union(near, Oval(blob));
+        // One real union, not two overlapping sub-paths: those would cancel out under the fill rule where the near arm crosses the body.
+        var outline = body.Op(near, SKPathOp.Union) ?? new SKPath(body);
+        return new FigurePaths(body, near, outline);
     }
 
     private static SKPath Union(SKPath a, SKPath b)

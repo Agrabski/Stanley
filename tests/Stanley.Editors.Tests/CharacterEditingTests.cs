@@ -86,6 +86,34 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void A_character_turns_to_a_side_view_in_place_undoably_and_the_view_is_saved()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A", BodyPresets.Shape(BodyPreset.Heavy));
+        page.InsertCharacter(item.Id, left);
+        var ground = page.Working.Panels[left].CharacterInstances[0].Placement.Ground;
+        var frontBounds = page.CharacterBounds(page.Working.Panels[left].CharacterInstances[0]);
+
+        page.IsSelectedCharacterSide = true;
+
+        var turned = page.Working.Panels[left].CharacterInstances[0];
+        Assert.Equal(ViewAngle.Profile, turned.Pose.ViewAngle);
+        Assert.Equal(ground, turned.Placement.Ground);
+        Assert.True(page.IsSelectedCharacterSide);
+        Assert.False(page.IsSelectedCharacterFront);
+        Assert.NotEqual(frontBounds, page.CharacterBounds(turned)); // hit-testing and handles follow the new outline
+        Assert.Equal(frontBounds.Height, page.CharacterBounds(turned).Height, 6);
+
+        var saved = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+        var reopened = ComicProject.Open(saved).Pages[0].Document.Panels.Values.SelectMany(p => p.CharacterInstances).Single();
+        Assert.Equal(ViewAngle.Profile, reopened.Pose.ViewAngle);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(ViewAngle.Front, page.Working.Panels[left].CharacterInstances[0].Pose.ViewAngle);
+        Assert.True(page.IsSelectedCharacterFront);
+    }
+
+    [Fact]
     public void Moving_a_character_snaps_its_feet_to_the_others_floor()
     {
         var (session, page, left, _) = NewSession();

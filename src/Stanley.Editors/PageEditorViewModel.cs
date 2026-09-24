@@ -438,6 +438,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(IsCharacterContext));
         OnPropertyChanged(nameof(SelectedCharacterName));
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
+        RaiseCharacterViewChanged();
         OnPropertyChanged(nameof(ShowBubbleStyle));
         OnPropertyChanged(nameof(BubbleContextTitle));
         RaiseBubbleDerivedChanged();
@@ -469,6 +470,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 Select(id);
         }
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
+        RaiseCharacterViewChanged();
         RaiseBubbleDerivedChanged();
         NotifyCommands();
     }
@@ -512,7 +514,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
-        _ when HasSelectedCharacter => "Drag to move the character · drag a top corner to resize everyone in the panel together (Shift: just this one) · double-click to edit its body · Delete removes it.",
+        _ when HasSelectedCharacter => "Drag to move · a top corner resizes the panel's characters together (Shift: just this one) · S side view, F front · double-click to edit the body.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
@@ -1025,13 +1027,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     }
 
     /// <summary>A character's figure-space bounding box; a default body's for a character missing from the catalog (it draws as a placeholder that size).</summary>
-    public Rect2D FigureExtent(CharacterId id) =>
+    public Rect2D FigureExtent(CharacterId id, ViewAngle angle = ViewAngle.Front) =>
         CharacterSnapshot.TryGetValue(id, out var character)
-            ? BodyRig.Extent(character.Body, character.Skeleton)
-            : BodyRig.Extent(BodyShape.Default);
+            ? BodyRig.Extent(character.Body, angle, character.Skeleton)
+            : BodyRig.Extent(BodyShape.Default, angle);
 
     /// <summary>A placed character's bounding box on the page.</summary>
-    public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(FigureExtent(instance.CharacterId));
+    public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(FigureExtent(instance.CharacterId, instance.Pose.ViewAngle));
 
     /// <summary>
     /// Places <paramref name="characterId"/> in <paramref name="panelId"/> (default: the
@@ -1132,6 +1134,39 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public void FlipCharacter(PanelId panelId, int index) =>
         Apply(EditCharacterInPanel(Working, panelId, index, CharacterPlacementEditing.Flip));
 
+    /// <summary>Front or side view (<see cref="ViewAngle.Profile"/>); the character keeps standing where it was. Flip then turns a side view to face the other way.</summary>
+    public void SetCharacterView(PanelId panelId, int index, ViewAngle angle) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, c => CharacterPlacementEditing.Turn(c, angle)));
+
+    /// <summary>The selected character's view, for the ribbon's Front/Side toggle.</summary>
+    public ViewAngle? SelectedCharacterView => SelectedCharacter?.Pose.ViewAngle;
+
+    public bool IsSelectedCharacterFront
+    {
+        get => SelectedCharacterView == ViewAngle.Front;
+        set => SetSelectedView(ViewAngle.Front, value);
+    }
+
+    public bool IsSelectedCharacterSide
+    {
+        get => SelectedCharacterView == ViewAngle.Profile;
+        set => SetSelectedView(ViewAngle.Profile, value);
+    }
+
+    private void SetSelectedView(ViewAngle angle, bool value)
+    {
+        if (value && SelectedCharacter is { } instance && instance.Pose.ViewAngle != angle)
+            SetCharacterView(_selectedPanelId!.Value, _selectedCharacterIndex, angle);
+        RaiseCharacterViewChanged(); // a toggle that flipped itself off locally hears "no, you're still on"
+    }
+
+    private void RaiseCharacterViewChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCharacterView));
+        OnPropertyChanged(nameof(IsSelectedCharacterFront));
+        OnPropertyChanged(nameof(IsSelectedCharacterSide));
+    }
+
     public void DeleteCharacter(PanelId panelId, int index)
     {
         Apply(EditPanel(Working, panelId, p =>
@@ -1175,7 +1210,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 return EditResult<Panel>.Failure("No such character.");
             var list = panel.CharacterInstances.ToList();
             var edited = edit(list[index]);
-            list[index] = CharacterPlacementEditing.KeepReachable(edited, FigureExtent(edited.CharacterId), Bounds(panel));
+            list[index] = CharacterPlacementEditing.KeepReachable(edited, FigureExtent(edited.CharacterId, edited.Pose.ViewAngle), Bounds(panel));
             return EditResult<Panel>.Success(panel with { CharacterInstances = list });
         });
 

@@ -7,14 +7,23 @@ namespace Stanley.ProjectModel.Tests;
 
 public class BodyRigTests
 {
-    public static TheoryData<BodyPreset> Presets() => new(BodyPresets.All);
+    public static TheoryData<BodyPreset, ViewAngle> PresetsAndViews()
+    {
+        var data = new TheoryData<BodyPreset, ViewAngle>();
+        foreach (var preset in BodyPresets.All)
+        {
+            data.Add(preset, ViewAngle.Front);
+            data.Add(preset, ViewAngle.Profile);
+        }
+        return data;
+    }
 
     [Theory]
-    [MemberData(nameof(Presets))]
-    public void Every_preset_stands_on_the_ground_with_its_head_top_exactly_at_its_height(BodyPreset preset)
+    [MemberData(nameof(PresetsAndViews))]
+    public void Every_preset_stands_on_the_ground_with_its_head_top_exactly_at_its_height_from_either_side(BodyPreset preset, ViewAngle angle)
     {
         var body = BodyPresets.Shape(preset);
-        var extent = BodyRig.Extent(body);
+        var extent = BodyRig.Extent(body, angle);
 
         Assert.Equal(-body.Height, extent.Top, 9);
         Assert.Equal(0, extent.Bottom, 9);
@@ -64,6 +73,42 @@ public class BodyRigTests
         Assert.Equal(1, body.Build);
         Assert.Equal(0, body.Muscle);
         Assert.Equal(BodyShape.MaxHeadsTall, body.HeadsTall);
+    }
+
+    [Fact]
+    public void The_side_view_faces_right_with_its_nose_and_toes_ahead_and_its_near_arm_drawn_on_top()
+    {
+        var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Profile);
+
+        Assert.Equal(ViewAngle.Profile, figure.Angle);
+        Assert.Equal(ViewAngle.Profile, figure.RestLayout.Angle);
+        Assert.True(figure.Extent.Right > -figure.Extent.Left, "the front (+x) reaches further than the back");
+        var head = figure.Blobs[0];
+        var nose = figure.Blobs[1];
+        Assert.True(nose.Center.X > head.Center.X + head.RadiusX * 0.8, "a nose on the front of the head");
+        Assert.Equal(2, figure.NearLimbs.Count); // near upper arm and forearm
+        Assert.Equal(2, figure.NearBlobs.Count); // near hand and foot
+        Assert.Empty(BodyRig.Build(BodyShape.Default).NearLimbs);
+    }
+
+    [Fact]
+    public void In_the_side_view_weight_shows_as_depth_and_the_front_view_width_is_unchanged_by_it()
+    {
+        var slim = BodyRig.Extent(BodyShape.Default with { Build = 0 }, ViewAngle.Profile);
+        var heavy = BodyRig.Extent(BodyShape.Default with { Build = 1 }, ViewAngle.Profile);
+
+        Assert.True(heavy.Right > slim.Right, "the belly sticks out further");
+        Assert.Equal(slim.Height, heavy.Height, 9);
+    }
+
+    [Fact]
+    public void A_skeleton_override_only_applies_to_its_own_view()
+    {
+        var raisedHand = new Point2D(0.3, -1.1);
+        var overrides = new Skeleton([new ViewAngleRestLayout(ViewAngle.Profile, [new BoneRestPose(HumanoidBone.LeftHand, raisedHand)])]);
+
+        Assert.Contains(BodyRig.Build(BodyShape.Default, ViewAngle.Profile, overrides).NearLimbs, l => l.To == raisedHand);
+        Assert.DoesNotContain(BodyRig.Build(BodyShape.Default, ViewAngle.Front, overrides).Limbs, l => l.To == raisedHand);
     }
 
     [Fact]
