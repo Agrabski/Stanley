@@ -24,7 +24,10 @@ public sealed record StickerChoice(string Label, string Slot, CharacterDefinitio
 
 /// <summary>A slot's gallery on the Look tab: its label, what's worn now, and everything it can wear.</summary>
 /// <param name="Wear">Wears a choice (carried here so the gallery's popup can reach it).</param>
-public sealed record SlotGallery(StickerSlotInfo Info, string Current, IReadOnlyList<StickerChoice> Choices, System.Windows.Input.ICommand Wear)
+/// <param name="Draw">Draws a sticker for the slot in the user's SVG editor (the slot's name is the parameter).</param>
+/// <param name="Import">Imports an SVG or PNG as a sticker for the slot.</param>
+public sealed record SlotGallery(StickerSlotInfo Info, string Current, IReadOnlyList<StickerChoice> Choices, System.Windows.Input.ICommand Wear,
+    System.Windows.Input.ICommand? Draw = null, System.Windows.Input.ICommand? Import = null)
 {
     public string Label => Info.Label;
 
@@ -307,7 +310,7 @@ public sealed partial class CharacterEditorViewModel
         foreach (var item in Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
             choices.Add(new StickerChoice(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
         var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?"));
-        return new SlotGallery(info, current, choices, WearCommand);
+        return new SlotGallery(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand);
     }
 
     private void Wear(StickerChoice choice)
@@ -571,6 +574,7 @@ public sealed partial class CharacterEditorViewModel
         if (_selectedSticker == id)
             return;
         _selectedSticker = id;
+        ShowMessage(null); // a message about the last thing worked on is stale now
         RaiseSelectedStickerChanged();
     }
 
@@ -658,12 +662,14 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(SelectedStickerName));
         OnPropertyChanged(nameof(SelectedStickerWarning));
         OnPropertyChanged(nameof(HasSelectedStickerWarning));
+        OnPropertyChanged(nameof(Hint));
         OnPropertyChanged(nameof(HasLength));
         OnPropertyChanged(nameof(HasSleeves));
         OnPropertyChanged(nameof(HasFit));
         OnPropertyChanged(nameof(SelectedLength));
         OnPropertyChanged(nameof(SelectedSleeves));
         OnPropertyChanged(nameof(SelectedFit));
+        RaiseArtChanged();
         TakeOffSelectedCommand.NotifyCanExecuteChanged();
         RemoveSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedUpCommand.NotifyCanExecuteChanged();

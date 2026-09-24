@@ -15,10 +15,11 @@ public sealed record ArtGradient(SKPoint Start, SKPoint End, float? Radius, IRea
 /// <summary>
 /// One drawn element of sticker art, in the SVG's own units: its outline, fill and stroke,
 /// the colour slot it follows (<c>class="slot-hair"</c>, its own or an ancestor's) and
-/// whether it keeps to the colour alone (<c>solid</c>).
+/// whether it keeps to the colour alone (<c>solid</c>) - or, for PNG art, the
+/// <paramref name="Image"/> filling <paramref name="Path"/>'s bounds.
 /// </summary>
 public sealed record ArtElement(SKPath Path, ArtPaint? Fill, ArtPaint? Stroke, float StrokeWidth, SKStrokeCap Cap, SKStrokeJoin Join,
-    float[]? Dash, string? Slot, bool Solid, SKPath? Clip, bool EvenOdd);
+    float[]? Dash, string? Slot, bool Solid, SKPath? Clip, bool EvenOdd, SKImage? Image = null);
 
 /// <summary>
 /// Sticker art read from an SVG file (docs/sticker-system.md §6.1): its view box, its
@@ -48,9 +49,15 @@ public sealed class ParsedArt
     public string? View { get; }
     public string? Slot { get; }
 
-    /// <summary>The elements of the layer for <paramref name="part"/>: the layer of that name, or - for a file without layers - all of it.</summary>
+    /// <summary>A part by this name takes every layer of its file, in order - what an imported file that wasn't made from a template becomes.</summary>
+    public const string WholeFile = "all";
+
+    /// <summary>The elements of the layer for <paramref name="part"/>: the layer of that name, or - for a file without layers, or a part named <see cref="WholeFile"/> - all of it.</summary>
     public IReadOnlyList<ArtElement> Part(string part) =>
-        Layers.TryGetValue(part, out var elements) ? elements : Layers.Count == 1 && Layers.ContainsKey("") ? Layers[""] : [];
+        Layers.TryGetValue(part, out var elements) ? elements
+        : Layers.Count == 1 && Layers.ContainsKey("") ? Layers[""]
+        : part == WholeFile ? Layers.Values.SelectMany(l => l).ToList()
+        : [];
 
     /// <summary>The bounds of everything drawn in a layer (art units), or empty.</summary>
     public SKRect Bounds(IReadOnlyList<ArtElement> elements)
@@ -78,6 +85,31 @@ public static class StickerSvg
     private static readonly XNamespace Inkscape = "http://www.inkscape.org/namespaces/inkscape";
     private const string TagPrefix = "stanley-art-";
     private static readonly ConditionalWeakTable<ArtFile, ParsedArt> Cache = new();
+
+    /// <summary>
+    /// Any art file as parsed art: an SVG through <see cref="Parse(ArtFile)"/>, a PNG as one
+    /// fixed-colour image element the size of its pixels (cached per file value). Null if
+    /// it can't be read.
+    /// </summary>
+    public static ParsedArt? ParseAny(ArtFile file)
+    {
+        if (file.Text is not null)
+            return Parse(file);
+        if (file.Bytes is not { Length: > 0 } bytes)
+            return null;
+        if (Cache.TryGetValue(file, out var cached))
+            return cached;
+        var image = SKImage.FromEncodedData(bytes);
+        if (image is null)
+            return null;
+        var rect = SKRect.Create(0, 0, image.Width, image.Height);
+        using var builder = new SKPathBuilder();
+        builder.AddRect(rect);
+        var element = new ArtElement(builder.Detach(), null, null, 0, SKStrokeCap.Butt, SKStrokeJoin.Miter, null, null, true, null, false, image);
+        var parsed = new ParsedArt(rect, new Dictionary<string, IReadOnlyList<ArtElement>> { [""] = [element] }, [], null, null);
+        Cache.AddOrUpdate(file, parsed);
+        return parsed;
+    }
 
     /// <summary>The parsed art of an SVG file (cached per file value); null for a PNG or unreadable text.</summary>
     public static ParsedArt? Parse(ArtFile file)

@@ -1,6 +1,6 @@
 # Sticker system — design
 
-**Status: being implemented** — slices 0–5 are built (§15), and §18 records where
+**Status: being implemented** — slices 0–6 are built (§15), and §18 records where
 the code differs from this text. This follows the character authoring POC
 (`docs/character-authoring-poc.md`) and revises the sticker parts of
 `docs/character-and-project-plan.md`. Where the two disagree, this document wins.
@@ -823,3 +823,10 @@ open:
   `PoseData.Expression` rather than writing "neutral", so an unposed face stores
   nothing. The page's Expression gallery is a dropdown of close-ups (the Character
   tab has no room for twelve more thumbnails beside the poses).
+- **Draw your own and import**: the art is placed with *Size* and *Turn* sliders on
+  the Sticker tab and by dragging it on the stage, instead of on-canvas scale and
+  rotate handles. An imported file that wasn't made from a template becomes one
+  part named `all`, which takes every layer of its file. Files being drawn live
+  under the app's data folder (`Drawing/`), not in the project, until a save brings
+  them in. "Draw your own" on a drawn sticker that's selected edits it (the stage's
+  view), so the side view is drawn by switching to Side and choosing it again.

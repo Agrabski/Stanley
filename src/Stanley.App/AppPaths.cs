@@ -19,6 +19,9 @@ public static class AppPaths
     public static string SettingsFile => Path.Combine(DataDirectory, "settings.txt");
     public static string RecentProjectsFile => Path.Combine(DataDirectory, "recent-projects.txt");
 
+    /// <summary>Where sticker art being drawn in the user's SVG editor ("Draw your own") is written and watched.</summary>
+    public static string ArtEditingDirectory => Path.Combine(DataDirectory, "Drawing");
+
     /// <summary>The user's own GitHub personal access token for update checks (see <see cref="Updates.GithubTokenStore"/>) - kept separate from <see cref="SettingsFile"/>, which is plain preferences meant to be freely read.</summary>
     public static string GithubTokenFile => Path.Combine(DataDirectory, "github-token.txt");
 }

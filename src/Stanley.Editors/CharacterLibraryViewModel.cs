@@ -152,6 +152,9 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         }
     }
 
+    /// <summary>How "Draw your own" reaches the user's SVG editor; the app points it at its data folder, tests at a fake.</summary>
+    public IArtEditing ArtEditing { get; set; } = new SystemArtEditing(Path.Combine(Path.GetTempPath(), "stanley-drawing"));
+
     // ---------------------------------------------------------------- ICharacterCatalog
 
     public IReadOnlyDictionary<CharacterId, CharacterDefinition> Characters => _snapshot;

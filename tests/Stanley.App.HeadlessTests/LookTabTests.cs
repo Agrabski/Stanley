@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Input.Raw;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -138,6 +139,47 @@ public class LookTabTests
         hair.Flyout!.Hide();
         Dispatcher.UIThread.RunJobs();
         Snapshot(window, "look-hair-and-face");
+    }
+
+    [Fact]
+    public void Galleries_offer_draw_your_own_and_import_and_imported_art_drags_on_the_stage()
+    {
+        var (window, editor, ribbon) = OpenCharacter();
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
+        Dispatcher.UIThread.RunJobs();
+        var other = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Other" });
+        other.Flyout!.ShowAt(other);
+        Dispatcher.UIThread.RunJobs();
+        var content = (Control)((Flyout)other.Flyout!).Content!;
+        Assert.Contains(content.GetLogicalDescendants().OfType<Button>(), b => b.Name == "DrawYourOwnButton" && b.Command is not null);
+        var import = content.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "ImportArtButton");
+        ArtImportRequest? asked = null;
+        editor.ArtImportRequested += (_, r) => asked = r;
+        import.Command!.Execute(import.CommandParameter);
+        Assert.Equal(new ArtImportRequest(StickerSlots.Accessory), asked);
+        other.Flyout!.Hide();
+
+        editor.ImportArt(StickerSlots.Accessory, "badge.svg", ArtFile.Svg("""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#ff9900" stroke="#000" stroke-width="3"/></svg>"""));
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("StickerTab");
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(ribbon.FindControl<Slider>("ArtScaleSlider")!.IsEffectivelyVisible);
+        Snapshot(window, "look-imported-art");
+
+        // Drag the badge across the chest: one undo step.
+        var id = editor.SelectedStickerId!.Value;
+        var stage = window.GetVisualDescendants().OfType<CharacterEditorView>().Single().Figure;
+        var on = FindPoint(stage, p => stage.StickerAt(p) == id);
+        var offset = editor.SelectedSticker!.Sticker.Parts[0].Art!.Offset;
+        window.MouseDown(stage.TranslatePoint(on, window)!.Value, MouseButton.Left);
+        window.MouseMove(stage.TranslatePoint(on + new Point(10, 0), window)!.Value, RawInputModifiers.LeftMouseButton);
+        window.MouseMove(stage.TranslatePoint(on + new Point(30, 0), window)!.Value, RawInputModifiers.LeftMouseButton);
+        window.MouseUp(stage.TranslatePoint(on + new Point(30, 0), window)!.Value, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var moved = editor.SelectedSticker!.Sticker.Parts[0].Art!.Offset!.Value;
+        Assert.True(moved.X > (offset?.X ?? 0) + 5, $"{offset} -> {moved}");
+        window.Workspace.History.Undo();
+        Assert.Equal(offset, editor.Working.Wardrobe.Find(id)!.Sticker.Parts[0].Art!.Offset);
     }
 
     private static Point FindPoint(Control control, Func<Point, bool> test)

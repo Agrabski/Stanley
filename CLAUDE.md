@@ -572,8 +572,8 @@ body and placement only.
 
 ### Stickers (implemented)
 
-Slices 1–5 of `docs/sticker-system.md` §15 (layered figure, cover stickers,
-fabrics, drawn stickers, expressions); draw-your-own/import and named looks are
+Slices 1–6 of `docs/sticker-system.md` §15 (layered figure, cover stickers,
+fabrics, drawn stickers, expressions, draw your own and import); named looks are
 still to come.
 
 - **Model** (ProjectModel/Characters): `Sticker` (slot, `Parts`, default `Colors`
@@ -645,6 +645,23 @@ still to come.
   face lacks that variant). Clicking a worn sticker on the stage opens the
   contextual **Sticker** tab (fit sliders, take off, remove, stacking, and inline
   notes on missing views or expressions).
+- **Draw your own / import** (`CharacterEditorViewModel.Art.cs`, `StickerImport`):
+  every slot gallery ends with *Draw your own…* and *Import…*. Draw your own wears a
+  new sticker with the slot's template parts (or takes the selected drawn sticker),
+  writes the template — or its existing art — for the stage's view through
+  `IArtEditing` (real: `SystemArtEditing`, a file under `AppPaths.ArtEditingDirectory`
+  opened via the shell and watched with a debounced `FileSystemWatcher`; tests use a
+  fake), and each save there comes back through `StickerImport.WithArt` as one undo
+  step (new layers → new parts, new `slot-` classes → colour slots, `Source`
+  cleared). Import (`ArtImportRequested` → file picker → `ImportArt`): a file with
+  `data-stanley-slot`/`-view` imports as-is (`StickerImport.FromFile`); anything
+  else, SVG or PNG, becomes one Pin part named `all` (`ParsedArt.WholeFile`: every
+  layer) centred on the slot's region and fitted (`StickerImport.RegionBox`), worn and
+  selected. PNG art is always pinned, in its own colours. Sticker tab › Art: Size and
+  Turn sliders, *Hug the shape* (Warp ↔ Pin), *Edit drawing…*; drag selected drawn art
+  on the stage to move it (`BeginArtDrag`/`UpdateArtDrag`, figure delta →
+  `RegionMapping.ToTemplate`, one undo step; a 3 px threshold keeps clicks from
+  nudging it).
 - **Expressions** (`ExpressionPresets`, Stanley.Editing, beside `PosePresets`):
   twelve presets (Neutral, Happy, Laughing, Sad, Angry, Surprised, Scared,
   Skeptical, Wink, Talking, Shouting, Asleep), each a variant for eyes, brows and

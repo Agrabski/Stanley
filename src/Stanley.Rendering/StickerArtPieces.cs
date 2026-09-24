@@ -77,6 +77,21 @@ public static class RegionMapping
             .PostConcat(SKMatrix.CreateTranslation((float)anchor.X, (float)anchor.Y));
     }
 
+    /// <summary>
+    /// A move on the character (<paramref name="figureDelta"/>, figure space) as a move in
+    /// template units for art on <paramref name="region"/> - what dragging drawn art on the
+    /// stage adds to its offset. Undoes the region's local turn and scale.
+    /// </summary>
+    public static Point2D ToTemplate(BodyFigure figure, BodyRegion region, LimbSide? partSide, Point2D figureDelta)
+    {
+        var (centre, _) = StickerImport.RegionBox(figure.Angle, region);
+        var pin = Pin(figure, region, partSide ?? LimbSide.Right, partSide, centre);
+        if (!pin.TryInvert(out var inverse))
+            return default;
+        var v = inverse.MapVector((float)figureDelta.X, (float)figureDelta.Y);
+        return new Point2D(v.X, v.Y);
+    }
+
     /// <summary>The frame a fabric on art lies in: the region's, near <paramref name="at"/> (figure space).</summary>
     internal static SKMatrix FabricFrame(BodyFigure figure, BodyRegion region, LimbSide side, Point2D at) => region switch
     {
@@ -195,8 +210,9 @@ public static class RegionMapping
 }
 
 /// <summary>One element of drawn art, in figure space, ready to paint.</summary>
+/// <remarks>An image element (PNG art) is <see cref="Image"/> drawn through <see cref="ImageMatrix"/> (art units to figure space); its <see cref="Path"/> is its outline.</remarks>
 internal sealed record ArtStroke(SKPath Path, SKPath? Clip, SKColor? Fill, SKShader? FillShader, SKColor? Stroke, SKShader? StrokeShader,
-    float StrokeInk, SKStrokeCap Cap, SKStrokeJoin Join, float[]? Dash, FabricFill? Fabric, bool EvenOdd);
+    float StrokeInk, SKStrokeCap Cap, SKStrokeJoin Join, float[]? Dash, FabricFill? Fabric, bool EvenOdd, SKImage? Image = null, SKMatrix ImageMatrix = default);
 
 /// <summary>
 /// A drawn part on the figure: its elements in paint order, each with its own fill and
@@ -234,6 +250,12 @@ internal sealed class ArtItem(IReadOnlyList<ArtStroke> elements, SKPath area, St
             canvas.Save();
             if (e.Clip is { } clip)
                 canvas.ClipPath(clip, antialias: true);
+            if (e.Image is { } image)
+            {
+                var matrix = e.ImageMatrix;
+                canvas.Concat(in matrix);
+                canvas.DrawImage(image, SKRect.Create(0, 0, image.Width, image.Height), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+            }
             if (e.Fill is { } fill)
             {
                 if (e.Fabric is { } fabric)
@@ -304,7 +326,7 @@ internal static class StickerArtPieces
         {
             foreach (var angle in ViewFallback(view))
             {
-                if (asset.ArtFor(v, angle) is { } file && StickerSvg.Parse(file) is { } parsed)
+                if (asset.ArtFor(v, angle) is { } file && StickerSvg.ParseAny(file) is { } parsed)
                     return parsed;
             }
         }
@@ -329,13 +351,15 @@ internal static class StickerArtPieces
         IEnumerable<LimbSide> sides = part.Region is BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot
             ? part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right]
             : [LimbSide.Left];
+        // Raster art can't bend: it's always pinned.
+        var pin = art.Mapping == ArtMapping.Pin || elements.Any(e => e.Image is not null);
         foreach (var side in sides)
         {
             Func<SKPath, SKPath> place;
             SKPoint? anchor = null;
-            if (art.Mapping == ArtMapping.Pin)
+            var matrix = adjust.PostConcat(RegionMapping.Pin(figure, part.Region, side, part.Side, pinned));
+            if (pin)
             {
-                var matrix = adjust.PostConcat(RegionMapping.Pin(figure, part.Region, side, part.Side, pinned));
                 place = p => FigureGeometry.Transformed(p, matrix);
                 if (art.KeepReadable == true)
                     anchor = matrix.MapPoint(centre.X + (float)(art.Offset?.X ?? 0), centre.Y + (float)(art.Offset?.Y ?? 0));
@@ -367,7 +391,7 @@ internal static class StickerArtPieces
                     fabric = new FabricFill([new PartPiece(path, FigureLayerKind.Front, frame)], ground, f2, height, tiles);
                 }
                 mapped.Add(new ArtStroke(path, clip, fill, fillShader, stroke, strokeShader, e.StrokeWidth / ArtItem.TemplateInk,
-                    e.Cap, e.Join, e.Dash, fabric, e.EvenOdd));
+                    e.Cap, e.Join, e.Dash, fabric, e.EvenOdd, e.Image, matrix));
             }
             yield return (side, mapped, anchor);
         }
@@ -384,7 +408,7 @@ internal static class StickerArtPieces
         foreach (var e in elements)
         {
             SKPath? shape = null;
-            if (e.Fill is not null)
+            if (e.Fill is not null || e.Image is not null)
                 shape = FigureGeometry.Copy(e.Path);
             if (e.Stroke is not null && e.StrokeInk > 0)
             {

@@ -15,7 +15,7 @@ public partial class CharacterEditorRibbon : UserControl
 
         // One slider drag = one undo step: the gesture opens on press (before the slider
         // jumps to the pointer) and commits on release.
-        foreach (var slider in new[] { HeightSlider, WeightSlider, MuscleSlider, HeadSlider, FrameSlider, LengthSlider, SleevesSlider, FitSlider })
+        foreach (var slider in new[] { HeightSlider, WeightSlider, MuscleSlider, HeadSlider, FrameSlider, LengthSlider, SleevesSlider, FitSlider, ArtScaleSlider, ArtTurnSlider })
         {
             slider.AddHandler(PointerPressedEvent, (_, _) => ViewModel?.BeginSliderDrag(), RoutingStrategies.Tunnel, handledEventsToo: true);
             slider.AddHandler(PointerReleasedEvent, (_, _) => ViewModel?.EndSliderDrag(), RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
@@ -48,12 +48,14 @@ public partial class CharacterEditorRibbon : UserControl
         {
             _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
             _subscribed.TileImportRequested -= OnTileImportRequested;
+            _subscribed.ArtImportRequested -= OnArtImportRequested;
         }
         _subscribed = ViewModel;
         if (_subscribed != null)
         {
             _subscribed.PropertyChanged += OnViewModelPropertyChanged;
             _subscribed.TileImportRequested += OnTileImportRequested;
+            _subscribed.ArtImportRequested += OnArtImportRequested;
         }
     }
 
@@ -67,16 +69,29 @@ public partial class CharacterEditorRibbon : UserControl
     /// <summary>"Custom..." in a pattern or texture gallery: pick an SVG or PNG and hand it to the editor.</summary>
     private async void OnTileImportRequested(object? sender, TileImportRequest request)
     {
-        if (sender is not CharacterEditorViewModel editor || TopLevel.GetTopLevel(this) is not { } top)
-            return;
+        if (sender is CharacterEditorViewModel editor && await PickArt(editor, request.Texture ? "Choose a texture tile (a greyscale image)" : "Choose a pattern tile (one repeat)") is { } picked)
+            editor.ImportTile(request.Slot, picked.Name, picked.File, request.Texture);
+    }
+
+    /// <summary>"Import..." in a gallery: pick an SVG or PNG and make it a sticker for that slot.</summary>
+    private async void OnArtImportRequested(object? sender, ArtImportRequest request)
+    {
+        if (sender is CharacterEditorViewModel editor && await PickArt(editor, "Import a picture to wear (SVG or PNG)") is { } picked)
+            editor.ImportArt(request.Slot, picked.Name, picked.File);
+    }
+
+    private async Task<(string Name, ArtFile File)?> PickArt(CharacterEditorViewModel editor, string title)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top)
+            return null;
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = request.Texture ? "Choose a texture tile (a greyscale image)" : "Choose a pattern tile (one repeat)",
+            Title = title,
             AllowMultiple = false,
             FileTypeFilter = [new FilePickerFileType("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
         });
         if (files is not [var picked])
-            return;
+            return null;
         try
         {
             await using var stream = await picked.OpenReadAsync();
@@ -84,11 +99,12 @@ public partial class CharacterEditorRibbon : UserControl
             await stream.CopyToAsync(memory);
             var bytes = memory.ToArray();
             var file = picked.Name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ? ArtFile.Svg(System.Text.Encoding.UTF8.GetString(bytes)) : ArtFile.Png(bytes);
-            editor.ImportTile(request.Slot, picked.Name, file, request.Texture);
+            return (picked.Name, file);
         }
         catch (IOException e)
         {
             editor.ShowMessage($"Couldn't read {picked.Name}: {e.Message}");
+            return null;
         }
     }
 

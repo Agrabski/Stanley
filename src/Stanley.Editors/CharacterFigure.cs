@@ -72,6 +72,18 @@ public sealed class CharacterFigure : Control
         return main.Character is null ? null : CharacterRenderers.Default.StickerAt(character, main.Placement, new Point2D(point.X, point.Y), angle, Pose);
     }
 
+    /// <summary>Where the main character stands in the control now (control coordinates are page millimetres to it), or null if nothing is drawn.</summary>
+    public CharacterPlacement? MainPlacement
+    {
+        get
+        {
+            if (Character is not { } character)
+                return null;
+            var main = Arrange(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, Pose?.ViewAngle ?? Angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
+            return main.Character is null ? null : main.Placement;
+        }
+    }
+
     /// <summary>Where each figure stands in <paramref name="bounds"/>: everyone to one scale, the main character in the middle, the others alternating right and left of it.</summary>
     private static List<(CharacterDefinition Character, CharacterPlacement Placement, bool Faded, double Unit)> Arrange(Rect bounds, CharacterDefinition main,
         IReadOnlyList<CharacterDefinition> others, bool guides, ViewAngle angle, ProjectModel.Poses.PoseData? pose, bool closeup = false)

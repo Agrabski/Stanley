@@ -53,6 +53,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
         });
         BackToPageCommand = new RelayCommand(() => Library?.ReturnToPage(), () => Library != null);
         InitializeLook();
+        InitializeArt();
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(Working))
@@ -230,7 +231,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
     public IReadOnlyList<CharacterDefinition> LineUp =>
         Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
-    public string Hint => _message ?? ExpressionWarning ??
+    public string Hint => _message ?? ExpressionWarning ?? (SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
         "Pick a body type and fine-tune it with the sliders; dress them on the Look tab, and click something they wear to adjust it. " +
         "Every panel this character is in updates as you go.";
 

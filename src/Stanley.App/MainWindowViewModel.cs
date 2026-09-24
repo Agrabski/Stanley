@@ -744,6 +744,7 @@ public sealed class MainWindowViewModel : ObservableObject
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
         (_workspace, _navigator, _characters) = PageEditorHost.CreateWorkspace(project);
+        _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory);
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _titleDirty = false;
