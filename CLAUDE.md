@@ -471,13 +471,8 @@ automatic back-merge) are plumbing and never appear in release notes.
   `src/Stanley.App` for linux-x64, packed with **Velopack** (`vpk pack`,
   channel `linux-nightly`) into a `.AppImage` — the only thing uploaded, as
   the `stanley-linux-x64` workflow artifact (30 days) and, from there, to the
-  rolling pre-release tagged `nightly` (**Releases › nightly**) for File ›
-  Options › Updates to pick up. No separate plain archive is built or
-  published — see `docs/auto-update.md` for why (a bare `dotnet publish`
-  folder never registers as installed, so it could never self-update anyway)
-  and for why that release is pruned per-run rather than deleted and
-  recreated (Velopack's update feed needs the release/tag to persist across
-  runs).
+  rolling pre-release tagged `nightly` (**Releases › nightly**). No separate
+  plain archive. See `docs/auto-update.md`.
 - **Push to `main`**: build + test, and keep **one draft GitHub Release `vX.Y.Z`**
   up to date: the next version and notes (New features / Bug fixes / Breaking
   changes / Other changes, one line per closed issue) for every change PR merged

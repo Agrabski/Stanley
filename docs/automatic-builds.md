@@ -38,51 +38,33 @@ supported.
 | **A stable release** | *Releases* › the newest `vX.Y.Z` | When the owner publishes one |
 | **The build of one exact commit** | *Actions* › a run › *Artifacts* | Every nightly and release run; kept for 30 days |
 
-Each release has exactly one thing to download: a `.AppImage` file (built and
-uploaded by `vpk pack`/`vpk upload github` in `.github/workflows/ci.yml` — see
-`docs/auto-update.md`). Nothing else is attached; there's no separate plain
-archive to be confused with it.
+Each release has one file: `Stanley*.AppImage`.
 
 ## Installing
 
-1. Download the `.AppImage` from the release (*Releases › nightly*, or the
-   newest `vX.Y.Z`).
-2. Make it executable and run it:
-   ```sh
-   chmod +x Stanley*.AppImage
-   ./Stanley*.AppImage
-   ```
-   Nothing else needs installing — the .NET runtime is bundled in.
-3. If your system doesn't have `libfuse2` (common on Ubuntu 22.04+/Fedora,
-   which switched to FUSE3 by default), you'll see `Error: No suitable
-   fusermount binary found on the $PATH` printed first. That's harmless — the
-   AppImage falls back to extracting and running itself anyway. To make it go
-   away: `sudo apt install libfuse2t64` (or `libfuse2` on older Ubuntu/Debian)
-   or the equivalent for your distro.
+```sh
+chmod +x Stanley*.AppImage
+./Stanley*.AppImage
+```
 
-Run `stanley --version` (or `./Stanley*.AppImage --version`) to see which
-build you have.
+`stanley --version` shows the build.
+
+No `libfuse2`? You'll see `Error: No suitable fusermount binary found on the
+$PATH` — ignore it, the AppImage still runs. To silence it:
+`sudo apt install libfuse2t64` (or `libfuse2`).
 
 ## Turning on self-update
 
-File › Options › Updates. Stanley checks this same private repository's
-releases, so it needs your own GitHub personal access token:
+File › Options › Updates:
 
-1. Create one at *GitHub › Settings › Developer settings › Personal access
-   tokens › Fine-grained tokens*, scoped to just this repository, with
-   **Contents: Read-only** — nothing more is needed.
-2. Paste it into the **GitHub token** field in File › Options › Updates.
-3. Pick a channel: **Stable** (tagged releases only) or **Nightly** (every
-   build from `develop`, for testers).
-4. Turn on **Check for updates automatically**, or press **Check now** any
-   time. When a newer build is found, **Install and restart** downloads and
-   applies it (asking to save first if you have unsaved changes).
+1. GitHub → Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → this repo only → **Contents: Read-only**.
+2. Paste the token into **GitHub token**.
+3. Pick a channel: **Stable** or **Nightly**.
+4. Turn on **Check for updates automatically**, or press **Check now**.
+   **Install and restart** applies an update once found.
 
-This only works when Stanley was launched from the `.AppImage` — that's what
-lets Velopack register the install and safely replace itself. A build run
-straight from a `dotnet publish` output (e.g. one you built yourself) has
-nowhere to install to, so the Updates panel stays inert for it; see
-`docs/auto-update.md` for why.
+Only works when launched from the `.AppImage`.
 
 ## Day to day
 
