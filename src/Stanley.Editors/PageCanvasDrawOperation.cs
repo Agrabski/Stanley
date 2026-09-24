@@ -33,7 +33,11 @@ public sealed record PageCanvasScene(
     int SelectedCharacterIndex = -1,
     Rect2D? SelectedCharacterBounds = null,
     IReadOnlyList<Point2D>? LimbHandles = null,
-    IReadOnlyList<Point2D>? TrunkHandles = null);
+    IReadOnlyList<Point2D>? TrunkHandles = null,
+    EditingBubble? EditingBubble = null);
+
+/// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
+public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -122,10 +126,21 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
         PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
             .Where(_scene.Document.Panels.ContainsKey)
-            .Select(id => _scene.Document.Panels[id])
+            .Select(id => WithoutEditedText(_scene.Document.Panels[id]))
             .ToList(), _scene.Characters);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
+    }
+
+    /// <summary>The inline text editor draws the edited bubble's text itself; drawing it here too would show it twice.</summary>
+    private ProjectModel.Issues.Panel WithoutEditedText(ProjectModel.Issues.Panel panel)
+    {
+        if (_scene.EditingBubble is not { } editing || !editing.Panel.Equals(panel.Id))
+            return panel;
+        return panel with
+        {
+            Bubbles = panel.Bubbles.Select(b => b.Id.Equals(editing.Bubble) ? b with { Text = "" } : b).ToList()
+        };
     }
 
     // ---------------------------------------------------------------- screen space (px)
@@ -152,7 +167,13 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
             using (var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter ? (byte)120 : (byte)255), 2f))
                 canvas.DrawRect(panelRect, outline);
-            if (hasBubble)
+            var isEditing = hasBubble && _scene.EditingBubble is { } editing && editing.Panel.Equals(selectedId)
+                && editing.Bubble.Equals(selectedPanel.Bubbles[_scene.SelectedBubbleIndex].Id);
+            if (isEditing)
+            {
+                // Typing into it: no box or handles over the bubble.
+            }
+            else if (hasBubble)
             {
                 DrawBubbleSelection(canvas, selectedPanel.Bubbles[_scene.SelectedBubbleIndex]);
             }

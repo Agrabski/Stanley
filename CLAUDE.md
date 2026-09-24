@@ -270,7 +270,10 @@ Editing pipeline layers, bottom to top:
     bubbles along (`BubbleEditing.Refit`, split sends each bubble to the half its
     centre is in). Double-click in a panel (or the Bubble tool, or "Add bubble")
     creates a bubble with a tail already aimed into free space, and opens an inline
-    text editor over it (Enter = done, Shift+Enter = newline, Esc = cancel).
+    text editor in it (Enter = done, Shift+Enter = newline, Esc = cancel). Nothing
+    may cover the bubble while typing: the text box is transparent and borderless,
+    sits in `BubbleTextRenderer.TextArea`, and the canvas (`PageCanvasControl.EditingBubble`)
+    leaves that bubble's lettering and handles off; key hints go in the status bar.
   - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm):
     panel edges snap to the page margin, one gutter from neighbours, and into line
     with neighbours' edges; Alt disables it for one drag. Gutter drags

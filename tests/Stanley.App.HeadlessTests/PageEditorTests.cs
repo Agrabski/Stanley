@@ -241,11 +241,13 @@ public class PageEditorTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible, "the inline text editor should open over the new bubble");
+        AssertEditorLeavesBubbleVisible(view, window.Editor.Working.Panels[panelId].Bubbles[0]);
         window.KeyTextInput("Hello there");
         window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(view.TextEditor.IsVisible);
+        Assert.Null(view.Canvas.EditingBubble);
         var bubble = Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
         Assert.Equal("Hello there", bubble.Text);
     }
@@ -525,7 +527,28 @@ public class PageEditorTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible);
-        Assert.Single(window.Editor.Working.Panels[window.Editor.Working.PanelOrder[0]].Bubbles);
+        var bubble = Assert.Single(window.Editor.Working.Panels[window.Editor.Working.PanelOrder[0]].Bubbles);
+        AssertEditorLeavesBubbleVisible(view, bubble);
+    }
+
+    /// <summary>
+    /// While typing, nothing may cover the bubble: the text box is see-through and
+    /// borderless (focused, too), sits inside the bubble's outline, and the canvas drops
+    /// that bubble's handles and lettering.
+    /// </summary>
+    private static void AssertEditorLeavesBubbleVisible(PageEditorView view, Stanley.ProjectModel.Bubbles.Bubble bubble)
+    {
+        Assert.True(view.TextEditor.IsFocused);
+        var border = view.TextEditor.GetVisualDescendants().OfType<Border>().First(b => b.Name == "PART_BorderElement");
+        Assert.True(border.Background is null or Avalonia.Media.ISolidColorBrush { Color.A: 0 }, $"text box background should be transparent, was {border.Background}");
+        Assert.Equal(default, border.BorderThickness);
+
+        var bubbleRect = view.Canvas.PageToControl(AnchorRing.BoundingBox(bubble.Shape.Anchors));
+        Dispatcher.UIThread.RunJobs();
+        var editorRect = view.TextEditor.Bounds;
+        Assert.True(bubbleRect.Contains(editorRect), $"text box {editorRect} should sit inside the bubble {bubbleRect}");
+
+        Assert.Equal(bubble.Id, view.Canvas.EditingBubble?.Bubble);
     }
 
     /// <summary>

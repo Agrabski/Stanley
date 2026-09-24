@@ -112,6 +112,21 @@ public sealed class PageCanvasControl : Control
         }
     }
 
+    /// <summary>The bubble the inline text editor is open over, if any: the canvas leaves its lettering and handles off so the editor sits on a clean bubble.</summary>
+    public EditingBubble? EditingBubble
+    {
+        get => _editingBubble;
+        set
+        {
+            if (_editingBubble == value)
+                return;
+            _editingBubble = value;
+            InvalidateVisual();
+        }
+    }
+
+    private EditingBubble? _editingBubble;
+
     // ---------------------------------------------------------------- view transform
 
     public double Zoom => _zoom;
@@ -223,7 +238,8 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedCharacterIndex,
             _viewModel.SelectedCharacter is { } selectedCharacter ? _viewModel.CharacterBounds(selectedCharacter) : null,
             _viewModel.SelectedCharacter is { } posed ? _viewModel.LimbHandles(posed).Select(h => h.Point).ToList() : null,
-            _viewModel.SelectedCharacter is { } trunk ? _viewModel.TrunkHandles(trunk).Select(h => h.Point).ToList() : null)));
+            _viewModel.SelectedCharacter is { } trunk ? _viewModel.TrunkHandles(trunk).Select(h => h.Point).ToList() : null,
+            _editingBubble)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
