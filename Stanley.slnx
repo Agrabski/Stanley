@@ -2,11 +2,13 @@
   <Folder Name="/src/">
     <Project Path="src/Stanley.App/Stanley.App.csproj" />
     <Project Path="src/Stanley.Bubbles/Stanley.Bubbles.csproj" />
+    <Project Path="src/Stanley.Cli/Stanley.Cli.csproj" />
     <Project Path="src/Stanley.ProjectModel/Stanley.ProjectModel.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj" />
     <Project Path="tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj" />
+    <Project Path="tests/Stanley.Cli.Tests/Stanley.Cli.Tests.csproj" />
     <Project Path="tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj" />
   </Folder>
 </Solution>

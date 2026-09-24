@@ -21,15 +21,18 @@ ships — .NET 11 doesn't exist as a stable release yet), rendering via
 in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 (the newer XML-free format).
 
-The speech-bubble POC (see below) and the project/data model (persistence only —
-no editor UI yet) exist so far. No character rendering, no document/page editor.
+The speech-bubble POC (see below), the project/data model (persistence only —
+no editor UI yet), and a `stanley` CLI (currently just `init`) exist so far.
+No character rendering, no document/page editor.
 
 ```
 src/Stanley.Bubbles/      # bubble geometry model, no Avalonia dependency (SkiaSharp only)
 src/Stanley.ProjectModel/ # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
+src/Stanley.Cli/          # `stanley` command-line tool (System.CommandLine), no Avalonia/SkiaSharp dependency
 src/Stanley.App/          # Avalonia POC host (single-bubble editor)
 tests/Stanley.Bubbles.Tests/       # xunit v2, geometry unit tests
 tests/Stanley.ProjectModel.Tests/  # xunit v2, id/serialization/repository unit tests
+tests/Stanley.Cli.Tests/           # xunit v2, command unit tests (invokes System.CommandLine commands directly, not via subprocess)
 tests/Stanley.App.HeadlessTests/   # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
 ```
 
@@ -38,8 +41,10 @@ Build/test/run:
 dotnet build Stanley.slnx
 dotnet test tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj
 dotnet test tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj
+dotnet test tests/Stanley.Cli.Tests/Stanley.Cli.Tests.csproj
 dotnet test tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
 dotnet run --project src/Stanley.App
+dotnet run --project src/Stanley.Cli -- init ./MyComic --title "My Comic"
 ```
 No linter is configured yet.
 
@@ -123,6 +128,30 @@ features will read and write.
   `SaveX`/`LoadX`, and NativeAOT publish validation (same deferral as the
   bubble POC — analyzer-clean under `IsAotCompatible`, not yet published via
   a real `PublishAot` executable).
+
+## Command-line tool (implemented)
+
+`Stanley.Cli` builds a `stanley` executable (`AssemblyName` set in the
+csproj) on top of `Stanley.ProjectModel`, using **System.CommandLine 2.0**
+(GA, not a beta) for parsing — chosen because it's Microsoft's own,
+AOT/trim-clean (0 analyzer warnings under this repo's `IsAotCompatible`),
+and MIT-licensed (AGPL-compatible).
+
+- One `Command` per subcommand, each in its own file under `Commands/`
+  (`InitCommand` so far), wired into the `RootCommand` in `Program.cs`.
+  `[assembly: InternalsVisibleTo("Stanley.Cli.Tests")]` (`AssemblyInfo.cs`)
+  lets tests call a command's `Build()` and `.Parse(args).Invoke()` directly
+  instead of shelling out to the built exe.
+- `stanley init <path>`: creates a new project via
+  `ProjectRepository.Initialize`. Defaults the title to the target
+  directory's name and the page trim to US comic trim (6.625 × 10.25 in +
+  1/8 in bleed) so it works with zero flags, per the project's "ease of use"
+  priority; `--title`/`--page-*-mm` override, `--force` is required to
+  overwrite a directory that already has a `stanley.json` (checked via
+  `ProjectRepository.IsInitialized`, added alongside this command).
+- Not yet implemented: any subcommand beyond `init` (add/list
+  character/issue/page/panel, etc.) and NativeAOT publish validation (same
+  deferral noted for the other two projects).
 
 ## Character system design (proposed, not final)
 

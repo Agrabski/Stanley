@@ -20,6 +20,10 @@ public sealed class ProjectRepository
 
     public ProjectRepository(string rootDirectory) => RootDirectory = Path.GetFullPath(rootDirectory);
 
+    /// <summary>Whether <paramref name="rootDirectory"/> already contains a Stanley project (i.e. has a <c>stanley.json</c>).</summary>
+    public static bool IsInitialized(string rootDirectory) =>
+        File.Exists(Path.Combine(Path.GetFullPath(rootDirectory), ProjectPaths.ManifestFileName));
+
     /// <summary>Creates a brand-new, empty project on disk: the manifest, top-level folders, and the LFS <c>.gitattributes</c> rule.</summary>
     public static ProjectRepository Initialize(string rootDirectory, string title, PageTrim defaultPageTrim)
     {
