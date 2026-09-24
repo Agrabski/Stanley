@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
-using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Stanley.Editors;
@@ -18,11 +17,16 @@ namespace Stanley.App.HeadlessTests;
 /// </summary>
 public class PageEditorTests
 {
+    static PageEditorTests()
+    {
+        // Initialize Avalonia once for all tests in this class
+        TestAppBuilder.BuildAvaloniaApp().SetupInProcessDesktopPlatform();
+    }
     /// <summary>
     /// Verifies that dragging a panel's bottom-right corner outward increases its bounds,
     /// and that the gesture commits so Working == Committed after release.
     /// </summary>
-    [AvaloniaFact]
+    [Fact]
     public void DraggingPanelCorner_ResizesThePanelAndCommits()
     {
         var window = new MainWindow();
@@ -58,7 +62,7 @@ public class PageEditorTests
     /// Verifies that pressing Escape mid-drag cancels the resize gesture, reverting
     /// the panel bounds and leaving History.CanUndo false.
     /// </summary>
-    [AvaloniaFact]
+    [Fact]
     public void PressEscapeMidDrag_CancelsDragAndReverts()
     {
         var window = new MainWindow();
@@ -103,7 +107,7 @@ public class PageEditorTests
     /// Verifies that Ctrl+Z (undo) and Ctrl+Shift+Z (redo) key bindings work:
     /// after committing a resize, Ctrl+Z reverts it, and Ctrl+Shift+Z restores it.
     /// </summary>
-    [AvaloniaFact]
+    [Fact]
     public void CtrlZAndCtrlShiftZ_UndoAndRedo()
     {
         var window = new MainWindow();
@@ -157,7 +161,7 @@ public class PageEditorTests
     /// PageEditorViewModel to PageEditorView, which renders a PageCanvasControl
     /// in the visual tree.
     /// </summary>
-    [AvaloniaFact]
+    [Fact]
     public void MainWindowRendersPageCanvasControlInVisualTree()
     {
         var window = new MainWindow();

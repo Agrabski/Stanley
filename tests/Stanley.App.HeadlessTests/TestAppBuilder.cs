@@ -1,17 +1,16 @@
 using Avalonia;
 using Avalonia.Headless;
-using Avalonia.Headless.XUnit;
 using Stanley.App;
-using Stanley.App.HeadlessTests;
-
-[assembly: AvaloniaTestFramework]
-[assembly: AvaloniaTestApplication(typeof(TestAppBuilder))]
 
 namespace Stanley.App.HeadlessTests;
 
-public class TestAppBuilder
+/// <summary>
+/// Provides static utility methods for building the Avalonia app in headless/test contexts.
+/// The actual test framework initialization is now handled via IAsyncLifetime in individual test classes.
+/// </summary>
+public static class TestAppBuilder
 {
-    /// <summary><c>UseHeadlessDrawing = false</c> so the real Skia backend runs (needed for <see cref="HeadlessWindowExtensions.CaptureRenderedFrame"/> to return actual pixels of our custom draw operation, not a stub).</summary>
+    /// <summary>Builds an AppBuilder configured for headless testing with real Skia rendering.</summary>
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UseSkia()
