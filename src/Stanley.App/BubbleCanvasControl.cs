@@ -87,7 +87,6 @@ public sealed class BubbleCanvasControl : Control
             return;
         }
 
-        // Tail-attachment handles.
         for (var i = _bubble.Tails.Count - 1; i >= 0; i--)
         {
             var attachPoint = _bubble.Outline.PointAt(_bubble.Tails[i].AttachmentT);
@@ -99,7 +98,6 @@ public sealed class BubbleCanvasControl : Control
             return;
         }
 
-        // Corner resize handles.
         var corner = HitTestCorner(p);
         if (corner == DragState.None) return;
         _drag = corner;

@@ -21,22 +21,33 @@ ships — .NET 11 doesn't exist as a stable release yet), rendering via
 in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 (the newer XML-free format).
 
-Only the speech-bubble POC exists so far (see below) — no character system,
-no document/page model, no persistence.
+The speech-bubble POC (see below) and the project/data model (persistence only —
+no editor UI yet) exist so far. No character rendering, no document/page editor.
+`Stanley.App` is the single `stanley` executable: no args opens the Avalonia
+GUI, any args dispatch through a CLI (System.CommandLine; currently just
+`init`) instead, without touching Avalonia at all — one binary, not a
+separate GUI exe plus a separate CLI exe (see "Command-line interface" below
+for why).
 
 ```
-src/Stanley.Bubbles/    # bubble geometry model, no Avalonia dependency (SkiaSharp only)
-src/Stanley.App/        # Avalonia POC host (single-bubble editor)
-tests/Stanley.Bubbles.Tests/     # xunit v2, geometry unit tests
-tests/Stanley.App.HeadlessTests/ # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
+src/Stanley.Bubbles/      # bubble geometry model, no Avalonia dependency (SkiaSharp only)
+src/Stanley.ProjectModel/ # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
+src/Stanley.App/          # the `stanley` executable: Avalonia POC host (single-bubble editor) + CLI (Commands/)
+tests/Stanley.Bubbles.Tests/       # xunit v2, geometry unit tests
+tests/Stanley.ProjectModel.Tests/  # xunit v2, id/serialization/repository unit tests
+tests/Stanley.App.Tests/           # xunit v2, CLI command unit tests (invokes System.CommandLine commands directly, no GUI/headless machinery needed)
+tests/Stanley.App.HeadlessTests/   # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
 ```
 
 Build/test/run:
 ```
 dotnet build Stanley.slnx
 dotnet test tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj
+dotnet test tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj
+dotnet test tests/Stanley.App.Tests/Stanley.App.Tests.csproj
 dotnet test tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
 dotnet run --project src/Stanley.App
+dotnet run --project src/Stanley.App -- init ./MyComic --title "My Comic"
 ```
 No linter is configured yet.
 
@@ -72,6 +83,100 @@ switching between style presets, and adding/moving any number of tails.
   See the design discussion in this repo's history for the full reasoning
   (bezier outlines, boolean-union tails, Avalonia+AOT tradeoffs, AGPL
   licensing check on the dependency stack).
+
+## Project & data model (implemented)
+
+Implemented in `Stanley.ProjectModel`, the persistence layer described under
+"Project & data model" in `docs/character-and-project-plan.md`. No editor UI
+consumes it yet; `ProjectRepository` is a `dotnet build`/`dotnet test`-only
+persistence layer so far. Character rendering (rig, stickers-as-pixels,
+posing, IK) itself is not implemented — this is the *data model* those
+features will read and write.
+
+- **One id struct per stable-id entity** (`CharacterId`, `PanelId`, etc., in
+  `Ids/`), each a validated opaque token — non-empty, no path separators, no
+  `-` (reserved as the folder-name id/slug delimiter, so an id can never be a
+  false-positive prefix match for another, longer id). `FromValue`/`Parse`
+  bring an id in from disk or JSON; `New()` mints one. Each has its own
+  `StrongIdJsonConverter<TId>` (value form and, for id-keyed maps like
+  `Issue.CharacterRevisions`, property-name form) — no reflection, so this
+  stays NativeAOT-safe under source-generated `System.Text.Json`.
+- **Folder structure is enforced, not optional**: `ProjectRepository` computes
+  every path from `ProjectPaths`; callers only ever pass ids and entity
+  values, never a path. Most entities get a `<id>-slug` folder/file (the slug
+  is cosmetic, recomputed only when an entity is first created — renaming
+  later doesn't move or rename its folder, so a rename never cascades into
+  unrelated diffs); panels are the one exception (`<id>.json`, no slug, since
+  panels aren't user-named).
+- **JSON conventions** (`Serialization/`): 2-space indent, alphabetically
+  sorted object keys (a `JsonTypeInfo` modifier over the source-generated
+  `StanleyJsonContext`, so declaration order in C# can stay readable while
+  the JSON output stays sorted), camelCase property *and* enum-value names,
+  trailing newline. `SortedDictionary` is used wherever a map's key order
+  isn't itself meaningful (colour slots, id-keyed maps); an explicit ordered
+  id array (never dictionary/filename/folder-position order) is used
+  wherever order *is* meaningful (z-order, reading order, stacking order).
+- **Geometry/skeleton is plain data, no SkiaSharp/Avalonia dependency**:
+  `Point2D`/`PanelShape` reimplement the anchor-ring model `BubbleOutline`
+  uses (deliberately not shared, to keep this project dependency-free);
+  `HumanoidBone` is the full VRM 1.0 humanoid bone set; bone rest
+  poses/rotations are `IReadOnlyList<(bone, value)>`, not
+  `Dictionary<HumanoidBone, T>`, to sidestep enum-as-dictionary-key edge
+  cases entirely.
+- **`PageTrim` = `PageSize` (width/height) + a bleed margin, kept as two
+  types.** Bleed is a print-production choice, not part of a paper size, so
+  it isn't baked into presets. `MetricPaperSize`/`MetricPaperSizes` give the
+  ISO 216 "A" series (A0–A6) as portrait `PageSize`s — the same
+  enum-plus-static-lookup shape as `BubbleStylePreset`/`BubbleStylePresets`.
+  **Always metric, project-wide** — no inch-derived defaults or imperial
+  preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
+  (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
+  not its own preset table entry, since bleed isn't part of a paper size).
+- **Not yet designed**: bubble persistence (`Panel.Bubbles` is a placeholder
+  `IReadOnlyList<BubbleId>` — Stanley.Bubbles has no JSON format yet),
+  `sticker.json`'s exact schema beyond what's implemented here (the design
+  doc doesn't draw one explicitly), any convenience "create new project/
+  character/issue" helpers beyond `ProjectRepository.Initialize` and raw
+  `SaveX`/`LoadX`, and NativeAOT publish validation (same deferral as the
+  bubble POC — analyzer-clean under `IsAotCompatible`, not yet published via
+  a real `PublishAot` executable).
+
+## Command-line interface (implemented)
+
+`stanley` is **one executable** with both a GUI and a CLI, not two separate
+binaries — `Stanley.App`'s `Program.Main` checks `args` before doing
+anything else: no args builds and starts the Avalonia app exactly as
+before; any args parse and invoke a CLI command instead, never touching
+Avalonia/the windowing system (so CLI use works headlessly — CI, no display
+server). This mirrors how e.g. Blender or VS Code ship a single binary that
+dispatches on args rather than a separate GUI product and CLI product —
+appropriate here since `stanley init` and the editor are the same tool, not
+different install/versioning lifecycles the way `docker`/Docker Desktop or
+`kubectl`/a dashboard are. (An earlier pass put the CLI in its own
+`Stanley.Cli` project/exe; that was wrong and was folded back in here.)
+
+Parsing is **System.CommandLine 2.0** (GA, not a beta) — chosen because
+it's Microsoft's own, AOT/trim-clean (0 analyzer warnings under this repo's
+`IsAotCompatible`), and MIT-licensed (AGPL-compatible).
+
+- One `Command` per subcommand, each in its own file under
+  `Stanley.App/Commands/` (`InitCommand` so far), wired into a `RootCommand`
+  in `Program.cs`. `[assembly: InternalsVisibleTo("Stanley.App.Tests")]`
+  (`Stanley.App/AssemblyInfo.cs`) lets `Stanley.App.Tests` call a command's
+  `Build()` and `.Parse(args).Invoke()` directly instead of shelling out to
+  the built exe.
+- `stanley init <path>`: creates a new project via
+  `ProjectRepository.Initialize`. Defaults the title to the target
+  directory's name and the page trim to A4 (`MetricPaperSizes.Size(A4)`)
+  with a 3mm bleed so it works with zero flags, per the project's "ease of
+  use" priority; `--title`/`--page-*-mm` override. Always metric, no
+  inch-derived defaults anywhere. `--force` is required to overwrite a
+  directory that already has a `stanley.json` (checked via
+  `ProjectRepository.IsInitialized`).
+- Not yet implemented: any subcommand beyond `init` (add/list
+  character/issue/page/panel, etc.), opening a project from the GUI via a
+  CLI arg, and NativeAOT publish validation (same deferral noted for the
+  other two projects).
 
 ## Character system design (proposed, not final)
 

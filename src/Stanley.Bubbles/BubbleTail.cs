@@ -36,37 +36,67 @@ public sealed class BubbleTail
     /// <summary>Builds this tail's standalone polygon, to be unioned with the bubble outline.</summary>
     public SKPath GeneratePath(BubbleOutline outline, float baseHalfWidth = 16f)
     {
-        var spread = SpreadFor(outline, Kind, baseHalfWidth);
+        // The widened spread (see SpreadFor) can absorb a concave stretch of a jagged
+        // outline (e.g. a Shout tooth's inner notch) that no jag orientation can route
+        // around without the tail crossing itself; retry at UniformSpread's narrower,
+        // rarely-concave base. Even that can occasionally still cross itself (an acute
+        // angle between the jag and the outline's own local direction), so the last
+        // resort drops the jag/absorbed-anchor detail entirely for a plain 3-point
+        // triangle - trivially simple, since 3 points can't self-intersect.
+        var points =
+            TryBuildSimplePolygon(outline, SpreadFor(outline, Kind, baseHalfWidth), baseHalfWidth) ??
+            TryBuildSimplePolygon(outline, UniformSpread(outline), baseHalfWidth) ??
+            BuildPlainTriangle(outline, UniformSpread(outline));
+
+        using var builder = new SKPathBuilder();
+        builder.MoveTo(points[0]);
+        for (var i = 1; i < points.Count; i++)
+            builder.LineTo(points[i]);
+        builder.Close();
+        return builder.Detach();
+    }
+
+    /// <summary>The polygon at this spread, preferring whichever jag orientation (for <see cref="TailKind.JaggedTriangle"/>) keeps it simple; null if neither does.</summary>
+    private List<SKPoint>? TryBuildSimplePolygon(BubbleOutline outline, float spread, float baseHalfWidth)
+    {
+        var unflipped = BuildPolygon(outline, spread, baseHalfWidth, jagFlipped: false);
+        if (!HasSelfIntersection(unflipped))
+            return unflipped;
+        if (Kind != TailKind.JaggedTriangle)
+            return null;
+
+        var flipped = BuildPolygon(outline, spread, baseHalfWidth, jagFlipped: true);
+        return HasSelfIntersection(flipped) ? null : flipped;
+    }
+
+    /// <summary>The guaranteed-simple last resort: no jag, no absorbed anchors, just the three points a triangle needs.</summary>
+    private List<SKPoint> BuildPlainTriangle(BubbleOutline outline, float spread) =>
+        [outline.PointAt(AttachmentT - spread), Target, outline.PointAt(AttachmentT + spread)];
+
+    private List<SKPoint> BuildPolygon(BubbleOutline outline, float spread, float baseHalfWidth, bool jagFlipped)
+    {
         var left = outline.PointAt(AttachmentT - spread);
         var right = outline.PointAt(AttachmentT + spread);
         var absorbed = outline.AnchorsBetween(AttachmentT - spread, AttachmentT + spread);
 
-        using var builder = new SKPathBuilder();
-        builder.MoveTo(left);
+        var points = new List<SKPoint>(5 + absorbed.Count) { left };
         if (Kind == TailKind.JaggedTriangle)
         {
-            var mid = Lerp(left, right, 0.5f);
-            var toward = Sub(Target, mid);
-            var jag = PerpOffset(toward, baseHalfWidth * 0.6f);
+            var mid = outline.PointAt(AttachmentT);
+            var jag = PerpOffset(Sub(Target, mid), baseHalfWidth * 0.6f);
+            if (jagFlipped)
+                jag = new SKPoint(-jag.X, -jag.Y);
             var kink = Lerp(mid, Target, 0.45f);
 
-            // PerpOffset's rotation direction is fixed, but which side "left" and
-            // "right" fall on flips with the outline's local winding (e.g. a convex
-            // spike vs. a concave notch on a jagged outline). Orient the jag so it
-            // bulges towards left's side on the way out and right's side on the way
-            // back, otherwise the two legs swap sides and the tail crosses itself.
-            if (Cross(toward, Sub(left, mid)) < 0 != Cross(toward, jag) < 0)
-                jag = new SKPoint(-jag.X, -jag.Y);
-
-            builder.LineTo(Add(kink, jag));
-            builder.LineTo(Target);
-            builder.LineTo(Sub(kink, jag));
+            points.Add(Add(kink, jag));
+            points.Add(Target);
+            points.Add(Sub(kink, jag));
         }
         else
         {
-            builder.LineTo(Target);
+            points.Add(Target);
         }
-        builder.LineTo(right);
+        points.Add(right);
 
         // The base (left..right) may straddle one or more outline vertices (e.g. a
         // Shout tooth) rather than sharing a single edge with the outline. Walk back
@@ -75,10 +105,35 @@ public sealed class BubbleTail
         // the union cleanly, rather than left as a sliver of the outline for the boolean
         // union to reconcile against a straight chord across it.
         for (var i = absorbed.Count - 1; i >= 0; i--)
-            builder.LineTo(absorbed[i]);
+            points.Add(absorbed[i]);
 
-        builder.Close();
-        return builder.Detach();
+        return points;
+    }
+
+    private static bool HasSelfIntersection(List<SKPoint> polygon)
+    {
+        var n = polygon.Count;
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = i + 1; j < n; j++)
+            {
+                if (j == i + 1 || (i == 0 && j == n - 1))
+                    continue;
+
+                if (SegmentsIntersect(polygon[i], polygon[(i + 1) % n], polygon[j], polygon[(j + 1) % n]))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool SegmentsIntersect(SKPoint p1, SKPoint p2, SKPoint p3, SKPoint p4)
+    {
+        var d1 = Cross(Sub(p4, p3), Sub(p1, p3));
+        var d2 = Cross(Sub(p4, p3), Sub(p2, p3));
+        var d3 = Cross(Sub(p2, p1), Sub(p3, p1));
+        var d4 = Cross(Sub(p2, p1), Sub(p4, p1));
+        return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
     }
 
     /// <summary>
@@ -90,7 +145,7 @@ public sealed class BubbleTail
     /// </summary>
     private static float SpreadFor(BubbleOutline outline, TailKind kind, float baseHalfWidth)
     {
-        var uniform = 1f / (outline.Anchors.Count * 6f);
+        var uniform = UniformSpread(outline);
         if (kind != TailKind.JaggedTriangle)
             return uniform;
 
@@ -101,6 +156,9 @@ public sealed class BubbleTail
         var arcSpread = MathF.Min(baseHalfWidth * 2f / perimeter, 0.2f);
         return MathF.Max(uniform, arcSpread);
     }
+
+    /// <summary>A spread narrow enough to never straddle a whole outline anchor, so the base is a single edge rather than a multi-anchor walk.</summary>
+    private static float UniformSpread(BubbleOutline outline) => 1f / (outline.Anchors.Count * 6f);
 
     private static float EstimatePerimeter(BubbleOutline outline, int samples = 64)
     {
