@@ -79,6 +79,69 @@ public class CharacterPosingTests
         Assert.Equal(ViewAngle.Front, reset.Pose.ViewAngle);
     }
 
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public void Dragging_the_elbow_or_knee_handle_moves_the_joint_there_and_keeps_the_limb_bent(Limb limb, ViewAngle angle, bool mirrored)
+    {
+        var instance = Placed(angle, mirrored);
+        var start = CharacterPosing.EndPoint(Alice, instance, limb);
+        var reached = CharacterPosing.Reach(Alice, instance, limb, new Point2D(start.X + 8, start.Y - 10), CharacterPosing.BendSign(Alice, instance, limb));
+        var elbow = CharacterPosing.BendPoint(Alice, reached, limb);
+        var hand = CharacterPosing.EndPoint(Alice, reached, limb);
+        var root = Root(reached, limb);
+        var forearm = Distance(elbow, hand);
+        var bendAngle = Angle(root, elbow, hand);
+
+        // Swing the upper bone a quarter turn: a target at the same distance from the shoulder/hip.
+        var target = new Point2D(root.X - (elbow.Y - root.Y), root.Y + (elbow.X - root.X));
+        var bent = CharacterPosing.Bend(Alice, reached, limb, target);
+
+        var newElbow = CharacterPosing.BendPoint(Alice, bent, limb);
+        var newHand = CharacterPosing.EndPoint(Alice, bent, limb);
+        Assert.True(Distance(target, newElbow) < 0.05, $"the elbow/knee lands on the target ({newElbow} vs {target})");
+        Assert.True(Math.Abs(forearm - Distance(newElbow, newHand)) < 0.05, "the forearm/shin keeps its length");
+        Assert.True(Math.Abs(bendAngle - Angle(Root(bent, limb), newElbow, newHand)) < 1, "the limb keeps its bend");
+        Assert.Equal(instance.Placement, bent.Placement);
+    }
+
+    [Fact]
+    public void Dragging_the_elbow_out_of_reach_points_the_upper_arm_at_the_target()
+    {
+        var instance = Placed();
+        var root = Root(instance, Limb.LeftArm);
+        var elbow = CharacterPosing.BendPoint(Alice, instance, Limb.LeftArm);
+        var far = new Point2D(root.X + 1000, root.Y);
+
+        var bent = CharacterPosing.Bend(Alice, instance, Limb.LeftArm, far);
+
+        var newElbow = CharacterPosing.BendPoint(Alice, bent, Limb.LeftArm);
+        Assert.True(Math.Abs(newElbow.Y - root.Y) < 0.05, "the elbow lies on the line to the target");
+        Assert.True(newElbow.X > root.X);
+        Assert.True(Math.Abs(Distance(root, newElbow) - Distance(root, elbow)) < 0.05, "the upper arm doesn't stretch");
+    }
+
+    [Fact]
+    public void Dragging_the_elbow_to_where_it_already_is_leaves_the_pose_unchanged()
+    {
+        var instance = Placed();
+        var start = CharacterPosing.EndPoint(Alice, instance, Limb.LeftArm);
+        var reached = CharacterPosing.Reach(Alice, instance, Limb.LeftArm, new Point2D(start.X + 8, start.Y - 10), CharacterPosing.BendSign(Alice, instance, Limb.LeftArm));
+        var elbow = CharacterPosing.BendPoint(Alice, reached, Limb.LeftArm);
+
+        var same = CharacterPosing.Bend(Alice, reached, Limb.LeftArm, elbow);
+
+        Assert.True(Distance(CharacterPosing.EndPoint(Alice, reached, Limb.LeftArm), CharacterPosing.EndPoint(Alice, same, Limb.LeftArm)) < 0.05);
+    }
+
+    private static Point2D Root(CharacterInstance instance, Limb limb) =>
+        instance.Placement.ToPage(CharacterPosing.Figure(Alice, instance).Layout.Bones.First(b => b.Bone == CharacterPosing.Chain(limb).Root).Position);
+
+    private static double Angle(Point2D a, Point2D vertex, Point2D b)
+    {
+        var d = Math.Atan2(b.Y - vertex.Y, b.X - vertex.X) - Math.Atan2(a.Y - vertex.Y, a.X - vertex.X);
+        return Math.Abs(Math.IEEERemainder(d * 180 / Math.PI, 360));
+    }
+
     [Fact]
     public void In_a_side_view_knees_bend_forward_and_elbows_back()
     {

@@ -1,3 +1,4 @@
+using Dock.Model.Core;
 using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel;

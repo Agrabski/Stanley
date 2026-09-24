@@ -90,6 +90,26 @@ public class CharacterTests
         Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
     }
 
+    [Fact]
+    public void ClickingTheAlreadyCurrentPage_WhileACharacterEditorIsShowing_BringsThePageBack()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        characters.OpenCharacter(created.Id);
+        Dispatcher.UIThread.RunJobs();
+        Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
+
+        var navigatorPane = window.GetVisualDescendants().OfType<PageNavigatorView>().Single();
+        var container = (Control)navigatorPane.List.ContainerFromIndex(0)!;
+        var point = container.TranslatePoint(new Point(container.Bounds.Width / 2, container.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+    }
+
     private static (CharacterLibraryView Pane, Point ItemCenter) ShowPane(MainWindow window, CharacterLibraryViewModel characters)
     {
         window.Workspace.Factory.SetActiveDockable(characters);
@@ -173,6 +193,39 @@ public class CharacterTests
         Assert.Equal(instance.Placement, posed.Placement); // posed, not moved
         Assert.NotEmpty(posed.Pose.BoneRotations);
         Assert.True(page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point.Y < hand.Y - 20);
+        Assert.True(window.Workspace.History.CanUndo);
+    }
+
+    [Fact]
+    public void Dragging_a_selected_characters_elbow_or_knee_dot_moves_the_joint_to_the_pointer()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId); // selected
+        Dispatcher.UIThread.RunJobs();
+        var canvas = Single<PageCanvasControl>(window);
+        var instance = page.Working.Panels[panelId].CharacterInstances[0];
+        var hand = page.LimbHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        var elbow = page.BendHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        Point ToWindow(ProjectModel.Geometry.Point2D p) => canvas.TranslatePoint(canvas.PageToControl(p), window)!.Value;
+        // Well out to the side of the hanging elbow: the upper arm swings out towards it.
+        var forearm = Math.Sqrt((elbow.X - hand.X) * (elbow.X - hand.X) + (elbow.Y - hand.Y) * (elbow.Y - hand.Y));
+        var target = new ProjectModel.Geometry.Point2D(elbow.X + 3 * forearm, elbow.Y);
+
+        window.MouseDown(ToWindow(elbow), MouseButton.Left);
+        window.MouseMove(ToWindow(target));
+        window.MouseUp(ToWindow(target), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var posed = page.Working.Panels[panelId].CharacterInstances[0];
+        var movedElbow = page.BendHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        var movedHand = page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        static double Dist(ProjectModel.Geometry.Point2D a, ProjectModel.Geometry.Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+        Assert.True(Dist(movedElbow, target) < Dist(elbow, target) - forearm / 2, "the elbow follows the pointer");
+        Assert.NotEqual(hand, movedHand);
+        Assert.NotEmpty(posed.Pose.BoneRotations);
         Assert.True(window.Workspace.History.CanUndo);
     }
 

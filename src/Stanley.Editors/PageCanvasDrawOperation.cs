@@ -33,6 +33,7 @@ public sealed record PageCanvasScene(
     int SelectedCharacterIndex = -1,
     Rect2D? SelectedCharacterBounds = null,
     IReadOnlyList<Point2D>? LimbHandles = null,
+    IReadOnlyList<Point2D>? BendHandles = null,
     IReadOnlyList<Point2D>? TrunkHandles = null,
     EditingBubble? EditingBubble = null);
 
@@ -277,6 +278,10 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
                 canvas.DrawCircle(p, 5.5f, limbRing);
             }
         }
+
+        // Elbows and knees: smaller squares in the same green, so they read apart from the hand/foot dots but stay in the same family.
+        foreach (var handle in _scene.BendHandles ?? [])
+            DrawSquareHandle(canvas, Screen(handle), PoseHandle, 3.5f);
 
         // Hips, chest, head: hollow rings, so they read apart from the hand/foot dots.
         using (var trunkFill = new SKPaint { Color = SKColors.White, IsAntialias = true })
