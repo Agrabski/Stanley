@@ -428,36 +428,37 @@ summary.
 
 ## Builds, versioning & releases
 
-**Commit messages must follow Conventional Commits** — they drive the version
-number and the changelog: `feat: …` (new user-visible feature → minor bump),
-`fix: …` (bug fix → patch bump), `feat!: …` or a `BREAKING CHANGE:` footer
-(breaking; while on 0.x this bumps minor), and `chore:`/`docs:`/`test:`/`ci:`/
-`refactor:` for everything else (no release). Scopes are optional
-(`fix(navigator): …`). With squash merges the PR title becomes the commit, so
-it must follow the same format.
+**Versions and release notes come from the issues each PR closes**, not from
+commit messages (write those however reads best). Every PR should link the
+issue(s) it resolves — "Closes #123" in the description, or the Development box.
+The closed issues' labels (or GitHub issue type) decide the bump:
+`breaking` → major (minor while on 0.x); `enhancement`/`feature` or type Feature
+→ minor; anything else (`bug`, unlabelled, a PR closing no issue) → patch. A PR
+closing no issue is listed under "Other changes" by its own title. Logic:
+`.github/scripts/release-notes.js` (run through `actions/github-script`).
 
 `.github/workflows/ci.yml`:
 - **Pull requests to `main`**: Release build of `Stanley.slnx` plus every test
-  project (`dotnet test --project … -c Release --no-build`). Nothing is published.
-- **Push to `main`** (and manual runs, minus release-please):
-  - *release-please* (`release-please-config.json`, `.release-please-manifest.json`)
-    keeps one "Release x.y.z" PR open with the next version and `CHANGELOG.md`,
-    computed from the commit messages. Merging it tags `vX.Y.Z` and creates the
-    GitHub Release. Nothing is released until someone merges that PR.
+  project (`dotnet test --project … -c Release --no-build`), and a notice (never a
+  failure) naming the issues the PR closes and the bump that implies. Nothing is
+  published.
+- **Push to `main`** (manual runs skip the first step):
+  - keeps **one draft GitHub Release `vX.Y.Z`** up to date: the next version and
+    notes (New features / Bug fixes / Breaking changes / Other changes, one line
+    per closed issue) for everything merged since the last published release.
   - build + test, then a self-contained `dotnet publish` of `src/Stanley.App` for
     linux-x64, win-x64 and osx-arm64 (`stanley-<version>-<rid>.tar.gz`, `.zip` on
-    Windows), kept as workflow artifacts for 30 days (~44 MB tar.gz on Linux).
-  - If the release PR was just merged, the builds are attached to that release;
-    otherwise they replace the rolling pre-release tagged `nightly`
-    (**Releases › nightly**). The repo is private, so only collaborators can
-    download either.
+    Windows), kept as workflow artifacts for 30 days (~44 MB tar.gz on Linux), and
+    they replace the rolling pre-release tagged `nightly` (**Releases › nightly**).
+- **Releasing = pressing Publish on the draft** (notes can be edited first). That
+  creates the `vX.Y.Z` tag; the `release: published` run builds and tests that tag
+  and attaches the builds to the release. The repo is private, so only
+  collaborators can download releases or nightlies.
 - **Version numbers are never written by hand.** MinVer (`Stanley.App.csproj`)
-  derives them from git tags: a `vX.Y.Z` commit is `X.Y.Z`, anything after it
-  is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag
-  `0.1.0-alpha.0.<n>`. `stanley --version` shows it plus the commit SHA. CI
-  checks out with `fetch-depth: 0` so MinVer can see the tags.
-- Repo setting needed once: Settings › Actions › General › "Allow GitHub
-  Actions to create and approve pull requests" (for the release PR).
+  derives the binaries' version from git tags: a `vX.Y.Z` commit is `X.Y.Z`,
+  anything after it is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag
+  `0.1.0-alpha.0.<n>`. `stanley --version` shows it plus the commit SHA. CI checks
+  out with `fetch-depth: 0` so MinVer can see the tags. The first release is 0.1.0.
 - Stay on 0.x until the project file format is stable. A project-file format
   version (in `stanley.json`), separate from the app version, is still to do.
 

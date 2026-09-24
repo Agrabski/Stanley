@@ -1,13 +1,16 @@
 # Builds, tests and releases for Stanley.
 #
-# - pull_request to main: build + test only.
-# - push to main: release-please keeps the "Release x.y.z" PR up to date (from
-#   feat:/fix: commit messages); build + test; publish self-contained builds
-#   for each platform (workflow artifacts, 30 days); then either
-#     * merging the release PR tagged vX.Y.Z -> attach the builds to that release, or
-#     * any other push -> replace the rolling "nightly" pre-release.
-# - workflow_dispatch: same as a push, without release-please.
-# The version itself comes from MinVer (git tags), see Stanley.App.csproj.
+# - pull_request to main: build + test, plus a notice saying which issues the PR
+#   closes and how that bumps the next version.
+# - push to main: keep the draft release "vX.Y.Z" up to date (version and notes
+#   from the issues closed by PRs merged since the last release, see
+#   .github/scripts/release-notes.js); build + test; publish self-contained
+#   builds for each platform (workflow artifacts, 30 days); replace the rolling
+#   "nightly" pre-release.
+# - release published (someone pressed Publish on the draft, creating the vX.Y.Z
+#   tag): build + test that tag and attach the builds to the release.
+# - workflow_dispatch: build + test + publish + nightly.
+# The binaries' version comes from MinVer (git tags), see Stanley.App.csproj.
 name: CI
 
 on:
@@ -15,6 +18,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -34,34 +39,52 @@ env:
   DOTNET_VERSION: "10.0.x"
 
 jobs:
-  # Opens/updates the release PR; when that PR is merged, tags vX.Y.Z and creates
-  # the GitHub Release (without files - release-assets attaches them below).
-  release-please:
+  # Keeps one draft release up to date; publishing it (by hand) makes the release.
+  release-draft:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      pull-requests: read
+      issues: read
+    concurrency:
+      group: release-draft
+      cancel-in-progress: false
     steps:
-      - uses: googleapis/release-please-action@v5
-        id: release
+      - uses: actions/checkout@v7
         with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { draftRelease } = require('./.github/scripts/release-notes.js');
+            await draftRelease({ github, context, core });
+
+  release-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { checkPullRequest } = require('./.github/scripts/release-notes.js');
+            await checkPullRequest({ github, context, core });
 
   build-and-test:
-    needs: release-please
-    # release-please only runs on pushes; still build when it was skipped.
-    if: ${{ !cancelled() && needs.release-please.result != 'failure' }}
+    # A published release that isn't a vX.Y.Z tag (e.g. nightly) needs no build.
+    if: github.event_name != 'release' || (startsWith(github.ref_name, 'v') && !github.event.release.prerelease)
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      # Full history + tags: MinVer derives the version from the latest vX.Y.Z tag
-      # (including one release-please created earlier in this same run).
+      # Full history + tags: MinVer derives the version from the latest vX.Y.Z tag.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -110,7 +133,7 @@ jobs:
 
   publish:
     needs: build-and-test
-    if: ${{ !cancelled() && needs.build-and-test.result == 'success' && github.event_name != 'pull_request' }}
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -175,17 +198,17 @@ jobs:
           # Already compressed.
           compression-level: 0
 
-  # A real release (the release PR was just merged): attach the builds to it.
+  # A release was just published from the draft: attach the builds to it.
   release-assets:
-    needs: [release-please, build-and-test, publish]
-    if: ${{ !cancelled() && needs.publish.result == 'success' && needs.release-please.outputs.release_created == 'true' }}
+    needs: [build-and-test, publish]
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      TAG: ${{ needs.release-please.outputs.tag_name }}
+      TAG: ${{ github.event.release.tag_name }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -197,12 +220,8 @@ jobs:
         run: gh release upload "$TAG" dist/* --clobber
 
   nightly-release:
-    needs: [release-please, build-and-test, publish]
-    if: >-
-      ${{ !cancelled() && needs.publish.result == 'success'
-      && github.ref == 'refs/heads/main'
-      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && needs.release-please.outputs.release_created != 'true' }}
+    needs: [build-and-test, publish]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       contents: write
