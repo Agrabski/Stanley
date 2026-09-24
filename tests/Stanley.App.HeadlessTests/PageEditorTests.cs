@@ -345,34 +345,119 @@ public class PageEditorTests
         Assert.True(ribbonBottom <= canvasTop, "ribbon should be above the editor pane");
     }
 
-    /// <summary>The Panel/Bubble sections appear only for their selection, and their buttons act on it.</summary>
+    /// <summary>Word-style tabs: the fixed ones are always there; the Panel/Bubble contextual tabs appear only for their selection, and their buttons act on it.</summary>
     [Fact]
-    public void RibbonContextualSections_FollowTheSelection()
+    public void RibbonTabs_ContextualTabsFollowTheSelection()
     {
         var window = new MainWindow();
         window.Show();
         GetPageCanvasControl(window);
         var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
-        Control Find(string name) => ribbon.GetVisualDescendants().OfType<Control>().Single(c => c.Name == name);
+        TabItem Tab(string name) => ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == name);
         var editor = window.Editor;
         var panelId = editor.Working.PanelOrder[0];
 
-        Assert.False(Find("PanelContext").IsVisible);
-        Assert.False(Find("BubbleContext").IsVisible);
+        Assert.Equal(["Home", "Insert", "Layout", "View"],
+            ribbon.TabControl.Items.OfType<TabItem>().Where(t => t.IsVisible).Select(t => t.Header as string));
+        Assert.False(Tab("PanelTab").IsVisible);
+        Assert.False(Tab("BubbleTab").IsVisible);
 
         editor.Select(panelId);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(Find("PanelContext").IsVisible);
-        Assert.False(Find("BubbleContext").IsVisible);
+        Assert.True(Tab("PanelTab").IsVisible);
+        Assert.False(Tab("BubbleTab").IsVisible);
 
-        var columns = (Button)Find("SplitColumnsButton");
+        ribbon.TabControl.SelectedItem = Tab("PanelTab");
+        Dispatcher.UIThread.RunJobs();
+        var columns = ribbon.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SplitColumnsButton");
         columns.Command!.Execute(columns.CommandParameter);
         Assert.Equal(2, editor.Working.PanelOrder.Count);
 
         editor.CreateBubble(editor.Working.PanelOrder[0], new Point2D(40, 40));
         Dispatcher.UIThread.RunJobs();
-        Assert.False(Find("PanelContext").IsVisible);
-        Assert.True(Find("BubbleContext").IsVisible);
+        Assert.False(Tab("PanelTab").IsVisible);
+        Assert.True(Tab("BubbleTab").IsVisible);
+        Assert.Same(Tab("HomeTab"), ribbon.TabControl.SelectedItem); // the Panel tab it was on went away
+    }
+
+    /// <summary>The File button opens the full-window File view over the ribbon and page; Escape goes back.</summary>
+    [Fact]
+    public void FileButton_OpensTheBackstage_AndEscapeReturns()
+    {
+        var window = new MainWindow();
+        window.Show();
+        GetPageCanvasControl(window);
+        var file = window.RibbonBarControl.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FileButton");
+
+        file.Command!.Execute(file.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(window.BackstageControl.IsVisible);
+        Assert.Equal(BackstagePage.Info, window.ViewModel.BackstagePage);
+
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(window.BackstageControl.IsVisible);
+    }
+
+    /// <summary>Ctrl+S on a new comic asks for a folder (Save As), saves there, and the title bar stops showing unsaved changes.</summary>
+    [Fact]
+    public void CtrlS_OnANewComic_SavesToThePickedFolder()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "stanley-headless-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var dialogs = new ScriptedDialogs(folder);
+            var window = new MainWindow(new MainWindowViewModel(dialogs, new Stanley.App.Documents.RecentProjects(null)));
+            window.Show();
+            var canvas = GetPageCanvasControl(window)!;
+            window.Editor.CreateBubble(window.Editor.Working.PanelOrder[0], new Point2D(60, 60));
+            Assert.True(window.ViewModel.IsDirty);
+            Assert.EndsWith("not saved yet", window.ViewModel.DocumentCaption, StringComparison.Ordinal);
+
+            canvas.Focus();
+            window.KeyPress(Key.S, RawInputModifiers.Control, PhysicalKey.S, "s");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(Stanley.ProjectModel.Storage.ProjectRepository.IsInitialized(folder));
+            Assert.False(window.ViewModel.IsDirty);
+            Assert.EndsWith("saved", window.ViewModel.DocumentCaption, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>File &gt; Close empties the window down to the File view; File &gt; New brings a fresh page (and its ribbon tabs) back.</summary>
+    [Fact]
+    public void CloseThenNew_SwapsTheWholeEditorAndRibbon()
+    {
+        var window = new MainWindow();
+        window.Show();
+        GetPageCanvasControl(window);
+        var before = window.Editor;
+
+        window.ViewModel.CloseDocumentCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(window.ViewModel.HasDocument);
+        Assert.True(window.BackstageControl.IsVisible);
+        Assert.Empty(window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>());
+
+        window.ViewModel.NewCommand.Execute(Stanley.Editing.PanelLayoutPresets.All[2]);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(window.BackstageControl.IsVisible);
+        Assert.NotSame(before, window.Editor);
+        Assert.Equal(3, window.Editor.Working.PanelOrder.Count);
+        Assert.Same(window.Editor, window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single().DataContext);
+        Assert.Same(window.Editor, GetPageCanvasControl(window)!.ViewModel);
+    }
+
+    private sealed class ScriptedDialogs(string folder) : Stanley.App.Documents.IFileDialogs
+    {
+        public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(folder);
+        public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) => Task.FromResult<string?>(null);
+        public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
     }
 
     /// <summary>A ribbon command outside the pane still reaches the pane's view: Add bubble opens the inline text editor.</summary>

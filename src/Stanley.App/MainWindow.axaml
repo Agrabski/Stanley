@@ -2,10 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dock="using:Dock.Avalonia.Controls"
         xmlns:editors="using:Stanley.Editors"
-        xmlns:framework="using:Stanley.EditorFramework"
+        xmlns:app="using:Stanley.App"
         x:Class="Stanley.App.MainWindow"
-        x:DataType="framework:EditorWorkspace"
-        Title="Stanley"
+        x:DataType="app:MainWindowViewModel"
+        Title="{Binding WindowTitle}"
         Width="1360" Height="900">
   <Window.DataTemplates>
     <!-- Pane content inside the dock area. -->
@@ -14,40 +14,52 @@
     </DataTemplate>
   </Window.DataTemplates>
 
-  <DockPanel>
-    <!--
-      One ribbon for the whole window, above every pane. The left end is project-wide
-      (undo/redo span all panes); the rest is whatever the active pane contributes,
-      chosen by the pane's view-model type through the templates below - these are
-      scoped to the ribbon host, so they win over the pane templates above for the same
-      type.
-    -->
-    <!-- Fixed height: contextual sections come and go with the selection, and the page
-         below must not jump (or re-fit its zoom) every time they do. -->
-    <Border Name="RibbonBar" DockPanel.Dock="Top" Classes="ribbon" Height="98">
-      <Grid ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Top">
-        <StackPanel Classes="group">
-          <StackPanel Orientation="Horizontal">
-            <Button Classes="tool" Command="{Binding History.UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
-              <StackPanel><PathIcon Data="M12.5,8 C9.9,8 7.5,9 5.6,10.6 L2,7 V16 H11 L7.4,12.4 C8.8,11.2 10.5,10.5 12.5,10.5 C16,10.5 19,12.8 20.1,16 L22.5,15.2 C21.1,11 17.2,8 12.5,8 Z" /><TextBlock Text="Undo" /></StackPanel>
+  <Grid>
+    <DockPanel>
+      <!-- Title row with the quick access toolbar (Save / Undo / Redo), as in Word. -->
+      <Border Name="TitleBar" DockPanel.Dock="Top" Classes="titleBar">
+        <Grid ColumnDefinitions="*,Auto,*">
+          <StackPanel Orientation="Horizontal" Margin="6,0,0,0">
+            <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
+              <PathIcon Data="{StaticResource SaveIcon}" />
             </Button>
-            <Button Classes="tool" Command="{Binding History.RedoCommand}" ToolTip.Tip="Redo (Ctrl+Shift+Z)">
-              <StackPanel><PathIcon Data="M18.4,10.6 C16.5,9 14.1,8 11.5,8 C6.8,8 2.9,11 1.5,15.2 L3.9,16 C5,12.8 8,10.5 11.5,10.5 C13.5,10.5 15.2,11.2 16.6,12.4 L13,16 H22 V7 Z" /><TextBlock Text="Redo" /></StackPanel>
+            <Button Name="QuickUndoButton" Classes="qat" Command="{Binding UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
+              <PathIcon Data="{StaticResource UndoIcon}" />
+            </Button>
+            <Button Name="QuickRedoButton" Classes="qat" Command="{Binding RedoCommand}" ToolTip.Tip="Redo (Ctrl+Y)">
+              <PathIcon Data="{StaticResource RedoIcon}" />
             </Button>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="History" />
-        </StackPanel>
-        <Rectangle Grid.Column="1" Classes="divider" />
-        <ContentControl Grid.Column="2" Name="RibbonHost" Content="{Binding ActiveEditor}">
-          <ContentControl.DataTemplates>
-            <DataTemplate DataType="editors:PageEditorViewModel">
-              <editors:PageEditorRibbon />
-            </DataTemplate>
-          </ContentControl.DataTemplates>
-        </ContentControl>
-      </Grid>
-    </Border>
+          <TextBlock Grid.Column="1" Name="CaptionText" Text="{Binding DocumentCaption}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right"
+                     Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
+        </Grid>
+      </Border>
 
-    <dock:DockControl x:Name="EditorDock" />
-  </DockPanel>
+      <!--
+        The ribbon: the File button (window-level - it acts on the comic, not a pane) laid
+        over the left end of the active pane's tab strip. The pane's tabs come from the
+        DataTemplates scoped to the ribbon host, so they win over the pane templates
+        above for the same view-model type. Fixed height, so switching tabs or
+        contextual tabs appearing never moves the page.
+      -->
+      <Border Name="RibbonBar" DockPanel.Dock="Top" Classes="ribbon" Height="130" Padding="0">
+        <Grid>
+          <ContentControl Name="RibbonHost" Content="{Binding Workspace.ActiveEditor}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="editors:PageEditorViewModel">
+                <editors:PageEditorRibbon />
+              </DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+          <Button Name="FileButton" Classes="fileTab" Command="{Binding OpenBackstageCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"
+                  ToolTip.Tip="New, open, save, export (Alt+F)">File</Button>
+        </Grid>
+      </Border>
+
+      <dock:DockControl x:Name="EditorDock" />
+    </DockPanel>
+
+    <app:Backstage Name="BackstageView" IsVisible="{Binding IsBackstageOpen}" />
+  </Grid>
 </Window>

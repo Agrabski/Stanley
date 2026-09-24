@@ -1,20 +1,27 @@
 <!--
-  The page editor's ribbon content. Hosted by the window's ribbon bar (above the dock
-  area) whenever a page editor is the active pane; its DataContext is that pane's
-  PageEditorViewModel. The fixed groups (tools, page, view) are always there; the
-  "Panel" and "Bubble" sections are contextual and appear for the current selection.
+  The page editor's ribbon: Word-style tabs (Home / Insert / Layout / View) plus
+  contextual tabs (Panel, Bubble) that appear only while a comic panel or a bubble is
+  selected. Hosted by the window's ribbon bar whenever a page editor is the active pane,
+  with that pane's PageEditorViewModel as DataContext. The window overlays its File
+  button on the left end of the tab strip, which is why the strip starts indented.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
              x:Class="Stanley.Editors.PageEditorRibbon"
              x:DataType="local:PageEditorViewModel">
-  <Grid ColumnDefinitions="*,Auto">
-    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-      <StackPanel Orientation="Horizontal">
+  <TabControl Name="Tabs" Classes="ribbonTabs">
+    <TabControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" Margin="64,0,0,0" />
+      </ItemsPanelTemplate>
+    </TabControl.ItemsPanel>
 
-        <!-- Tools -->
-        <StackPanel Classes="group">
+    <!-- ============================== HOME ============================== -->
+    <TabItem Name="HomeTab" Header="Home">
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <RadioButton Name="SelectToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
                          IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select, move and resize panels and bubbles (V)">
@@ -34,115 +41,232 @@
             </RadioButton>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Tools" />
-        </StackPanel>
+        </DockPanel>
         <Rectangle Classes="divider" />
 
-        <!-- Page -->
-        <StackPanel Classes="group">
+        <DockPanel Classes="group">
+          <StackPanel Spacing="1">
+            <RadioButton Classes="small" GroupName="HomeBubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSpeechStyle}"
+                         ToolTip.Tip="Rounded speech bubble (the selected bubble, and new ones)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" /></StackPanel>
+            </RadioButton>
+            <RadioButton Classes="small" GroupName="HomeBubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShoutStyle}"
+                         ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" /></StackPanel>
+            </RadioButton>
+            <RadioButton Classes="small" GroupName="HomeBubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsWhisperStyle}"
+                         ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" /></StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Bubble style" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
-            <DropDownButton Name="LayoutButton" Classes="tool" ToolTip.Tip="Fill the page with a ready-made panel grid">
-              <StackPanel><PathIcon Data="M3,3 H11 V11 H3 Z M13,3 H21 V11 H13 Z M3,13 H11 V21 H3 Z M13,13 H21 V21 H13 Z" /><TextBlock Text="Layout" /></StackPanel>
-              <DropDownButton.Flyout>
-                <Flyout Placement="BottomEdgeAlignedLeft">
-                  <StackPanel Spacing="6" Width="420">
-                    <TextBlock Text="Fill the page with a panel grid" FontWeight="SemiBold" />
-                    <TextBlock Text="Existing panels (and their bubbles) move into the new slots in reading order." FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
-                    <WrapPanel Name="LayoutPresetPanel" Orientation="Horizontal" />
-                    <Separator />
-                    <TextBlock Text="Spacing (used by layouts, splits and snapping)" FontSize="11" Opacity="0.7" />
-                    <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
-                      <TextBlock Grid.Column="0" Text="Margin" VerticalAlignment="Center" />
-                      <NumericUpDown Name="MarginInput" Grid.Column="1" Minimum="0" Maximum="40" Increment="1" FormatString="0.# mm"
-                                     ToolTip.Tip="Distance from the page edge to the panel area" />
-                      <TextBlock Grid.Column="2" Text="Gutter" VerticalAlignment="Center" />
-                      <NumericUpDown Name="GutterInput" Grid.Column="3" Minimum="0" Maximum="20" Increment="0.5" FormatString="0.# mm"
-                                     ToolTip.Tip="Space between neighbouring panels" />
-                    </Grid>
-                  </StackPanel>
-                </Flyout>
-              </DropDownButton.Flyout>
-            </DropDownButton>
+            <Button Name="AddBubbleButton" Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to the selected panel and start typing">
+              <StackPanel><PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" /></StackPanel>
+            </Button>
+            <Button Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the selected bubble's text (Enter, or double-click the bubble)">
+              <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
+            </Button>
+            <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete the selected bubble or panel (Delete)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Edit" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <!-- ============================== INSERT ============================== -->
+    <TabItem Name="InsertTab" Header="Insert">
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}" ToolTip.Tip="Drag on the page to draw a new panel (P)">
+              <StackPanel><PathIcon Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" /><TextBlock Text="Panel" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Panels" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="InsertSpeechButton" Classes="tool" Command="{Binding InsertBubbleCommand}" CommandParameter="{x:Static bubbles:BubbleStylePreset.Speech}"
+                    ToolTip.Tip="Insert a speech bubble into the selected panel">
+              <StackPanel><PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" /></StackPanel>
+            </Button>
+            <Button Name="InsertShoutButton" Classes="tool" Command="{Binding InsertBubbleCommand}" CommandParameter="{x:Static bubbles:BubbleStylePreset.Shout}"
+                    ToolTip.Tip="Insert a shout bubble into the selected panel">
+              <StackPanel><PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" /></StackPanel>
+            </Button>
+            <Button Name="InsertWhisperButton" Classes="tool" Command="{Binding InsertBubbleCommand}" CommandParameter="{x:Static bubbles:BubbleStylePreset.Whisper}"
+                    ToolTip.Tip="Insert a whisper bubble into the selected panel">
+              <StackPanel><PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Bubbles" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <!-- ============================== LAYOUT ============================== -->
+    <TabItem Name="LayoutTab" Header="Layout">
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Name="LayoutGallery" Orientation="Horizontal" Height="60" Spacing="2" />
+          <TextBlock Classes="groupLabel" Text="Page layout" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6" VerticalAlignment="Center">
+              <TextBlock Text="Margin" FontSize="12" VerticalAlignment="Center" />
+              <NumericUpDown Name="MarginInput" Grid.Column="1" Minimum="0" Maximum="40" Increment="1" FormatString="0.# mm" Width="130" Height="26" FontSize="12"
+                             ToolTip.Tip="Distance from the page edge to the panel area" />
+              <TextBlock Grid.Row="1" Text="Gutter" FontSize="12" VerticalAlignment="Center" />
+              <NumericUpDown Name="GutterInput" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="20" Increment="0.5" FormatString="0.# mm" Width="130" Height="26" FontSize="12"
+                             ToolTip.Tip="Space between neighbouring panels" />
+            </Grid>
             <ToggleButton Name="SnapButton" Classes="tool" IsChecked="{Binding SnapEnabled}" ToolTip.Tip="Snap panel edges to the page margin and a gutter's width from other panels (hold Alt while dragging to place freely)">
               <StackPanel><PathIcon Data="M4,3 H9 V12 A3,3 0 0 0 15,12 V3 H20 V12 A8,8 0 0 1 4,12 Z M4,5 H9 V7 H4 Z M15,5 H20 V7 H15 Z" /><TextBlock Text="Snap" /></StackPanel>
             </ToggleButton>
-            <Button Name="AddBubbleButton" Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to the selected panel and start typing">
-              <StackPanel><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z M11,7 V10 H8 V12 H11 V15 H13 V12 H16 V10 H13 V7 Z" /><TextBlock Text="Add bubble" /></StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Spacing" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Classes="tool" Command="{Binding SplitColumnsCommand}" ToolTip.Tip="Split the selected panel into two side-by-side panels">
+              <StackPanel><PathIcon Data="{StaticResource ColumnsIcon}" /><TextBlock Text="Columns" /></StackPanel>
+            </Button>
+            <Button Classes="tool" Command="{Binding SplitRowsCommand}" ToolTip.Tip="Split the selected panel into two stacked panels">
+              <StackPanel><PathIcon Data="{StaticResource RowsIcon}" /><TextBlock Text="Rows" /></StackPanel>
             </Button>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Page" />
-        </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Split panel" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
 
-        <!-- Contextual: selected comic panel -->
-        <Border Name="PanelContext" Classes="context panel" IsVisible="{Binding IsPanelContext}">
-          <StackPanel>
-            <TextBlock Classes="contextTitle" Text="PANEL" />
-            <StackPanel Classes="group">
-              <StackPanel Orientation="Horizontal">
-                <Button Name="SplitColumnsButton" Classes="tool" Command="{Binding SplitColumnsCommand}" ToolTip.Tip="Split the selected panel into two side-by-side panels">
-                  <StackPanel><PathIcon Data="M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z" /><TextBlock Text="Columns" /></StackPanel>
-                </Button>
-                <Button Name="SplitRowsButton" Classes="tool" Command="{Binding SplitRowsCommand}" ToolTip.Tip="Split the selected panel into two stacked panels">
-                  <StackPanel><PathIcon Data="M3,2 H21 V11 H3 Z M3,13 H21 V22 H3 Z" /><TextBlock Text="Rows" /></StackPanel>
-                </Button>
-                <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles (Delete)">
-                  <StackPanel><PathIcon Data="M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z" /><TextBlock Text="Delete" /></StackPanel>
-                </Button>
-              </StackPanel>
+    <!-- ============================== VIEW ============================== -->
+    <TabItem Name="ViewTab" Header="View">
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Classes="tool" Command="{Binding FitPageCommand}" ToolTip.Tip="Show the whole page (Ctrl+0)">
+              <StackPanel><PathIcon Data="M3,3 H9 V5 H5 V9 H3 Z M15,3 H21 V9 H19 V5 H15 Z M3,15 H5 V19 H9 V21 H3 Z M19,15 H21 V21 H15 V19 H19 Z M8,8 H16 V16 H8 Z" /><TextBlock Text="Fit page" /></StackPanel>
+            </Button>
+            <Button Classes="tool" Command="{Binding ActualSizeCommand}" ToolTip.Tip="Show the page at its printed size (Ctrl+1)">
+              <StackPanel><TextBlock Text="1:1" FontSize="15" FontWeight="SemiBold" Margin="0" /><TextBlock Text="Actual size" /></StackPanel>
+            </Button>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+              <Button Classes="small" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out (Ctrl+−, or Ctrl+scroll)" FontSize="16">−</Button>
+              <TextBlock Name="ZoomText" Width="52" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Text="{Binding ZoomText}" />
+              <Button Classes="small" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in (Ctrl++, or Ctrl+scroll)" FontSize="16">+</Button>
             </StackPanel>
           </StackPanel>
-        </Border>
+          <TextBlock Classes="groupLabel" Text="Zoom" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
 
-        <!-- Contextual: selected bubble (or the bubble tool's next bubble) -->
-        <Border Name="BubbleContext" Classes="context bubble" IsVisible="{Binding ShowBubbleStyle}">
-          <StackPanel>
-            <TextBlock Classes="contextTitle" Text="{Binding BubbleContextTitle}" />
-            <StackPanel Orientation="Horizontal" Classes="group">
-              <StackPanel VerticalAlignment="Center" Spacing="1">
-                <RadioButton Name="SpeechStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSpeechStyle}"
-                             ToolTip.Tip="Rounded speech bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z" /><TextBlock Text="Speech" /></StackPanel>
-                </RadioButton>
-                <RadioButton Name="ShoutStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShoutStyle}"
-                             ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,1 L14.5,6.5 L20.5,4 L18.5,10 L23,13 L17,14.5 L18.5,21 L12,17.5 L5.5,21 L7,14.5 L1,13 L5.5,10 L3.5,4 L9.5,6.5 Z" /><TextBlock Text="Shout" /></StackPanel>
-                </RadioButton>
-                <RadioButton Name="WhisperStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsWhisperStyle}"
-                             ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z" /><TextBlock Text="Whisper" /></StackPanel>
-                </RadioButton>
-              </StackPanel>
-              <StackPanel Orientation="Horizontal" IsVisible="{Binding IsBubbleContext}">
-                <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the bubble's text (Enter, or double-click the bubble)">
-                  <StackPanel><PathIcon Data="M4,3 H20 V8 H18 V5 H13 V19 H16 V21 H8 V19 H11 V5 H6 V8 H4 Z" /><TextBlock Text="Edit text" /></StackPanel>
-                </Button>
-                <StackPanel VerticalAlignment="Center" Spacing="1">
-                  <Button Name="AddTailButton" Classes="small" Command="{Binding AddTailCommand}" ToolTip.Tip="Add another tail - drag its orange tip onto the speaker" HorizontalAlignment="Stretch">Add tail</Button>
-                  <Button Name="RemoveTailButton" Classes="small" Command="{Binding RemoveTailCommand}" ToolTip.Tip="Remove the most recently added tail (right-click a tail to remove that one)" HorizontalAlignment="Stretch">Remove tail</Button>
-                </StackPanel>
-                <StackPanel VerticalAlignment="Center" Spacing="1">
-                  <Button Name="BringToFrontButton" Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="Draw this bubble above the others in its panel" HorizontalAlignment="Stretch">To front</Button>
-                  <Button Name="SendToBackButton" Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Draw this bubble below the others in its panel" HorizontalAlignment="Stretch">To back</Button>
-                </StackPanel>
-                <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble (Delete)">
-                  <StackPanel><PathIcon Data="M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z" /><TextBlock Text="Delete" /></StackPanel>
-                </Button>
-              </StackPanel>
-            </StackPanel>
+        <DockPanel Classes="group">
+          <StackPanel VerticalAlignment="Center" Spacing="4" Margin="0,6,0,0">
+            <CheckBox Name="MarginGuidesCheck" IsChecked="{Binding ShowMarginGuides}" Focusable="False" FontSize="12" Content="Margin guides" />
+            <CheckBox IsChecked="{Binding SnapEnabled}" Focusable="False" FontSize="12" Content="Snap to margins and gutters" />
           </StackPanel>
-        </Border>
+          <TextBlock Classes="groupLabel" Text="Show" />
+        </DockPanel>
       </StackPanel>
-    </ScrollViewer>
+    </TabItem>
 
-    <!-- View: pinned to the right edge -->
-    <StackPanel Grid.Column="1" Classes="group" Orientation="Horizontal" VerticalAlignment="Center">
-      <Rectangle Classes="divider" />
-      <Button Classes="small" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out (Ctrl+−, or Ctrl+scroll)" FontSize="16">−</Button>
-      <TextBlock Name="ZoomText" Width="52" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Text="{Binding ZoomText}" />
-      <Button Classes="small" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in (Ctrl++, or Ctrl+scroll)" FontSize="16">+</Button>
-      <StackPanel VerticalAlignment="Center" Spacing="1" Margin="4,0,0,0">
-        <Button Name="FitPageButton" Classes="small" Command="{Binding FitPageCommand}" ToolTip.Tip="Show the whole page (Ctrl+0)" HorizontalAlignment="Stretch">Fit page</Button>
-        <Button Name="ActualSizeButton" Classes="small" Command="{Binding ActualSizeCommand}" ToolTip.Tip="Show the page at its printed size (Ctrl+1)" HorizontalAlignment="Stretch">Actual size</Button>
+    <!-- ============================== PANEL (contextual) ============================== -->
+    <TabItem Name="PanelTab" Classes="contextual panel" IsVisible="{Binding IsPanelContext}">
+      <TabItem.Header><TextBlock Classes="panelHeader" Text="Panel" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="SplitColumnsButton" Classes="tool" Command="{Binding SplitColumnsCommand}" ToolTip.Tip="Split this panel into two side-by-side panels">
+              <StackPanel><PathIcon Data="{StaticResource ColumnsIcon}" /><TextBlock Text="Columns" /></StackPanel>
+            </Button>
+            <Button Name="SplitRowsButton" Classes="tool" Command="{Binding SplitRowsCommand}" ToolTip.Tip="Split this panel into two stacked panels">
+              <StackPanel><PathIcon Data="{StaticResource RowsIcon}" /><TextBlock Text="Rows" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Split" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to this panel and start typing">
+              <StackPanel><PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" /></StackPanel>
+            </Button>
+            <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles (Delete)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Panel" />
+        </DockPanel>
       </StackPanel>
-    </StackPanel>
-  </Grid>
+    </TabItem>
+
+    <!-- ============================== BUBBLE (contextual) ============================== -->
+    <TabItem Name="BubbleTab" Classes="contextual bubble" IsVisible="{Binding IsBubbleContext}">
+      <TabItem.Header><TextBlock Classes="bubbleHeader" Text="Bubble" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Spacing="1">
+            <RadioButton Name="SpeechStyleButton" Classes="small" GroupName="BubbleTabStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSpeechStyle}"
+                         ToolTip.Tip="Rounded speech bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="ShoutStyleButton" Classes="small" GroupName="BubbleTabStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShoutStyle}"
+                         ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="WhisperStyleButton" Classes="small" GroupName="BubbleTabStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsWhisperStyle}"
+                         ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" /></StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Style" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the bubble's text (Enter, or double-click the bubble)">
+              <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <Button Name="AddTailButton" Classes="small" Command="{Binding AddTailCommand}" ToolTip.Tip="Add another tail - drag its orange tip onto the speaker" HorizontalAlignment="Stretch">Add tail</Button>
+            <Button Name="RemoveTailButton" Classes="small" Command="{Binding RemoveTailCommand}" ToolTip.Tip="Remove the most recently added tail (right-click a tail to remove that one)" HorizontalAlignment="Stretch">Remove tail</Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Tails" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="BringToFrontButton" Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="Draw this bubble above the others in its panel" HorizontalAlignment="Stretch">To front</Button>
+              <Button Name="SendToBackButton" Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Draw this bubble below the others in its panel" HorizontalAlignment="Stretch">To back</Button>
+            </StackPanel>
+            <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble (Delete)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+  </TabControl>
 </UserControl>

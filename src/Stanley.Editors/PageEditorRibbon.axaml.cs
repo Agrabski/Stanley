@@ -3,40 +3,30 @@ using Avalonia.Layout;
 
 namespace Stanley.Editors;
 
-/// <summary>The page editor's ribbon content; see PageEditorRibbon.axaml. Everything it does goes through <see cref="PageEditorViewModel"/> commands, since it lives outside the pane's own view.</summary>
+/// <summary>The page editor's ribbon tabs; see PageEditorRibbon.axaml. Everything it does goes through <see cref="PageEditorViewModel"/> commands, since it lives outside the pane's own view.</summary>
 public partial class PageEditorRibbon : UserControl
 {
+    private PageEditorViewModel? _subscribed;
+
     public PageEditorRibbon()
     {
         InitializeComponent();
 
-        // The flyout's content lives in a popup, outside this control's tree, so the
-        // preset buttons are wired here rather than with bindings that would have to
-        // reach back across the popup boundary.
+        // Layout tab gallery: every preset as a thumbnail, one click to apply - like
+        // Word's styles gallery, no dialog in between.
         foreach (var preset in Editing.PanelLayoutPresets.All)
         {
             var button = new Button
             {
-                Classes = { "tool" },
-                Width = 80,
-                Height = 92,
-                Content = new StackPanel
-                {
-                    Spacing = 3,
-                    Children =
-                    {
-                        new LayoutPresetPreview { Preset = preset, HorizontalAlignment = HorizontalAlignment.Center },
-                        new TextBlock { Text = preset.Name, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center }
-                    }
-                }
+                Classes = { "small" },
+                Width = 40,
+                Height = 58,
+                Padding = new Avalonia.Thickness(3),
+                Content = new LayoutPresetPreview { Preset = preset, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
             };
-            ToolTip.SetTip(button, $"{preset.Name}: {string.Join(" / ", preset.ColumnsPerRow)} panels per row");
-            button.Click += (_, _) =>
-            {
-                ViewModel?.ApplyLayoutCommand.Execute(preset);
-                LayoutButton.Flyout?.Hide();
-            };
-            LayoutPresetPanel.Children.Add(button);
+            ToolTip.SetTip(button, $"{preset.Name} - existing panels and their bubbles move into the new slots in reading order");
+            button.Click += (_, _) => ViewModel?.ApplyLayoutCommand.Execute(preset);
+            LayoutGallery.Children.Add(button);
         }
 
         MarginInput.ValueChanged += (_, e) =>
@@ -53,13 +43,33 @@ public partial class PageEditorRibbon : UserControl
 
     private PageEditorViewModel? ViewModel => DataContext as PageEditorViewModel;
 
+    /// <summary>Exposed for headless UI tests.</summary>
+    public TabControl TabControl => Tabs;
+
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+        if (_subscribed != null)
+            _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
+        _subscribed = ViewModel;
+        if (_subscribed != null)
+            _subscribed.PropertyChanged += OnViewModelPropertyChanged;
+
         if (ViewModel is { } vm)
         {
             MarginInput.Value = (decimal)vm.MarginMm;
             GutterInput.Value = (decimal)vm.GutterMm;
         }
+    }
+
+    /// <summary>Like Word: a contextual tab appears with its selection but isn't forced open; if the one you're on goes away (selection cleared), fall back to Home.</summary>
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(PageEditorViewModel.IsPanelContext) or nameof(PageEditorViewModel.IsBubbleContext)) || ViewModel is not { } vm)
+            return;
+        // Read the view model rather than the tabs' IsVisible: those bindings may not have
+        // caught up with this same change notification yet.
+        if ((Tabs.SelectedItem == PanelTab && !vm.IsPanelContext) || (Tabs.SelectedItem == BubbleTab && !vm.IsBubbleContext))
+            Tabs.SelectedItem = HomeTab;
     }
 }

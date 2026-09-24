@@ -24,7 +24,8 @@ public sealed record PageCanvasScene(
     GutterHit? HighlightGutter,
     IReadOnlyList<SnapGuide> Guides,
     Rect2D? RubberBand,
-    bool RubberBandIsBubble);
+    bool RubberBandIsBubble,
+    bool ShowMarginGuides = true);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -33,11 +34,8 @@ public sealed record PageCanvasScene(
 /// </summary>
 public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 {
-    /// <summary>Lettering size: ~10pt, the usual comic dialogue size at print.</summary>
-    public const float FontSizeMm = 3.5f;
-    public const float BubbleStrokeMm = 0.35f;
-    public const float PanelBorderMm = 0.7f;
-    public const float TailBaseHalfWidthMm = 2.5f;
+    public const float FontSizeMm = PageRenderer.FontSizeMm;
+    public const float TailBaseHalfWidthMm = PageRenderer.TailBaseHalfWidthMm;
 
     private static readonly SKColor Pasteboard = new(0xDD, 0xDF, 0xE3);
     private static readonly SKColor Accent = new(0x25, 0x7A, 0xE8);
@@ -94,39 +92,26 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
         using (var shadow = new SKPaint { Color = new SKColor(0, 0, 0, 60), MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6 * px), IsAntialias = true })
             canvas.DrawRect(SKRect.Create(page.Left + 2 * px, page.Top + 3 * px, page.Width, page.Height), shadow);
-        using (var fill = new SKPaint { Color = SKColors.White })
-            canvas.DrawRect(page, fill);
-
-        // Margin guide: where the live area (and the snap grid) starts.
-        using (var margin = new SKPaint
+        PageRenderer.DrawPaper(canvas, _scene.PageBounds);
+        if (_scene.ShowMarginGuides)
         {
-            Color = MarginColor,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = px,
-            PathEffect = SKPathEffect.CreateDash([4 * px, 4 * px], 0),
-            IsAntialias = true
-        })
+            // Margin guide: where the live area (and the snap grid) starts. Drawn under
+            // the panels, so it only shows where the page isn't covered yet.
+            using var margin = new SKPaint
+            {
+                Color = MarginColor,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = px,
+                PathEffect = SKPathEffect.CreateDash([4 * px, 4 * px], 0),
+                IsAntialias = true
+            };
             canvas.DrawRect(ToSk(_scene.Grid.LiveArea(_scene.PageBounds)), margin);
-
-        using var border = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = PanelBorderMm, IsAntialias = true, StrokeJoin = SKStrokeJoin.Miter };
-        using var panelFill = new SKPaint { Color = SKColors.White };
-        foreach (var panelId in _scene.Document.PanelOrder)
-        {
-            if (!_scene.Document.Panels.TryGetValue(panelId, out var panel))
-                continue;
-
-            using var path = PanelRenderer.ToSkPath(panel.Shape);
-            canvas.DrawPath(path, panelFill);
-
-            // A bubble belongs to its panel: clip it there, like ink that can't leave the frame.
-            canvas.Save();
-            canvas.ClipPath(path, antialias: true);
-            foreach (var bubble in panel.Bubbles)
-                BubbleRenderer.Draw(canvas, bubble, SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
-            canvas.Restore();
-
-            canvas.DrawPath(path, border);
         }
+
+        PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
+            .Where(_scene.Document.Panels.ContainsKey)
+            .Select(id => _scene.Document.Panels[id])
+            .ToList());
     }
 
     // ---------------------------------------------------------------- screen space (px)

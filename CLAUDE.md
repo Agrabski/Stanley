@@ -24,8 +24,9 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
-concrete page/panel/bubble editor (ribbon UI, zoom, snapping) all exist. The page
-editor still edits an in-memory demo page — it doesn't load/save a project yet. No character rendering yet.
+concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
+snapping) all exist. The GUI opens/saves real project folders (one page of one issue
+for now — see "Documents" below). No character rendering yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -39,7 +40,7 @@ src/Stanley.EditorFramework/      # undo/redo (EditorHistory), gesture lifecycle
 src/Stanley.Editors/              # concrete editors (PageEditorViewModel, PageEditorView, PageEditorHost)
 src/Stanley.ProjectModel/         # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
 src/Stanley.Rendering/            # pure SkiaSharp rendering (bubble/panel path-building, text, drawing)
-src/Stanley.App/                  # the `stanley` executable: Avalonia GUI host + CLI (Commands/)
+src/Stanley.App/                  # the `stanley` executable: Avalonia GUI host (window, File view, Documents/) + CLI (Commands/)
 tests/Stanley.App.HeadlessTests/   # xunit v3, UI smoke tests
 tests/Stanley.App.Tests/           # xunit v3, CLI command unit tests
 tests/Stanley.Editing.Tests/       # xunit v3, editing operation unit tests
@@ -190,27 +191,31 @@ Editing pipeline layers, bottom to top:
   always axis-aligned rectangles (an arbitrary hand-edited `PanelShape` remains a
   data-model escape hatch, just unreachable through this editor's drag interactions).
   The page editor UI:
-  - **Ribbon**: one ribbon in the window, above the dock area — not inside a pane.
-    `MainWindow` shows project-wide undo/redo, then whatever the active pane
-    contributes: `EditorWorkspace.ActiveEditor` (EditorFramework; follows the dock
-    factory's active/focused dockable) is the ribbon host's content, and a
+  - **Ribbon** (Word-style): one ribbon in the window, above the dock area — not
+    inside a pane. Rows: a blue title bar with the quick access toolbar (Save,
+    Undo, Redo) and the "<title> - saved / unsaved changes" caption; then the tab
+    strip with the window-level **File** button laid over its left end; then the
+    active tab's groups (fixed height, so the page never moves). The tabs come from
+    the active pane: `EditorWorkspace.ActiveEditor` (EditorFramework; follows the
+    dock factory's active/focused dockable) is the ribbon host's content, and a
     `DataTemplate` scoped to that host maps each editor view-model type to its
-    ribbon (`PageEditorViewModel` → `PageEditorRibbon`). A new editor type adds
-    its own ribbon the same way. The ribbon only talks to its pane through the
-    view model: commands (`SplitColumnsCommand`, `AddBubbleCommand`, …) plus events
-    for view-only work (`ViewportRequested` for zoom, `TextEditRequested` for the
-    inline text editor), which `PageEditorView` carries out. Within the page
-    ribbon, fixed groups (Tools, Page: layout/snap/add bubble, View) are always
-    shown; contextual sections appear for the selection (`IsPanelContext` →
-    blue "PANEL": columns/rows/delete; `IsBubbleContext` → orange "BUBBLE":
-    style, text, tails, z-order, delete — style also shows for the bubble tool,
-    as "NEW BUBBLE"). The ribbon bar has a fixed height so the page doesn't jump
-    as sections come and go; ribbon buttons are non-focusable so keyboard
-    shortcuts keep reaching the page. Shared look: `RibbonStyles.axaml`,
-    included from `App.axaml`. The pane itself (`PageEditorView`) is just the
-    canvas, inline text editor, and a status bar with a one-line hint for the
-    current tool/selection plus the last validation error. Right-click gives a
-    context menu for the thing under the pointer.
+    ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
+    editor type adds its own tabs the same way. Page editor tabs: Home (tools,
+    bubble style, add/edit/delete), Insert (panel, speech/shout/whisper bubble),
+    Layout (inline preset gallery, margin/gutter, snap, split), View (fit/actual
+    size/zoom, margin guides), plus contextual **Panel** (blue) and **Bubble**
+    (orange) tabs visible only for that selection (`IsPanelContext` /
+    `IsBubbleContext`); like Word they aren't forced open, and if the selected one
+    disappears the ribbon falls back to Home. The ribbon only talks to its pane
+    through the view model: commands plus events for view-only work
+    (`ViewportRequested` for zoom, `TextEditRequested` for the inline text editor).
+    Ribbon buttons are non-focusable so shortcuts keep reaching the page. Shared
+    look and icon geometries: `RibbonStyles.axaml`, included from `App.axaml`.
+    Group labels are pinned to the bottom (`DockPanel.group`).
+  - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
+    bar with a one-line hint for the current tool/selection plus the last
+    validation error. Right-click gives a context menu for the thing under the
+    pointer.
   - **Zoom**: the document is in millimetres; `PageCanvasControl` owns the mm→screen
     transform. 100% = the page at its printed size on a 96 DPI screen
     (`ActualSizeZoom`); starts in fit-page mode (re-fits on resize until the user
@@ -232,9 +237,37 @@ Editing pipeline layers, bottom to top:
     keeping the gutter width (`PanelBoundaryDrag.Gap`).
   - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
     `Working`, so a drag is a pure function of the current pointer position.
-- **`Stanley.App`**: wires `PageEditorHost.CreateDemoWorkspace()` (an
-  `EditorWorkspace`: history + dock layout + active pane) into `MainWindow`'s
-  ribbon bar and Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
+- **`Stanley.App`**: `MainWindow` + `MainWindowViewModel` own the document
+  lifecycle (below) and swap a fresh `EditorWorkspace` (history + dock layout +
+  active pane, from `PageEditorHost.CreateWorkspace(ComicProject)`) into the
+  ribbon bar and Dock.Avalonia `DockControl` whenever a comic is created/opened.
+
+### Documents (File view, open/save)
+
+Modelled on Word. `ComicProject` (Stanley.Editors) is "the document": a project
+folder on disk (or untitled, `Location == null`) plus the one page the editor edits —
+the first page of the first issue, created on the fly for a project with none (e.g.
+straight from `stanley init`). `Save` writes the manifest title, the issue/page
+entries and every panel file, and deletes files of panels removed since the last
+save (`ProjectRepository.DeletePanel`); nothing else in the folder is touched.
+`SaveAs` copies the whole project folder (minus `.git`) to the new location first,
+and never writes into a non-empty folder — it uses a subfolder named after the title
+instead. An untitled comic takes its folder's name as title on first save. Export
+(PDF at trim size, PNG at 300 dpi) goes through `PageRenderer` (Stanley.Rendering),
+the same code the canvas draws with.
+
+`MainWindowViewModel` (Stanley.App) runs New / Open / Save / Save As / Close /
+Export and the File ("backstage") view, `Backstage.axaml`: full-window, blue command
+rail, pages New (paper size + layout tiles), Open (Browse + Recent), Info (editable
+title, location, size), Save As, Export. With no comic open the window *is* the File
+view. Dirty state is `EditorHistory.IsDirty` (undo-stack top vs. the top at
+`MarkSaved()`, so undoing back to the saved state is clean again) or an unsaved title
+edit; New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
+the File view, not modals. OS dialogs sit behind `IFileDialogs`
+(`AvaloniaFileDialogs` for real; tests script a fake). Recent comics:
+`RecentProjects`, a plain text file under the user's app-data folder. Shortcuts:
+Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S / F12 save as, Alt+F File view,
+Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
 
 The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a

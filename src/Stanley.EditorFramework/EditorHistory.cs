@@ -14,6 +14,11 @@ public sealed class EditorHistory : ObservableObject
     private readonly Stack<HistoryEntry> _undo = new();
     private readonly Stack<HistoryEntry> _redo = new();
 
+    // The undo-stack top at the last save (null = empty stack). The document is unchanged
+    // since then exactly when the current top is that same entry - so undoing back to the
+    // saved state counts as clean again, the way Word's "saved" indicator behaves.
+    private HistoryEntry? _savedTop;
+
     public EditorHistory()
     {
         UndoCommand = new RelayCommand(Undo, () => CanUndo);
@@ -22,6 +27,16 @@ public sealed class EditorHistory : ObservableObject
 
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
+
+    /// <summary>Whether anything has changed since the last <see cref="MarkSaved"/> (or since the history was created).</summary>
+    public bool IsDirty => !ReferenceEquals(_undo.TryPeek(out var top) ? top : null, _savedTop);
+
+    /// <summary>Records the current state as saved; <see cref="IsDirty"/> is false until the next edit, undo or redo moves away from it.</summary>
+    public void MarkSaved()
+    {
+        _savedTop = _undo.TryPeek(out var top) ? top : null;
+        OnPropertyChanged(nameof(IsDirty));
+    }
 
     public IRelayCommand UndoCommand { get; }
     public IRelayCommand RedoCommand { get; }
@@ -60,6 +75,7 @@ public sealed class EditorHistory : ObservableObject
     {
         OnPropertyChanged(nameof(CanUndo));
         OnPropertyChanged(nameof(CanRedo));
+        OnPropertyChanged(nameof(IsDirty));
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
     }

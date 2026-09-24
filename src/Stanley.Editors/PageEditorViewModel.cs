@@ -43,6 +43,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     private IReadOnlyList<SnapGuide> _activeGuides = [];
     private PanelId _pendingPanelId;
     private double _zoomPercent = 100;
+    private bool _showMarginGuides = true;
 
     public Rect2D PageBounds { get; }
 
@@ -63,6 +64,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             () => SelectedBubbleHasTails);
         BringToFrontCommand = new RelayCommand(() => BringBubbleToFront(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
         SendToBackCommand = new RelayCommand(() => SendBubbleToBack(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        DrawPanelCommand = new RelayCommand(() => Tool = PageEditorTool.Panel);
+        InsertBubbleCommand = new RelayCommand<BubbleStylePreset>(style =>
+        {
+            _newBubbleStyle = style;
+            RaiseBubbleDerivedChanged();
+            AddBubbleToSelectedPanel();
+        }, _ => Working.PanelOrder.Count > 0);
         ApplyLayoutCommand = new RelayCommand<PanelLayoutPreset>(preset =>
         {
             if (preset != null)
@@ -90,6 +98,12 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public IRelayCommand BringToFrontCommand { get; }
     public IRelayCommand SendToBackCommand { get; }
     public IRelayCommand<PanelLayoutPreset> ApplyLayoutCommand { get; }
+
+    /// <summary>Insert tab: switches to the panel tool, ready to drag out a new panel.</summary>
+    public IRelayCommand DrawPanelCommand { get; }
+
+    /// <summary>Insert tab: a bubble of the given style in the selected (or first) panel, ready to type into.</summary>
+    public IRelayCommand<BubbleStylePreset> InsertBubbleCommand { get; }
     public IRelayCommand ZoomInCommand { get; }
     public IRelayCommand ZoomOutCommand { get; }
     public IRelayCommand FitPageCommand { get; }
@@ -150,6 +164,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         SplitColumnsCommand.NotifyCanExecuteChanged();
         SplitRowsCommand.NotifyCanExecuteChanged();
         AddBubbleCommand.NotifyCanExecuteChanged();
+        InsertBubbleCommand.NotifyCanExecuteChanged();
         EditTextCommand.NotifyCanExecuteChanged();
         AddTailCommand.NotifyCanExecuteChanged();
         RemoveTailCommand.NotifyCanExecuteChanged();
@@ -208,6 +223,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             Grid = Grid with { GutterMm = Math.Max(0, value) };
             OnPropertyChanged();
         }
+    }
+
+    /// <summary>Whether the canvas draws the dashed margin (live area) guide.</summary>
+    public bool ShowMarginGuides
+    {
+        get => _showMarginGuides;
+        set => SetProperty(ref _showMarginGuides, value);
     }
 
     public bool SnapEnabled
