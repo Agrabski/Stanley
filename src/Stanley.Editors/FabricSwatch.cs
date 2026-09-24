@@ -18,9 +18,19 @@ public sealed class FabricSwatch : Control
 
     public static readonly StyledProperty<Fabric?> FabricProperty = AvaloniaProperty.Register<FabricSwatch, Fabric?>(nameof(Fabric));
 
+    public static readonly StyledProperty<IReadOnlyDictionary<string, ArtFile>?> TilesProperty =
+        AvaloniaProperty.Register<FabricSwatch, IReadOnlyDictionary<string, ArtFile>?>(nameof(Tiles));
+
     static FabricSwatch()
     {
-        AffectsRender<FabricSwatch>(ColorProperty, FabricProperty);
+        AffectsRender<FabricSwatch>(ColorProperty, FabricProperty, TilesProperty);
+    }
+
+    /// <summary>The tile files a tile pattern or texture draws from, by name.</summary>
+    public IReadOnlyDictionary<string, ArtFile>? Tiles
+    {
+        get => GetValue(TilesProperty);
+        set => SetValue(TilesProperty, value);
     }
 
     public ColorValue Color
@@ -39,10 +49,10 @@ public sealed class FabricSwatch : Control
     {
         if (Bounds.Width < 1 || Bounds.Height < 1)
             return;
-        context.Custom(new SwatchDrawOperation(new Rect(Bounds.Size), Color, Fabric));
+        context.Custom(new SwatchDrawOperation(new Rect(Bounds.Size), Color, Fabric, Tiles));
     }
 
-    private sealed class SwatchDrawOperation(Rect bounds, ColorValue color, Fabric? fabric) : ICustomDrawOperation
+    private sealed class SwatchDrawOperation(Rect bounds, ColorValue color, Fabric? fabric, IReadOnlyDictionary<string, ArtFile>? tiles) : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
 
@@ -71,7 +81,7 @@ public sealed class FabricSwatch : Control
             };
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
-            FabricShaders.Fill(canvas, path, ToSk(color), shown, SKMatrix.Identity, patternHeight);
+            FabricShaders.Fill(canvas, path, ToSk(color), shown, SKMatrix.Identity, patternHeight, name => tiles is not null && tiles.TryGetValue(name, out var file) ? file : null);
             canvas.Restore();
             using var border = new SKPaint { Color = new SKColor(0, 0, 0, 96), Style = SKPaintStyle.Stroke, StrokeWidth = 1, IsAntialias = true };
             canvas.DrawPath(path, border);

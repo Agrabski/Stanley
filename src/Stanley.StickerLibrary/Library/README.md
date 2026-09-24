@@ -14,3 +14,12 @@ that is already CC0. No third-party art under any other licence.
 Layout: `<slot>/<key>/sticker.json` in Stanley's project format, plus any
 `variants/<variant>/<view>.svg` art, and `patterns/<name>.svg` tiles. A library
 sticker's `id` is a placeholder; a fresh one is minted when it's worn.
+
+Drawn art follows the template conventions (`StickerTemplates.Export`): the default
+body is 1000 units tall with the origin on the ground between the feet, each part is
+a top-level layer named after it, `class="slot-<name>"` makes a shape follow that
+colour slot (greys such as the ink outline stay as drawn), and a 3-unit line matches
+the body's outline. Faces carry the expression vocabulary as variants (eyes: neutral,
+happy, sad, angry, wide, closed, wink, halfClosed; brows: neutral, raised, angry, sad,
+skeptical; mouth: neutral, smile, grin, open, shout, frown, o, smirk). Pattern tiles
+are one repeat per view box, with `slot-ground`, `slot-1` and `slot-2` classes.

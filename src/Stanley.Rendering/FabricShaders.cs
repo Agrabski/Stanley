@@ -20,7 +20,8 @@ public static class FabricShaders
     /// (figure space), for a character <paramref name="height"/> tall, over
     /// <paramref name="ground"/>; null if there's no pattern (or its tile is missing).
     /// </summary>
-    public static SKShader? Pattern(PatternFill pattern, SKColor ground, SKMatrix frame, double height, Func<string, SKPicture?>? tiles = null)
+    /// <param name="tiles">The character's tile files by name, for <see cref="PatternKind.Tile"/>.</param>
+    public static SKShader? Pattern(PatternFill pattern, SKColor ground, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
         var size = (float)(Math.Max(pattern.Size ?? PatternFill.DefaultSize, 0.005) * height);
         var local = SKMatrix.CreateScale(size, size)
@@ -28,8 +29,9 @@ public static class FabricShaders
             .PostConcat(frame);
         if (pattern.Kind == PatternKind.Tile)
         {
-            // Tiles are cached by whoever loaded them - not ours to dispose.
-            var tile = pattern.Tile is { } name ? tiles?.Invoke(name) : null;
+            // Tile pictures are cached per file and colours - not ours to dispose.
+            var file = pattern.Tile is { } name ? tiles?.Invoke(name) : null;
+            var tile = file is null ? null : ArtPictures.PatternTile(file, ground, pattern.Colors.Select(FigureGeometry.ToSk).ToList());
             return tile is null ? null : SKShader.CreatePicture(tile, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, local, Unit);
         }
         using var picture = Record(canvas => DrawPattern(canvas, pattern, ground));
@@ -37,13 +39,13 @@ public static class FabricShaders
     }
 
     /// <summary>The texture's greyscale shader, to multiply over the fill; null for none.</summary>
-    public static SKShader? Texture(TextureFill texture, SKMatrix frame, double height, Func<string, SKPicture?>? tiles = null)
+    public static SKShader? Texture(TextureFill texture, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
         var size = (float)(Math.Max(texture.Size ?? TextureFill.DefaultSize, 0.003) * height);
         var local = SKMatrix.CreateScale(size, size).PostConcat(frame);
         if (texture.Kind == TextureKind.Tile)
         {
-            var tile = texture.Tile is { } name ? tiles?.Invoke(name) : null;
+            var tile = texture.Tile is { } name && tiles?.Invoke(name) is { } file ? ArtPictures.Tile(file) : null;
             return tile is null ? null : SKShader.CreatePicture(tile, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, local, Unit);
         }
         using var lines = Record(canvas => DrawTexture(canvas, texture.Kind));
@@ -65,7 +67,7 @@ public static class FabricShaders
     }
 
     /// <summary>Fills <paramref name="path"/> with <paramref name="ground"/>, then the fabric's pattern and texture in <paramref name="frame"/>.</summary>
-    public static void Fill(SKCanvas canvas, SKPath path, SKColor ground, Fabric? fabric, SKMatrix frame, double height, Func<string, SKPicture?>? tiles = null)
+    public static void Fill(SKCanvas canvas, SKPath path, SKColor ground, Fabric? fabric, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
         using (var paint = new SKPaint { Color = ground, Style = SKPaintStyle.Fill, IsAntialias = true })
             canvas.DrawPath(path, paint);

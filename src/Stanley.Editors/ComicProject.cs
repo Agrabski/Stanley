@@ -143,14 +143,22 @@ public sealed class ComicProject
 
     /// <summary>
     /// The characters as they're written: without library stickers that were tried on but
-    /// aren't worn anywhere - not by the character, a named look or any panel - so trying
-    /// things on leaves no files behind (docs/sticker-system.md §11).
+    /// aren't worn anywhere - not by the character, a named look or any panel - and without
+    /// library pattern tiles no fabric uses, so trying things on leaves no files behind
+    /// (docs/sticker-system.md §11).
     /// </summary>
     private static IReadOnlyList<CharacterDefinition> Tidied(IReadOnlyList<CharacterDefinition> characters, IReadOnlyList<(PageId Id, PageDocument Document)> pages)
     {
         var instances = pages.SelectMany(p => p.Document.Panels.Values.SelectMany(panel => panel.CharacterInstances)).ToList();
-        return characters.Select(c => LookEditing.TidyWardrobe(c, LookEditing.WornElsewhere(c, instances))).ToList();
+        return characters.Select(c =>
+        {
+            var tidied = LookEditing.TidyWardrobe(c, LookEditing.WornElsewhere(c, instances));
+            return LookEditing.TidyTiles(tidied, LookEditing.TilesInUse(tidied, instances), IsLibraryTile);
+        }).ToList();
     }
+
+    private static bool IsLibraryTile(string name, ArtFile file) =>
+        Stanley.StickerLibrary.StickerLibrary.PatternTiles.TryGetValue(name, out var shipped) && shipped.SameContent(file);
 
     private HashSet<CharacterId> WriteCharacters(ProjectRepository repository, IReadOnlyList<CharacterDefinition> characters, bool prune)
     {

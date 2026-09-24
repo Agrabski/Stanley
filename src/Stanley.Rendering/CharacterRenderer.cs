@@ -83,15 +83,15 @@ public sealed class FigureDrawing
     public SKPath Outline { get; }
 
     /// <summary>Whether any sticker paints anything.</summary>
-    public bool HasStickers => Items.OfType<ShapeItem>().Any(i => i.Owner is not null);
+    public bool HasStickers => Items.Any(i => i.Owner is not null);
 
     /// <summary>The worn sticker painted topmost at <paramref name="figurePoint"/> (figure space), or null for bare skin or nothing.</summary>
     public StickerId? StickerAt(Point2D figurePoint)
     {
         for (var i = Items.Count - 1; i >= 0; i--)
         {
-            if (Items[i] is ShapeItem shape && shape.Path.Contains((float)figurePoint.X, (float)figurePoint.Y))
-                return shape.Owner;
+            if (Items[i].Area.Contains((float)figurePoint.X, (float)figurePoint.Y))
+                return Items[i].Owner;
         }
         return null;
     }
@@ -100,8 +100,8 @@ public sealed class FigureDrawing
     public SKPath OutlineOf(StickerId sticker)
     {
         var all = FigureGeometry.Empty();
-        foreach (var item in Items.OfType<ShapeItem>().Where(i => i.Owner == sticker))
-            all = FigureGeometry.Union(all, FigureGeometry.Copy(item.Path));
+        foreach (var item in Items.Where(i => i.Owner == sticker))
+            all = FigureGeometry.Union(all, FigureGeometry.Copy(item.Area));
         return all;
     }
 
@@ -125,6 +125,12 @@ public sealed class FigureDrawing
 /// <summary>One thing a <see cref="FigureDrawing"/> paints.</summary>
 internal abstract class FigureItem
 {
+    /// <summary>What it covers, in figure space - for hit-testing and highlighting.</summary>
+    public abstract SKPath Area { get; }
+
+    /// <summary>The sticker it belongs to, or null for skin.</summary>
+    public abstract StickerId? Owner { get; }
+
     public abstract void Draw(SKCanvas canvas, SKPaint ink);
 }
 
@@ -137,8 +143,9 @@ internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, Stic
 {
     public SKPath Path { get; } = path;
 
-    /// <summary>The sticker this belongs to, or null for skin.</summary>
-    public StickerId? Owner { get; } = owner;
+    public override SKPath Area => Path;
+
+    public override StickerId? Owner { get; } = owner;
 
     public SKPath? InkMask { get; } = inkMask;
 
@@ -181,7 +188,7 @@ internal sealed class FabricFill
     private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
     private readonly float _strength;
 
-    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, SKPicture?> tiles)
+    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles)
     {
         _pieces = pieces.Select(p => (p.Path,
             fabric.Pattern is { } pattern ? FabricShaders.Pattern(pattern, ground, p.Frame, height, tiles) : null,
@@ -299,16 +306,17 @@ public sealed class FigureRenderer : ICharacterRenderer
     /// <summary>
     /// Paints the figure's layers back to front: each layer's skin, then - in the look's
     /// order (slot z-order, then stacking) - every worn sticker's pieces that belong in
-    /// that layer, merged per colour, with the sticker's cut parts taken out and its
-    /// clipped parts clipped. Every item is inked on its own outline, except in the
-    /// layer's seams where it lies over the layers before it.
+    /// that layer: its covers merged per colour, then its drawn parts, with the sticker's
+    /// cut parts taken out and its clipped parts clipped. Skin and covers are inked on
+    /// their own outline, except in the layer's seams where they lie over the layers before
+    /// it; drawn art brings its own lines.
     /// </summary>
     public static FigureDrawing Build(CharacterDefinition character, BodyFigure figure, CharacterLook look, PoseData? pose)
     {
         var height = character.Body.Normalized().Height;
         var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
         var tiles = TileLookup(character);
-        var pieces = look.Stickers.Select(w => StickerPieces(figure, w, height)).ToList();
+        var stickers = look.Stickers.Select(w => StickerGeometry.Of(figure, w, look, pose, height, tiles)).ToList();
         var bodySkin = FigureGeometry.Empty();
         foreach (var layer in figure.Layers.Where(l => l.HasBody))
             bodySkin = FigureGeometry.Union(bodySkin, FigureGeometry.LayerSkin(layer));
@@ -318,7 +326,7 @@ public sealed class FigureRenderer : ICharacterRenderer
         // sleeve with its shirt at the shoulder), so a shirt's hem over the trousers keeps its line.
         var items = new List<FigureItem>();
         var below = FigureGeometry.Empty();
-        var belowOwn = pieces.Select(_ => FigureGeometry.Empty()).ToList();
+        var belowOwn = stickers.Select(_ => FigureGeometry.Empty()).ToList();
         foreach (var layer in figure.Layers)
         {
             var painted = FigureGeometry.Empty();
@@ -328,14 +336,14 @@ public sealed class FigureRenderer : ICharacterRenderer
                 items.Add(new ShapeItem(path, skin, SeamMask(layer, below)));
                 painted = FigureGeometry.Union(painted, FigureGeometry.Copy(path));
             }
-            for (var i = 0; i < pieces.Count; i++)
+            for (var i = 0; i < stickers.Count; i++)
             {
                 var mask = SeamMask(layer, belowOwn[i]);
                 var own = FigureGeometry.Empty();
-                foreach (var item in StickerItems(look.Stickers[i], pieces[i], layer.Kind, look, bodySkin, mask, height, tiles))
+                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, mask, height, tiles))
                 {
                     items.Add(item);
-                    own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Path));
+                    own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Area));
                 }
                 painted = FigureGeometry.Union(painted, FigureGeometry.Copy(own));
                 belowOwn[i] = FigureGeometry.Union(belowOwn[i], own);
@@ -348,34 +356,63 @@ public sealed class FigureRenderer : ICharacterRenderer
         return new FigureDrawing(items, below);
     }
 
-    /// <summary>A sticker's pieces, each with the part it came from.</summary>
-    private static List<(StickerPart Part, PartPiece Piece)> StickerPieces(BodyFigure figure, WornSticker worn, double height)
+    /// <summary>A worn sticker on the figure: its cover pieces, each with the part it came from, and its drawn parts mapped into figure space.</summary>
+    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art)
     {
-        var result = new List<(StickerPart, PartPiece)>();
-        foreach (var part in worn.Asset.Sticker.Parts)
+        public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
         {
-            if (part.Cover is { } cover)
-                result.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
+            var sticker = worn.Asset.Sticker;
+            var covers = new List<(StickerPart, PartPiece)>();
+            foreach (var part in sticker.Parts)
+            {
+                if (part.Cover is { } cover)
+                    covers.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
+            }
+
+            var art = new List<ArtPiece>();
+            var drawn = sticker.Parts.Where(p => p is { Art: not null, Cover: null }).ToList();
+            if (drawn.Count > 0 && StickerArtPieces.ArtFor(worn.Asset, StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression), figure.Angle) is { } parsed)
+            {
+                foreach (var part in drawn)
+                {
+                    foreach (var (side, elements, anchor) in StickerArtPieces.Map(figure, worn, part, part.Art!, parsed, look, height, tiles))
+                    {
+                        var layer = part.Depth switch
+                        {
+                            PartDepth.Back => FigureLayerKind.Back,
+                            PartDepth.Front => FigureLayerKind.Front,
+                            _ => figure.LayerOf(part.Region, side)
+                        };
+                        art.Add(new ArtPiece(part, layer, elements, anchor, StickerArtPieces.Area(elements, height)));
+                    }
+                }
+            }
+            return new StickerGeometry(covers, art);
         }
-        return result;
     }
 
-    /// <summary>What one worn sticker paints in one layer: its painted pieces merged per colour slot, minus its cuts, clipped as asked.</summary>
-    private static IEnumerable<ShapeItem> StickerItems(WornSticker worn, List<(StickerPart Part, PartPiece Piece)> pieces, FigureLayerKind layer,
-        CharacterLook look, SKPath bodySkin, SKPath? mask, double height, Func<string, SKPicture?> tiles)
+    /// <summary>One drawn part (one side of it, for a limb) in figure space: its elements and the area they cover.</summary>
+    private sealed record ArtPiece(StickerPart Part, FigureLayerKind Layer, IReadOnlyList<ArtStroke> Elements, SKPoint? Anchor, SKPath Area);
+
+    /// <summary>What one worn sticker paints in one layer: its covers merged per colour slot, then its drawn parts - minus its cuts, clipped as asked.</summary>
+    private static IEnumerable<FigureItem> StickerItems(WornSticker worn, StickerGeometry geometry, FigureLayerKind layer,
+        CharacterLook look, SKPath bodySkin, SKPath? mask, double height, Func<string, ArtFile?> tiles)
     {
-        var here = pieces.Where(p => p.Piece.Layer == layer).ToList();
-        if (here.Count == 0)
+        var here = geometry.Covers.Where(p => p.Piece.Layer == layer).ToList();
+        var art = geometry.Art.Where(a => a.Layer == layer).ToList();
+        if (here.Count == 0 && art.Count == 0)
             yield break;
         var sticker = worn.Asset.Sticker;
         var cuts = FigureGeometry.Empty();
         foreach (var (_, piece) in here.Where(p => p.Part.Blend == PartBlend.Cut))
             cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Path));
+        foreach (var piece in art.Where(a => a.Part.Blend == PartBlend.Cut))
+            cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Area));
         var own = FigureGeometry.Empty();
-        foreach (var (_, piece) in pieces.Where(p => p.Part.Blend != PartBlend.Cut && p.Part.Clip is null))
+        foreach (var (_, piece) in geometry.Covers.Where(p => p.Part.Blend != PartBlend.Cut && p.Part.Clip is null))
             own = FigureGeometry.Union(own, FigureGeometry.Copy(piece.Path));
 
-        foreach (var group in here.Where(p => p.Part.Blend != PartBlend.Cut && p.Part.Cover is not null).GroupBy(p => p.Part.Cover!.Color))
+        foreach (var group in here.Where(p => p.Part.Blend != PartBlend.Cut).GroupBy(p => p.Part.Cover!.Color))
         {
             var fallback = sticker.Colors.TryGetValue(group.Key, out var c) ? c : ColorValue.FromHex("#9a9a9a");
             var path = FigureGeometry.Empty();
@@ -401,13 +438,37 @@ public sealed class FigureRenderer : ICharacterRenderer
             var fabric = look.FabricOf(group.Key) is { } f ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles) : null;
             yield return new ShapeItem(path, ground, mask, worn.Asset.Id, fabric);
         }
+
+        foreach (var piece in art.Where(a => a.Part.Blend != PartBlend.Cut))
+        {
+            var keep = piece.Part.Clip switch
+            {
+                PartClip.Body => FigureGeometry.Copy(bodySkin),
+                PartClip.Sticker => FigureGeometry.Copy(own),
+                _ => null
+            };
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            if (!cuts.IsEmpty)
+            {
+                var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
+                area.Dispose();
+                area = cut;
+            }
+            if (area.IsEmpty)
+            {
+                area.Dispose();
+                keep?.Dispose();
+                continue;
+            }
+            yield return new ArtItem(piece.Elements, area, worn.Asset.Id, piece.Anchor, keep, cuts.IsEmpty ? null : FigureGeometry.Copy(cuts));
+        }
         cuts.Dispose();
         own.Dispose();
     }
 
-    /// <summary>The character's pattern tiles, as pictures one repeat (a unit square) in size.</summary>
-    private static Func<string, SKPicture?> TileLookup(CharacterDefinition character) =>
-        name => character.Wardrobe.Tiles.TryGetValue(name, out var file) ? ArtPictures.Tile(file) : null;
+    /// <summary>The character's pattern and texture tiles, by name.</summary>
+    private static Func<string, ArtFile?> TileLookup(CharacterDefinition character) =>
+        name => character.Wardrobe.Tiles.TryGetValue(name, out var file) ? file : null;
 
     /// <summary>Where a layer's ink is left out: its seams, where they lie over what's already painted.</summary>
     internal static SKPath? SeamMask(FigureLayer layer, SKPath below)

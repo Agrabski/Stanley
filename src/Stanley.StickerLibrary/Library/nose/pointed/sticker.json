@@ -1,0 +1,20 @@
+{
+  "colors": {
+    "skin": "#f2c9a4"
+  },
+  "id": "library",
+  "name": "Pointed",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "nose",
+      "region": "head"
+    }
+  ],
+  "slot": "nose",
+  "variants": [
+    "default"
+  ]
+}

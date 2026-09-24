@@ -1,6 +1,7 @@
 # Sticker system — design
 
-**Status: proposed, not implemented.** This follows the character authoring POC
+**Status: being implemented** — slices 0–4 are built (§15), and §18 records where
+the code differs from this text. This follows the character authoring POC
 (`docs/character-authoring-poc.md`) and revises the sticker parts of
 `docs/character-and-project-plan.md`. Where the two disagree, this document wins.
 §17 lists what has been decided since the first draft and what is still open.
@@ -778,3 +779,43 @@ Still open. Each has a recommendation, which the design assumes until told other
    than keeping everything ever clicked. *Recommended*: yes.
 5. **Fabric size relative to the character** (a toddler's shirt has as many stripes
    as an adult's) rather than absolute. *Recommended*: relative (§9.3).
+
+## 18. Implementation notes
+
+Where the built code differs from the design above, or settles something it left
+open:
+- **The wardrobe lives on the character in memory.** Instead of a separate
+  `CharacterBundle`, `CharacterDefinition.Wardrobe` (stickers with their art files,
+  and tiles) and `Revisions` are `[JsonIgnore]` properties loaded and saved with the
+  character's folder, so any edit to them is an ordinary character edit: one undo
+  step, one redraw everywhere.
+- **Tiles are per character**, in `characters/<id>-slug/patterns/`, keyed by file
+  name (not project-level `patterns/<id>-slug/` with a `pattern.json`). A texture
+  tile's name starts with `texture-`. Library tiles are copied in under their
+  library name (`floral.svg`) when picked and tidied on save while unmodified and
+  unused, like library stickers.
+- **Ink at seams**: skin leaves its ink out where a layer's seam lies over anything
+  painted before it; a garment only where it lies over its *own* earlier pieces, so
+  a shirt's hem over the trousers keeps its line.
+- **The SVG adapter** also normalises what VectSharp reads differently from the
+  spec: ellipses become paths (VectSharp strokes them in a scaled space), clip paths
+  become one path (it only takes a single path or rectangle there), and Inkscape's
+  duplicate `svg:` namespace prefix is dropped. Only *named* top-level groups are
+  parts; drawing outside them is reported. A trimmed publish shows trim warnings
+  only from ExCSS (VectSharp.SVG's CSS parser); VectSharp itself is clean. CI
+  doesn't trim.
+- **Recolouring leaves greys alone** on a colourful default: black ink and white
+  highlights on a tagged shape aren't shades of its colour, so an artist can put
+  fill and outline on one element.
+- **Pattern tiles recolour by class** (`slot-ground`, `slot-1`, `slot-2`), the
+  default for each being the first colour drawn in it; a pattern without colours of
+  its own keeps the tile's.
+- **Starter library as built**: 23 cover garments; hair (short, bob, long,
+  ponytail, curly, bun); eyes (dots, round, lashes), brows (thin, medium, thick),
+  mouth (simple, wide, lips) with the full expression vocabulary as variants, and
+  two noses; five SVG pattern tiles (floral, stars, hearts, camo, leopard); all
+  front and profile. New characters start wearing the default face (dot eyes, thin
+  brows, simple mouth).
+- **Trunk posing is inverse kinematics** (asked for alongside slice 4): dragging
+  the chest or head bends the spine or neck joint by joint, and the upper body's
+  outline bends with it (`TrunkBend`), instead of turning the trunk as one board.

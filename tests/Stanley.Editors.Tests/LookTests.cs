@@ -41,6 +41,31 @@ public sealed class LookTests : IDisposable
     }
 
     [Fact]
+    public void Every_drawn_library_sticker_has_clean_front_and_side_art_for_every_variant_and_part()
+    {
+        var drawn = StickerLibrary.StickerLibrary.All.Where(s => s.Asset.HasArt).ToList();
+        Assert.Contains(drawn, s => s.Slot == StickerSlots.Hair);
+        Assert.Contains(drawn, s => s.Slot == StickerSlots.Eyes);
+        foreach (var item in drawn)
+        {
+            foreach (var variant in item.Asset.Sticker.Variants)
+            {
+                foreach (var view in new[] { ViewAngle.Front, ViewAngle.Profile })
+                {
+                    var file = item.Asset.ArtFor(variant, view);
+                    Assert.True(file is not null, $"{item.Key}: {variant} {view}");
+                    var art = Stanley.Rendering.StickerSvg.Parse(file!);
+                    Assert.True(art is not null, $"{item.Key}: {variant} {view} parses");
+                    Assert.Empty(art!.Report);
+                    Assert.Equal(StickerSlots.Get(item.Slot).Name, art.Slot);
+                    foreach (var part in item.Asset.Sticker.Parts.Where(p => p.Art is not null))
+                        Assert.True(art.Part(part.Name).Count > 0 || part.Depth == PartDepth.Back && view == ViewAngle.Front, $"{item.Key}: {variant} {view} draws {part.Name}");
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void A_library_sticker_is_worn_as_a_fresh_copy_marked_as_coming_from_the_library()
     {
         var item = StickerLibrary.StickerLibrary.Find("top/t-shirt")!;
@@ -70,7 +95,17 @@ public sealed class LookTests : IDisposable
 
         session.Workspace.History.Undo();
         Assert.Equal("None", editor.Gallery(StickerSlots.Top).Current);
-        Assert.Empty(editor.Working.Wardrobe.Stickers);
+        Assert.DoesNotContain(editor.Working.Wardrobe.Stickers.Values, a => a.Sticker.Slot == StickerSlots.Top);
+    }
+
+    [Fact]
+    public void A_new_character_starts_with_the_default_face_on()
+    {
+        var (_, editor) = NewCharacter();
+
+        var worn = CharacterLooks.Resolve(editor.Working).Stickers.Select(w => w.Asset.Sticker.Source).ToList();
+        Assert.Equal(StickerLibrary.StickerLibrary.DefaultFace.Select(k => StickerLibrary.StickerLibrary.SourcePrefix + k).Order(), worn.Order());
+        Assert.Equal("Dots", editor.Gallery(StickerSlots.Eyes).Current);
     }
 
     [Fact]
@@ -83,7 +118,7 @@ public sealed class LookTests : IDisposable
 
         Assert.Equal(editor.Working.Body, jeans.Preview.Body);
         Assert.Contains(CharacterLooks.Resolve(jeans.Preview).Stickers, w => w.Asset.Sticker.Name == "Jeans");
-        Assert.Empty(CharacterLooks.Resolve(Choice(editor, StickerSlots.Bottom, "None").Preview).Stickers);
+        Assert.DoesNotContain(CharacterLooks.Resolve(Choice(editor, StickerSlots.Bottom, "None").Preview).Stickers, w => w.Slot == StickerSlots.Bottom);
     }
 
     [Fact]
@@ -134,9 +169,9 @@ public sealed class LookTests : IDisposable
         var folder = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
         var saved = ComicProject.Open(folder).Characters.Single();
 
-        Assert.Equal(["Hoodie", "Jeans"], saved.Wardrobe.Stickers.Values.Select(a => a.Sticker.Name).Order());
+        Assert.Equal(["Dots", "Hoodie", "Jeans", "Simple", "Thin"], saved.Wardrobe.Stickers.Values.Select(a => a.Sticker.Name).Order());
         Assert.Equal(editor.Working.Stickers[StickerSlots.Top], saved.Stickers[StickerSlots.Top]);
-        Assert.Equal(2, Directory.GetDirectories(Path.Combine(Directory.GetDirectories(Path.Combine(folder, "characters")).Single(), "stickers")).Length);
+        Assert.Equal(5, Directory.GetDirectories(Path.Combine(Directory.GetDirectories(Path.Combine(folder, "characters")).Single(), "stickers")).Length);
     }
 }
 
@@ -204,5 +239,71 @@ public sealed class FabricEditingTests
 
         Assert.Null(bottom.Fabric);
         Assert.False(editor.ColorEditors.Single(e => e.Slot == "skin").CanHaveFabric);
+    }
+
+    [Fact]
+    public void A_library_tile_is_copied_in_when_picked_as_one_undo_step()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        var floral = top.PatternChoices.Single(c => c.Label == "Floral");
+
+        top.SetPattern.Execute(floral);
+
+        Assert.Equal(PatternKind.Tile, top.Fabric?.Pattern?.Kind);
+        Assert.Equal("floral.svg", top.Fabric?.Pattern?.Tile);
+        Assert.True(editor.Working.Wardrobe.Tiles.ContainsKey("floral.svg"));
+        Assert.True(top.PatternChoices.Single(c => c.Label == "Floral").IsCurrent);
+        session.Workspace.History.Undo();
+        Assert.Null(top.Fabric);
+        Assert.Empty(editor.Working.Wardrobe.Tiles);
+    }
+
+    [Fact]
+    public void Custom_asks_the_view_for_a_file_and_an_imported_tile_is_offered_from_then_on()
+    {
+        var (_, editor) = Dressed("T-shirt");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        TileImportRequest? asked = null;
+        editor.TileImportRequested += (_, request) => asked = request;
+
+        top.SetTexture.Execute(top.TextureChoices.Single(c => c.IsCustom));
+        Assert.Equal(new TileImportRequest("top", Texture: true), asked);
+
+        const string tile = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#ffffff"/><circle cx="5" cy="5" r="3" fill="#808080" filter="url(#x)"/></svg>""";
+        Assert.True(editor.ImportTile("top", "My Burlap.svg", ArtFile.Svg(tile), texture: true));
+
+        Assert.Equal("texture-my-burlap.svg", top.Fabric?.Texture?.Tile);
+        Assert.Equal(TextureKind.Tile, top.Fabric?.Texture?.Kind);
+        Assert.Contains(top.TextureChoices, c => c.Label == "My burlap" && c.IsCurrent);
+        Assert.DoesNotContain(top.PatternChoices, c => c.Label == "My burlap");
+        Assert.Contains("filter", editor.Hint, StringComparison.Ordinal); // what wasn't drawn is reported
+
+        Assert.False(editor.ImportTile("top", "broken.png", ArtFile.Png([1, 2, 3]), texture: false));
+        Assert.Contains("broken.png", editor.Hint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Saving_drops_library_tiles_nothing_uses_but_keeps_imported_ones()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "stanley-tiles-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var (session, editor) = Dressed("T-shirt");
+            var top = editor.ColorEditors.Single(e => e.Slot == "top");
+            top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Stars"));
+            top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Hearts")); // stars only tried on
+            editor.ImportTile("top", "mine.svg", ArtFile.Svg("""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="5" height="5"/></svg>"""), texture: true);
+
+            var folder = ComicProject.CreateNew().SaveAs(root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+            var saved = ComicProject.Open(folder).Characters.Single();
+
+            Assert.Equal(["hearts.svg", "texture-mine.svg"], saved.Wardrobe.Tiles.Keys.Order());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 }

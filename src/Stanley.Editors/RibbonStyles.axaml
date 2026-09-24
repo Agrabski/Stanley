@@ -184,6 +184,12 @@
     <Setter Property="Focusable" Value="False" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
+  <Style Selector="DropDownButton.slotGallery.compact">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="31" />
+    <Setter Property="Margin" Value="0,0,2,2" />
+    <Setter Property="Padding" Value="2,0" />
+  </Style>
   <Style Selector="DropDownButton.colorSlot">
     <Setter Property="Height" Value="26" />
     <Setter Property="Padding" Value="6,0" />
@@ -359,5 +365,15 @@
   <Style Selector=":is(Button).small PathIcon">
     <Setter Property="Width" Value="14" />
     <Setter Property="Height" Value="14" />
+  </Style>
+  <!-- A sticker on offer in a slot's gallery: a full figure, or a head close-up. After
+       .small, whose height it overrides. -->
+  <Style Selector=":is(Button).small.choice.sticker">
+    <Setter Property="Width" Value="66" />
+    <Setter Property="Height" Value="104" />
+  </Style>
+  <Style Selector=":is(Button).small.choice.sticker.closeup">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="80" />
   </Style>
 </Styles>

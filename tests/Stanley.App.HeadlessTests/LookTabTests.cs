@@ -67,7 +67,8 @@ public class LookTabTests
         // Clicking the T-shirt on the stage selects it: the Sticker tab appears with its sliders.
         var view = window.GetVisualDescendants().OfType<CharacterEditorView>().Single();
         var stage = view.Figure;
-        var chest = FindPoint(stage, p => stage.StickerAt(p) is not null);
+        var tee = editor.Working.Stickers[StickerSlots.Top].Single();
+        var chest = FindPoint(stage, p => stage.StickerAt(p) == tee);
         window.MouseDown(stage.TranslatePoint(chest, window)!.Value, MouseButton.Left);
         window.MouseUp(stage.TranslatePoint(chest, window)!.Value, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
@@ -105,6 +106,38 @@ public class LookTabTests
         Assert.True(top.Flyout!.IsOpen);
         Assert.Equal(PatternKind.Stripes, ((ColorSlotEditor)top.DataContext!).Fabric?.Pattern?.Kind);
         Snapshot(window, "look-fabric-dropdown");
+    }
+
+    [Fact]
+    public void The_hair_gallery_shows_close_ups_and_dresses_the_head()
+    {
+        var (window, editor, ribbon) = OpenCharacter();
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var hair = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Hair" });
+        hair.Flyout!.ShowAt(hair);
+        Dispatcher.UIThread.RunJobs();
+        Snapshot(window, "look-hair-gallery");
+        var content = (Control)((Flyout)hair.Flyout!).Content!;
+        var figures = content.GetVisualDescendants().OfType<CharacterFigure>().ToList();
+        Assert.NotEmpty(figures);
+        Assert.All(figures, f => Assert.True(f.Closeup));
+        var bob = content.GetLogicalDescendants().OfType<Button>().First(b => b.DataContext is StickerChoice { Label: "Bob" });
+        bob.Command!.Execute(bob.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Bob", editor.Gallery(StickerSlots.Hair).Current);
+        Assert.Contains(ribbon.GetVisualDescendants().OfType<DropDownButton>(), b => b.DataContext is ColorSlotEditor { Slot: "hair" });
+
+        // The face galleries sit beside it, half height.
+        var eyes = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Eyes" });
+        Assert.Contains("compact", eyes.Classes);
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Eyes).Choices.First(c => c.Label == "Round"));
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Mouth).Choices.First(c => c.Label == "Lips"));
+        Dispatcher.UIThread.RunJobs();
+        hair.Flyout!.Hide();
+        Dispatcher.UIThread.RunJobs();
+        Snapshot(window, "look-hair-and-face");
     }
 
     private static Point FindPoint(Control control, Func<Point, bool> test)

@@ -80,4 +80,13 @@ public sealed record Wardrobe(IReadOnlyDictionary<StickerId, StickerAsset> Stick
         var tiles = new Dictionary<string, ArtFile>(Tiles) { [name] = file };
         return this with { Tiles = tiles };
     }
+
+    public Wardrobe WithoutTile(string name)
+    {
+        if (!Tiles.ContainsKey(name))
+            return this;
+        var tiles = new Dictionary<string, ArtFile>(Tiles);
+        tiles.Remove(name);
+        return this with { Tiles = tiles };
+    }
 }

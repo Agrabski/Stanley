@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="300" height="340" viewBox="-150 -1060 300 340" data-stanley-view="profile" data-stanley-slot="hair">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back">
+    <ellipse class="slot-hair" cx="-48" cy="-996" rx="25" ry="23" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3"/>
+    <path class="slot-hair" d="M-60,-1008 C-52,-1015 -40,-1012 -33,-1000" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" d="M42.6,-995.4 C39.3,-998 35.9,-999 32.4,-1000.4 C28.9,-1001.8 25.2,-1002.9 21.5,-1003.6 C17.8,-1004.4 14,-1004.8 10.3,-1005 C6.5,-1005.1 2.7,-1004.9 -1,-1004.4 C-4.8,-1003.9 -8.5,-1003 -12.1,-1001.9 C-15.7,-1000.8 -19.2,-999.3 -22.6,-997.6 C-26,-995.9 -29.2,-993.9 -32.3,-991.6 C-35.3,-989.3 -38.3,-986.8 -40.9,-984 C-43.6,-981.3 -46,-978.2 -48.2,-975.1 C-50.4,-971.9 -52.4,-968.5 -54,-965 C-55.7,-961.5 -57.1,-957.9 -58.2,-954.1 C-59.3,-950.4 -60.1,-946.5 -60.6,-942.7 C-61.1,-938.8 -61.3,-934.9 -61.1,-931 C-61,-927.1 -60.6,-923.2 -59.8,-919.3 C-59.1,-915.5 -58.1,-911.7 -56.7,-908.1 C-55.4,-904.4 -53.4,-899.2 -51.9,-897.5 C-50.4,-895.8 -53,-896.6 -48,-898 C-43,-899.4 -31.3,-904 -22,-906 C-12.7,-908 1.2,-907.2 8,-910 C14.8,-912.8 14.7,-915 19,-923 C23.3,-931 28.5,-947.7 34,-958 C39.5,-968.3 50.6,-978.8 52,-985 C53.4,-991.2 45.9,-992.8 42.6,-995.4 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M40,-985 C33.3,-986.7 13.3,-996.7 0,-995 C-13.3,-993.3 -33.3,-978.3 -40,-975" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M25,-950 C19.2,-951.7 1.7,-961.7 -10,-960 C-21.7,-958.3 -39.2,-943.3 -45,-940" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

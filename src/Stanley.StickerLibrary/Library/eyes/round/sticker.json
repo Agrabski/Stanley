@@ -1,0 +1,28 @@
+{
+  "colors": {
+    "eyes": "#4a7ab5",
+    "skin": "#f2c9a4"
+  },
+  "id": "library",
+  "name": "Round",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "eyes",
+      "region": "head"
+    }
+  ],
+  "slot": "eyes",
+  "variants": [
+    "neutral",
+    "happy",
+    "sad",
+    "angry",
+    "wide",
+    "closed",
+    "wink",
+    "halfClosed"
+  ]
+}

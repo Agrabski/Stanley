@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="150" height="150" viewBox="-60 -1010 150 150" data-stanley-view="profile" data-stanley-slot="eyes">
+  <g id="eyes" inkscape:groupmode="layer" inkscape:label="eyes">
+    <ellipse cx="50" cy="-931" rx="7.5" ry="9.5" fill="#ffffff" stroke="#1a1a1a" stroke-width="2.5"/>
+    <ellipse class="slot-eyes" cx="53" cy="-929.5" rx="4.4" ry="5.5" fill="#4a7ab5"/>
+    <ellipse cx="53" cy="-929.5" rx="2" ry="2.5" fill="#1a1a1a"/>
+    <ellipse cx="54.8" cy="-931.5" rx="1.4" ry="1.4" fill="#ffffff"/>
+    <clipPath id="lid-p"><ellipse cx="50" cy="-931" rx="7.5" ry="9.5"/></clipPath>
+    <path class="slot-skin" d="M41,-942 L59,-942 L59,-933 Z" fill="#f2c9a4" stroke="#1a1a1a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#lid-p)"/>
+    <ellipse cx="50" cy="-931" rx="7.5" ry="9.5" fill="none" stroke="#1a1a1a" stroke-width="2.5"/>
+    <path d="M54.1,-939 l3,-5 M56.4,-936.5 l4.5,-3.5 M58,-932.5 l5,-1.5" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

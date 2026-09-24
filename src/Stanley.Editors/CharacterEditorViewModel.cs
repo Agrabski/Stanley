@@ -228,9 +228,20 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
     public IReadOnlyList<CharacterDefinition> LineUp =>
         Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
-    public string Hint =>
+    public string Hint => _message ??
         "Pick a body type and fine-tune it with the sliders; dress them on the Look tab, and click something they wear to adjust it. " +
         "Every panel this character is in updates as you go.";
+
+    private string? _message;
+
+    /// <summary>Shows <paramref name="message"/> in the status bar instead of the usual hint (an import's report, say); null goes back to the hint.</summary>
+    public void ShowMessage(string? message)
+    {
+        if (_message == message)
+            return;
+        _message = message;
+        OnPropertyChanged(nameof(Hint));
+    }
 
     private static readonly IReadOnlyList<SkinSwatch> Swatches =
     [

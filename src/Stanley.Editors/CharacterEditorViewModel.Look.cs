@@ -14,6 +14,9 @@ public sealed record StickerChoice(string Label, string Slot, CharacterDefinitio
 {
     public bool IsNone => Asset is null && Library is null;
 
+    /// <summary>Worn on the head (hair, face, hats, glasses): previewed as a close-up.</summary>
+    public bool Closeup => StickerSlots.Get(Slot).Region == BodyRegion.Head;
+
     public string Tip => IsNone ? "Nothing in this slot" : Library is not null ? $"{Label} - from the starter library" : IsWorn ? $"{Label} - wearing it" : Label;
 }
 
@@ -34,8 +37,20 @@ public sealed record ColorSwatchChoice(string Slot, string Name, ColorValue Colo
     internal static string ColorHex(ColorValue c) => c.Hex.Length == 9 ? "#" + c.Hex[7..] + c.Hex[1..7] : c.Hex;
 }
 
-/// <summary>A pattern or texture on offer for a colour slot (or none), previewed in the slot's colour.</summary>
-public sealed record FabricChoice(string Label, ColorValue Ground, Fabric Preview, PatternKind? Pattern, TextureKind? Texture, bool IsCurrent);
+/// <summary>
+/// A pattern or texture on offer for a colour slot (or none), previewed in the slot's
+/// colour: a generated one, a tile (<paramref name="Tile"/>, from the library or the
+/// character's own), or <paramref name="IsCustom"/> - "Custom...", which asks for a file.
+/// </summary>
+public sealed record FabricChoice(string Label, ColorValue Ground, Fabric Preview, PatternKind? Pattern, TextureKind? Texture, bool IsCurrent,
+    string? Tile = null, ArtFile? TileFile = null, bool IsCustom = false)
+{
+    /// <summary>The tile the preview draws, by name.</summary>
+    public IReadOnlyDictionary<string, ArtFile>? Tiles => Tile is { } name && TileFile is { } file ? new Dictionary<string, ArtFile> { [name] = file } : null;
+}
+
+/// <summary>Asks the view for a tile file to import for a colour slot - as its pattern, or its texture.</summary>
+public sealed record TileImportRequest(string Slot, bool Texture);
 
 /// <summary>
 /// One colour slot the character's clothes use, on the Look tab: its colour, and - for
@@ -63,12 +78,20 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
         });
         SetPattern = new RelayCommand<FabricChoice>(c =>
         {
-            if (c != null)
+            if (c is { IsCustom: true })
+                owner.RequestTileImport(new TileImportRequest(Slot, Texture: false));
+            else if (c is { Tile: { } tile, TileFile: { } file })
+                owner.SetTile(Slot, tile, file, texture: false);
+            else if (c != null)
                 owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? new PatternFill(kind, f.Pattern?.Colors is { Count: > 0 } colors ? colors : [], f.Pattern?.Size, f.Pattern?.Angle) : null });
         });
         SetTexture = new RelayCommand<FabricChoice>(c =>
         {
-            if (c != null)
+            if (c is { IsCustom: true })
+                owner.RequestTileImport(new TileImportRequest(Slot, Texture: true));
+            else if (c is { Tile: { } tile, TileFile: { } file })
+                owner.SetTile(Slot, tile, file, texture: true);
+            else if (c != null)
                 owner.EditFabric(Slot, f => f with { Texture = c.Texture is { } kind ? new TextureFill(kind, f.Texture?.Strength, f.Texture?.Size) : null });
         });
     }
@@ -101,19 +124,48 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
     public bool HasTexture => _fabric?.Texture is not null;
 
-    public IReadOnlyList<FabricChoice> PatternChoices =>
-        new (string Label, PatternKind? Kind)[] { ("None", null), ("Stripes", PatternKind.Stripes), ("Pinstripes", PatternKind.Pinstripes), ("Checks", PatternKind.Checks),
-            ("Plaid", PatternKind.Plaid), ("Dots", PatternKind.Dots), ("Chevron", PatternKind.Chevron) }
-            .Select(p => new FabricChoice(p.Label, _color,
-                new Fabric(p.Kind is { } kind ? new PatternFill(kind, _fabric?.Pattern?.Colors ?? [], Angle: _fabric?.Pattern?.Angle) : null),
-                p.Kind, null, _fabric?.Pattern?.Kind == p.Kind))
-            .ToList();
+    /// <summary>The character's tiles, for drawing this slot's swatch.</summary>
+    public IReadOnlyDictionary<string, ArtFile> Tiles => _owner.Working.Wardrobe.Tiles;
 
-    public IReadOnlyList<FabricChoice> TextureChoices =>
-        new (string Label, TextureKind? Kind)[] { ("None", null), ("Denim", TextureKind.Denim), ("Knit", TextureKind.Knit), ("Corduroy", TextureKind.Corduroy),
-            ("Wool", TextureKind.Wool), ("Leather", TextureKind.Leather), ("Canvas", TextureKind.Canvas), ("Felt", TextureKind.Felt) }
-            .Select(t => new FabricChoice(t.Label, _color, new Fabric(Texture: t.Kind is { } kind ? new TextureFill(kind, 0.9) : null), null, t.Kind, _fabric?.Texture?.Kind == t.Kind))
-            .ToList();
+    /// <summary>The generated patterns, then the library's tiles, then the character's own, then "Custom...".</summary>
+    public IReadOnlyList<FabricChoice> PatternChoices
+    {
+        get
+        {
+            var colors = _fabric?.Pattern?.Colors ?? [];
+            var angle = _fabric?.Pattern?.Angle;
+            var current = _fabric?.Pattern;
+            var choices = new (string Label, PatternKind? Kind)[] { ("None", null), ("Stripes", PatternKind.Stripes), ("Pinstripes", PatternKind.Pinstripes), ("Checks", PatternKind.Checks),
+                    ("Plaid", PatternKind.Plaid), ("Dots", PatternKind.Dots), ("Chevron", PatternKind.Chevron) }
+                .Select(p => new FabricChoice(p.Label, _color, new Fabric(p.Kind is { } kind ? new PatternFill(kind, colors, Angle: angle) : null),
+                    p.Kind, null, current?.Kind == p.Kind && current?.Kind != PatternKind.Tile))
+                .ToList();
+            foreach (var (name, file) in CharacterEditorViewModel.TileChoices(_owner.Working, texture: false))
+                choices.Add(new FabricChoice(CharacterEditorViewModel.TileLabel(name), _color, new Fabric(new PatternFill(PatternKind.Tile, colors, Angle: angle, Tile: name)),
+                    PatternKind.Tile, null, current is { Kind: PatternKind.Tile } && current.Tile == name, name, file));
+            choices.Add(new FabricChoice("Custom...", _color, new Fabric(), null, null, false, IsCustom: true));
+            return choices;
+        }
+    }
+
+    /// <summary>The generated textures, then the character's own texture tiles, then "Custom..." (a greyscale PNG or SVG).</summary>
+    public IReadOnlyList<FabricChoice> TextureChoices
+    {
+        get
+        {
+            var current = _fabric?.Texture;
+            var choices = new (string Label, TextureKind? Kind)[] { ("None", null), ("Denim", TextureKind.Denim), ("Knit", TextureKind.Knit), ("Corduroy", TextureKind.Corduroy),
+                    ("Wool", TextureKind.Wool), ("Leather", TextureKind.Leather), ("Canvas", TextureKind.Canvas), ("Felt", TextureKind.Felt) }
+                .Select(t => new FabricChoice(t.Label, _color, new Fabric(Texture: t.Kind is { } kind ? new TextureFill(kind, 0.9) : null), null, t.Kind,
+                    current?.Kind == t.Kind && current?.Kind != TextureKind.Tile))
+                .ToList();
+            foreach (var (name, file) in CharacterEditorViewModel.TileChoices(_owner.Working, texture: true))
+                choices.Add(new FabricChoice(CharacterEditorViewModel.TileLabel(name), _color, new Fabric(Texture: new TextureFill(TextureKind.Tile, 0.9, Tile: name)),
+                    null, TextureKind.Tile, current is { Kind: TextureKind.Tile } && current.Tile == name, name, file));
+            choices.Add(new FabricChoice("Custom...", _color, new Fabric(), null, null, false, IsCustom: true));
+            return choices;
+        }
+    }
 
     /// <summary>Pattern size: one repeat as a percentage of the character's height.</summary>
     public double PatternSize
@@ -139,10 +191,14 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
     public void EndDrag() => _owner.EndSliderDrag();
 
+    private IReadOnlyDictionary<string, ArtFile>? _tiles;
+
     internal void Refresh(ColorValue color, Fabric? fabric)
     {
         var colorChanged = color != _color;
         var fabricChanged = !Equals(fabric, _fabric);
+        var tilesChanged = !ReferenceEquals(_tiles, _owner.Working.Wardrobe.Tiles);
+        _tiles = _owner.Working.Wardrobe.Tiles;
         _color = color;
         _fabric = fabric;
         if (colorChanged)
@@ -150,8 +206,9 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
             OnPropertyChanged(nameof(Color));
             OnPropertyChanged(nameof(Brush));
         }
-        if (colorChanged || fabricChanged)
+        if (colorChanged || fabricChanged || tilesChanged)
         {
+            OnPropertyChanged(nameof(Tiles));
             OnPropertyChanged(nameof(Fabric));
             OnPropertyChanged(nameof(HasPattern));
             OnPropertyChanged(nameof(HasTexture));
@@ -209,6 +266,12 @@ public sealed partial class CharacterEditorViewModel
     }
 
     // ---------------------------------------------------------------- galleries
+
+    /// <summary>The hair gallery.</summary>
+    public IReadOnlyList<SlotGallery> HairGalleries => Galleries(StickerSlots.Hair);
+
+    /// <summary>The face's galleries (Eyes, Brows, Mouth, Nose).</summary>
+    public IReadOnlyList<SlotGallery> FaceGalleries => Galleries(StickerSlots.Eyes, StickerSlots.Brows, StickerSlots.Mouth, StickerSlots.Nose);
 
     /// <summary>The clothes slots' galleries (Top, Outer, Bottom, Shoes).</summary>
     public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
@@ -296,6 +359,74 @@ public sealed partial class CharacterEditorViewModel
             UpdateGesture(result);
         else
             Apply(result);
+    }
+
+    /// <summary>Raised to ask the view for a tile file ("Custom..." in a pattern or texture gallery); the view answers with <see cref="ImportTile"/>.</summary>
+    public event EventHandler<TileImportRequest>? TileImportRequested;
+
+    internal void RequestTileImport(TileImportRequest request) => TileImportRequested?.Invoke(this, request);
+
+    /// <summary>Prefix of a texture tile's file name, telling it apart from pattern tiles in the character's <c>patterns/</c> folder.</summary>
+    public const string TextureTilePrefix = "texture-";
+
+    /// <summary>Tiles on offer: for patterns, the library's then the character's own; for textures, the character's own texture tiles.</summary>
+    internal static IEnumerable<(string Name, ArtFile File)> TileChoices(CharacterDefinition character, bool texture)
+    {
+        var library = texture ? [] : Stanley.StickerLibrary.StickerLibrary.PatternTiles.OrderBy(t => t.Key, StringComparer.Ordinal).Select(t => (t.Key, t.Value)).ToList();
+        var own = character.Wardrobe.Tiles
+            .Where(t => t.Key.StartsWith(TextureTilePrefix, StringComparison.Ordinal) == texture)
+            .Where(t => !Stanley.StickerLibrary.StickerLibrary.PatternTiles.TryGetValue(t.Key, out var shipped) || !shipped.SameContent(t.Value))
+            .OrderBy(t => t.Key, StringComparer.Ordinal)
+            .Select(t => (t.Key, t.Value));
+        return library.Concat(own);
+    }
+
+    internal static string TileLabel(string name)
+    {
+        var stem = Path.GetFileNameWithoutExtension(name);
+        if (stem.StartsWith(TextureTilePrefix, StringComparison.Ordinal))
+            stem = stem[TextureTilePrefix.Length..];
+        stem = stem.Replace('-', ' ');
+        return stem.Length == 0 ? name : char.ToUpperInvariant(stem[0]) + stem[1..];
+    }
+
+    /// <summary>Puts a tile on a colour slot - as its pattern or its texture - copying it into the character's tiles if it isn't there yet. One undo step.</summary>
+    internal void SetTile(string slot, string name, ArtFile file, bool texture)
+    {
+        var character = Committed;
+        if (!character.Wardrobe.Tiles.TryGetValue(name, out var existing) || !existing.SameContent(file))
+            character = character with { Wardrobe = character.Wardrobe.WithTile(name, file) };
+        var current = CharacterLooks.Resolve(character).FabricOf(slot) ?? new Fabric();
+        var next = texture
+            ? current with { Texture = new TextureFill(TextureKind.Tile, current.Texture?.Strength, current.Texture?.Size, name) }
+            : current with { Pattern = new PatternFill(PatternKind.Tile, current.Pattern?.Colors ?? [], current.Pattern?.Size, current.Pattern?.Angle, Tile: name) };
+        ShowMessage(null);
+        Apply(EditResult<CharacterDefinition>.Success(LookEditing.SetFabric(character, slot, next)));
+    }
+
+    /// <summary>
+    /// Imports a tile file the user picked (an SVG, whose view box is one repeat, or a PNG)
+    /// and puts it on <paramref name="slot"/>. False, with the reason in the status bar, if
+    /// the file can't be drawn; anything in an SVG that isn't drawn is reported there too.
+    /// </summary>
+    public bool ImportTile(string slot, string fileName, ArtFile file, bool texture)
+    {
+        var extension = file.IsSvg ? ".svg" : ".png";
+        if (file.IsSvg ? Stanley.Rendering.StickerSvg.Parse(file) is null : !Stanley.Rendering.ArtFiles.IsImage(file))
+        {
+            ShowMessage($"Couldn't read {fileName} as a {(file.IsSvg ? "SVG" : "PNG")} tile.");
+            return false;
+        }
+        var stem = new string(Path.GetFileNameWithoutExtension(fileName).ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        var baseName = (texture ? TextureTilePrefix : "") + (stem.Length == 0 ? "tile" : stem);
+        var name = baseName + extension;
+        for (var n = 2; Committed.Wardrobe.Tiles.TryGetValue(name, out var taken) && !taken.SameContent(file); n++)
+            name = $"{baseName}-{n}{extension}";
+        SetTile(slot, name, file, texture);
+        if (file.IsSvg && Stanley.Rendering.StickerSvg.Parse(file) is { Report.Count: > 0 } art)
+            ShowMessage($"{fileName}: {string.Join("; ", art.Report)}.");
+        return true;
     }
 
     public static string ColorSlotLabel(string slot) => slot switch
@@ -439,6 +570,8 @@ public sealed partial class CharacterEditorViewModel
     {
         if (_selectedSticker is { } id && Working.Wardrobe.Find(id) is null)
             _selectedSticker = null;
+        OnPropertyChanged(nameof(HairGalleries));
+        OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));
         OnPropertyChanged(nameof(AccessoryGalleries));
         if (RefreshColorEditors())

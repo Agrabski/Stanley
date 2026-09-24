@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
+using Stanley.ProjectModel.Characters;
 
 namespace Stanley.Editors;
 
@@ -43,10 +45,16 @@ public partial class CharacterEditorRibbon : UserControl
     {
         base.OnDataContextChanged(e);
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
+            _subscribed.TileImportRequested -= OnTileImportRequested;
+        }
         _subscribed = ViewModel;
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged += OnViewModelPropertyChanged;
+            _subscribed.TileImportRequested += OnTileImportRequested;
+        }
     }
 
     /// <summary>Like the page ribbon: the Sticker tab appears with a selection but isn't forced open; if it goes away while shown, back to Look.</summary>
@@ -54,6 +62,34 @@ public partial class CharacterEditorRibbon : UserControl
     {
         if (e.PropertyName == nameof(CharacterEditorViewModel.HasSelectedSticker) && ViewModel is { HasSelectedSticker: false } && Tabs.SelectedItem == StickerTab)
             Tabs.SelectedItem = LookTab;
+    }
+
+    /// <summary>"Custom..." in a pattern or texture gallery: pick an SVG or PNG and hand it to the editor.</summary>
+    private async void OnTileImportRequested(object? sender, TileImportRequest request)
+    {
+        if (sender is not CharacterEditorViewModel editor || TopLevel.GetTopLevel(this) is not { } top)
+            return;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = request.Texture ? "Choose a texture tile (a greyscale image)" : "Choose a pattern tile (one repeat)",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
+        });
+        if (files is not [var picked])
+            return;
+        try
+        {
+            await using var stream = await picked.OpenReadAsync();
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var bytes = memory.ToArray();
+            var file = picked.Name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ? ArtFile.Svg(System.Text.Encoding.UTF8.GetString(bytes)) : ArtFile.Png(bytes);
+            editor.ImportTile(request.Slot, picked.Name, file, request.Texture);
+        }
+        catch (IOException e)
+        {
+            editor.ShowMessage($"Couldn't read {picked.Name}: {e.Message}");
+        }
     }
 
     /// <summary>Exposed for headless UI tests.</summary>

@@ -40,6 +40,9 @@ public static class StickerLibrary
 
     public static IEnumerable<LibrarySticker> ForSlot(string slot) => All.Where(s => s.Slot == slot);
 
+    /// <summary>What a new character's face starts as - simple, so it reads at any size; each is one click to change or take off.</summary>
+    public static IReadOnlyList<string> DefaultFace { get; } = ["eyes/dots", "brows/thin", "mouth/simple"];
+
     public static LibrarySticker? Find(string key) => All.FirstOrDefault(s => s.Key == key);
 
     /// <summary>The library sticker a wardrobe sticker was copied from, if it's still an unmodified copy.</summary>

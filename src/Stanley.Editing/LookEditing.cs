@@ -158,6 +158,36 @@ public static class LookEditing
         return character with { Wardrobe = wardrobe };
     }
 
+    /// <summary>The tiles some fabric draws from: the character's, a named look's, a panel's (<paramref name="instances"/>) or a sticker's default.</summary>
+    public static IReadOnlySet<string> TilesInUse(CharacterDefinition character, IEnumerable<CharacterInstance> instances)
+    {
+        var fabrics = (character.Fabrics?.Values ?? Enumerable.Empty<Fabric>())
+            .Concat(character.Revisions.Values.SelectMany(r => r.FabricValues?.Values ?? Enumerable.Empty<Fabric>()))
+            .Concat(instances.Where(i => i.CharacterId == character.Id).SelectMany(i => i.Overrides?.FabricOverrides?.Values ?? Enumerable.Empty<Fabric>()))
+            .Concat(character.Wardrobe.Stickers.Values.SelectMany(a => a.Sticker.Fabrics?.Values ?? Enumerable.Empty<Fabric>()));
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var fabric in fabrics)
+        {
+            if (fabric.Pattern?.Tile is { } pattern)
+                names.Add(pattern);
+            if (fabric.Texture?.Tile is { } texture)
+                names.Add(texture);
+        }
+        return names;
+    }
+
+    /// <summary>The character's tiles without unmodified library copies (<paramref name="isLibraryCopy"/>) that no fabric uses (<paramref name="inUse"/>) - picking a library tile and changing your mind leaves no file behind.</summary>
+    public static CharacterDefinition TidyTiles(CharacterDefinition character, IReadOnlySet<string> inUse, Func<string, ArtFile, bool> isLibraryCopy)
+    {
+        var unused = character.Wardrobe.Tiles.Where(t => !inUse.Contains(t.Key) && isLibraryCopy(t.Key, t.Value)).Select(t => t.Key).ToList();
+        if (unused.Count == 0)
+            return character;
+        var wardrobe = character.Wardrobe;
+        foreach (var name in unused)
+            wardrobe = wardrobe.WithoutTile(name);
+        return character with { Wardrobe = wardrobe };
+    }
+
     private static SortedDictionary<string, IReadOnlyList<StickerId>> WithSlot(SortedDictionary<string, IReadOnlyList<StickerId>> stickers, string slot, IReadOnlyList<StickerId> ids) =>
         new(stickers, StringComparer.Ordinal) { [slot] = ids };
 }

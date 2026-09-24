@@ -1,0 +1,25 @@
+{
+  "colors": {},
+  "id": "library",
+  "name": "Dots",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "eyes",
+      "region": "head"
+    }
+  ],
+  "slot": "eyes",
+  "variants": [
+    "neutral",
+    "happy",
+    "sad",
+    "angry",
+    "wide",
+    "closed",
+    "wink",
+    "halfClosed"
+  ]
+}

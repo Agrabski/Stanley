@@ -57,6 +57,7 @@ internal static class FigureGeometry
     public static SKPath Transformed(SKPath path, SKMatrix matrix)
     {
         using var builder = new SKPathBuilder();
+        builder.FillType = path.FillType;
         builder.AddPath(path, in matrix);
         return builder.Detach();
     }
