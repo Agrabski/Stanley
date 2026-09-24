@@ -1226,7 +1226,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
     }
 
-    /// <summary>The elbow/knee handles of a placed character, on the page - a second, independent drag handle per limb for the bend itself.</summary>
+    /// <summary>The elbow/knee handles of a placed character, on the page - a second drag handle per limb that swings the upper arm or thigh.</summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> BendHandles(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
             ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.BendPoint(character, instance, limb))).ToList()
@@ -1234,7 +1234,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public void BeginPoseBend(PanelId panelId, int index, Limb limb) => BeginGesture();
 
-    /// <summary>Drags a limb's elbow/knee handle: the hand or foot stays exactly where it is; only the bend side follows the pointer.</summary>
+    /// <summary>Drags a limb's elbow/knee handle: the joint follows the pointer (the upper bone reaches towards it); the forearm or shin keeps its bend.</summary>
     public void UpdatePoseBend(PanelId panelId, int index, Limb limb, Point2D target)
     {
         if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count

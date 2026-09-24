@@ -197,7 +197,7 @@ public class CharacterTests
     }
 
     [Fact]
-    public void Dragging_a_selected_characters_elbow_or_knee_dot_bends_the_limb_without_moving_the_hand_or_foot()
+    public void Dragging_a_selected_characters_elbow_or_knee_dot_moves_the_joint_to_the_pointer()
     {
         var (window, characters) = Open();
         var created = characters.CreateCharacter();
@@ -210,15 +210,21 @@ public class CharacterTests
         var hand = page.LimbHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
         var elbow = page.BendHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
         Point ToWindow(ProjectModel.Geometry.Point2D p) => canvas.TranslatePoint(canvas.PageToControl(p), window)!.Value;
+        // Well out to the side of the hanging elbow: the upper arm swings out towards it.
+        var forearm = Math.Sqrt((elbow.X - hand.X) * (elbow.X - hand.X) + (elbow.Y - hand.Y) * (elbow.Y - hand.Y));
+        var target = new ProjectModel.Geometry.Point2D(elbow.X + 3 * forearm, elbow.Y);
 
         window.MouseDown(ToWindow(elbow), MouseButton.Left);
-        window.MouseMove(ToWindow(new ProjectModel.Geometry.Point2D(2 * hand.X - elbow.X, 2 * hand.Y - elbow.Y)));
-        window.MouseUp(ToWindow(new ProjectModel.Geometry.Point2D(2 * hand.X - elbow.X, 2 * hand.Y - elbow.Y)), MouseButton.Left);
+        window.MouseMove(ToWindow(target));
+        window.MouseUp(ToWindow(target), MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
 
         var posed = page.Working.Panels[panelId].CharacterInstances[0];
+        var movedElbow = page.BendHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
         var movedHand = page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
-        Assert.True(Math.Abs(movedHand.X - hand.X) < 0.1 && Math.Abs(movedHand.Y - hand.Y) < 0.1, "the hand stays put");
+        static double Dist(ProjectModel.Geometry.Point2D a, ProjectModel.Geometry.Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+        Assert.True(Dist(movedElbow, target) < Dist(elbow, target) - forearm / 2, "the elbow follows the pointer");
+        Assert.NotEqual(hand, movedHand);
         Assert.NotEmpty(posed.Pose.BoneRotations);
         Assert.True(window.Workspace.History.CanUndo);
     }

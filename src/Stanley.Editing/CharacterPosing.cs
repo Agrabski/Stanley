@@ -42,7 +42,7 @@ public static class CharacterPosing
     public static Point2D EndPoint(CharacterDefinition character, CharacterInstance instance, Limb limb) =>
         instance.Placement.ToPage(Joint(Figure(character, instance).Layout, Chain(limb).End));
 
-    /// <summary>Where the limb's elbow or knee joint is on the page - a second drag handle for the bend itself, independent of the hand/foot one.</summary>
+    /// <summary>Where the limb's elbow or knee joint is on the page - a second drag handle that swings the upper arm or thigh.</summary>
     public static Point2D BendPoint(CharacterDefinition character, CharacterInstance instance, Limb limb) =>
         instance.Placement.ToPage(Joint(Figure(character, instance).Layout, Chain(limb).Middle));
 
@@ -92,20 +92,23 @@ public static class CharacterPosing
     }
 
     /// <summary>
-    /// Drags the limb's elbow or knee handle directly: the hand or foot stays exactly
-    /// where it already is, and only which side the joint bends towards changes - whichever
-    /// side of the straight root-to-end line <paramref name="pageTarget"/> is on. Lets a
-    /// user draw the elbow/knee itself instead of only inferring the bend from a hand/foot
-    /// drag's approach angle.
+    /// Drags the limb's elbow or knee handle: the upper arm or thigh swings about the
+    /// shoulder or hip so the joint follows <paramref name="pageTarget"/> (landing on it
+    /// when it's at the bone's length, pointing at it otherwise - the same reach-towards
+    /// behaviour as a hand/foot drag, one bone shorter). The forearm or shin keeps its bend,
+    /// so the hand or foot rides along. Only the limb's upper rotation changes.
     /// </summary>
     public static CharacterInstance Bend(CharacterDefinition character, CharacterInstance instance, Limb limb, Point2D pageTarget)
     {
-        var (root, _, end) = Chain(limb);
-        var layout = Figure(character, instance).Layout;
-        var rootPoint = Joint(layout, root);
-        var endPoint = Joint(layout, end);
-        var sign = Side(rootPoint, endPoint, instance.Placement.ToFigure(pageTarget));
-        return Reach(character, instance, limb, instance.Placement.ToPage(endPoint), sign != 0 ? sign : BendSign(character, instance, limb));
+        var reference = Figure(character, instance).BaseLayout;
+        var (root, middle, _) = Chain(limb);
+        var s = Joint(reference, root);
+        var e0 = Joint(reference, middle);
+        var target = instance.Placement.ToFigure(pageTarget);
+        if (Distance(s, e0) < 1e-9 || Distance(s, target) < 1e-9)
+            return instance;
+        var lower = instance.Pose.BoneRotations.FirstOrDefault(r => r.Bone == middle)?.Degrees ?? 0;
+        return WithLimb(instance, limb, Wrap(AngleOf(s, target) - AngleOf(s, e0)), lower);
     }
 
     /// <summary>

@@ -500,7 +500,9 @@ body and placement only.
 - **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
   character's handles: green hand/foot dots → `Reach` (two-bone IK, exact in reach,
   pointing at the target out of reach; bend side held per drag via `BendSign`,
-  anatomical side on); hollow rings → `MoveHips` (feet pinned by re-solving both
+  anatomical side on); green elbow/knee squares → `Bend` (the upper
+  bone swings about the shoulder/hip so the joint follows the pointer — one-bone IK,
+  pointing at it out of reach; the forearm/shin keeps its bend and rides along); hollow rings → `MoveHips` (feet pinned by re-solving both
   legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest), `TiltHead`.
   `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
   (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
