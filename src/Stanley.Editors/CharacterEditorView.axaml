@@ -11,7 +11,7 @@
   <Grid RowDefinitions="*,Auto">
     <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
       <local:CharacterFigure Name="Stage" Character="{Binding Working}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
-                             Highlight="{Binding SelectedStickerId}" />
+                             Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}" />
     </Border>
     <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
       <Grid ColumnDefinitions="*,Auto">

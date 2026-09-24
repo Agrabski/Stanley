@@ -261,6 +261,48 @@ public class RegionMappingTests
     }
 }
 
+/// <summary>Which variant a worn sticker shows for an expression.</summary>
+public class VariantTests
+{
+    private static Sticker Eyes(params string[] variants) =>
+        new(StickerId.New(), "Eyes", StickerSlots.Eyes, [], new SortedDictionary<string, ColorValue>(), variants);
+
+    [Fact]
+    public void The_expression_picks_the_variant_and_a_missing_one_falls_back_to_neutral_then_the_first()
+    {
+        var wink = new Dictionary<string, string> { [StickerSlots.Eyes] = "wink" };
+
+        Assert.Equal("wink", StickerArtPieces.VariantFor(Eyes("neutral", "wink"), StickerSlots.Eyes, wink));
+        Assert.Equal("neutral", StickerArtPieces.VariantFor(Eyes("happy", "neutral"), StickerSlots.Eyes, wink));
+        Assert.Equal("happy", StickerArtPieces.VariantFor(Eyes("happy", "sad"), StickerSlots.Eyes, wink));
+        Assert.Equal("neutral", StickerArtPieces.VariantFor(Eyes("happy", "neutral"), StickerSlots.Eyes, null));
+    }
+
+    [Fact]
+    public void A_face_shows_the_pose_expression()
+    {
+        const string neutral = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="-80 -1010 160 150"><rect x="-30" y="-935" width="60" height="10" fill="#000"/></svg>""";
+        const string closed = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="-80 -1010 160 150"><rect x="-30" y="-935" width="60" height="2" fill="#000"/></svg>""";
+        var sticker = Eyes("neutral", "closed") with { Parts = [new StickerPart("eyes", BodyRegion.Head, Art: new PartArt(ArtMapping.Warp))] };
+        var character = CharacterDefinition.Create("A") with { Stickers = new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Eyes] = [sticker.Id] } };
+        character = character with
+        {
+            Wardrobe = character.Wardrobe.With(new StickerAsset(sticker, new Dictionary<string, ArtFile>
+            {
+                ["variants/neutral/front.svg"] = ArtFile.Svg(neutral),
+                ["variants/closed/front.svg"] = ArtFile.Svg(closed),
+            }))
+        };
+        var renderer = (FigureRenderer)CharacterRenderers.Default;
+
+        using var open = renderer.Drawing(character, ViewAngle.Front, new PoseData(ViewAngle.Front, [], [])).OutlineOf(sticker.Id);
+        using var shut = renderer.Drawing(character, ViewAngle.Front, new PoseData(ViewAngle.Front, [], new SortedDictionary<string, string> { [StickerSlots.Eyes] = "closed" })).OutlineOf(sticker.Id);
+
+        Assert.Equal(0.010, open.TightBounds.Height, 4);
+        Assert.Equal(0.002, shut.TightBounds.Height, 4);
+    }
+}
+
 /// <summary>Drawn parts on the figure: layered, recoloured, hit-testable, falling back across views.</summary>
 public class DrawnStickerRenderingTests
 {

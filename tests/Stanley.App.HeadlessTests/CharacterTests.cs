@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Input.Raw;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Stanley.Editors;
@@ -201,6 +202,32 @@ public class CharacterTests
         var head = page.TrunkHandles(instance).Single(h => h.Part == Editing.TrunkPart.Head).Point;
         Assert.All(page.LimbHandles(instance).Where(h => h.Limb is Editing.Limb.LeftArm or Editing.Limb.RightArm),
             h => Assert.True(h.Point.Y < head.Y + 5, "both hands up"));
+    }
+
+    [Fact]
+    public void The_expression_gallery_on_the_Character_tab_changes_the_face()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId);
+        var ribbon = Single<PageEditorRibbon>(window.RibbonBarControl);
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "CharacterTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var gallery = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "ExpressionGallery");
+        gallery.Flyout!.ShowAt(gallery);
+        Dispatcher.UIThread.RunJobs();
+        LookTabTests.Snapshot(window, "page-expression-gallery");
+        var content = (Control)((Flyout)gallery.Flyout!).Content!;
+        var surprised = content.GetLogicalDescendants().OfType<Button>().Single(b => b.DataContext is ExpressionPresetChoice { Name: "Surprised" });
+        Assert.True(surprised.GetVisualDescendants().OfType<CharacterFigure>().Single().Closeup);
+        surprised.Command!.Execute(surprised.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("Surprised", page.SelectedExpressionName);
+        Assert.Equal("wide", page.Working.Panels[panelId].CharacterInstances[0].Pose.Expression["eyes"]);
     }
 
     [Fact]

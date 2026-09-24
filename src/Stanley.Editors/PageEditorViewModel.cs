@@ -89,6 +89,11 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             if (choice != null && HasSelectedCharacter)
                 ApplyPosePreset(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
         });
+        ApplyExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                ApplyExpression(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
+        });
         MirrorPoseCommand = new RelayCommand(() => MirrorCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
@@ -1085,6 +1090,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(HasCharacterChoices));
         OnPropertyChanged(nameof(SelectedCharacterName));
         OnPropertyChanged(nameof(PoseChoices));
+        OnPropertyChanged(nameof(ExpressionChoices));
         NotifyCommands();
     }
 
@@ -1210,6 +1216,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     private int _bendSign = 1;
     private (CharacterId, ViewAngle) _poseChoicesKey;
+    private string _expressionChoicesKey = "";
 
     /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
@@ -1264,6 +1271,37 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         Apply(EditCharacterInPanel(Working, panelId, index, c => PosePresets.Apply(character, c, preset)));
         RaiseCharacterViewChanged();
     }
+
+    /// <summary>Gives the character <paramref name="preset"/>'s face, in one undo step. The pose is untouched.</summary>
+    public void ApplyExpression(PanelId panelId, int index, ExpressionPresetDefinition preset)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+        if (ExpressionPresets.Of(panel.CharacterInstances[index].Pose) == preset)
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => ExpressionPresets.Apply(c, preset)));
+        RaiseCharacterViewChanged();
+    }
+
+    /// <summary>The Character tab's expression gallery: every preset, as a close-up of the selected character.</summary>
+    public IReadOnlyList<ExpressionPresetChoice> ExpressionChoices
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+                return [];
+            var current = ExpressionPresets.Of(instance.Pose);
+            var standing = new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>());
+            return ExpressionPresets.All
+                .Select(p => new ExpressionPresetChoice(p, character, ExpressionPresets.Apply(standing, p), p == current))
+                .ToList();
+        }
+    }
+
+    /// <summary>The selected character's expression, for the gallery button: a preset's name, or "Custom" for a mix.</summary>
+    public string SelectedExpressionName => SelectedCharacter is { } instance ? ExpressionPresets.Of(instance.Pose)?.Name ?? "Custom" : "";
+
+    public IRelayCommand<ExpressionPresetChoice> ApplyExpressionCommand { get; }
 
     /// <summary>The Character tab's pose gallery: every preset, previewed on the selected character.</summary>
     public IReadOnlyList<PosePresetChoice> PoseChoices
@@ -1329,6 +1367,15 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             _poseChoicesKey = key;
             OnPropertyChanged(nameof(PoseChoices));
+        }
+        var expressionKey = SelectedCharacter is { } face
+            ? $"{face.CharacterId}:{face.Pose.ViewAngle}:{string.Join(";", (face.Pose.Expression ?? []).Select(e => e.Key + "=" + e.Value))}"
+            : "";
+        if (expressionKey != _expressionChoicesKey)
+        {
+            _expressionChoicesKey = expressionKey;
+            OnPropertyChanged(nameof(ExpressionChoices));
+            OnPropertyChanged(nameof(SelectedExpressionName));
         }
         OnPropertyChanged(nameof(SelectedCharacterView));
         OnPropertyChanged(nameof(IsSelectedCharacterFront));

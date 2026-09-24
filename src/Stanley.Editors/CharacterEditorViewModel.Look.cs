@@ -10,7 +10,9 @@ using Stanley.StickerLibrary;
 namespace Stanley.Editors;
 
 /// <summary>One thing a slot gallery offers: nothing, a sticker from the wardrobe, or one from the library - previewed on this character.</summary>
-public sealed record StickerChoice(string Label, string Slot, CharacterDefinition Preview, StickerAsset? Asset, LibrarySticker? Library, bool IsWorn)
+/// <param name="Pose">The stage's preview pose (its view and expression), so a face gallery shows the expression being previewed.</param>
+public sealed record StickerChoice(string Label, string Slot, CharacterDefinition Preview, StickerAsset? Asset, LibrarySticker? Library, bool IsWorn,
+    Stanley.ProjectModel.Poses.PoseData? Pose = null)
 {
     public bool IsNone => Asset is null && Library is null;
 
@@ -263,6 +265,11 @@ public sealed partial class CharacterEditorViewModel
         MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => LookEditing.MoveInStack(Committed, id, +1)), () => SelectedStickerIsWorn);
         MoveSelectedDownCommand = new RelayCommand(() => EditSelected(id => LookEditing.MoveInStack(Committed, id, -1)), () => SelectedStickerIsWorn);
         DeselectStickerCommand = new RelayCommand(() => SelectSticker(null));
+        PreviewExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
+        {
+            if (choice != null)
+                PreviewExpression = choice.Preset;
+        });
     }
 
     // ---------------------------------------------------------------- galleries
@@ -291,13 +298,14 @@ public sealed partial class CharacterEditorViewModel
         var info = StickerSlots.Get(slot);
         var character = Working;
         var worn = character.Stickers.TryGetValue(slot, out var ids) ? ids : [];
-        var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0) };
+        var pose = StagePose;
+        var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0, pose) };
         var owned = character.Wardrobe.Stickers.Values.Where(a => a.Sticker.Slot == slot).OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         foreach (var asset in owned)
-            choices.Add(new StickerChoice(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id)));
+            choices.Add(new StickerChoice(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id), pose));
         var ownedSources = owned.Select(a => a.Sticker.Source).OfType<string>().ToHashSet();
         foreach (var item in Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
-            choices.Add(new StickerChoice(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false));
+            choices.Add(new StickerChoice(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
         var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?"));
         return new SlotGallery(info, current, choices, WearCommand);
     }
@@ -313,6 +321,74 @@ public sealed partial class CharacterEditorViewModel
         else
             next = LookEditing.Wear(character, choice.Library!.Instantiate());
         Apply(EditResult<CharacterDefinition>.Success(next));
+    }
+
+    // ---------------------------------------------------------------- preview expression
+
+    private ExpressionPresetDefinition _previewExpression = ExpressionPresets.Get(ExpressionPreset.Neutral);
+
+    public IRelayCommand<ExpressionPresetChoice> PreviewExpressionCommand { get; private set; } = null!;
+
+    /// <summary>The expression the stage (and the Look galleries) show - only a preview: expressions are set per panel.</summary>
+    public ExpressionPresetDefinition PreviewExpression
+    {
+        get => _previewExpression;
+        set
+        {
+            if (_previewExpression == value)
+                return;
+            _previewExpression = value;
+            OnPropertyChanged();
+            RaisePreviewPoseChanged();
+        }
+    }
+
+    /// <summary>What the stage shows the character in: the previewed view and expression (null at rest, front view and neutral).</summary>
+    public Stanley.ProjectModel.Poses.PoseData? StagePose
+    {
+        get
+        {
+            if (_previewExpression.Preset == ExpressionPreset.Neutral)
+                return null;
+            if (_stagePose is not { } pose || pose.ViewAngle != PreviewAngle || ExpressionPresets.Of(pose) != _previewExpression)
+                _stagePose = ExpressionPresets.Apply(new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new SortedDictionary<string, string>()), _previewExpression);
+            return _stagePose;
+        }
+    }
+
+    private Stanley.ProjectModel.Poses.PoseData? _stagePose;
+
+    /// <summary>Every expression, as a close-up of this character.</summary>
+    public IReadOnlyList<ExpressionPresetChoice> PreviewExpressionChoices
+    {
+        get
+        {
+            var rest = new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new SortedDictionary<string, string>());
+            return ExpressionPresets.All.Select(p => new ExpressionPresetChoice(p, Working, ExpressionPresets.Apply(rest, p), p == _previewExpression)).ToList();
+        }
+    }
+
+    /// <summary>What the previewed expression can't show on this face - "Dots has no wink" - or null.</summary>
+    public string? ExpressionWarning
+    {
+        get
+        {
+            var missing = CharacterLooks.Resolve(Working).Stickers
+                .Where(w => _previewExpression.Variants.TryGetValue(w.Slot, out var v) && v != ExpressionPresets.Neutral && !w.Asset.Sticker.Variants.Contains(v))
+                .Select(w => $"{w.Asset.Sticker.Name} ({StickerSlots.Get(w.Slot).Label.ToLowerInvariant()}) has no \"{_previewExpression.Variants[w.Slot]}\"")
+                .ToList();
+            return missing.Count == 0 ? null : string.Join("; ", missing) + " - showing neutral.";
+        }
+    }
+
+    private void RaisePreviewPoseChanged()
+    {
+        OnPropertyChanged(nameof(StagePose));
+        OnPropertyChanged(nameof(PreviewExpressionChoices));
+        OnPropertyChanged(nameof(ExpressionWarning));
+        OnPropertyChanged(nameof(Hint));
+        OnPropertyChanged(nameof(HairGalleries));
+        OnPropertyChanged(nameof(FaceGalleries));
     }
 
     // ---------------------------------------------------------------- colours
@@ -500,6 +576,32 @@ public sealed partial class CharacterEditorViewModel
 
     public string SelectedStickerName => SelectedSticker?.Sticker.Name ?? "";
 
+    /// <summary>Gaps in the selected sticker's art, said inline: "No side view", "No wink, sad (shows neutral)" - or null.</summary>
+    public string? SelectedStickerWarning
+    {
+        get
+        {
+            if (SelectedSticker is not { HasArt: true } asset)
+                return null;
+            var notes = new List<string>();
+            var variant = asset.Sticker.Variants[0];
+            if (asset.ArtFor(variant, ViewAngle.Profile) is null)
+                notes.Add("No side view (shows the front)");
+            if (asset.ArtFor(variant, ViewAngle.Front) is null)
+                notes.Add("No front view (shows the side)");
+            if (ExpressionPresets.MissingVariants(asset.Sticker) is { Count: > 0 } missing)
+            {
+                var total = ExpressionPresets.Vocabulary[asset.Sticker.Slot].Count;
+                notes.Add(missing.Count >= total - 1 ? "No expressions (always looks the same)"
+                    : missing.Count <= 3 ? $"No {string.Join(", ", missing)} (shows neutral)"
+                    : $"{missing.Count} of {total} expressions missing (they show neutral)");
+            }
+            return notes.Count == 0 ? null : string.Join(". ", notes) + ".";
+        }
+    }
+
+    public bool HasSelectedStickerWarning => SelectedStickerWarning is not null;
+
     public bool HasLength => SelectedSticker is { } s && StickerFitting.LengthPart(s.Sticker) is not null;
     public bool HasSleeves => SelectedSticker is { } s && StickerFitting.SleevePart(s.Sticker) is not null;
     public bool HasFit => SelectedSticker is { } s && StickerFitting.HasCovers(s.Sticker);
@@ -554,6 +656,8 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(SelectedStickerIsWorn));
         OnPropertyChanged(nameof(SelectedWorn));
         OnPropertyChanged(nameof(SelectedStickerName));
+        OnPropertyChanged(nameof(SelectedStickerWarning));
+        OnPropertyChanged(nameof(HasSelectedStickerWarning));
         OnPropertyChanged(nameof(HasLength));
         OnPropertyChanged(nameof(HasSleeves));
         OnPropertyChanged(nameof(HasFit));
@@ -577,6 +681,9 @@ public sealed partial class CharacterEditorViewModel
         if (RefreshColorEditors())
             OnPropertyChanged(nameof(ColorEditors));
         OnPropertyChanged(nameof(WornStickers));
+        OnPropertyChanged(nameof(PreviewExpressionChoices));
+        OnPropertyChanged(nameof(ExpressionWarning));
+        OnPropertyChanged(nameof(Hint));
         RaiseSelectedStickerChanged();
     }
 }

@@ -954,6 +954,9 @@ public sealed class PageCanvasControl : Control
             var poses = new MenuItem { Header = "Pose" };
             poses.ItemsSource = PosePresets.All.Select(preset => Item(preset.Name, () => vm.ApplyPosePreset(characterPanel, index, preset))).ToList();
             items.Add(poses);
+            var expressions = new MenuItem { Header = "Expression" };
+            expressions.ItemsSource = ExpressionPresets.All.Select(preset => Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset))).ToList();
+            items.Add(expressions);
             if (vm.SelectedCharacterIsPosed)
             {
                 items.Add(Item("Mirror pose", () => vm.MirrorCharacterPose(characterPanel, index)));

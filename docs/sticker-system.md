@@ -1,6 +1,6 @@
 # Sticker system — design
 
-**Status: being implemented** — slices 0–4 are built (§15), and §18 records where
+**Status: being implemented** — slices 0–5 are built (§15), and §18 records where
 the code differs from this text. This follows the character authoring POC
 (`docs/character-authoring-poc.md`) and revises the sticker parts of
 `docs/character-and-project-plan.md`. Where the two disagree, this document wins.
@@ -819,3 +819,7 @@ open:
 - **Trunk posing is inverse kinematics** (asked for alongside slice 4): dragging
   the chest or head bends the spine or neck joint by joint, and the upper body's
   outline bends with it (`TrunkBend`), instead of turning the trunk as one board.
+- **Expressions**: applying Neutral removes the face slots from
+  `PoseData.Expression` rather than writing "neutral", so an unposed face stores
+  nothing. The page's Expression gallery is a dropdown of close-ups (the Character
+  tab has no room for twelve more thumbnails beside the poses).

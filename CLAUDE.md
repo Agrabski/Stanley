@@ -572,8 +572,8 @@ body and placement only.
 
 ### Stickers (implemented)
 
-Slices 1–4 of `docs/sticker-system.md` §15 (layered figure, cover stickers,
-fabrics, drawn stickers); expressions, draw-your-own/import and named looks are
+Slices 1–5 of `docs/sticker-system.md` §15 (layered figure, cover stickers,
+fabrics, drawn stickers, expressions); draw-your-own/import and named looks are
 still to come.
 
 - **Model** (ProjectModel/Characters): `Sticker` (slot, `Parts`, default `Colors`
@@ -640,8 +640,19 @@ still to come.
   `CharacterFigure.Closeup`), Clothes, Accessories, and a colour dropdown per colour
   slot in use (swatches, pattern and texture galleries incl. library tiles and
   *Custom…* → `TileImportRequested` → `ImportTile`, size/angle/strength sliders, each
-  drag one undo step). Clicking a worn sticker on the stage opens the contextual
-  **Sticker** tab (fit sliders, take off, remove, stacking).
+  drag one undo step), plus *Preview* (an expression on the stage and in the face
+  galleries — `StagePose`, never a history entry; the status bar says which worn
+  face lacks that variant). Clicking a worn sticker on the stage opens the
+  contextual **Sticker** tab (fit sliders, take off, remove, stacking, and inline
+  notes on missing views or expressions).
+- **Expressions** (`ExpressionPresets`, Stanley.Editing, beside `PosePresets`):
+  twelve presets (Neutral, Happy, Laughing, Sad, Angry, Surprised, Scared,
+  Skeptical, Wink, Talking, Shouting, Asleep), each a variant for eyes, brows and
+  mouth from the standard `Vocabulary`; stored per panel in `PoseData.Expression`
+  (neutral stores nothing; other slots' variants are kept). A sticker without the
+  variant shows its neutral one (`StickerArtPieces.VariantFor`). Page editor:
+  Character tab › Expression dropdown (close-ups of the selected character,
+  `ExpressionChoices`, one undo step) and right-click › Expression.
 
 ## Builds, versioning & releases
 
