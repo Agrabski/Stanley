@@ -44,8 +44,12 @@ nothing platform-specific left to verify beyond the one RID this repo builds.
 
 ## How CI publishes it
 
-The `publish` job packs a Velopack release alongside the existing plain
-`dotnet publish` output for `linux-x64`:
+The `publish` job runs a plain `dotnet publish` for `linux-x64` first (input
+to the packing step below, and what the smoke test runs against), then packs
+it with Velopack - **that pack is the only thing uploaded anywhere**, as the
+`stanley-linux-x64` build artifact (30 days) and, from there, the release
+asset. There's no separate plain archive to publish alongside it and no
+second artifact for someone to download the wrong one by mistake.
 
 - Installs `vpk` (pinned to `1.2.158`, matching the `Velopack` NuGet package
   version `Stanley.App.csproj` references, so the client and the packer
@@ -55,14 +59,10 @@ The `publish` job packs a Velopack release alongside the existing plain
   schedule/`workflow_dispatch` run, exactly matching
   `VelopackUpdateService.ResolveChannel` on the client side.
 - `vpk pack --delta None ...` produces a full package only, no delta patch,
-  uploaded as a short-lived (3-day) `velopack` build artifact - not a
-  release yet, so the packaging step and the upload step (see below) stay
-  independent.
-- The **existing plain `tar.gz` archive is untouched** (still the 30-day
-  `stanley-linux-x64` artifact, still the manual "download it yourself" path
-  `docs/automatic-builds.md` describes) - only the Velopack packaging is new.
+  uploaded as the `stanley-linux-x64` build artifact - not a release yet, so
+  the packaging step and the upload step (see below) stay independent.
 
-A single new `velopack-release` job then downloads the packed output and
+A single `velopack-release` job then downloads that packed output and
 uploads it for real:
 
 - **A stable `vX.Y.Z` release is a fresh tag every time** - `vpk upload
@@ -77,21 +77,48 @@ uploads it for real:
   (that would silently erase delta history every night, defeating half of
   Velopack's point); instead it **prunes the previous nightly package
   first** (`gh release delete-asset`), then uploads the new one - so the
-  release/tag itself is permanent, but doesn't grow without bound. Real
-  delta chains (packing against the previous nightly's package instead of
-  `--delta None`) are a follow-up, not done here: it needs downloading the
-  previous package into the pack step before running `vpk pack`, which is
-  more CI plumbing than this pass covers.
+  release/tag itself is permanent, but doesn't grow without bound. This
+  step also sweeps up any leftover `.tar.gz`/`.zip`: earlier versions of
+  this workflow attached plain archives for three platforms directly to
+  releases, before Velopack existed here, and those are stale now - the
+  live `nightly` release had exactly this leftover clutter until this
+  pruning rule was added. Real delta chains (packing against the previous
+  nightly's package instead of `--delta None`) are a follow-up, not done
+  here: it needs downloading the previous package into the pack step before
+  running `vpk pack`, which is more CI plumbing than this pass covers.
 
-## What to verify on the first real run
+## What's been verified locally, and why only the AppImage ships
 
-The full app-side test suite passes, and `vpk pack` for `linux-x64` was run
-locally and inspected by hand (`Releases/RELEASES-<channel>`, the `.nupkg`,
-and the `.AppImage` all produced correctly). Every `vpk upload github` /
-`gh release delete-asset` call against the real repository is **unverified**
-- watch the first scheduled nightly (or run it manually via
-`workflow_dispatch`) to confirm the upload and pruning steps behave as
-expected against a live GitHub release.
+The full app-side test suite passes. Beyond that, this was tested end to end
+in a Linux sandbox (no real display, but `xvfb-run` stands in for one):
+
+- A plain `dotnet publish` build actually launches the GUI cleanly under
+  Xvfb (logs a normal startup, opens a blank comic, no errors) - so the app
+  itself works on any machine with the usual desktop X11/GL libraries
+  (`libx11-6`, `libice6`, `libsm6`, `libgl1`, …, all standard on any desktop
+  Linux distro).
+- But `Velopack.UpdateManager.IsInstalled` is **`false`** for that same plain
+  build, and `CanCheckForUpdates` requires it - so a build handed out as a
+  bare `dotnet publish` folder (which is what the old `tar.gz` archive was)
+  can never offer updates, no matter what's configured in Options. This is
+  exactly why this workflow no longer produces that archive at all: shipping
+  it alongside the AppImage would silently give most users a copy that can
+  never self-update, with no indication why.
+- Packing the same build with `vpk pack` and running the resulting
+  `.AppImage` instead gives `IsInstalled = true` (`LinuxVelopackLocator`
+  finds its embedded manifest) - confirmed by instrumenting `Program.Main`
+  temporarily and running both builds side by side.
+- The AppImage itself ran and logged a clean startup too, but printed `Error:
+  No suitable fusermount binary found on the $PATH` first (this sandbox has
+  no `libfuse2`) before falling back to extracting and running itself - see
+  "Installing" in `docs/automatic-builds.md` for the one-line fix and why
+  it's safe to ignore either way.
+
+Every `vpk upload github` / `gh release delete-asset` call against the real
+repository is still **unverified** - watch the first scheduled nightly (or
+run it manually via `workflow_dispatch`) to confirm the upload and pruning
+steps behave as expected against a live GitHub release, and that the
+leftover three-platform `.tar.gz`/`.zip` files get cleaned off it.
 
 ## Platform caveat
 

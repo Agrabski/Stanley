@@ -258,26 +258,17 @@ jobs:
             --packTitle Stanley --channel "${{ steps.channel.outputs.channel }}" \
             --delta None --outputDir Releases
 
+      # The only build artifact - no separate plain tar.gz. The AppImage is
+      # what people install and run (see docs/automatic-builds.md); the
+      # .nupkg/RELEASES/*.json alongside it are what Velopack's update feed
+      # needs. Kept 30 days so a specific commit's build stays downloadable
+      # from the run itself, same as before.
       - uses: actions/upload-artifact@v7
         with:
-          name: velopack
+          name: stanley-linux-x64
           path: Releases
           if-no-files-found: error
-          retention-days: 3
-          compression-level: 0
-
-      # tar keeps the executable bit; the artifact zip around it doesn't matter.
-      - name: Archive (tar.gz)
-        shell: bash
-        run: tar -czf "stanley-$VERSION-$RID.tar.gz" -C out "stanley-$VERSION-$RID"
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: stanley-${{ env.RID }}
-          path: stanley-${{ env.VERSION }}-${{ env.RID }}.tar.gz
-          if-no-files-found: error
           retention-days: 30
-          # Already compressed.
           compression-level: 0
 
   # Uploads the Linux build's packed Velopack output: a release was just
@@ -302,7 +293,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: velopack
+          name: stanley-linux-x64
           path: Releases
 
       - name: Install vpk
@@ -331,6 +322,9 @@ jobs:
       # header), so without this its assets would grow by one package every
       # single night forever. Only ever touches the "nightly" release: a stable
       # vX.Y.Z release is a fresh tag every time, so there's nothing to prune.
+      # Also deletes any leftover .tar.gz/.zip - this workflow used to attach
+      # plain archives (three platforms' worth) directly to the release; only
+      # the Velopack package is uploaded now, so any of those are stale.
       - name: Prune yesterday's nightly package
         if: steps.release.outputs.nightly == 'true'
         shell: bash
@@ -338,7 +332,7 @@ jobs:
           set -euo pipefail
           for name in $(gh release view nightly --json assets --jq ".assets[].name" 2>/dev/null || true); do
             case "$name" in
-              *-linux-nightly*|*.linux-nightly.*|RELEASES-linux-nightly)
+              *-linux-nightly*|*.linux-nightly.*|RELEASES-linux-nightly|*.tar.gz|*.zip)
                 gh release delete-asset nightly "$name" --yes || true ;;
             esac
           done

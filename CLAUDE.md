@@ -468,23 +468,27 @@ automatic back-merge) are plumbing and never appear in release notes.
 - **Nightly** (daily 02:00 UTC schedule; at most once a day, and skipped when
   `develop` hasn't moved since the last nightly; a manual run always builds):
   builds and tests `develop`, then a self-contained `dotnet publish` of
-  `src/Stanley.App` for linux-x64 (`stanley-<version>-linux-x64.tar.gz`, ~44 MB),
-  kept as a workflow artifact for 30 days. It's also packed with **Velopack**
-  (`vpk pack`, channel `linux-nightly`) and uploaded to the rolling pre-release
-  tagged `nightly` (**Releases › nightly**) for File › Options › Updates to pick
-  up — see `docs/auto-update.md` for why that release is pruned per-run rather
-  than deleted and recreated (Velopack's update feed needs the release/tag to
-  persist across runs).
+  `src/Stanley.App` for linux-x64, packed with **Velopack** (`vpk pack`,
+  channel `linux-nightly`) into a `.AppImage` — the only thing uploaded, as
+  the `stanley-linux-x64` workflow artifact (30 days) and, from there, to the
+  rolling pre-release tagged `nightly` (**Releases › nightly**) for File ›
+  Options › Updates to pick up. No separate plain archive is built or
+  published — see `docs/auto-update.md` for why (a bare `dotnet publish`
+  folder never registers as installed, so it could never self-update anyway)
+  and for why that release is pruned per-run rather than deleted and
+  recreated (Velopack's update feed needs the release/tag to persist across
+  runs).
 - **Push to `main`**: build + test, and keep **one draft GitHub Release `vX.Y.Z`**
   up to date: the next version and notes (New features / Bug fixes / Breaking
   changes / Other changes, one line per closed issue) for every change PR merged
   since the last published release that `main` now contains.
 - **Releasing = pressing Publish on the draft** (notes can be edited first). That
   creates the `vX.Y.Z` tag; the `release: published` run builds and tests that
-  tag, attaches the `tar.gz` and its Velopack package (channel `linux`), and
-  merges the tag back into `develop` (if that fails — protected branch, conflict
-  — it warns; merge `main` into `develop` by hand). The repo is private, so only
-  collaborators can download releases or nightlies.
+  tag, attaches its `.AppImage` (channel `linux`), and merges the tag back
+  into `develop` (if that fails — protected branch, conflict — it warns; merge
+  `main` into `develop` by hand). The repo is private, so only collaborators
+  can download releases or nightlies. See `docs/automatic-builds.md` for the
+  end-user install/self-update steps.
 - **Version numbers are never written by hand.** MinVer (`Stanley.App.csproj`)
   derives the binaries' version from git tags: a `vX.Y.Z` commit is `X.Y.Z`,
   anything after it is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag

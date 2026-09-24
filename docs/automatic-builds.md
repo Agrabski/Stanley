@@ -29,7 +29,8 @@ Do these once, in the GitHub repository settings:
 ## Getting the builds
 
 The repository is private, so you need to be a collaborator (read access is
-enough) to download anything.
+enough) to download anything. Linux only — Windows and macOS aren't
+supported.
 
 | You want | Where | How often it changes |
 |---|---|---|
@@ -37,19 +38,51 @@ enough) to download anything.
 | **A stable release** | *Releases* › the newest `vX.Y.Z` | When the owner publishes one |
 | **The build of one exact commit** | *Actions* › a run › *Artifacts* | Every nightly and release run; kept for 30 days |
 
-Each release has one file, Linux only — Windows and macOS aren't supported:
+Each release has exactly one thing to download: a `.AppImage` file (built and
+uploaded by `vpk pack`/`vpk upload github` in `.github/workflows/ci.yml` — see
+`docs/auto-update.md`). Nothing else is attached; there's no separate plain
+archive to be confused with it.
 
-- `stanley-<version>-linux-x64.tar.gz`
+## Installing
 
-Unpack it and run `stanley`. Nothing needs installing, because the .NET
-runtime is included. Run `stanley --version` to see which build you have.
+1. Download the `.AppImage` from the release (*Releases › nightly*, or the
+   newest `vX.Y.Z`).
+2. Make it executable and run it:
+   ```sh
+   chmod +x Stanley*.AppImage
+   ./Stanley*.AppImage
+   ```
+   Nothing else needs installing — the .NET runtime is bundled in.
+3. If your system doesn't have `libfuse2` (common on Ubuntu 22.04+/Fedora,
+   which switched to FUSE3 by default), you'll see `Error: No suitable
+   fusermount binary found on the $PATH` printed first. That's harmless — the
+   AppImage falls back to extracting and running itself anyway. To make it go
+   away: `sudo apt install libfuse2t64` (or `libfuse2` on older Ubuntu/Debian)
+   or the equivalent for your distro.
 
-Stanley can also update itself: File › Options › Updates, backed by Velopack
-(each of these releases carries a matching Velopack package alongside the
-archive above). It needs your own GitHub personal access token, since the
-repository is private — see [`docs/auto-update.md`](auto-update.md) for how
-that's stored and how CI publishes the feed it reads. Without a token
-configured, download the file again from the same place instead.
+Run `stanley --version` (or `./Stanley*.AppImage --version`) to see which
+build you have.
+
+## Turning on self-update
+
+File › Options › Updates. Stanley checks this same private repository's
+releases, so it needs your own GitHub personal access token:
+
+1. Create one at *GitHub › Settings › Developer settings › Personal access
+   tokens › Fine-grained tokens*, scoped to just this repository, with
+   **Contents: Read-only** — nothing more is needed.
+2. Paste it into the **GitHub token** field in File › Options › Updates.
+3. Pick a channel: **Stable** (tagged releases only) or **Nightly** (every
+   build from `develop`, for testers).
+4. Turn on **Check for updates automatically**, or press **Check now** any
+   time. When a newer build is found, **Install and restart** downloads and
+   applies it (asking to save first if you have unsaved changes).
+
+This only works when Stanley was launched from the `.AppImage` — that's what
+lets Velopack register the install and safely replace itself. A build run
+straight from a `dotnet publish` output (e.g. one you built yourself) has
+nowhere to install to, so the Updates panel stays inert for it; see
+`docs/auto-update.md` for why.
 
 ## Day to day
 
@@ -74,8 +107,8 @@ configured, download the file again from the same place instead.
      release `vX.Y.Z` up to date under *Releases*. The draft lists the closed
      issues under New features, Bug fixes, Breaking changes and Other changes.
   2. Edit the notes if you like, then press **Publish release**. CI builds that
-     exact version, attaches the Linux archive and its Velopack package, and
-     merges the release back into `develop`.
+     exact version, attaches its `.AppImage`, and merges the release back into
+     `develop`.
   3. If the merge back fails (a conflict or branch protection), the run shows a
      warning. Merge `main` into `develop` by hand.
 - **Urgent fix:** open a PR straight into `main`. It gets counted in the next
