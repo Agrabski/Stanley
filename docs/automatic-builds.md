@@ -49,7 +49,8 @@ see which build you have.
 
 Stanley doesn't update itself yet. To update, download the file again from the
 same place. Self-updating builds (Velopack, a beta channel for testers) are
-planned but not built.
+planned but not built — see [`docs/auto-update.md`](auto-update.md) for what
+that needs and why it isn't started yet.
 
 ## Day to day
 
