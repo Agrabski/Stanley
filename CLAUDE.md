@@ -293,7 +293,35 @@ view. Dirty state is `EditorHistory.IsDirty` (undo-stack top vs. the top at
 edit; New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
 the File view, not modals. OS dialogs sit behind `IFileDialogs`
 (`AvaloniaFileDialogs` for real; tests script a fake). Recent comics:
-`RecentProjects`, a plain text file under the user's app-data folder. Shortcuts:
+`RecentProjects`, a plain text file under the user's app-data folder.
+
+**AutoSave, crash recovery, logging** (all under `AppPaths.DataDirectory` —
+`<AppData>/Stanley`, overridable with `STANLEY_DATA_DIR`, which the headless tests
+point at a temp folder):
+- *AutoSave*: the title-bar switch left of Save (`AutoSaveEnabled`), a persisted
+  preference (`AppSettings`, `settings.txt`, on by default) that only applies once
+  the comic has a folder; switching it on for an untitled comic runs Save As first.
+  Saves `AutoSaveDelay` (2 s) after the last change (debounced), and with it on,
+  New/Open/Close/window-close save instead of prompting. Failures are logged and
+  shown in the title bar, never as a prompt.
+- *Crash recovery* (`RecoveryStore`, `Recovery/<session>/`): each session holds an
+  exclusively-locked `session.lock`; while there are unsaved changes a snapshot
+  (`ComicProject.WriteCopy` — same issue/page ids — written beside the old one then
+  swapped in) plus `info.txt` is kept at most `RecoveryDelay` (5 s) stale. Saving or
+  deliberately discarding clears it; a clean exit (`MainWindowViewModel.EndSession`,
+  from `MainWindow.OnClosed`) deletes the session folder. On start, session folders
+  whose lock can be taken belong to dead processes: their snapshots appear under
+  File › Open › *Recovered* (the File view opens there), with Open
+  (`ComicProject.OpenRecovered`: the snapshot's pages, back at the original folder,
+  marked unsaved) or Discard. An unhandled UI-thread exception writes one last
+  snapshot before the process goes down (`App`).
+- *Logging* (`Diagnostics/AppLog`): `Logs/stanley-yyyy-MM-dd.log`, append-and-close
+  per line (nothing lost in a crash), pruned after 14 days, a no-op until
+  `Initialize` (so the CLI and tests don't log). Records startup environment,
+  every open/save/autosave/export/recovery with failures' exceptions, and all
+  unhandled exceptions (`Program`: AppDomain + unobserved tasks; `App`: UI thread).
+  Timers go through `IDelayScheduler` (`DispatcherDelayScheduler` for real; tests
+  use a manual one). Shortcuts:
 Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S / F12 save as, Alt+F File view,
 Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.

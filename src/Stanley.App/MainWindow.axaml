@@ -23,7 +23,33 @@
       <!-- Title row with the quick access toolbar (Save / Undo / Redo), as in Word. -->
       <Border Name="TitleBar" DockPanel.Dock="Top" Classes="titleBar">
         <Grid ColumnDefinitions="*,Auto,*">
-          <StackPanel Orientation="Horizontal" Margin="6,0,0,0">
+          <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+            <TextBlock Text="AutoSave" Foreground="White" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <ToggleSwitch Name="AutoSaveSwitch" Classes="autoSave" IsChecked="{Binding AutoSaveEnabled}" IsEnabled="{Binding HasDocument}"
+                          OnContent="On" OffContent="Off" ToolTip.Tip="{Binding AutoSaveTip}" Focusable="False">
+              <ToggleSwitch.Resources>
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#26FFFFFF" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#40FFFFFF" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressed" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#E6FFFFFF" />
+                <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#CCFFFFFF" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1E5AA8" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1E5AA8" />
+                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1E5AA8" />
+                <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="White" />
+                <SolidColorBrush x:Key="ToggleSwitchContentForegroundDisabled" Color="#80FFFFFF" />
+                <SolidColorBrush x:Key="ToggleSwitchHeaderForeground" Color="White" />
+              </ToggleSwitch.Resources>
+            </ToggleSwitch>
+            <Rectangle Width="1" Height="16" Fill="#50FFFFFF" Margin="6,0" VerticalAlignment="Center" />
             <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
               <PathIcon Data="{StaticResource SaveIcon}" />
             </Button>

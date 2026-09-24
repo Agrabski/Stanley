@@ -121,17 +121,55 @@ public sealed class ComicProject
             ? new ProjectRepository(Location)
             : ProjectRepository.Initialize(Location, Title, Trim);
 
+        (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: true);
+    }
+
+    /// <summary>
+    /// Writes the comic's current pages as a self-contained project in
+    /// <paramref name="folder"/> without making it the comic's home - the crash-recovery
+    /// snapshot. Same issue and page ids as the real thing, so <see cref="OpenRecovered"/>
+    /// can line it back up with the original folder.
+    /// </summary>
+    public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
+    {
+        var repository = ProjectRepository.Initialize(folder, Title, Trim);
+        WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: false);
+    }
+
+    /// <summary>
+    /// Opens a snapshot written by <see cref="WriteCopy"/> as the comic it was taken from:
+    /// the snapshot's pages, but at <paramref name="originalLocation"/> (so Save goes back
+    /// where the work belongs, pruning against what's actually there) - or untitled if it
+    /// had never been saved, or its folder is gone.
+    /// </summary>
+    public static ComicProject OpenRecovered(string snapshotFolder, string? originalLocation)
+    {
+        var copy = Open(snapshotFolder);
+        if (originalLocation != null && ProjectRepository.IsInitialized(originalLocation))
+        {
+            var original = Open(originalLocation);
+            return new ComicProject(original.Location, copy.Title, original.Trim, copy._issue, copy.Pages, original._pageRecords, original._savedPanels);
+        }
+        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], []);
+    }
+
+    private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
+        ProjectRepository repository,
+        IReadOnlyList<(PageId Id, PageDocument Document)> pages,
+        PageNumbering pageNumbering,
+        bool prune)
+    {
         var manifest = repository.LoadManifest();
         var issueIds = manifest.IssueIds.Contains(_issue.Id) ? manifest.IssueIds : [.. manifest.IssueIds, _issue.Id];
         repository.SaveManifest(manifest with { Title = Title, IssueIds = issueIds });
 
-        _issue = _issue with
+        var issue = _issue with
         {
             PageIds = pages.Select(p => p.Id).ToList(),
             // "Off" is stored as absent, so turning numbers off leaves the file as it was before they existed.
-            PageNumbering = (pageNumbering ?? PageNumbering) is { Position: not PageNumberPosition.None } numbering ? numbering : null
+            PageNumbering = pageNumbering is { Position: not PageNumberPosition.None } ? pageNumbering : null
         };
-        repository.SaveIssue(_issue);
+        repository.SaveIssue(issue);
 
         var records = new Dictionary<PageId, Page>();
         var saved = new Dictionary<PageId, HashSet<PanelId>>();
@@ -141,23 +179,25 @@ public sealed class ComicProject
             var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
             var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, $"Page {i + 1}", TrimOverride: null, []))
                 with { PanelIds = panelIds };
-            repository.SavePage(_issue.Id, record);
+            repository.SavePage(issue.Id, record);
             foreach (var panelId in panelIds)
-                repository.SavePanel(_issue.Id, id, document.Panels[panelId]);
-            if (_savedPanels.TryGetValue(id, out var before))
+                repository.SavePanel(issue.Id, id, document.Panels[panelId]);
+            if (prune && _savedPanels.TryGetValue(id, out var before))
             {
                 foreach (var removed in before.Except(panelIds))
-                    repository.DeletePanel(_issue.Id, id, removed);
+                    repository.DeletePanel(issue.Id, id, removed);
             }
             records[id] = record;
             saved[id] = [.. panelIds];
         }
 
-        foreach (var removedPage in _savedPanels.Keys.Except(saved.Keys))
-            repository.DeletePage(_issue.Id, removedPage);
+        if (prune)
+        {
+            foreach (var removedPage in _savedPanels.Keys.Except(saved.Keys))
+                repository.DeletePage(issue.Id, removedPage);
+        }
 
-        _pageRecords = records;
-        _savedPanels = saved;
+        return (issue, records, saved);
     }
 
     /// <summary>

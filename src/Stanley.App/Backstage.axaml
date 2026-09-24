@@ -6,6 +6,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:app="using:Stanley.App"
+             xmlns:documents="using:Stanley.App.Documents"
              x:Class="Stanley.App.Backstage"
              x:DataType="app:MainWindowViewModel">
   <Grid ColumnDefinitions="200,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
@@ -59,6 +60,34 @@
         <!-- Open -->
         <StackPanel IsVisible="{Binding IsOpenPage}">
           <TextBlock Classes="backstageHeading" Text="Open" />
+
+          <!-- Crash recovery, like Word's Document Recovery pane. -->
+          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="#FFF4E0" BorderBrush="#F0B35A" BorderThickness="1"
+                  CornerRadius="4" Padding="16,12" Margin="0,0,0,24" MaxWidth="720" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Recovered" FontSize="15" FontWeight="SemiBold" />
+              <TextBlock Text="Stanley didn't shut down properly last time. This unsaved work was kept - open it to carry on, then save." TextWrapping="Wrap" FontSize="13" />
+              <ItemsControl Name="RecoveredList" ItemsSource="{Binding RecoveredEntries}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="documents:RecoveredComic">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,4">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                        <TextBlock FontSize="12" Opacity="0.75">
+                          <Run Text="{Binding SavedAtText}" /><Run Text=" · " /><Run Text="{Binding LocationText}" />
+                        </TextBlock>
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="accent" Content="Open" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).OpenRecoveredCommand}" CommandParameter="{Binding}" />
+                      <Button Grid.Column="2" Content="Discard" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).DiscardRecoveredCommand}" CommandParameter="{Binding}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
           <Button Name="BrowseOpenButton" Command="{Binding OpenCommand}" Padding="14,10">
             <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Browse for a comic folder…" /></StackPanel>
           </Button>

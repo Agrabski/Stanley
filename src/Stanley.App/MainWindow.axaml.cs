@@ -20,7 +20,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        ViewModel = viewModel ?? new MainWindowViewModel(new AvaloniaFileDialogs(this), new RecentProjects(RecentProjects.DefaultStorePath));
+        ViewModel = viewModel ?? new MainWindowViewModel(
+            new AvaloniaFileDialogs(this),
+            new RecentProjects(AppPaths.RecentProjectsFile),
+            settings: new AppSettings(AppPaths.SettingsFile),
+            recovery: new RecoveryStore(AppPaths.RecoveryDirectory),
+            scheduler: new DispatcherDelayScheduler());
         DataContext = ViewModel;
         ViewModel.PropertyChanged += (_, e) =>
         {
@@ -84,7 +89,14 @@ public partial class MainWindow : Window
         base.OnKeyDown(e);
     }
 
-    /// <summary>Closing the window with unsaved changes asks first, like Word; Cancel keeps the window open.</summary>
+    /// <summary>The window is gone for good: end the session cleanly, so its recovery data isn't mistaken for a crash next time.</summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        ViewModel.EndSession();
+    }
+
+    /// <summary>Closing the window with unsaved changes asks first, like Word (or just saves, with AutoSave on); Cancel keeps the window open.</summary>
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         if (!_closeConfirmed && ViewModel.IsDirty)

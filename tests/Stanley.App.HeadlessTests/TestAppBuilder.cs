@@ -9,9 +9,13 @@ namespace Stanley.App.HeadlessTests;
 /// </summary>
 public static class TestAppBuilder
 {
-    /// <summary>Builds an AppBuilder configured for headless testing with real Skia rendering.</summary>
-    public static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
+    /// <summary>Builds an AppBuilder configured for headless testing with real Skia rendering. Points Stanley's per-user data (settings, recent list, crash recovery) at a throwaway folder, so tests never touch the real profile.</summary>
+    public static AppBuilder BuildAvaloniaApp()
+    {
+        Environment.SetEnvironmentVariable(AppPaths.DataDirectoryVariable,
+            Path.Combine(Path.GetTempPath(), "stanley-headless-data-" + Guid.NewGuid().ToString("N")));
+        return AppBuilder.Configure<App>()
             .UseSkia()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
+    }
 }

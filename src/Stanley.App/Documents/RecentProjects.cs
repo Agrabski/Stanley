@@ -33,7 +33,7 @@ public sealed class RecentProjects
     }
 
     public static string DefaultStorePath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Stanley", "recent-projects.txt");
+        AppPaths.RecentProjectsFile;
 
     public IReadOnlyList<string> Paths => _paths;
 

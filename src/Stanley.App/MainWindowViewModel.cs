@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Stanley.App.Diagnostics;
 using Stanley.App.Documents;
 using Stanley.Editing;
 using Stanley.EditorFramework;
@@ -31,8 +32,20 @@ public sealed record RecentProjectEntry(string Name, string Path);
 /// </summary>
 public sealed class MainWindowViewModel : ObservableObject
 {
+    /// <summary>How long after the last change AutoSave waits, so a burst of edits is one save, not twenty.</summary>
+    public static readonly TimeSpan AutoSaveDelay = TimeSpan.FromSeconds(2);
+
+    /// <summary>At most this long between a change and its crash-recovery snapshot.</summary>
+    public static readonly TimeSpan RecoveryDelay = TimeSpan.FromSeconds(5);
+
     private readonly IFileDialogs _dialogs;
     private readonly RecentProjects _recent;
+    private readonly AppSettings _settings;
+    private readonly RecoveryStore? _recovery;
+    private readonly IDelayScheduler? _scheduler;
+    private IDisposable? _pendingAutoSave;
+    private IDisposable? _pendingRecovery;
+    private bool _recoveredUnsaved;
     private ComicProject? _project;
     private EditorWorkspace? _workspace;
     private PageNavigatorViewModel? _navigator;
@@ -42,10 +55,22 @@ public sealed class MainWindowViewModel : ObservableObject
     private MetricPaperSize _newPaperSize = MetricPaperSize.A4;
     private string? _message;
 
-    public MainWindowViewModel(IFileDialogs dialogs, RecentProjects recent, bool startWithBlankComic = true)
+    /// <param name="settings">User preferences (AutoSave); in-memory defaults if null.</param>
+    /// <param name="recovery">Crash recovery; none if null.</param>
+    /// <param name="scheduler">Runs AutoSave and recovery snapshots after a delay; without one, neither runs on its own (tests drive them directly).</param>
+    public MainWindowViewModel(
+        IFileDialogs dialogs,
+        RecentProjects recent,
+        bool startWithBlankComic = true,
+        AppSettings? settings = null,
+        RecoveryStore? recovery = null,
+        IDelayScheduler? scheduler = null)
     {
         _dialogs = dialogs;
         _recent = recent;
+        _settings = settings ?? new AppSettings(null);
+        _recovery = recovery;
+        _scheduler = scheduler;
 
         OpenBackstageCommand = new RelayCommand<BackstagePage?>(page => ShowBackstage(page ?? (HasDocument ? BackstagePage.Info : BackstagePage.New)));
         CloseBackstageCommand = new RelayCommand(() => IsBackstageOpen = false, () => HasDocument);
@@ -59,12 +84,30 @@ public sealed class MainWindowViewModel : ObservableObject
         ExportPngCommand = new AsyncRelayCommand(() => ExportAsync("png"), () => HasDocument);
         UndoCommand = new RelayCommand(() => _workspace?.History.Undo(), () => _workspace?.History.CanUndo ?? false);
         RedoCommand = new RelayCommand(() => _workspace?.History.Redo(), () => _workspace?.History.CanRedo ?? false);
+        OpenRecoveredCommand = new AsyncRelayCommand<RecoveredComic>(comic => comic is null ? Task.CompletedTask : OpenRecoveredAsync(comic));
+        DiscardRecoveredCommand = new RelayCommand<RecoveredComic>(comic =>
+        {
+            if (comic is null)
+                return;
+            _recovery?.Discard(comic);
+            AppLog.Info($"Discarded recovered work \"{comic.Title}\" from {comic.SavedAtText}.");
+            RefreshRecovered();
+        });
 
         RefreshRecent();
+        _recovery?.StartSession();
         if (startWithBlankComic)
             Load(ComicProject.CreateNew(_newPaperSize));
         else
             ShowBackstage(BackstagePage.New);
+
+        // Unsaved work from a session that crashed: say so up front, like Word's Document Recovery.
+        RefreshRecovered();
+        if (HasRecovered)
+        {
+            AppLog.Warn($"Found {RecoveredEntries.Count} recovered comic(s) from a session that didn't shut down properly.");
+            ShowBackstage(BackstagePage.Open);
+        }
     }
 
     // ---------------------------------------------------------------- document state
@@ -77,8 +120,158 @@ public sealed class MainWindowViewModel : ObservableObject
     public PageEditorViewModel? Editor => _navigator?.CurrentPage.Editor;
     public bool HasDocument => _project is not null;
 
-    /// <summary>Unsaved edits (anything undoable since the last save) or an unsaved title change.</summary>
-    public bool IsDirty => HasDocument && ((_workspace?.History.IsDirty ?? false) || _titleDirty);
+    /// <summary>Unsaved edits (anything undoable since the last save), an unsaved title change, or recovered work not yet saved back.</summary>
+    public bool IsDirty => HasDocument && ((_workspace?.History.IsDirty ?? false) || _titleDirty || _recoveredUnsaved);
+
+    // ---------------------------------------------------------------- AutoSave
+
+    /// <summary>
+    /// The title bar's AutoSave switch: a remembered preference, on by default. It saves a
+    /// moment after each change once the comic has a folder; switching it on for a comic
+    /// that has never been saved asks where to save it first (and stays off if that's
+    /// cancelled), like Word.
+    /// </summary>
+    public bool AutoSaveEnabled
+    {
+        get => _settings.AutoSave && !(_project?.IsUntitled ?? false);
+        set
+        {
+            if (value == AutoSaveEnabled)
+                return;
+            if (value && _project is { IsUntitled: true })
+            {
+                OnPropertyChanged(); // stays off until the first save succeeds
+                _ = EnableAutoSaveForUntitledAsync();
+                return;
+            }
+            SetAutoSavePreference(value);
+        }
+    }
+
+    private async Task EnableAutoSaveForUntitledAsync()
+    {
+        if (await SaveAsAsync())
+            SetAutoSavePreference(true);
+    }
+
+    private void SetAutoSavePreference(bool on)
+    {
+        _settings.AutoSave = on;
+        AppLog.Info($"AutoSave turned {(on ? "on" : "off")}.");
+        OnPropertyChanged(nameof(AutoSaveEnabled));
+        OnPropertyChanged(nameof(AutoSaveTip));
+        if (on && IsDirty)
+            ScheduleBackgroundSaves();
+    }
+
+    public string AutoSaveTip => _project is { IsUntitled: true }
+        ? "AutoSave - switch on to pick a folder for this comic; after that every change is saved automatically."
+        : AutoSaveEnabled
+            ? "AutoSave is on: changes are saved a moment after you make them."
+            : "AutoSave is off: save with Ctrl+S.";
+
+    /// <summary>Saves now if AutoSave is on and there's anything to save; failures are logged and shown, never prompted. Called by the timer (and by tests).</summary>
+    public void AutoSaveNow()
+    {
+        _pendingAutoSave = null;
+        if (!AutoSaveEnabled || !IsDirty || _project is null || _navigator is null)
+            return;
+
+        try
+        {
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering);
+            AppLog.Info($"AutoSaved \"{DocumentTitle}\" to {_project.Location}.");
+            MarkSaved();
+        }
+        catch (Exception e) when (IsFileProblem(e))
+        {
+            AppLog.Error($"AutoSave of \"{DocumentTitle}\" to {_project.Location} failed.", e);
+            Message = $"AutoSave failed: {e.Message}";
+        }
+    }
+
+    // ---------------------------------------------------------------- crash recovery
+
+    public ObservableCollection<RecoveredComic> RecoveredEntries { get; } = [];
+
+    public bool HasRecovered => RecoveredEntries.Count > 0;
+
+    public IAsyncRelayCommand<RecoveredComic> OpenRecoveredCommand { get; }
+    public IRelayCommand<RecoveredComic> DiscardRecoveredCommand { get; }
+
+    /// <summary>Writes the crash-recovery snapshot now if there's unsaved work. Called by the timer, before an unhandled crash takes the process down, and by tests.</summary>
+    public void WriteRecoverySnapshot()
+    {
+        _pendingRecovery = null;
+        if (_recovery is null || _project is null || _navigator is null || !IsDirty)
+            return;
+
+        try
+        {
+            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering);
+        }
+        catch (Exception e) when (IsFileProblem(e))
+        {
+            AppLog.Error("Couldn't write the crash-recovery snapshot.", e);
+        }
+    }
+
+    /// <summary>Opens recovered work as the current comic: back at its original folder if it had one (so Save puts it where it belongs), with unsaved changes pending.</summary>
+    public async Task OpenRecoveredAsync(RecoveredComic comic)
+    {
+        if (!await ConfirmDiscardAsync())
+            return;
+
+        try
+        {
+            var project = ComicProject.OpenRecovered(comic.SnapshotDirectory, comic.OriginalLocation);
+            Load(project);
+            _recoveredUnsaved = true;
+            AppLog.Info($"Opened recovered work \"{comic.Title}\" from {comic.SavedAtText} (originally {comic.LocationText}).");
+            // It's in this session's hands now: snapshot it here before dropping the old copy.
+            WriteRecoverySnapshot();
+            _recovery?.Discard(comic);
+            RefreshRecovered();
+            RaiseDocumentChanged();
+            ScheduleBackgroundSaves();
+        }
+        catch (Exception e) when (IsFileProblem(e))
+        {
+            AppLog.Error($"Couldn't open recovered work from {comic.SnapshotDirectory}.", e);
+            ShowError($"Couldn't open the recovered comic: {e.Message}");
+        }
+    }
+
+    /// <summary>Clean shutdown: nothing is left to recover. (A crash never gets here, which is the point.)</summary>
+    public void EndSession()
+    {
+        _pendingAutoSave?.Dispose();
+        _pendingRecovery?.Dispose();
+        _recovery?.Dispose();
+        AppLog.Info("Session ended cleanly.");
+    }
+
+    private void RefreshRecovered()
+    {
+        RecoveredEntries.Clear();
+        foreach (var comic in _recovery?.FindAbandoned() ?? [])
+            RecoveredEntries.Add(comic);
+        OnPropertyChanged(nameof(HasRecovered));
+    }
+
+    /// <summary>After any change: AutoSave (debounced - each change restarts the wait) and a recovery snapshot (throttled - at most one pending).</summary>
+    private void ScheduleBackgroundSaves()
+    {
+        if (_scheduler is null || !IsDirty)
+            return;
+
+        if (AutoSaveEnabled)
+        {
+            _pendingAutoSave?.Dispose();
+            _pendingAutoSave = _scheduler.Schedule(AutoSaveDelay, AutoSaveNow);
+        }
+        _pendingRecovery ??= _scheduler.Schedule(RecoveryDelay, WriteRecoverySnapshot);
+    }
 
     public string WindowTitle => HasDocument ? $"{DocumentTitle}{(IsDirty ? " •" : "")} - Stanley" : "Stanley";
 
@@ -99,6 +292,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _project.Title = value.Trim();
             _titleDirty = true;
             RaiseDocumentChanged();
+            ScheduleBackgroundSaves();
         }
     }
 
@@ -256,9 +450,11 @@ public sealed class MainWindowViewModel : ObservableObject
             Load(project);
             _recent.Add(project.Location!);
             RefreshRecent();
+            AppLog.Info($"Opened \"{project.Title}\" from {project.Location} ({project.Pages.Count} pages).");
         }
         catch (Exception e) when (IsFileProblem(e))
         {
+            AppLog.Error($"Couldn't open {folder}.", e);
             ShowError($"Couldn't open \"{folder}\": {e.Message}");
         }
     }
@@ -274,11 +470,13 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             _project.Save(_navigator.Snapshot(), _navigator.PageNumbering);
+            AppLog.Info($"Saved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
             return true;
         }
         catch (Exception e) when (IsFileProblem(e))
         {
+            AppLog.Error($"Saving \"{DocumentTitle}\" to {_project.Location} failed.", e);
             ShowError($"Couldn't save: {e.Message}");
             return false;
         }
@@ -296,12 +494,16 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering);
+            AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             MarkSaved();
             Message = $"Saved to {saved}";
+            OnPropertyChanged(nameof(AutoSaveEnabled)); // no longer untitled - AutoSave can apply
+            OnPropertyChanged(nameof(AutoSaveTip));
             return true;
         }
         catch (Exception e) when (IsFileProblem(e))
         {
+            AppLog.Error($"Save As of \"{DocumentTitle}\" to {folder} failed.", e);
             ShowError($"Couldn't save: {e.Message}");
             return false;
         }
@@ -338,10 +540,12 @@ public sealed class MainWindowViewModel : ObservableObject
             else
                 ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio);
             Message = $"Exported to {path}";
+            AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
         }
         catch (Exception e) when (IsFileProblem(e))
         {
+            AppLog.Error($"Export to {path} failed.", e);
             ShowError($"Couldn't export: {e.Message}");
         }
     }
@@ -351,6 +555,14 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (!IsDirty)
             return true;
+
+        // With AutoSave on there's nothing to ask - just save, as Word does.
+        if (AutoSaveEnabled)
+        {
+            AutoSaveNow();
+            if (!IsDirty)
+                return true;
+        }
 
         return await _dialogs.AskSaveChangesAsync(DocumentTitle) switch
         {
@@ -365,6 +577,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private void Load(ComicProject project)
     {
         Unload();
+        AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
         (_workspace, _navigator) = PageEditorHost.CreateWorkspace(project);
         _workspace.History.PropertyChanged += OnHistoryChanged;
@@ -389,6 +602,12 @@ public sealed class MainWindowViewModel : ObservableObject
         _workspace = null;
         _navigator = null;
         _titleDirty = false;
+        _recoveredUnsaved = false;
+        _pendingAutoSave?.Dispose();
+        _pendingAutoSave = null;
+        _pendingRecovery?.Dispose();
+        _pendingRecovery = null;
+        _recovery?.Clear(); // the comic is being put down on purpose - saved or deliberately discarded
         RaiseDocumentChanged();
         OnPropertyChanged(nameof(Workspace));
         OnPropertyChanged(nameof(Editor));
@@ -400,6 +619,8 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         _workspace?.History.MarkSaved();
         _titleDirty = false;
+        _recoveredUnsaved = false;
+        _recovery?.Clear();
         Message = null;
         if (_project?.Location is { } location)
             _recent.Add(location);
@@ -411,6 +632,8 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (e.PropertyName is nameof(EditorHistory.IsDirty))
             RaiseDocumentChanged();
+        if (e.PropertyName is nameof(EditorHistory.CanUndo))
+            ScheduleBackgroundSaves(); // every edit, undo and redo passes through here
         if (e.PropertyName is nameof(EditorHistory.CanUndo))
             OnPropertyChanged(nameof(PanelCountText)); // every edit, undo and redo passes through here
         if (e.PropertyName is nameof(EditorHistory.CanUndo) or nameof(EditorHistory.CanRedo))
@@ -434,6 +657,8 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LocationText));
         OnPropertyChanged(nameof(PageSizeText));
         OnPropertyChanged(nameof(PanelCountText));
+        OnPropertyChanged(nameof(AutoSaveEnabled));
+        OnPropertyChanged(nameof(AutoSaveTip));
         CloseBackstageCommand.NotifyCanExecuteChanged();
         SaveCommand.NotifyCanExecuteChanged();
         SaveAsCommand.NotifyCanExecuteChanged();

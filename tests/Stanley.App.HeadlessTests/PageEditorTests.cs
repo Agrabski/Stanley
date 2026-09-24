@@ -453,6 +453,26 @@ public class PageEditorTests
         Assert.Same(window.Editor, GetPageCanvasControl(window)!.ViewModel);
     }
 
+    /// <summary>The AutoSave switch sits in the title bar right before the Save button, and is off for a comic that has never been saved.</summary>
+    [Fact]
+    public void AutoSaveSwitch_SitsNextToSave_AndIsOffUntilTheComicIsSaved()
+    {
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>().Single(t => t.Name == "AutoSaveSwitch");
+        var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "QuickSaveButton");
+
+        var toggleRight = toggle.TranslatePoint(new Point(toggle.Bounds.Width, 0), window)!.Value.X;
+        var saveLeft = save.TranslatePoint(new Point(0, 0), window)!.Value.X;
+        Assert.InRange(saveLeft - toggleRight, 0, 24);
+        Assert.Equal(toggle.TranslatePoint(new Point(0, toggle.Bounds.Height / 2), window)!.Value.Y,
+            save.TranslatePoint(new Point(0, save.Bounds.Height / 2), window)!.Value.Y, 2);
+
+        Assert.True(window.ViewModel.Project!.IsUntitled);
+        Assert.False(toggle.IsChecked);
+    }
+
     private sealed class ScriptedDialogs(string folder) : Stanley.App.Documents.IFileDialogs
     {
         public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(folder);
