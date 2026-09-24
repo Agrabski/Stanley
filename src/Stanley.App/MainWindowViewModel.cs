@@ -19,7 +19,8 @@ public enum BackstagePage
     Open,
     Info,
     SaveAs,
-    Export
+    Export,
+    Options
 }
 
 public sealed record RecentProjectEntry(string Name, string Path);
@@ -71,6 +72,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _settings = settings ?? new AppSettings(null);
         _recovery = recovery;
         _scheduler = scheduler;
+        ThemeSwitcher.Apply(_settings.Theme);
 
         OpenBackstageCommand = new RelayCommand<BackstagePage?>(page => ShowBackstage(page ?? (HasDocument ? BackstagePage.Info : BackstagePage.New)));
         CloseBackstageCommand = new RelayCommand(() => IsBackstageOpen = false, () => HasDocument);
@@ -122,6 +124,30 @@ public sealed class MainWindowViewModel : ObservableObject
 
     /// <summary>Unsaved edits (anything undoable since the last save), an unsaved title change, or recovered work not yet saved back.</summary>
     public bool IsDirty => HasDocument && ((_workspace?.History.IsDirty ?? false) || _titleDirty || _recoveredUnsaved);
+
+    // ---------------------------------------------------------------- appearance
+
+    /// <summary>File &gt; Options &gt; Appearance: light, dark, or follow the system. Remembered, and applied straight away.</summary>
+    public AppTheme Theme
+    {
+        get => _settings.Theme;
+        set
+        {
+            if (value == _settings.Theme)
+                return;
+            _settings.Theme = value;
+            AppLog.Info($"Theme set to {value}.");
+            ThemeSwitcher.Apply(value);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsSystemTheme));
+            OnPropertyChanged(nameof(IsLightTheme));
+            OnPropertyChanged(nameof(IsDarkTheme));
+        }
+    }
+
+    public bool IsSystemTheme { get => Theme == AppTheme.System; set { if (value) Theme = AppTheme.System; } }
+    public bool IsLightTheme { get => Theme == AppTheme.Light; set { if (value) Theme = AppTheme.Light; } }
+    public bool IsDarkTheme { get => Theme == AppTheme.Dark; set { if (value) Theme = AppTheme.Dark; } }
 
     // ---------------------------------------------------------------- AutoSave
 
@@ -357,6 +383,7 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(IsInfoPage));
             OnPropertyChanged(nameof(IsSaveAsPage));
             OnPropertyChanged(nameof(IsExportPage));
+            OnPropertyChanged(nameof(IsOptionsPage));
         }
     }
 
@@ -365,6 +392,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public bool IsInfoPage { get => BackstagePage == BackstagePage.Info; set => SetPageFlag(BackstagePage.Info, value); }
     public bool IsSaveAsPage { get => BackstagePage == BackstagePage.SaveAs; set => SetPageFlag(BackstagePage.SaveAs, value); }
     public bool IsExportPage { get => BackstagePage == BackstagePage.Export; set => SetPageFlag(BackstagePage.Export, value); }
+    public bool IsOptionsPage { get => BackstagePage == BackstagePage.Options; set => SetPageFlag(BackstagePage.Options, value); }
 
     private void SetPageFlag(BackstagePage page, bool value)
     {

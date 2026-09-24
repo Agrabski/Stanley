@@ -26,7 +26,8 @@ public sealed record PageCanvasScene(
     Rect2D? RubberBand,
     bool RubberBandIsBubble,
     bool ShowMarginGuides = true,
-    PageFolio? Folio = null);
+    PageFolio? Folio = null,
+    bool DarkChrome = false);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -39,6 +40,9 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
     public const float TailBaseHalfWidthMm = PageRenderer.TailBaseHalfWidthMm;
 
     private static readonly SKColor Pasteboard = new(0xDD, 0xDF, 0xE3);
+
+    /// <summary>The desk around the page in dark mode. The page itself stays white - it's paper, and the print is what's being judged.</summary>
+    private static readonly SKColor DarkPasteboard = new(0x2B, 0x2D, 0x31);
     private static readonly SKColor Accent = new(0x25, 0x7A, 0xE8);
     private static readonly SKColor TailHandle = new(0xF5, 0x8A, 0x07);
     private static readonly SKColor GuideColor = new(0xE0, 0x2F, 0x8C);
@@ -72,7 +76,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
         canvas.Save();
         canvas.ClipRect(new SKRect(0, 0, (float)_bounds.Width, (float)_bounds.Height));
-        canvas.DrawColor(Pasteboard);
+        canvas.DrawColor(_scene.DarkChrome ? DarkPasteboard : Pasteboard);
 
         canvas.Save();
         canvas.Translate((float)_scene.Offset.X, (float)_scene.Offset.Y);

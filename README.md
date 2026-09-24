@@ -36,6 +36,12 @@ the rest of the limb follows (inverse kinematics). A library of ready-made poses
 and expressions will be included. A 3D backend (glTF/VRM with toon shading) may
 come later behind the same interfaces.
 
+## Builds and releases
+
+Test builds come out nightly and releases are made automatically; see
+[Automatic builds and releases](docs/automatic-builds.md) for the one-time
+setup, where to download builds, and how versions are chosen.
+
 ## Licence
 
 Stanley is released under the [GNU Affero General Public License v3.0](LICENSE).

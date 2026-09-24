@@ -2,6 +2,14 @@ using System.Globalization;
 
 namespace Stanley.App.Documents;
 
+/// <summary>Light or dark UI. <see cref="System"/> follows the operating system's setting, so most people never need to touch it.</summary>
+public enum AppTheme
+{
+    System,
+    Light,
+    Dark
+}
+
 /// <summary>
 /// Per-user preferences, as <c>key=value</c> lines (trivially AOT-safe, readable by hand).
 /// Unknown keys are kept, so an older version doesn't drop a newer one's settings. A
@@ -40,6 +48,15 @@ public sealed class AppSettings
     {
         get => !_values.TryGetValue(nameof(AutoSave), out var value) || !bool.TryParse(value, out var on) || on;
         set => Set(nameof(AutoSave), value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Light or dark UI; follows the system unless changed.</summary>
+    public AppTheme Theme
+    {
+        get => _values.TryGetValue(nameof(Theme), out var value) && Enum.TryParse<AppTheme>(value, ignoreCase: true, out var theme) && Enum.IsDefined(theme)
+            ? theme
+            : AppTheme.System;
+        set => Set(nameof(Theme), value.ToString());
     }
 
     private void Set(string key, string value)

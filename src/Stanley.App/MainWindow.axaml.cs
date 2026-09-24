@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Stanley.App.Documents;
 using Stanley.EditorFramework;
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
         Bind(Key.N, KeyModifiers.Control, ViewModel.NewCommand);
         Bind(Key.O, KeyModifiers.Control, ViewModel.OpenBackstageCommand, BackstagePage.Open);
         Bind(Key.F, KeyModifiers.Alt, ViewModel.OpenBackstageCommand);
+        AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
     }
 
     public MainWindowViewModel ViewModel { get; }
@@ -78,15 +80,18 @@ public partial class MainWindow : Window
         EditorDock.IsVisible = workspace != null;
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    /// <summary>
+    /// Escape leaves the File view. Handled on the way down (tunnel), because the page
+    /// canvas under the File view can still have keyboard focus and would otherwise take
+    /// Escape for itself (deselect) before the window ever saw it.
+    /// </summary>
+    private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape && ViewModel.IsBackstageOpen && ViewModel.HasDocument)
         {
             ViewModel.IsBackstageOpen = false;
             e.Handled = true;
-            return;
         }
-        base.OnKeyDown(e);
     }
 
     /// <summary>The window is gone for good: end the session cleanly, so its recovery data isn't mistaken for a crash next time.</summary>

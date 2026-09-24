@@ -386,7 +386,8 @@ public class PageEditorTests
     {
         var window = new MainWindow();
         window.Show();
-        GetPageCanvasControl(window);
+        var canvas = GetPageCanvasControl(window)!;
+        canvas.Focus(); // the page keeps focus under the File view, and handles Escape itself
         var file = window.RibbonBarControl.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FileButton");
 
         file.Command!.Execute(file.CommandParameter);
@@ -426,6 +427,35 @@ public class PageEditorTests
         {
             if (Directory.Exists(folder))
                 Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>File &gt; Options &gt; Dark switches the whole app, Stanley's own chrome colours included, and back again.</summary>
+    [Fact]
+    public void DarkTheme_AppliesToTheApp_AndTheTitleBarFollows()
+    {
+        var app = Application.Current!;
+        try
+        {
+            var window = new MainWindow(new MainWindowViewModel(new ScriptedDialogs(Path.GetTempPath()), new Stanley.App.Documents.RecentProjects(null)));
+            window.Show();
+            var titleBar = window.FindControl<Border>("TitleBar")!;
+            var lightBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+
+            window.ViewModel.IsDarkTheme = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(Avalonia.Styling.ThemeVariant.Dark, app.ActualThemeVariant);
+            var darkBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+            Assert.NotEqual(lightBrush, darkBrush);
+
+            window.ViewModel.IsLightTheme = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(lightBrush, ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color);
+        }
+        finally
+        {
+            app.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Default;
         }
     }
 
