@@ -12,6 +12,12 @@ bloat that file.
 These directions came out of design discussions. Treat them as the working
 plan unless the user says otherwise.
 
+> **Stickers are revised in [`sticker-system.md`](sticker-system.md)**, which
+> wins where the two differ. The main changes: clothing is generated from the
+> body ("cover" parts) instead of drawn per bone; drawn art is mapped from region
+> templates (Pin/Warp) instead of rigidly attached to a bone; `stretch.json`/9-slice
+> is dropped; and the per-slot catalogue on the definition becomes a folder scan.
+
 ### Three-layer model — keep these separate
 - **CharacterDefinition**: the "wardrobe" — a 2D skeleton (VRM humanoid bone
   set) with a **per-view-angle rest layout** (front/three-quarter/profile are
@@ -62,6 +68,10 @@ plan unless the user says otherwise.
   core. Its output isn't repeatable and characters drift between panels.
 
 ### Body type / build
+
+*(Superseded for stickers by `sticker-system.md`: covers follow `build` and the
+other body sliders automatically, drawn art uses Warp, and build breakpoints stay
+designed but unbuilt.)*
 - **`build`** is a continuous character parameter (0–1, slim → heavy),
   stored as a skeleton proportion override at the **Revision** level —
   same tier as aging/redesigns — with a sparse per-instance override

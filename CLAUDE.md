@@ -43,7 +43,8 @@ snapping, page navigator) all exist. The GUI opens/saves real project folders (t
 pages of one issue for now — see "Documents" below). Characters exist as a
 **POC** (sliders + a generated flat mannequin, front or side view, placed on
 panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
-see "Characters (POC, implemented)" below); no stickers or three-quarter view yet.
+see "Characters (POC, implemented)" below); no stickers or three-quarter view yet
+(stickers are designed in `docs/sticker-system.md`, not implemented).
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -175,11 +176,9 @@ features will read and write.
   preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
   (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
   not its own preset table entry, since bleed isn't part of a paper size).
-- **Not yet designed**: `sticker.json`'s exact schema beyond what's
-  implemented here (the design doc doesn't draw one explicitly), any
-  convenience "create new project/character/issue" helpers beyond
-  `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and NativeAOT
-  publish validation (analyzer-clean under `IsAotCompatible`, not yet
+- **Not yet designed**: any convenience "create new project/character/issue"
+  helpers beyond `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and
+  NativeAOT publish validation (analyzer-clean under `IsAotCompatible`, not yet
   published via a real `PublishAot` executable).
 
 ## Editor architecture
@@ -469,6 +468,16 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 [`docs/character-and-project-plan.md`](docs/character-and-project-plan.md) —
 that file is the plan, not implemented yet; this section stays the short
 summary.
+
+The **sticker system** (hair, faces, clothes, accessories, expressions) is
+designed in [`docs/sticker-system.md`](docs/sticker-system.md) (proposed, not
+implemented, and it wins over the plan where they differ): stickers are made
+of parts that either *cover* a body region (generated from the rig, so clothing
+follows every slider, pose and view with no art) or place SVG *art* drawn over
+a region template (Pin = rigid, Warp = hugs the outline); the figure draws in
+depth groups; colours are character-owned slots referenced by name; expressions
+are per-slot variants from a standard vocabulary. Its §17 lists the decisions
+awaiting sign-off.
 
 ### Characters (POC, implemented)
 
