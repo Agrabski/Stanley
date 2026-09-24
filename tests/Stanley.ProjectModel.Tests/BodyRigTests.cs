@@ -92,6 +92,19 @@ public class BodyRigTests
     }
 
     [Fact]
+    public void Facing_right_the_characters_own_right_side_is_nearest_the_viewer()
+    {
+        var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Profile);
+        Point2D Joint(HumanoidBone bone) => figure.Layout.Bones.Single(b => b.Bone == bone).Position;
+
+        var nearArm = figure.NearLimbs[0];
+        Assert.Equal(Joint(HumanoidBone.RightUpperArm), nearArm.From);
+        Assert.Equal(Joint(HumanoidBone.RightHand), figure.NearLimbs[1].To);
+        Assert.DoesNotContain(figure.NearLimbs, l => l.From == Joint(HumanoidBone.LeftUpperArm));
+        Assert.True(Joint(HumanoidBone.RightUpperLeg).X > Joint(HumanoidBone.LeftUpperLeg).X, "the far (left) leg is set back");
+    }
+
+    [Fact]
     public void In_the_side_view_weight_shows_as_depth_and_the_front_view_width_is_unchanged_by_it()
     {
         var slim = BodyRig.Extent(BodyShape.Default with { Build = 0 }, ViewAngle.Profile);
@@ -105,7 +118,7 @@ public class BodyRigTests
     public void A_skeleton_override_only_applies_to_its_own_view()
     {
         var raisedHand = new Point2D(0.3, -1.1);
-        var overrides = new Skeleton([new ViewAngleRestLayout(ViewAngle.Profile, [new BoneRestPose(HumanoidBone.LeftHand, raisedHand)])]);
+        var overrides = new Skeleton([new ViewAngleRestLayout(ViewAngle.Profile, [new BoneRestPose(HumanoidBone.RightHand, raisedHand)])]);
 
         Assert.Contains(BodyRig.Build(BodyShape.Default, ViewAngle.Profile, overrides).NearLimbs, l => l.To == raisedHand);
         Assert.DoesNotContain(BodyRig.Build(BodyShape.Default, ViewAngle.Front, overrides).Limbs, l => l.To == raisedHand);
@@ -224,12 +237,12 @@ public class BodyRigTrunkTests
     public void Hands_lie_along_the_forearm_and_a_lifted_foot_tips_with_its_shin_while_a_planted_one_stays_flat()
     {
         var pose = new Poses.PoseData(ViewAngle.Profile,
-            [new Poses.BoneRotation(HumanoidBone.LeftUpperArm, -90), new Poses.BoneRotation(HumanoidBone.LeftUpperLeg, -40), new Poses.BoneRotation(HumanoidBone.LeftLowerLeg, 60)], []);
+            [new Poses.BoneRotation(HumanoidBone.RightUpperArm, -90), new Poses.BoneRotation(HumanoidBone.RightUpperLeg, -40), new Poses.BoneRotation(HumanoidBone.RightLowerLeg, 60)], []);
         var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Profile, null, pose);
 
         var hand = figure.NearBlobs[0];
-        var elbow = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.LeftLowerArm).Position;
-        var wrist = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.LeftHand).Position;
+        var elbow = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.RightLowerArm).Position;
+        var wrist = figure.Layout.Bones.Single(b => b.Bone == HumanoidBone.RightHand).Position;
         var forearm = Math.Atan2(wrist.Y - elbow.Y, wrist.X - elbow.X) * 180 / Math.PI;
         Assert.Equal(forearm - 90, hand.RotationDegrees, 6);
 

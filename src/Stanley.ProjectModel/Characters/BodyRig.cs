@@ -312,9 +312,11 @@ public static class BodyRig
 
     /// <summary>
     /// Facing +x. The body's width becomes its depth: chest (muscle, and a "V" frame),
-    /// belly (weight), seat (weight, and an "A" frame). The near (left) arm and foot are
-    /// drawn on top of the body as their own shape; the legs merge into it, the far one
-    /// set back a little so both feet show.
+    /// belly (weight), seat (weight, and an "A" frame). Facing right, the character's own
+    /// right side is the one nearest the viewer (as it would be for a real person), so the
+    /// right arm and foot are drawn on top of the body as their own shape; the legs merge
+    /// into it, the far (left) one set back a little so both feet show. A mirrored
+    /// placement is a mirror image of this, not the character turned around.
     /// </summary>
     private static BodyFigure BuildProfile(Measures m, Skeleton? overrides, PoseData? pose)
     {
@@ -340,20 +342,20 @@ public static class BodyRig
         var farLeg = new Point2D(-w * 0.2, 0);
 
         var bones = Spine(m, w * 0.02);
-        bones.Add(new(HumanoidBone.LeftShoulder, new Point2D(0, m.ShoulderY)));
-        bones.Add(new(HumanoidBone.LeftUpperArm, nearShoulder));
-        bones.Add(new(HumanoidBone.LeftLowerArm, nearElbow));
-        bones.Add(new(HumanoidBone.LeftHand, nearWrist));
-        bones.Add(new(HumanoidBone.LeftUpperLeg, nearHip));
-        bones.Add(new(HumanoidBone.LeftLowerLeg, nearKnee));
-        bones.Add(new(HumanoidBone.LeftFoot, nearAnkle));
-        bones.Add(new(HumanoidBone.RightShoulder, Offset(new Point2D(0, m.ShoulderY), farOffset)));
-        bones.Add(new(HumanoidBone.RightUpperArm, Offset(nearShoulder, farOffset)));
-        bones.Add(new(HumanoidBone.RightLowerArm, Offset(nearElbow, farOffset)));
-        bones.Add(new(HumanoidBone.RightHand, Offset(nearWrist, farOffset)));
-        bones.Add(new(HumanoidBone.RightUpperLeg, Offset(nearHip, farLeg)));
-        bones.Add(new(HumanoidBone.RightLowerLeg, Offset(nearKnee, farLeg)));
-        bones.Add(new(HumanoidBone.RightFoot, Offset(nearAnkle, farLeg)));
+        bones.Add(new(HumanoidBone.RightShoulder, new Point2D(0, m.ShoulderY)));
+        bones.Add(new(HumanoidBone.RightUpperArm, nearShoulder));
+        bones.Add(new(HumanoidBone.RightLowerArm, nearElbow));
+        bones.Add(new(HumanoidBone.RightHand, nearWrist));
+        bones.Add(new(HumanoidBone.RightUpperLeg, nearHip));
+        bones.Add(new(HumanoidBone.RightLowerLeg, nearKnee));
+        bones.Add(new(HumanoidBone.RightFoot, nearAnkle));
+        bones.Add(new(HumanoidBone.LeftShoulder, Offset(new Point2D(0, m.ShoulderY), farOffset)));
+        bones.Add(new(HumanoidBone.LeftUpperArm, Offset(nearShoulder, farOffset)));
+        bones.Add(new(HumanoidBone.LeftLowerArm, Offset(nearElbow, farOffset)));
+        bones.Add(new(HumanoidBone.LeftHand, Offset(nearWrist, farOffset)));
+        bones.Add(new(HumanoidBone.LeftUpperLeg, Offset(nearHip, farLeg)));
+        bones.Add(new(HumanoidBone.LeftLowerLeg, Offset(nearKnee, farLeg)));
+        bones.Add(new(HumanoidBone.LeftFoot, Offset(nearAnkle, farLeg)));
         var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Profile, bones), overrides);
         var trunk = new Trunk(m, rest, pose);
         var baseLayout = trunk.Apply(rest);
@@ -394,7 +396,7 @@ public static class BodyRig
         var nearBlobs = new List<BodyEllipse>();
 
         var footLength = m.Below * 0.17;
-        foreach (var (side, near) in new[] { (Side.Right, false), (Side.Left, true) })
+        foreach (var (side, near) in new[] { (Side.Left, false), (Side.Right, true) })
         {
             var (targetLimbs, targetBlobs) = near ? (nearLimbs, nearBlobs) : (limbs, blobs);
             var (s, e, h) = (At(side.UpperArm), At(side.LowerArm), At(side.Hand));

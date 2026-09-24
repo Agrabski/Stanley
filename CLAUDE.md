@@ -495,7 +495,9 @@ body and placement only.
   layout + torso outline, limb capsules, head/hand/foot ellipses) in *figure space*
   (unit = relative height, y down, origin = ground between the feet; head top at
   `-Height`), for `ViewAngle.Front` or `Profile` (faces +x, has a nose; the near
-  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
+  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer, and
+  are the character's own *right* limbs - as for a real person facing right; a
+  mirrored placement is a mirror image, not the character turned around).
   Heights depend only on `Height`/`HeadsTall`, identical in both views;
   `ThreeQuarter` falls back to front. Skeleton overrides are per view.
   `BodyFigure.RestLayout` is the unposed layout, `BaseLayout` the trunk-posed one

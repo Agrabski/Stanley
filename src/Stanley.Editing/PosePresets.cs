@@ -57,12 +57,13 @@ public static class PosePresets
         new(PosePreset.Shrug, "Shrug", ViewAngle.Front, 0, 8, default, [new(Limb.RightArm, 0.48, 0.42, Tucked: true), new(Limb.LeftArm, 0.48, 0.42, Tucked: true)]),
         new(PosePreset.Think, "Think", null, 0, 10, default, [new(Limb.RightArm, -0.25, -0.12), new(Limb.LeftArm, 0.05, 0.55)]),
         new(PosePreset.Crouch, "Crouch", null, 0, 0, new Point2D(0, 0.13), [new(Limb.RightArm, 0.25, 0.7), new(Limb.LeftArm, 0.25, 0.7)]),
+        // Side-on presets: the character's right limbs are the near ones (facing right).
         new(PosePreset.Walk, "Walk", ViewAngle.Profile, 3, 0, new Point2D(0, 0.012),
-            [new(Limb.LeftLeg, 0.3, 0.95), new(Limb.RightLeg, -0.28, 0.95), new(Limb.LeftArm, -0.3, 0.93), new(Limb.RightArm, 0.32, 0.92)]),
+            [new(Limb.RightLeg, 0.3, 0.95), new(Limb.LeftLeg, -0.28, 0.95), new(Limb.RightArm, -0.3, 0.93), new(Limb.LeftArm, 0.32, 0.92)]),
         new(PosePreset.Run, "Run", ViewAngle.Profile, 14, -5, new Point2D(0, 0.03),
-            [new(Limb.LeftLeg, 0.5, 0.55), new(Limb.RightLeg, -0.55, 0.72), new(Limb.LeftArm, 0.5, 0.15), new(Limb.RightArm, -0.5, 0.55)]),
+            [new(Limb.RightLeg, 0.5, 0.55), new(Limb.LeftLeg, -0.55, 0.72), new(Limb.RightArm, 0.5, 0.15), new(Limb.LeftArm, -0.5, 0.55)]),
         new(PosePreset.Sit, "Sit", ViewAngle.Profile, -4, 0, new Point2D(-0.03, 0.24),
-            [new(Limb.LeftLeg, 0.62, 0.5), new(Limb.RightLeg, 0.58, 0.52), new(Limb.LeftArm, 0.55, 0.55), new(Limb.RightArm, 0.5, 0.58)]),
+            [new(Limb.RightLeg, 0.62, 0.5), new(Limb.LeftLeg, 0.58, 0.52), new(Limb.RightArm, 0.55, 0.55), new(Limb.LeftArm, 0.5, 0.58)]),
     ];
 
     public static PosePresetDefinition Get(PosePreset preset) => All.First(p => p.Preset == preset);

@@ -332,8 +332,9 @@ editor ribbon, click/double-click on the page).
 angle, overrides)` generates a profile facing +x: head with a nose (the cue for
 which way a flat figure faces), chest/belly/seat depths from muscle, weight and
 frame, legs merged into the body with the far one set back, feet pointing
-forward. The near arm, hand and foot are a second layer (`BodyFigure.NearLimbs` /
-`NearBlobs`) drawn over the body with their own outline so they read on a flat
+forward. The near arm, hand and foot (the character's right, as for a real person
+facing right) are a second layer (`BodyFigure.NearLimbs` / `NearBlobs`) drawn over
+the body with their own outline so they read on a flat
 fill; hit-testing uses the true union of both. On the page: the Character tab's
 View group (Front / Side / Flip), S and F keys, right-click. The character editor
 has a Front/Side preview toggle (the line-up turns too). Skeleton overrides are
