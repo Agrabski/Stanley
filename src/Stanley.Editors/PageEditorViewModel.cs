@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Stanley.Editing;
 using Stanley.Editing.Abstractions;
 using Stanley.EditorFramework;
@@ -18,6 +19,15 @@ public enum PageEditorTool
     Pan
 }
 
+/// <summary>View changes the ribbon can ask for; the view that owns the zoom transform carries them out.</summary>
+public enum ViewportRequest
+{
+    ZoomIn,
+    ZoomOut,
+    FitPage,
+    ActualSize
+}
+
 public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 {
     /// <summary>Default size for a bubble created with a single click, in mm - roughly two short lines of lettering.</summary>
@@ -32,6 +42,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     private bool _snapEnabled = true;
     private IReadOnlyList<SnapGuide> _activeGuides = [];
     private PanelId _pendingPanelId;
+    private double _zoomPercent = 100;
 
     public Rect2D PageBounds { get; }
 
@@ -40,6 +51,110 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     {
         PageBounds = pageBounds;
         PropertyChanged += OnSelfPropertyChanged;
+
+        DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelection);
+        SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel);
+        SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel);
+        AddBubbleCommand = new RelayCommand(AddBubbleToSelectedPanel, () => Working.PanelOrder.Count > 0);
+        EditTextCommand = new RelayCommand(() => RequestTextEdit(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        AddTailCommand = new RelayCommand(() => AddBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        RemoveTailCommand = new RelayCommand(
+            () => RemoveBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex, SelectedBubble!.Tails.Count - 1),
+            () => SelectedBubbleHasTails);
+        BringToFrontCommand = new RelayCommand(() => BringBubbleToFront(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        SendToBackCommand = new RelayCommand(() => SendBubbleToBack(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        ApplyLayoutCommand = new RelayCommand<PanelLayoutPreset>(preset =>
+        {
+            if (preset != null)
+                ApplyLayoutPreset(preset);
+        });
+        ZoomInCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomIn));
+        ZoomOutCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomOut));
+        FitPageCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.FitPage));
+        ActualSizeCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ActualSize));
+    }
+
+    // ---------------------------------------------------------------- ribbon commands
+    //
+    // The ribbon lives in the window, outside this pane's view, so everything it can do
+    // is a command (or, for view-only things like zoom and the inline text editor, an
+    // event the pane's view carries out).
+
+    public IRelayCommand DeleteSelectionCommand { get; }
+    public IRelayCommand SplitColumnsCommand { get; }
+    public IRelayCommand SplitRowsCommand { get; }
+    public IRelayCommand AddBubbleCommand { get; }
+    public IRelayCommand EditTextCommand { get; }
+    public IRelayCommand AddTailCommand { get; }
+    public IRelayCommand RemoveTailCommand { get; }
+    public IRelayCommand BringToFrontCommand { get; }
+    public IRelayCommand SendToBackCommand { get; }
+    public IRelayCommand<PanelLayoutPreset> ApplyLayoutCommand { get; }
+    public IRelayCommand ZoomInCommand { get; }
+    public IRelayCommand ZoomOutCommand { get; }
+    public IRelayCommand FitPageCommand { get; }
+    public IRelayCommand ActualSizeCommand { get; }
+
+    public IReadOnlyList<PanelLayoutPreset> LayoutPresets => PanelLayoutPresets.All;
+
+    /// <summary>Raised for zoom/fit requests; the pane's view owns the transform and applies them.</summary>
+    public event Action<ViewportRequest>? ViewportRequested;
+
+    /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
+    public event Action<PanelId, int>? TextEditRequested;
+
+    public void RequestTextEdit(PanelId panelId, int bubbleIndex)
+    {
+        if (Working.Panels.TryGetValue(panelId, out var panel) && bubbleIndex >= 0 && bubbleIndex < panel.Bubbles.Count)
+            TextEditRequested?.Invoke(panelId, bubbleIndex);
+    }
+
+    /// <summary>The zoom the view is currently showing, reported back by it, for the ribbon's readout.</summary>
+    public double ZoomPercent
+    {
+        get => _zoomPercent;
+        set
+        {
+            if (SetProperty(ref _zoomPercent, value))
+                OnPropertyChanged(nameof(ZoomText));
+        }
+    }
+
+    public string ZoomText => $"{ZoomPercent:0}%";
+
+    private void SplitSelected(BoundaryOrientation orientation)
+    {
+        if (_selectedPanelId is { } id)
+            SplitPanel(id, orientation, 0.5);
+    }
+
+    /// <summary>Adds to the selected panel - or, with nothing selected, the first panel - in its upper third (where dialogue usually goes), then opens the text editor.</summary>
+    public void AddBubbleToSelectedPanel()
+    {
+        if (_selectedPanelId is not { } panelId || !Working.Panels.ContainsKey(panelId))
+        {
+            if (Working.PanelOrder.Count == 0)
+                return;
+            panelId = Working.PanelOrder[0];
+        }
+
+        var bounds = PanelBounds(panelId);
+        var index = CreateBubble(panelId, new Point2D(bounds.MidX, bounds.Top + bounds.Height * 0.3));
+        if (index >= 0)
+            RequestTextEdit(panelId, index);
+    }
+
+    private void NotifyCommands()
+    {
+        DeleteSelectionCommand.NotifyCanExecuteChanged();
+        SplitColumnsCommand.NotifyCanExecuteChanged();
+        SplitRowsCommand.NotifyCanExecuteChanged();
+        AddBubbleCommand.NotifyCanExecuteChanged();
+        EditTextCommand.NotifyCanExecuteChanged();
+        AddTailCommand.NotifyCanExecuteChanged();
+        RemoveTailCommand.NotifyCanExecuteChanged();
+        BringToFrontCommand.NotifyCanExecuteChanged();
+        SendToBackCommand.NotifyCanExecuteChanged();
     }
 
     // ---------------------------------------------------------------- tool & settings
@@ -56,6 +171,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             OnPropertyChanged(nameof(IsPanelTool));
             OnPropertyChanged(nameof(IsBubbleTool));
             OnPropertyChanged(nameof(IsPanTool));
+            OnPropertyChanged(nameof(ShowBubbleStyle));
             OnPropertyChanged(nameof(Hint));
         }
     }
@@ -119,6 +235,17 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public bool HasSelection => HasSelectedPanel;
     public bool SelectedBubbleHasTails => SelectedBubble is { Tails.Count: > 0 };
 
+    /// <summary>A comic panel (and no bubble in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
+    public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble;
+
+    /// <summary>A bubble is selected: the ribbon shows its "Bubble" contextual groups.</summary>
+    public bool IsBubbleContext => HasSelectedBubble;
+
+    /// <summary>The bubble style picker is useful for the selected bubble and for the bubble tool's next bubble.</summary>
+    public bool ShowBubbleStyle => HasSelectedBubble || IsBubbleTool;
+
+    public string BubbleContextTitle => HasSelectedBubble ? "BUBBLE" : "NEW BUBBLE";
+
     public Panel? SelectedPanel =>
         _selectedPanelId is { } id && Working.Panels.TryGetValue(id, out var panel) ? panel : null;
 
@@ -150,8 +277,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(HasSelectedPanel));
         OnPropertyChanged(nameof(HasSelectedBubble));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(IsPanelContext));
+        OnPropertyChanged(nameof(IsBubbleContext));
+        OnPropertyChanged(nameof(ShowBubbleStyle));
+        OnPropertyChanged(nameof(BubbleContextTitle));
         RaiseBubbleDerivedChanged();
         OnPropertyChanged(nameof(Hint));
+        NotifyCommands();
         SelectionChanged?.Invoke();
     }
 
@@ -178,6 +310,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 Select(id);
         }
         RaiseBubbleDerivedChanged();
+        NotifyCommands();
     }
 
     // ---------------------------------------------------------------- bubble style (selection + next new bubble)

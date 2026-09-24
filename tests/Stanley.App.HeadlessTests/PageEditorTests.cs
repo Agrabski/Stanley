@@ -324,6 +324,75 @@ public class PageEditorTests
         Assert.True(window.History.CanUndo);
     }
 
+    /// <summary>The ribbon sits in the window above the dock area (not inside the pane) and shows the active pane's ribbon.</summary>
+    [Fact]
+    public void Ribbon_IsAboveTheDockArea_AndBoundToTheActiveEditor()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+
+        var dock = window.GetVisualDescendants().OfType<Dock.Avalonia.Controls.DockControl>().Single();
+        Assert.DoesNotContain(window.RibbonBarControl, dock.GetVisualDescendants());
+        Assert.DoesNotContain(dock.GetVisualDescendants(), v => v is PageEditorRibbon);
+
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        Assert.Same(window.Editor, ribbon.DataContext);
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+
+        var ribbonBottom = window.RibbonBarControl.TranslatePoint(new Point(0, window.RibbonBarControl.Bounds.Height), window)!.Value.Y;
+        var canvasTop = canvas.TranslatePoint(new Point(0, 0), window)!.Value.Y;
+        Assert.True(ribbonBottom <= canvasTop, "ribbon should be above the editor pane");
+    }
+
+    /// <summary>The Panel/Bubble sections appear only for their selection, and their buttons act on it.</summary>
+    [Fact]
+    public void RibbonContextualSections_FollowTheSelection()
+    {
+        var window = new MainWindow();
+        window.Show();
+        GetPageCanvasControl(window);
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        Control Find(string name) => ribbon.GetVisualDescendants().OfType<Control>().Single(c => c.Name == name);
+        var editor = window.Editor;
+        var panelId = editor.Working.PanelOrder[0];
+
+        Assert.False(Find("PanelContext").IsVisible);
+        Assert.False(Find("BubbleContext").IsVisible);
+
+        editor.Select(panelId);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(Find("PanelContext").IsVisible);
+        Assert.False(Find("BubbleContext").IsVisible);
+
+        var columns = (Button)Find("SplitColumnsButton");
+        columns.Command!.Execute(columns.CommandParameter);
+        Assert.Equal(2, editor.Working.PanelOrder.Count);
+
+        editor.CreateBubble(editor.Working.PanelOrder[0], new Point2D(40, 40));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(Find("PanelContext").IsVisible);
+        Assert.True(Find("BubbleContext").IsVisible);
+    }
+
+    /// <summary>A ribbon command outside the pane still reaches the pane's view: Add bubble opens the inline text editor.</summary>
+    [Fact]
+    public void RibbonAddBubble_OpensTheInlineTextEditorInThePane()
+    {
+        var window = new MainWindow();
+        window.Show();
+        GetPageCanvasControl(window);
+        var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        var add = ribbon.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "AddBubbleButton");
+
+        add.Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.TextEditor.IsVisible);
+        Assert.Single(window.Editor.Working.Panels[window.Editor.Working.PanelOrder[0]].Bubbles);
+    }
+
     /// <summary>
     /// Helper: finds the PageCanvasControl in the window's visual tree.
     /// </summary>

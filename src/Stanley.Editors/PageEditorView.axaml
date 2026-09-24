@@ -1,206 +1,16 @@
+<!--
+  The page editor pane: the zoomable page, an inline text editor that opens over a
+  bubble, and a status bar. Its ribbon is not in here - it's PageEditorRibbon, shown in
+  the window's ribbon bar above the dock area whenever this pane is the active one.
+-->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.PageEditorView"
              x:DataType="local:PageEditorViewModel">
-  <UserControl.Styles>
-    <Style Selector="Border.ribbon">
-      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
-      <Setter Property="BorderThickness" Value="0,0,0,1" />
-      <Setter Property="Padding" Value="6,4" />
-    </Style>
-    <Style Selector="StackPanel.group">
-      <Setter Property="Margin" Value="6,0" />
-      <Setter Property="Spacing" Value="2" />
-    </Style>
-    <Style Selector="TextBlock.groupLabel">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="Opacity" Value="0.65" />
-    </Style>
-    <Style Selector="Rectangle.divider">
-      <Setter Property="Width" Value="1" />
-      <Setter Property="Margin" Value="2,4" />
-      <Setter Property="Fill" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
-    </Style>
-    <Style Selector=":is(Button).tool">
-      <Setter Property="MinWidth" Value="58" />
-      <Setter Property="Height" Value="56" />
-      <Setter Property="Padding" Value="4,4" />
-      <Setter Property="Margin" Value="1,0" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
-    <Style Selector=":is(Button).tool PathIcon">
-      <Setter Property="Width" Value="20" />
-      <Setter Property="Height" Value="20" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-    </Style>
-    <Style Selector=":is(Button).tool TextBlock">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="Margin" Value="0,3,0,0" />
-    </Style>
-    <Style Selector=":is(Button).small">
-      <Setter Property="Height" Value="26" />
-      <Setter Property="MinWidth" Value="28" />
-      <Setter Property="Padding" Value="6,2" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-    </Style>
-    <Style Selector=":is(Button).small PathIcon">
-      <Setter Property="Width" Value="14" />
-      <Setter Property="Height" Value="14" />
-    </Style>
-  </UserControl.Styles>
-
-  <Grid RowDefinitions="Auto,*,Auto">
-    <!-- Ribbon -->
-    <Border Grid.Row="0" Classes="ribbon">
-      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-        <StackPanel Orientation="Horizontal">
-
-          <!-- Tools -->
-          <StackPanel Classes="group">
-            <StackPanel Orientation="Horizontal">
-              <RadioButton Name="SelectToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                           IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select, move and resize panels and bubbles (V)">
-                <StackPanel><PathIcon Data="M5,2 L5,19 L9.5,14.5 L12.7,21.5 L15.3,20.3 L12.1,13.4 L18.5,13.4 Z" /><TextBlock Text="Select" /></StackPanel>
-              </RadioButton>
-              <RadioButton Name="PanelToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                           IsChecked="{Binding IsPanelTool}" ToolTip.Tip="Draw a new panel by dragging on the page (P)">
-                <StackPanel><PathIcon Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" /><TextBlock Text="Panel" /></StackPanel>
-              </RadioButton>
-              <RadioButton Name="BubbleToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                           IsChecked="{Binding IsBubbleTool}" ToolTip.Tip="Click inside a panel to add a speech bubble (B)">
-                <StackPanel><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z" /><TextBlock Text="Bubble" /></StackPanel>
-              </RadioButton>
-              <RadioButton Name="PanToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                           IsChecked="{Binding IsPanTool}" ToolTip.Tip="Move around the page (H, or hold Space)">
-                <StackPanel><PathIcon Data="M12,1 L15.5,4.5 H13 V11 H19.5 V8.5 L23,12 L19.5,15.5 V13 H13 V19.5 H15.5 L12,23 L8.5,19.5 H11 V13 H4.5 V15.5 L1,12 L4.5,8.5 V11 H11 V4.5 H8.5 Z" /><TextBlock Text="Pan" /></StackPanel>
-              </RadioButton>
-            </StackPanel>
-            <TextBlock Classes="groupLabel" Text="Tools" />
-          </StackPanel>
-          <Rectangle Classes="divider" />
-
-          <!-- Edit -->
-          <StackPanel Classes="group">
-            <StackPanel Orientation="Horizontal">
-              <Button Classes="tool" Command="{Binding History.UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
-                <StackPanel><PathIcon Data="M12.5,8 C9.9,8 7.5,9 5.6,10.6 L2,7 V16 H11 L7.4,12.4 C8.8,11.2 10.5,10.5 12.5,10.5 C16,10.5 19,12.8 20.1,16 L22.5,15.2 C21.1,11 17.2,8 12.5,8 Z" /><TextBlock Text="Undo" /></StackPanel>
-              </Button>
-              <Button Classes="tool" Command="{Binding History.RedoCommand}" ToolTip.Tip="Redo (Ctrl+Shift+Z)">
-                <StackPanel><PathIcon Data="M18.4,10.6 C16.5,9 14.1,8 11.5,8 C6.8,8 2.9,11 1.5,15.2 L3.9,16 C5,12.8 8,10.5 11.5,10.5 C13.5,10.5 15.2,11.2 16.6,12.4 L13,16 H22 V7 Z" /><TextBlock Text="Redo" /></StackPanel>
-              </Button>
-              <Button Name="DeleteButton" Classes="tool" Click="OnDeleteClick" IsEnabled="{Binding HasSelection}" ToolTip.Tip="Delete the selected bubble or panel (Delete)">
-                <StackPanel><PathIcon Data="M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z" /><TextBlock Text="Delete" /></StackPanel>
-              </Button>
-            </StackPanel>
-            <TextBlock Classes="groupLabel" Text="Edit" />
-          </StackPanel>
-          <Rectangle Classes="divider" />
-
-          <!-- Page layout -->
-          <StackPanel Classes="group">
-            <StackPanel Orientation="Horizontal">
-              <DropDownButton Name="LayoutButton" Classes="tool" ToolTip.Tip="Fill the page with a ready-made panel grid">
-                <StackPanel><PathIcon Data="M3,3 H11 V11 H3 Z M13,3 H21 V11 H13 Z M3,13 H11 V21 H3 Z M13,13 H21 V21 H13 Z" /><TextBlock Text="Layout" /></StackPanel>
-                <DropDownButton.Flyout>
-                  <Flyout Placement="BottomEdgeAlignedLeft">
-                    <StackPanel Spacing="6" Width="420">
-                      <TextBlock Text="Fill the page with a panel grid" FontWeight="SemiBold" />
-                      <TextBlock Text="Existing panels (and their bubbles) move into the new slots in reading order." FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
-                      <WrapPanel Name="LayoutPresetPanel" Orientation="Horizontal" />
-                      <Separator />
-                      <TextBlock Text="Spacing (used by layouts, splits and snapping)" FontSize="11" Opacity="0.7" />
-                      <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
-                        <TextBlock Grid.Column="0" Text="Margin" VerticalAlignment="Center" />
-                        <NumericUpDown Name="MarginInput" Grid.Column="1" Minimum="0" Maximum="40" Increment="1" FormatString="0.# mm"
-                                       ToolTip.Tip="Distance from the page edge to the panel area" />
-                        <TextBlock Grid.Column="2" Text="Gutter" VerticalAlignment="Center" />
-                        <NumericUpDown Name="GutterInput" Grid.Column="3" Minimum="0" Maximum="20" Increment="0.5" FormatString="0.# mm"
-                                       ToolTip.Tip="Space between neighbouring panels" />
-                      </Grid>
-                    </StackPanel>
-                  </Flyout>
-                </DropDownButton.Flyout>
-              </DropDownButton>
-              <Button Name="SplitVerticalButton" Classes="tool" Click="OnSplitVerticalClick" IsEnabled="{Binding HasSelectedPanel}" ToolTip.Tip="Split the selected panel into two side-by-side panels">
-                <StackPanel><PathIcon Data="M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z" /><TextBlock Text="Columns" /></StackPanel>
-              </Button>
-              <Button Name="SplitHorizontalButton" Classes="tool" Click="OnSplitHorizontalClick" IsEnabled="{Binding HasSelectedPanel}" ToolTip.Tip="Split the selected panel into two stacked panels">
-                <StackPanel><PathIcon Data="M3,2 H21 V11 H3 Z M3,13 H21 V22 H3 Z" /><TextBlock Text="Rows" /></StackPanel>
-              </Button>
-              <ToggleButton Name="SnapButton" Classes="tool" IsChecked="{Binding SnapEnabled}" ToolTip.Tip="Snap panel edges to the page margin and a gutter's width from other panels (hold Alt while dragging to place freely)">
-                <StackPanel><PathIcon Data="M4,3 H9 V12 A3,3 0 0 0 15,12 V3 H20 V12 A8,8 0 0 1 4,12 Z M4,5 H9 V7 H4 Z M15,5 H20 V7 H15 Z" /><TextBlock Text="Snap" /></StackPanel>
-              </ToggleButton>
-            </StackPanel>
-            <TextBlock Classes="groupLabel" Text="Panels" />
-          </StackPanel>
-          <Rectangle Classes="divider" />
-
-          <!-- Bubble -->
-          <StackPanel Classes="group">
-            <StackPanel Orientation="Horizontal">
-              <Button Name="AddBubbleButton" Classes="tool" Click="OnAddBubbleClick" ToolTip.Tip="Add a bubble to the selected panel and start typing">
-                <StackPanel><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z M11,7 V10 H8 V12 H11 V15 H13 V12 H16 V10 H13 V7 Z" /><TextBlock Text="Add bubble" /></StackPanel>
-              </Button>
-              <StackPanel VerticalAlignment="Center" Spacing="1">
-                <RadioButton Name="SpeechStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSpeechStyle}"
-                             ToolTip.Tip="Rounded speech bubble (for the selected bubble and new ones)" HorizontalAlignment="Stretch">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z" /><TextBlock Text="Speech" /></StackPanel>
-                </RadioButton>
-                <RadioButton Name="ShoutStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShoutStyle}"
-                             ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,1 L14.5,6.5 L20.5,4 L18.5,10 L23,13 L17,14.5 L18.5,21 L12,17.5 L5.5,21 L7,14.5 L1,13 L5.5,10 L3.5,4 L9.5,6.5 Z" /><TextBlock Text="Shout" /></StackPanel>
-                </RadioButton>
-                <RadioButton Name="WhisperStyleButton" Classes="small" GroupName="BubbleStyle" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsWhisperStyle}"
-                             ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch">
-                  <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z" /><TextBlock Text="Whisper" /></StackPanel>
-                </RadioButton>
-              </StackPanel>
-              <Button Name="EditTextButton" Classes="tool" Click="OnEditTextClick" IsEnabled="{Binding HasSelectedBubble}" ToolTip.Tip="Edit the selected bubble's text (Enter, or double-click the bubble)">
-                <StackPanel><PathIcon Data="M4,3 H20 V8 H18 V5 H13 V19 H16 V21 H8 V19 H11 V5 H6 V8 H4 Z" /><TextBlock Text="Edit text" /></StackPanel>
-              </Button>
-              <StackPanel VerticalAlignment="Center" Spacing="1">
-                <Button Name="AddTailButton" Classes="small" Click="OnAddTailClick" IsEnabled="{Binding HasSelectedBubble}" ToolTip.Tip="Add another tail - drag its orange tip onto the speaker" HorizontalAlignment="Stretch">Add tail</Button>
-                <Button Name="RemoveTailButton" Classes="small" Click="OnRemoveTailClick" IsEnabled="{Binding SelectedBubbleHasTails}" ToolTip.Tip="Remove the most recently added tail (right-click a tail to remove that one)" HorizontalAlignment="Stretch">Remove tail</Button>
-              </StackPanel>
-              <StackPanel VerticalAlignment="Center" Spacing="1">
-                <Button Name="BringToFrontButton" Classes="small" Click="OnBringToFrontClick" IsEnabled="{Binding HasSelectedBubble}" ToolTip.Tip="Draw this bubble above the others in its panel" HorizontalAlignment="Stretch">To front</Button>
-                <Button Name="SendToBackButton" Classes="small" Click="OnSendToBackClick" IsEnabled="{Binding HasSelectedBubble}" ToolTip.Tip="Draw this bubble below the others in its panel" HorizontalAlignment="Stretch">To back</Button>
-              </StackPanel>
-            </StackPanel>
-            <TextBlock Classes="groupLabel" Text="Bubbles" />
-          </StackPanel>
-          <Rectangle Classes="divider" />
-
-          <!-- View -->
-          <StackPanel Classes="group">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Height="56">
-              <Button Classes="small" Click="OnZoomOutClick" ToolTip.Tip="Zoom out (Ctrl+−, or Ctrl+scroll)" VerticalAlignment="Center" FontSize="16">−</Button>
-              <TextBlock Name="ZoomText" Width="52" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Text="100%" />
-              <Button Classes="small" Click="OnZoomInClick" ToolTip.Tip="Zoom in (Ctrl++, or Ctrl+scroll)" VerticalAlignment="Center" FontSize="16">+</Button>
-              <StackPanel VerticalAlignment="Center" Spacing="1" Margin="4,0,0,0">
-                <Button Name="FitPageButton" Classes="small" Click="OnFitPageClick" ToolTip.Tip="Show the whole page (Ctrl+0)" HorizontalAlignment="Stretch">Fit page</Button>
-                <Button Name="ActualSizeButton" Classes="small" Click="OnActualSizeClick" ToolTip.Tip="Show the page at its printed size (Ctrl+1)" HorizontalAlignment="Stretch">Actual size</Button>
-              </StackPanel>
-            </StackPanel>
-            <TextBlock Classes="groupLabel" Text="View" />
-          </StackPanel>
-        </StackPanel>
-      </ScrollViewer>
-    </Border>
-
+  <Grid RowDefinitions="*,Auto">
     <!-- Page -->
-    <Grid Grid.Row="1">
+    <Grid Grid.Row="0">
       <local:PageCanvasControl x:Name="PageCanvas" />
       <Canvas Name="Overlay">
         <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
@@ -210,7 +20,7 @@
     </Grid>
 
     <!-- Status bar -->
-    <Border Grid.Row="2" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
+    <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
       <Grid ColumnDefinitions="*,Auto">
         <StackPanel Orientation="Horizontal" Spacing="12">
           <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="#C62828" FontSize="12" VerticalAlignment="Center"

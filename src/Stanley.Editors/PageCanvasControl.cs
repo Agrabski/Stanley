@@ -61,9 +61,6 @@ public sealed class PageCanvasControl : Control
     /// <summary>Raised when zoom or pan changes, so the ribbon's zoom readout and any overlay (the inline text editor) can follow.</summary>
     public event Action? ViewChanged;
 
-    /// <summary>Raised on double-click/Enter on a bubble: the containing view opens its inline text editor over it.</summary>
-    public event Action<PanelId, int>? EditTextRequested;
-
     public PageEditorViewModel? ViewModel
     {
         get => _viewModel;
@@ -402,12 +399,12 @@ public sealed class PageCanvasControl : Control
             {
                 case HitKind.BubbleBody or HitKind.BubbleHandle when hit.PanelId is { } bubblePanel:
                     vm.Select(bubblePanel, hit.BubbleIndex);
-                    EditTextRequested?.Invoke(bubblePanel, hit.BubbleIndex);
+                    _viewModel!.RequestTextEdit(bubblePanel, hit.BubbleIndex);
                     return;
                 case HitKind.PanelBody when hit.PanelId is { } emptyPanel:
                     var index = vm.CreateBubble(emptyPanel, page);
                     if (index >= 0)
-                        EditTextRequested?.Invoke(emptyPanel, index);
+                        _viewModel!.RequestTextEdit(emptyPanel, index);
                     return;
             }
         }
@@ -596,7 +593,7 @@ public sealed class PageCanvasControl : Control
                 if (index >= 0)
                 {
                     vm.Tool = PageEditorTool.Select;
-                    EditTextRequested?.Invoke(panelId, index);
+                    _viewModel!.RequestTextEdit(panelId, index);
                 }
                 break;
 
@@ -688,7 +685,7 @@ public sealed class PageCanvasControl : Control
                 vm.DeleteSelection();
                 break;
             case Key.Enter or Key.F2 when vm.HasSelectedBubble:
-                EditTextRequested?.Invoke(vm.SelectedPanelId!.Value, vm.SelectedBubbleIndex);
+                vm.RequestTextEdit(vm.SelectedPanelId!.Value, vm.SelectedBubbleIndex);
                 break;
             case Key.Left when _drag == DragKind.None:
                 vm.NudgeSelection(-step, 0);
@@ -759,7 +756,7 @@ public sealed class PageCanvasControl : Control
         {
             var index = hit.BubbleIndex;
             vm.Select(bubblePanel, index);
-            items.Add(Item("Edit text", () => EditTextRequested?.Invoke(bubblePanel, index), "Enter"));
+            items.Add(Item("Edit text", () => _viewModel!.RequestTextEdit(bubblePanel, index), "Enter"));
             var styles = new MenuItem { Header = "Style" };
             styles.ItemsSource = Enum.GetValues<BubbleStylePreset>()
                 .Select(style => Item(style.ToString(), () => vm.SetBubbleStyle(bubblePanel, index, style)))
@@ -786,7 +783,7 @@ public sealed class PageCanvasControl : Control
             {
                 var index = vm.CreateBubble(panelId, at);
                 if (index >= 0)
-                    EditTextRequested?.Invoke(panelId, index);
+                    _viewModel!.RequestTextEdit(panelId, index);
             }));
             items.Add(new Separator());
             items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));

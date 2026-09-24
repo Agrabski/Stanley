@@ -190,13 +190,27 @@ Editing pipeline layers, bottom to top:
   always axis-aligned rectangles (an arbitrary hand-edited `PanelShape` remains a
   data-model escape hatch, just unreachable through this editor's drag interactions).
   The page editor UI:
-  - **Ribbon** (`PageEditorView.axaml`): tools (Select/Panel/Bubble/Pan, also
-    V/P/B/H), undo/redo/delete, page layout presets (`PanelLayoutPresets`, with
-    margin/gutter settings tucked into the same flyout), split into columns/rows,
-    snap toggle, bubble style (one control for "selected bubble" *and* "next new
-    bubble", like a font box), text/tail/z-order actions, zoom. A status bar always
-    shows a one-line hint for the current tool/selection plus the last validation
-    error. Right-click gives a context menu for the thing under the pointer.
+  - **Ribbon**: one ribbon in the window, above the dock area — not inside a pane.
+    `MainWindow` shows project-wide undo/redo, then whatever the active pane
+    contributes: `EditorWorkspace.ActiveEditor` (EditorFramework; follows the dock
+    factory's active/focused dockable) is the ribbon host's content, and a
+    `DataTemplate` scoped to that host maps each editor view-model type to its
+    ribbon (`PageEditorViewModel` → `PageEditorRibbon`). A new editor type adds
+    its own ribbon the same way. The ribbon only talks to its pane through the
+    view model: commands (`SplitColumnsCommand`, `AddBubbleCommand`, …) plus events
+    for view-only work (`ViewportRequested` for zoom, `TextEditRequested` for the
+    inline text editor), which `PageEditorView` carries out. Within the page
+    ribbon, fixed groups (Tools, Page: layout/snap/add bubble, View) are always
+    shown; contextual sections appear for the selection (`IsPanelContext` →
+    blue "PANEL": columns/rows/delete; `IsBubbleContext` → orange "BUBBLE":
+    style, text, tails, z-order, delete — style also shows for the bubble tool,
+    as "NEW BUBBLE"). The ribbon bar has a fixed height so the page doesn't jump
+    as sections come and go; ribbon buttons are non-focusable so keyboard
+    shortcuts keep reaching the page. Shared look: `RibbonStyles.axaml`,
+    included from `App.axaml`. The pane itself (`PageEditorView`) is just the
+    canvas, inline text editor, and a status bar with a one-line hint for the
+    current tool/selection plus the last validation error. Right-click gives a
+    context menu for the thing under the pointer.
   - **Zoom**: the document is in millimetres; `PageCanvasControl` owns the mm→screen
     transform. 100% = the page at its printed size on a 96 DPI screen
     (`ActualSizeZoom`); starts in fit-page mode (re-fits on resize until the user
@@ -218,8 +232,9 @@ Editing pipeline layers, bottom to top:
     keeping the gutter width (`PanelBoundaryDrag.Gap`).
   - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
     `Working`, so a drag is a pure function of the current pointer position.
-- **`Stanley.App`**: wires `EditorHistory` + `PageEditorHost.CreateDemoLayout()`
-  into `MainWindow`'s Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
+- **`Stanley.App`**: wires `PageEditorHost.CreateDemoWorkspace()` (an
+  `EditorWorkspace`: history + dock layout + active pane) into `MainWindow`'s
+  ribbon bar and Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
 
 The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a

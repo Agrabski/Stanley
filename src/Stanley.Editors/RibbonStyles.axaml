@@ -1,0 +1,91 @@
+<!--
+  The ribbon's look, shared by the window's ribbon bar (quick-access undo/redo) and each
+  editor's ribbon content. Included once, application-wide, from App.axaml.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Border.ribbon">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="6,4" />
+  </Style>
+  <Style Selector="StackPanel.group">
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="Spacing" Value="2" />
+  </Style>
+  <Style Selector="TextBlock.groupLabel">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+  <Style Selector="Rectangle.divider">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Margin" Value="2,4" />
+    <Setter Property="Fill" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+  </Style>
+
+  <!-- A contextual section: groups that only appear for the current selection, marked
+       with a coloured band and title the way Office marks contextual tabs. -->
+  <Style Selector="Border.context">
+    <Setter Property="BorderThickness" Value="0,3,0,0" />
+    <Setter Property="Margin" Value="4,0" />
+    <Setter Property="Padding" Value="0,0,0,0" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+  <Style Selector="Border.context.panel">
+    <Setter Property="BorderBrush" Value="#257AE8" />
+    <Setter Property="Background" Value="#10257AE8" />
+  </Style>
+  <Style Selector="Border.context.bubble">
+    <Setter Property="BorderBrush" Value="#F58A07" />
+    <Setter Property="Background" Value="#12F58A07" />
+  </Style>
+  <Style Selector="TextBlock.contextTitle">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Margin" Value="8,1,0,0" />
+  </Style>
+  <Style Selector="Border.context.panel TextBlock.contextTitle">
+    <Setter Property="Foreground" Value="#257AE8" />
+  </Style>
+  <Style Selector="Border.context.bubble TextBlock.contextTitle">
+    <Setter Property="Foreground" Value="#C96F00" />
+  </Style>
+
+  <!-- Ribbon buttons never take keyboard focus, so Delete/arrow keys/shortcuts keep
+       going to the page after a ribbon click. -->
+  <Style Selector=":is(Button).tool, :is(Button).small">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).tool">
+    <Setter Property="MinWidth" Value="58" />
+    <Setter Property="Height" Value="56" />
+    <Setter Property="Padding" Value="4,4" />
+    <Setter Property="Margin" Value="1,0" />
+  </Style>
+  <Style Selector=":is(Button).tool PathIcon">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).tool TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,3,0,0" />
+  </Style>
+  <Style Selector=":is(Button).small">
+    <Setter Property="Height" Value="25" />
+    <Setter Property="MinWidth" Value="28" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector=":is(Button).small PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+  </Style>
+</Styles>

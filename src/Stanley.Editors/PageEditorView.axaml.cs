@@ -9,9 +9,10 @@ using Stanley.ProjectModel.Ids;
 namespace Stanley.Editors;
 
 /// <summary>
-/// The page editor pane: a ribbon of tools and actions, the zoomable page canvas, an
-/// inline text editor that opens over a bubble, and a status bar that always says what
-/// the pointer can do right now.
+/// The page editor pane: the zoomable page canvas, an inline text editor that opens over
+/// a bubble, and a status bar that always says what the pointer can do right now. Its
+/// ribbon is <see cref="PageEditorRibbon"/>, hosted by the window above the dock area;
+/// the two only meet through <see cref="PageEditorViewModel"/>.
 /// </summary>
 public partial class PageEditorView : UserControl
 {
@@ -22,46 +23,7 @@ public partial class PageEditorView : UserControl
     {
         InitializeComponent();
 
-        foreach (var preset in PanelLayoutPresets.All)
-        {
-            var button = new Button
-            {
-                Classes = { "tool" },
-                Width = 80,
-                Height = 92,
-                Content = new StackPanel
-                {
-                    Spacing = 3,
-                    Children =
-                    {
-                        new LayoutPresetPreview { Preset = preset, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center },
-                        new TextBlock { Text = preset.Name, FontSize = 11, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center }
-                    }
-                }
-            };
-            ToolTip.SetTip(button, $"{preset.Name}: {string.Join(" / ", preset.ColumnsPerRow)} panels per row");
-            button.Click += (_, _) =>
-            {
-                ViewModel?.ApplyLayoutPreset(preset);
-                LayoutButton.Flyout?.Hide();
-                PageCanvas.Focus();
-            };
-            LayoutPresetPanel.Children.Add(button);
-        }
-
         PageCanvas.ViewChanged += OnCanvasViewChanged;
-        PageCanvas.EditTextRequested += BeginTextEdit;
-
-        MarginInput.ValueChanged += (_, e) =>
-        {
-            if (ViewModel is { } vm && e.NewValue is { } value)
-                vm.MarginMm = (double)value;
-        };
-        GutterInput.ValueChanged += (_, e) =>
-        {
-            if (ViewModel is { } vm && e.NewValue is { } value)
-                vm.GutterMm = (double)value;
-        };
 
         InlineTextEditor.AddHandler(KeyDownEvent, OnInlineEditorKeyDown, RoutingStrategies.Tunnel);
         InlineTextEditor.LostFocus += (_, _) => EndTextEdit(commit: true);
@@ -81,16 +43,22 @@ public partial class PageEditorView : UserControl
         EndTextEdit(commit: false);
 
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
+            _subscribed.TextEditRequested -= BeginTextEdit;
+            _subscribed.ViewportRequested -= OnViewportRequested;
+        }
         _subscribed = ViewModel;
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged += OnViewModelPropertyChanged;
+            _subscribed.TextEditRequested += BeginTextEdit;
+            _subscribed.ViewportRequested += OnViewportRequested;
+        }
 
         PageCanvas.ViewModel = ViewModel;
         if (ViewModel is { } vm)
         {
-            MarginInput.Value = (decimal)vm.MarginMm;
-            GutterInput.Value = (decimal)vm.GutterMm;
             PageInfoText.Text = $"{DescribePaper(vm.PageBounds)} · {vm.PageBounds.Width:0.#} × {vm.PageBounds.Height:0.#} mm";
         }
         UpdateZoomText();
@@ -126,83 +94,22 @@ public partial class PageEditorView : UserControl
             PositionTextEditor();
     }
 
-    private void UpdateZoomText() => ZoomText.Text = $"{PageCanvas.ZoomPercent:0}%";
-
-    private void OnZoomInClick(object? sender, RoutedEventArgs e) => PageCanvas.ZoomIn();
-    private void OnZoomOutClick(object? sender, RoutedEventArgs e) => PageCanvas.ZoomOut();
-    private void OnFitPageClick(object? sender, RoutedEventArgs e) => PageCanvas.FitPage();
-    private void OnActualSizeClick(object? sender, RoutedEventArgs e) => PageCanvas.ActualSize();
-
-    // ---------------------------------------------------------------- ribbon actions
-
-    private void OnDeleteClick(object? sender, RoutedEventArgs e)
+    /// <summary>Reports the zoom back to the view model, where the ribbon's readout (outside this view) picks it up.</summary>
+    private void UpdateZoomText()
     {
-        ViewModel?.DeleteSelection();
-        PageCanvas.Focus();
+        if (ViewModel is { } vm)
+            vm.ZoomPercent = PageCanvas.ZoomPercent;
     }
 
-    private void OnSplitVerticalClick(object? sender, RoutedEventArgs e) => Split(BoundaryOrientation.Vertical);
-    private void OnSplitHorizontalClick(object? sender, RoutedEventArgs e) => Split(BoundaryOrientation.Horizontal);
-
-    private void Split(BoundaryOrientation orientation)
+    private void OnViewportRequested(ViewportRequest request)
     {
-        if (ViewModel is { SelectedPanelId: { } panelId } vm)
-            vm.SplitPanel(panelId, orientation, 0.5);
-        PageCanvas.Focus();
-    }
-
-    /// <summary>Adds to the selected panel - or, with nothing selected, the first panel - so the button never silently does nothing.</summary>
-    private void OnAddBubbleClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is not { } vm)
-            return;
-
-        if (vm.SelectedPanelId is not { } panelId)
+        switch (request)
         {
-            if (vm.Working.PanelOrder.Count == 0)
-                return;
-            panelId = vm.Working.PanelOrder[0];
+            case ViewportRequest.ZoomIn: PageCanvas.ZoomIn(); break;
+            case ViewportRequest.ZoomOut: PageCanvas.ZoomOut(); break;
+            case ViewportRequest.FitPage: PageCanvas.FitPage(); break;
+            case ViewportRequest.ActualSize: PageCanvas.ActualSize(); break;
         }
-
-        var bounds = vm.PanelBounds(panelId);
-        // Upper third of the panel: where dialogue usually goes, clear of the action.
-        var index = vm.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.Top + bounds.Height * 0.3));
-        if (index >= 0)
-            BeginTextEdit(panelId, index);
-    }
-
-    private void OnEditTextClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var index })
-            BeginTextEdit(panelId, index);
-    }
-
-    private void OnAddTailClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var index } vm)
-            vm.AddBubbleTail(panelId, index);
-        PageCanvas.Focus();
-    }
-
-    private void OnRemoveTailClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var index, SelectedBubble: { Tails.Count: > 0 } bubble } vm)
-            vm.RemoveBubbleTail(panelId, index, bubble.Tails.Count - 1);
-        PageCanvas.Focus();
-    }
-
-    private void OnBringToFrontClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var index } vm)
-            vm.BringBubbleToFront(panelId, index);
-        PageCanvas.Focus();
-    }
-
-    private void OnSendToBackClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var index } vm)
-            vm.SendBubbleToBack(panelId, index);
-        PageCanvas.Focus();
     }
 
     // ---------------------------------------------------------------- inline text editing

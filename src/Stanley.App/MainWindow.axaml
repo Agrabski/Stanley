@@ -2,13 +2,52 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dock="using:Dock.Avalonia.Controls"
         xmlns:editors="using:Stanley.Editors"
+        xmlns:framework="using:Stanley.EditorFramework"
         x:Class="Stanley.App.MainWindow"
+        x:DataType="framework:EditorWorkspace"
         Title="Stanley"
         Width="1360" Height="900">
   <Window.DataTemplates>
+    <!-- Pane content inside the dock area. -->
     <DataTemplate DataType="editors:PageEditorViewModel">
       <editors:PageEditorView />
     </DataTemplate>
   </Window.DataTemplates>
-  <dock:DockControl x:Name="EditorDock" />
+
+  <DockPanel>
+    <!--
+      One ribbon for the whole window, above every pane. The left end is project-wide
+      (undo/redo span all panes); the rest is whatever the active pane contributes,
+      chosen by the pane's view-model type through the templates below - these are
+      scoped to the ribbon host, so they win over the pane templates above for the same
+      type.
+    -->
+    <!-- Fixed height: contextual sections come and go with the selection, and the page
+         below must not jump (or re-fit its zoom) every time they do. -->
+    <Border Name="RibbonBar" DockPanel.Dock="Top" Classes="ribbon" Height="98">
+      <Grid ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Top">
+        <StackPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Classes="tool" Command="{Binding History.UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
+              <StackPanel><PathIcon Data="M12.5,8 C9.9,8 7.5,9 5.6,10.6 L2,7 V16 H11 L7.4,12.4 C8.8,11.2 10.5,10.5 12.5,10.5 C16,10.5 19,12.8 20.1,16 L22.5,15.2 C21.1,11 17.2,8 12.5,8 Z" /><TextBlock Text="Undo" /></StackPanel>
+            </Button>
+            <Button Classes="tool" Command="{Binding History.RedoCommand}" ToolTip.Tip="Redo (Ctrl+Shift+Z)">
+              <StackPanel><PathIcon Data="M18.4,10.6 C16.5,9 14.1,8 11.5,8 C6.8,8 2.9,11 1.5,15.2 L3.9,16 C5,12.8 8,10.5 11.5,10.5 C13.5,10.5 15.2,11.2 16.6,12.4 L13,16 H22 V7 Z" /><TextBlock Text="Redo" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="History" />
+        </StackPanel>
+        <Rectangle Grid.Column="1" Classes="divider" />
+        <ContentControl Grid.Column="2" Name="RibbonHost" Content="{Binding ActiveEditor}">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="editors:PageEditorViewModel">
+              <editors:PageEditorRibbon />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+      </Grid>
+    </Border>
+
+    <dock:DockControl x:Name="EditorDock" />
+  </DockPanel>
 </Window>

@@ -362,4 +362,51 @@ public class PageEditorViewModelTests
         var distance = Math.Sqrt(Math.Pow(tails[0].Target.X - tails[1].Target.X, 2) + Math.Pow(tails[0].Target.Y - tails[1].Target.Y, 2));
         Assert.True(distance > 15, $"second tail should point somewhere else, but its tip is only {distance:0.0}mm from the first");
     }
+
+    [Fact]
+    public void RibbonCommands_AreOnlyEnabledForTheMatchingSelection()
+    {
+        var (_, vm, panelId) = NewEditor();
+
+        Assert.False(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.False(vm.EditTextCommand.CanExecute(null));
+        Assert.False(vm.IsPanelContext);
+        Assert.False(vm.IsBubbleContext);
+
+        vm.Select(panelId);
+        Assert.True(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.False(vm.EditTextCommand.CanExecute(null));
+        Assert.True(vm.IsPanelContext);
+
+        vm.CreateBubble(panelId, new Point2D(50, 50));
+        Assert.True(vm.EditTextCommand.CanExecute(null));
+        Assert.True(vm.IsBubbleContext);
+        Assert.False(vm.IsPanelContext);
+    }
+
+    [Fact]
+    public void AddBubbleCommand_CreatesABubbleAndAsksForTheTextEditor()
+    {
+        var (_, vm, panelId) = NewEditor();
+        (PanelId Panel, int Index)? requested = null;
+        vm.TextEditRequested += (p, i) => requested = (p, i);
+
+        vm.AddBubbleCommand.Execute(null);
+
+        Assert.Single(vm.Working.Panels[panelId].Bubbles);
+        Assert.Equal((panelId, 0), requested);
+    }
+
+    [Fact]
+    public void ZoomCommands_AreForwardedToTheView()
+    {
+        var (_, vm, _) = NewEditor();
+        var requests = new List<ViewportRequest>();
+        vm.ViewportRequested += requests.Add;
+
+        vm.ZoomInCommand.Execute(null);
+        vm.FitPageCommand.Execute(null);
+
+        Assert.Equal([ViewportRequest.ZoomIn, ViewportRequest.FitPage], requests);
+    }
 }

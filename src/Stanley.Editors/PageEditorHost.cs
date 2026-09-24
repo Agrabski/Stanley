@@ -1,4 +1,3 @@
-using Dock.Model.Controls;
 using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel;
@@ -12,7 +11,7 @@ namespace Stanley.Editors;
 public static class PageEditorHost
 {
     /// <summary>An A4 page (the project-wide default trim) holding one panel that fills the live area inside the default margin - a blank page ready to be split or given a layout.</summary>
-    public static (EditorHistory History, IRootDock Layout, PageEditorViewModel Editor) CreateDemoLayout()
+    public static (EditorWorkspace Workspace, PageEditorViewModel Editor) CreateDemoWorkspace()
     {
         var history = new EditorHistory();
         var paper = MetricPaperSizes.Size(MetricPaperSize.A4);
@@ -26,7 +25,6 @@ public static class PageEditorHost
             Bubbles: []);
         var document = new PageDocument([panelId], new Dictionary<PanelId, PanelModel> { [panelId] = panel });
         var editor = new PageEditorViewModel(history, pageBounds, document);
-        var (_, layout) = EditorDockHost.CreateLayout(editor);
-        return (history, layout, editor);
+        return (new EditorWorkspace(history, editor), editor);
     }
 }

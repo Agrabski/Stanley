@@ -118,3 +118,36 @@ public class EditorViewModelTests
         Assert.False(history.CanUndo);
     }
 }
+
+public class EditorWorkspaceTests
+{
+    [Fact]
+    public void ActiveEditor_StartsOnTheFirstPane()
+    {
+        var history = new EditorHistory();
+        var first = new TestEditor(history, new TestDocument(0));
+        var second = new TestEditor(history, new TestDocument(1));
+
+        var workspace = new EditorWorkspace(history, first, second);
+
+        Assert.Same(first, workspace.ActiveEditor);
+    }
+
+    [Fact]
+    public void ActiveEditor_FollowsTheDockLayoutsActivePane()
+    {
+        var history = new EditorHistory();
+        var first = new TestEditor(history, new TestDocument(0));
+        var second = new TestEditor(history, new TestDocument(1));
+        var workspace = new EditorWorkspace(history, first, second);
+        var changes = new List<string?>();
+        workspace.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        workspace.Factory.SetActiveDockable(second);
+        Assert.Same(second, workspace.ActiveEditor);
+
+        workspace.Activate(first);
+        Assert.Same(first, workspace.ActiveEditor);
+        Assert.Contains(nameof(EditorWorkspace.ActiveEditor), changes);
+    }
+}

@@ -15,7 +15,7 @@ namespace Stanley.EditorFramework;
 /// undo stack by value, so a mutable reference type here would let later mutation
 /// corrupt history silently.
 /// </summary>
-public abstract class EditorViewModel<TDocument> : Document
+public abstract class EditorViewModel<TDocument> : Document, IEditorPane
     where TDocument : notnull, IEquatable<TDocument>
 {
     private readonly EditorHistory _history;
