@@ -1,4 +1,4 @@
-using Dock.Model.Core;
+using Dock.Model.Controls;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;

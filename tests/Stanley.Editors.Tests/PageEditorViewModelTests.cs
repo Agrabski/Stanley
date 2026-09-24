@@ -35,7 +35,7 @@ public class PageEditorViewModelTests
         var bubbleBounds = new Rect2D(20, 20, 50, 40);
         viewModel.InsertBubble(panelId, bubbleBounds, BubbleStylePreset.Speech);
 
-        Assert.Equal(1, viewModel.Working.Panels[panelId].Bubbles.Count);
+        Assert.Single(viewModel.Working.Panels[panelId].Bubbles);
         Assert.True(viewModel.Working.Panels[panelId].Bubbles[0].Text == "");
     }
 
@@ -57,8 +57,8 @@ public class PageEditorViewModelTests
         // Undo
         history.Undo();
 
-        Assert.Equal(1, viewModel.Working.PanelOrder.Count);
-        Assert.Equal(1, viewModel.Working.Panels.Count);
+        Assert.Single(viewModel.Working.PanelOrder);
+        Assert.Single(viewModel.Working.Panels);
         Assert.Contains(panelId, viewModel.Working.PanelOrder);
     }
 
@@ -74,7 +74,7 @@ public class PageEditorViewModelTests
         // Insert bubble
         var bubbleBounds = new Rect2D(20, 20, 50, 40);
         viewModel.InsertBubble(panelId, bubbleBounds, BubbleStylePreset.Speech);
-        Assert.Equal(1, viewModel.Working.Panels[panelId].Bubbles.Count);
+        Assert.Single(viewModel.Working.Panels[panelId].Bubbles);
 
         // Split
         viewModel.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5);
@@ -82,11 +82,11 @@ public class PageEditorViewModelTests
 
         // Undo split
         history.Undo();
-        Assert.Equal(1, viewModel.Working.PanelOrder.Count);
+        Assert.Single(viewModel.Working.PanelOrder);
 
         // Undo insert
         history.Undo();
-        Assert.Equal(0, viewModel.Working.Panels[panelId].Bubbles.Count);
+        Assert.Empty(viewModel.Working.Panels[panelId].Bubbles);
     }
 
     [Fact]

@@ -23,14 +23,67 @@ public partial class PageEditorView : UserControl
         InitializeComponent();
     }
 
+    private PageEditorViewModel? ViewModel => DataContext as PageEditorViewModel;
+
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        var viewModel = DataContext as PageEditorViewModel;
-        if (this.FindControl<PageCanvasControl>("PageCanvas") is PageCanvasControl canvas)
-        {
-            canvas.ViewModel = viewModel;
-        }
+        PageCanvas.SelectionChanged -= OnCanvasSelectionChanged;
+        PageCanvas.ViewModel = ViewModel;
+        PageCanvas.SelectionChanged += OnCanvasSelectionChanged;
+    }
+
+    /// <summary>Keeps the text box showing whichever bubble is currently selected on the canvas, rather than a stale value from a previous selection.</summary>
+    private void OnCanvasSelectionChanged()
+    {
+        if (PageCanvas is not { SelectedPanelId: { } panelId, SelectedBubbleIndex: >= 0 and var bubbleIndex } ||
+            ViewModel is not { } viewModel)
+            return;
+
+        if (viewModel.Working.Panels.TryGetValue(panelId, out var panel) && bubbleIndex < panel.Bubbles.Count)
+            BubbleTextBox.Text = panel.Bubbles[bubbleIndex].Text;
+    }
+
+    private void OnAddBubbleClick(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } viewModel || PageCanvas.SelectedPanelId is not { } panelId)
+            return;
+        if (!viewModel.Working.Panels.TryGetValue(panelId, out var panel))
+            return;
+
+        var panelBounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+        var width = Math.Min(panelBounds.Width * 0.4, 60);
+        var height = Math.Min(panelBounds.Height * 0.3, 40);
+        var bounds = new Rect2D(
+            panelBounds.MidX - width / 2,
+            panelBounds.MidY - height / 2,
+            width,
+            height);
+
+        viewModel.InsertBubble(panelId, bounds, BubbleStylePreset.Speech);
+        PageCanvas.InvalidateVisual();
+    }
+
+    private void OnSplitPanelClick(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } viewModel || PageCanvas.SelectedPanelId is not { } panelId)
+            return;
+
+        viewModel.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5);
+        PageCanvas.InvalidateVisual();
+    }
+
+    private void OnBubbleTextLostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } viewModel || PageCanvas.SelectedPanelId is not { } panelId)
+            return;
+
+        var bubbleIndex = PageCanvas.SelectedBubbleIndex;
+        if (bubbleIndex < 0)
+            return;
+
+        viewModel.SetBubbleText(panelId, bubbleIndex, BubbleTextBox.Text ?? "");
+        PageCanvas.InvalidateVisual();
     }
 }
 
@@ -44,11 +97,21 @@ public sealed class PageCanvasControl : Control
     private PanelId? _dragPanelId;
     private int _dragBubbleIndex = -1;
     private int _dragTailIndex = -1;
+    private int _dragCorner = -1;
     private PanelBoundaryDrag? _dragBoundary;
     private Rect2D _dragStartBounds;
 
     private PanelId? _selectedPanelId;
     private int _selectedBubbleIndex = -1;
+
+    /// <summary>The panel most recently clicked - what the "Split Panel"/"Add Bubble" toolbar actions apply to.</summary>
+    public PanelId? SelectedPanelId => _selectedPanelId;
+
+    /// <summary>The bubble most recently clicked (its body or one of its handles), or -1 if none/a bubble-less click. What the text box edits.</summary>
+    public int SelectedBubbleIndex => _selectedBubbleIndex;
+
+    /// <summary>Raised whenever <see cref="SelectedPanelId"/>/<see cref="SelectedBubbleIndex"/> changes, so the containing view can keep the text box in sync.</summary>
+    public event Action? SelectionChanged;
 
     public PageEditorViewModel? ViewModel
     {
@@ -99,6 +162,11 @@ public sealed class PageCanvasControl : Control
 
         if (_viewModel == null)
             return;
+
+        // 0. Selection: record whichever panel (and, if applicable, bubble) the click
+        // landed in, regardless of whether it also hits a drag handle below - this is
+        // what the "Split Panel"/"Add Bubble" buttons and the text box act on.
+        UpdateSelection(point2D);
 
         // Try to hit-test: tail target handles, then tail attachment, then bubble corners,
         // then panel corners, then boundary line
@@ -169,17 +237,6 @@ public sealed class PageCanvasControl : Control
                 var bubble = panel.Bubbles[bubbleIdx];
                 var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
 
-                // Check if we hit a bubble body first (for selection)
-                using (var path = BubbleRenderer.BuildRenderPath(bubble))
-                {
-                    if (path.Contains((float)point2D.X, (float)point2D.Y))
-                    {
-                        _selectedPanelId = panelId;
-                        _selectedBubbleIndex = bubbleIdx;
-                    }
-                }
-
-                // Check corners
                 var corners = new[]
                 {
                     new Point2D(bounds.Left, bounds.Top),
@@ -195,6 +252,7 @@ public sealed class PageCanvasControl : Control
                         _dragState = DragState.ResizeBubble;
                         _dragPanelId = panelId;
                         _dragBubbleIndex = bubbleIdx;
+                        _dragCorner = cornerIdx;
                         _dragStartBounds = bounds;
                         _viewModel.BeginResizeBubble(panelId, bubbleIdx);
                         e.Pointer.Capture(this);
@@ -226,6 +284,7 @@ public sealed class PageCanvasControl : Control
                 {
                     _dragState = DragState.ResizePanel;
                     _dragPanelId = panelId;
+                    _dragCorner = cornerIdx;
                     _dragStartBounds = bounds;
                     _viewModel.BeginResizePanel(panelId);
                     e.Pointer.Capture(this);
@@ -304,7 +363,7 @@ public sealed class PageCanvasControl : Control
             case DragState.ResizePanel:
                 if (_dragPanelId.HasValue)
                 {
-                    var newBounds = ComputeResizeBounds(_dragStartBounds, point2D);
+                    var newBounds = ComputeResizeBounds(_dragStartBounds, _dragCorner, point2D);
                     _viewModel.UpdateResizePanel(_dragPanelId.Value, newBounds);
                     InvalidateVisual();
                 }
@@ -313,7 +372,7 @@ public sealed class PageCanvasControl : Control
             case DragState.ResizeBubble:
                 if (_dragPanelId.HasValue)
                 {
-                    var newBounds = ComputeResizeBounds(_dragStartBounds, point2D);
+                    var newBounds = ComputeResizeBounds(_dragStartBounds, _dragCorner, point2D);
                     _viewModel.UpdateResizeBubble(_dragPanelId.Value, _dragBubbleIndex, newBounds);
                     InvalidateVisual();
                 }
@@ -356,6 +415,7 @@ public sealed class PageCanvasControl : Control
             _dragPanelId = null;
             _dragBubbleIndex = -1;
             _dragTailIndex = -1;
+            _dragCorner = -1;
             _dragBoundary = null;
             e.Pointer.Capture(null);
             InvalidateVisual();
@@ -373,19 +433,66 @@ public sealed class PageCanvasControl : Control
             _dragPanelId = null;
             _dragBubbleIndex = -1;
             _dragTailIndex = -1;
+            _dragCorner = -1;
             _dragBoundary = null;
             InvalidateVisual();
             e.Handled = true;
         }
     }
 
-    private Rect2D ComputeResizeBounds(Rect2D original, Point2D currentMouse)
+    /// <summary>Records the panel (and, if the click landed inside one, the bubble) under <paramref name="point"/> as the current selection, firing <see cref="SelectionChanged"/> if it moved. Panels are always axis-aligned rectangles in this editor, so a bounds check is enough - no need for the full bezier path.</summary>
+    private void UpdateSelection(Point2D point)
     {
-        var minX = original.Left;
-        var minY = original.Top;
-        var maxX = Math.Max(currentMouse.X, original.Left + 20);
-        var maxY = Math.Max(currentMouse.Y, original.Top + 20);
-        return Rect2D.FromEdges(minX, minY, maxX, maxY);
+        if (_viewModel == null)
+            return;
+
+        PanelId? hitPanel = null;
+        var hitBubbleIndex = -1;
+
+        foreach (var panelId in _viewModel.Working.PanelOrder)
+        {
+            if (!_viewModel.Working.Panels.TryGetValue(panelId, out var panel))
+                continue;
+
+            var bounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+            if (point.X < bounds.Left || point.X > bounds.Right || point.Y < bounds.Top || point.Y > bounds.Bottom)
+                continue;
+
+            hitPanel = panelId;
+            for (var bubbleIdx = panel.Bubbles.Count - 1; bubbleIdx >= 0; bubbleIdx--)
+            {
+                using var path = BubbleRenderer.BuildRenderPath(panel.Bubbles[bubbleIdx]);
+                if (path.Contains((float)point.X, (float)point.Y))
+                {
+                    hitBubbleIndex = bubbleIdx;
+                    break;
+                }
+            }
+            break;
+        }
+
+        if (hitPanel is null || hitPanel.Equals(_selectedPanelId) && hitBubbleIndex == _selectedBubbleIndex)
+            return;
+
+        _selectedPanelId = hitPanel;
+        _selectedBubbleIndex = hitBubbleIndex;
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Resizes from <paramref name="original"/> by moving only the two edges that meet at whichever corner (0=TL, 1=TR, 2=BR, 3=BL) was grabbed - the other two edges stay fixed, so each handle drags independently instead of every corner growing the same bottom-right-anchored rectangle.</summary>
+    private static Rect2D ComputeResizeBounds(Rect2D original, int corner, Point2D pointer)
+    {
+        var left = corner is 0 or 3 ? pointer.X : original.Left;
+        var top = corner is 0 or 1 ? pointer.Y : original.Top;
+        var right = corner is 1 or 2 ? pointer.X : original.Right;
+        var bottom = corner is 2 or 3 ? pointer.Y : original.Bottom;
+
+        if (right - left < 1)
+            right = left + 1;
+        if (bottom - top < 1)
+            bottom = top + 1;
+
+        return Rect2D.FromEdges(left, top, right, bottom);
     }
 
     private double DistPoint(Point2D a, Point2D b)

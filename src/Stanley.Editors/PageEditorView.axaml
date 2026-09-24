@@ -4,10 +4,12 @@
              x:Class="Stanley.Editors.PageEditorView">
   <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
     <!-- Controls bar -->
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Padding="8">
-      <Button Name="AddBubbleButton">Add Bubble</Button>
-      <Button Name="SplitPanelButton">Split Panel</Button>
-    </StackPanel>
+    <Border Grid.Row="0" Padding="8" BorderBrush="LightGray" BorderThickness="0,0,0,1">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Name="AddBubbleButton" Click="OnAddBubbleClick">Add Bubble</Button>
+        <Button Name="SplitPanelButton" Click="OnSplitPanelClick">Split Panel</Button>
+      </StackPanel>
+    </Border>
 
     <!-- Main canvas -->
     <Grid Grid.Row="1">
@@ -16,7 +18,7 @@
       <!-- Text editing box (overlaid, positioned outside canvas typically) -->
       <StackPanel Margin="8" VerticalAlignment="Top" HorizontalAlignment="Right" Width="200">
         <TextBlock Text="Bubble Text:" Margin="0,0,0,4" />
-        <TextBox Name="BubbleTextBox" Height="100" TextWrapping="Wrap" />
+        <TextBox Name="BubbleTextBox" Height="100" TextWrapping="Wrap" LostFocus="OnBubbleTextLostFocus" />
       </StackPanel>
     </Grid>
   </Grid>

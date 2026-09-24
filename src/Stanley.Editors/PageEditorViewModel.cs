@@ -39,7 +39,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     {
         if (!Working.Panels.TryGetValue(id, out var panel))
         {
-            LastError = $"Unknown panel '{id}'.";
+            Apply(EditResult<PageDocument>.Failure($"Unknown panel '{id}'."));
             return;
         }
 
@@ -56,12 +56,14 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         newOrder[panelIndex] = first.Id;
         newOrder.Insert(panelIndex + 1, second.Id);
 
-        var newPanels = new Dictionary<PanelId, Panel>(Working.Panels)
+        var newPanels = new Dictionary<PanelId, Panel>();
+        foreach (var kvp in Working.Panels)
         {
-            [first.Id] = first,
-            [second.Id] = second
-        };
-        newPanels.Remove(id);
+            if (!kvp.Key.Equals(id))
+                newPanels[kvp.Key] = kvp.Value;
+        }
+        newPanels[first.Id] = first;
+        newPanels[second.Id] = second;
 
         var newDocument = new PageDocument(newOrder, newPanels);
         Apply(EditResult<PageDocument>.Success(newDocument));
