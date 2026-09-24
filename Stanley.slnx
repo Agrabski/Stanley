@@ -1,13 +1,20 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Stanley.App/Stanley.App.csproj" />
-    <Project Path="src/Stanley.Bubbles/Stanley.Bubbles.csproj" />
+    <Project Path="src/Stanley.Editing/Stanley.Editing.csproj" />
+    <Project Path="src/Stanley.Editing.Abstractions/Stanley.Editing.Abstractions.csproj" />
+    <Project Path="src/Stanley.EditorFramework/Stanley.EditorFramework.csproj" />
+    <Project Path="src/Stanley.Editors/Stanley.Editors.csproj" />
     <Project Path="src/Stanley.ProjectModel/Stanley.ProjectModel.csproj" />
+    <Project Path="src/Stanley.Rendering/Stanley.Rendering.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj" />
     <Project Path="tests/Stanley.App.Tests/Stanley.App.Tests.csproj" />
-    <Project Path="tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj" />
+    <Project Path="tests/Stanley.Editing.Tests/Stanley.Editing.Tests.csproj" />
+    <Project Path="tests/Stanley.EditorFramework.Tests/Stanley.EditorFramework.Tests.csproj" />
+    <Project Path="tests/Stanley.Editors.Tests/Stanley.Editors.Tests.csproj" />
     <Project Path="tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj" />
+    <Project Path="tests/Stanley.Rendering.Tests/Stanley.Rendering.Tests.csproj" />
   </Folder>
 </Solution>

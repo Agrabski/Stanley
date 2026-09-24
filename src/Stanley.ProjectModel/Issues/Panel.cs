@@ -1,3 +1,4 @@
+using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 
@@ -10,12 +11,12 @@ namespace Stanley.ProjectModel.Issues;
 /// graph spanning panels.
 /// </summary>
 /// <param name="Bubbles">
-/// Placeholder: Stanley.Bubbles has no persistence format yet, so a panel only
-/// references bubble ids for now, in reading/z-order.
+/// Embedded directly, in z-order, the same way <see cref="CharacterInstances"/> is -
+/// nothing outside this panel ever references a bubble by id.
 /// </param>
 public sealed record Panel(
     PanelId Id,
     PanelShape Shape,
     PanelBackground? Background,
     IReadOnlyList<CharacterInstance> CharacterInstances,
-    IReadOnlyList<BubbleId> Bubbles);
+    IReadOnlyList<Bubble> Bubbles);

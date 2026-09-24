@@ -1,25 +1,26 @@
 using SkiaSharp;
-using Stanley.Bubbles;
+using Stanley.ProjectModel.Bubbles;
+using Stanley.ProjectModel.Geometry;
 using Xunit;
 
-namespace Stanley.Bubbles.Tests;
+namespace Stanley.Rendering.Tests;
 
-public class BubbleTailTests
+public class TailPathTests
 {
     [Theory]
-    [InlineData(0.02f, -150, -80)]
-    [InlineData(0.13f, 480, 410)]
-    [InlineData(0.37f, 600, 50)]
-    [InlineData(0.55f, 620, 480)]
-    [InlineData(0.61f, -100, 300)]
-    [InlineData(0.75f, 50, 400)]
-    [InlineData(0.9f, 400, -120)]
-    public void GeneratePath_JaggedTriangle_ProducesASimplePolygon(float attachmentT, float targetX, float targetY)
+    [InlineData(0.02, -150, -80)]
+    [InlineData(0.13, 480, 410)]
+    [InlineData(0.37, 600, 50)]
+    [InlineData(0.55, 620, 480)]
+    [InlineData(0.61, -100, 300)]
+    [InlineData(0.75, 50, 400)]
+    [InlineData(0.9, 400, -120)]
+    public void Generate_JaggedTriangle_ProducesASimplePolygon(double attachmentT, double targetX, double targetY)
     {
-        var outline = new BubbleOutline(BubbleStylePresets.GenerateOutline(BubbleStylePreset.Shout, new SKRect(100, 100, 300, 220)));
-        var tail = new BubbleTail(attachmentT, new SKPoint(targetX, targetY), TailKind.JaggedTriangle);
+        var shape = BubbleStylePresets.GenerateShape(BubbleStylePreset.Shout, new Rect2D(100, 100, 200, 120));
+        var tail = new BubbleTail(attachmentT, new Point2D(targetX, targetY), TailKind.JaggedTriangle);
 
-        using var path = tail.GeneratePath(outline);
+        using var path = TailPath.Generate(tail, shape);
         var vertices = path.Points;
 
         Assert.True(vertices.Length >= 3, "left, target, right is the fallback minimum; more once the jag/absorbed-outline-anchor detail fits without crossing itself");
@@ -27,18 +28,18 @@ public class BubbleTailTests
     }
 
     [Fact]
-    public void GeneratePath_JaggedTriangle_BaseSpansMoreThanASingleZigzagTooth()
+    public void Generate_JaggedTriangle_BaseSpansMoreThanASingleZigzagTooth()
     {
         // A jagged outline is made of many short straight edges; the tail's base
         // (its two attachment points either side of AttachmentT) needs to span wide
         // enough to blend across that jaggedness instead of pinching into a sliver
         // inside one tooth.
-        var outline = new BubbleOutline(BubbleStylePresets.GenerateOutline(BubbleStylePreset.Shout, new SKRect(100, 100, 300, 220)));
-        var tail = new BubbleTail(0.75f, new SKPoint(50, 400), TailKind.JaggedTriangle);
+        var shape = BubbleStylePresets.GenerateShape(BubbleStylePreset.Shout, new Rect2D(100, 100, 200, 120));
+        var tail = new BubbleTail(0.75, new Point2D(50, 400), TailKind.JaggedTriangle);
 
-        using var path = tail.GeneratePath(outline);
+        using var path = TailPath.Generate(tail, shape);
         var left = path.Points[0];
-        // GeneratePath's JaggedTriangle point order is fixed: left, kink+jag, target,
+        // Generate's JaggedTriangle point order is fixed: left, kink+jag, target,
         // kink-jag, right, then any absorbed outline anchors - so index 4 is always
         // "right", not Points[^1] (which is the last absorbed anchor when there is one).
         var right = path.Points[4];
@@ -54,7 +55,6 @@ public class BubbleTailTests
         {
             for (var j = i + 1; j < n; j++)
             {
-                // Skip edges that share a vertex (adjacent, or the pair that meets at the polygon's closing edge).
                 if (j == i + 1 || (i == 0 && j == n - 1))
                     continue;
 

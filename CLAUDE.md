@@ -19,10 +19,12 @@ Stack: **Avalonia** on **.NET 10** (`net10.0`; retarget to net11.0 once that
 ships — .NET 11 doesn't exist as a stable release yet), rendering via
 **SkiaSharp** (Avalonia's built-in Skia backend). Shared MSBuild settings live
 in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
-(the newer XML-free format).
+(the newer XML-free format). All test projects opt into
+`Microsoft.Testing.Platform` via `global.json`.
 
-The speech-bubble POC (see below) and the project/data model (persistence only —
-no editor UI yet) exist so far. No character rendering, no document/page editor.
+The project/data model (persistence layer), editing operations (validation +
+transformation), editor framework (undo/redo + gesture lifecycle), and one
+concrete page/panel/bubble editor all exist. No character rendering yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -30,59 +32,81 @@ separate GUI exe plus a separate CLI exe (see "Command-line interface" below
 for why).
 
 ```
-src/Stanley.Bubbles/      # bubble geometry model, no Avalonia dependency (SkiaSharp only)
-src/Stanley.ProjectModel/ # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
-src/Stanley.App/          # the `stanley` executable: Avalonia POC host (single-bubble editor) + CLI (Commands/)
-tests/Stanley.Bubbles.Tests/       # xunit v2, geometry unit tests
-tests/Stanley.ProjectModel.Tests/  # xunit v2, id/serialization/repository unit tests
-tests/Stanley.App.Tests/           # xunit v2, CLI command unit tests (invokes System.CommandLine commands directly, no GUI/headless machinery needed)
-tests/Stanley.App.HeadlessTests/   # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
+src/Stanley.Editing.Abstractions/ # EditResult only, zero-dependency shared vocabulary
+src/Stanley.Editing/              # pure editing functions (bubble/panel operations), Avalonia-free
+src/Stanley.EditorFramework/      # undo/redo (EditorHistory), gesture lifecycle (EditorViewModel), Dock.Avalonia-coupled
+src/Stanley.Editors/              # concrete editors (PageEditorViewModel, PageEditorView, PageEditorHost)
+src/Stanley.ProjectModel/         # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
+src/Stanley.Rendering/            # pure SkiaSharp rendering (bubble/panel path-building, text, drawing)
+src/Stanley.App/                  # the `stanley` executable: Avalonia GUI host + CLI (Commands/)
+tests/Stanley.App.HeadlessTests/   # xunit v3, UI smoke tests
+tests/Stanley.App.Tests/           # xunit v3, CLI command unit tests
+tests/Stanley.Editing.Tests/       # xunit v3, editing operation unit tests
+tests/Stanley.EditorFramework.Tests/ # xunit v3, undo/redo + gesture lifecycle unit tests
+tests/Stanley.Editors.Tests/       # xunit v3, concrete editor unit tests
+tests/Stanley.ProjectModel.Tests/  # xunit v3, id/serialization/repository unit tests
+tests/Stanley.Rendering.Tests/     # xunit v3, rendering unit tests
 ```
 
 Build/test/run:
 ```
 dotnet build Stanley.slnx
-dotnet test tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj
-dotnet test tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj
-dotnet test tests/Stanley.App.Tests/Stanley.App.Tests.csproj
-dotnet test tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
+dotnet test --project tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
+dotnet test --project tests/Stanley.App.Tests/Stanley.App.Tests.csproj
+dotnet test --project tests/Stanley.Editing.Tests/Stanley.Editing.Tests.csproj
+dotnet test --project tests/Stanley.EditorFramework.Tests/Stanley.EditorFramework.Tests.csproj
+dotnet test --project tests/Stanley.Editors.Tests/Stanley.Editors.Tests.csproj
+dotnet test --project tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj
+dotnet test --project tests/Stanley.Rendering.Tests/Stanley.Rendering.Tests.csproj
 dotnet run --project src/Stanley.App
 dotnet run --project src/Stanley.App -- init ./MyComic --title "My Comic"
 ```
-No linter is configured yet.
+All tests use xunit v3 (4.0.1), Microsoft.NET.Test.Sdk (18.10.1), and
+coverlet.collector (10.0.1). No linter is configured yet.
 
-Environment notes: on a fresh Linux container, `apt-get install dotnet-sdk-10.0`
-works when `dot.net`/`builds.dotnet.microsoft.com` is egress-blocked (the
-official dotnet-install script host). SkiaSharp needs an explicit
-`SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per platform —
-the base `SkiaSharp` package alone throws `DllNotFoundException` at runtime.
-Avalonia's headless test host needs `.UseSkia()` even though it's not
+Dependencies: **Avalonia** 12.1.3, **SkiaSharp** 4.152.1, **System.CommandLine**
+2.0.12, **CommunityToolkit.Mvvm** 8.4.2, **Dock.Avalonia** / **Dock.Model.Mvvm**
+12.1.0.6 (for dockable panes). Environment notes: on a fresh Linux container,
+`apt-get install dotnet-sdk-10.0` works when `dot.net`/`builds.dotnet.microsoft.com`
+is egress-blocked (the official dotnet-install script host). SkiaSharp needs an
+explicit `SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per
+platform — the base `SkiaSharp` package alone throws `DllNotFoundException` at
+runtime. Avalonia's headless test host needs `.UseSkia()` even though it's not
 rendering to a real window, or any `TextBlock` measurement throws
 (`Unable to locate 'Avalonia.Platform.IFontManagerImpl'`).
 
-## Speech bubble system (POC)
+## Speech bubble system
 
-Implemented in `Stanley.Bubbles` + `Stanley.App`, demonstrating: resizing,
-switching between style presets, and adding/moving any number of tails.
+Data model in `Stanley.ProjectModel/Bubbles/` (immutable `record`), rendering
+in `Stanley.Rendering`, editing operations in `Stanley.Editing`, wired into
+the page editor via `PageEditorViewModel`.
 
-- **`BubbleOutline`**: an arbitrary closed bezier shape (ordered `BubbleAnchor`
-  ring, each with absolute in/out handle points and a corner-vs-smooth type).
-  `Rescale(from, to)` affine-maps every anchor for resizing.
+- **`BubbleShape`** (not `BubbleOutline`): an arbitrary closed bezier shape
+  (ordered `ShapeAnchor` ring, each with absolute in/out handle points and
+  smoothness type). Reuses the anchor-ring math (`AnchorRing` free functions)
+  shared with `PanelShape` — no duplication, no shared base type (kept them
+  separate to sidestep unnecessary coupling). `BubbleEditing.Resize(bubble, newBounds)`
+  rescales anchors affine-style.
+- **`Bubble` is a persisted value**, embedded directly in `Panel.Bubbles`
+  (like `CharacterInstance`) with id stable only within its panel — nothing
+  outside that panel ever references a bubble by id.
 - **Tails are independent, not part of the outline.** Each `BubbleTail` has an
   `AttachmentT` (0–1 fraction along the outline) and a free `Target` point.
-  `SpeechBubble.BuildRenderPath()` unions the outline with every tail's own
-  polygon via `SKPath.Op(..., SKPathOp.Union)` — this is why adding another
-  tail needs no special case, and why any number of tails works.
+  `BubbleRenderer` (in `Stanley.Rendering`) unions the outline with every
+  tail's own polygon via `SKPath.Op(..., SKPathOp.Union)` — this is why adding
+  another tail needs no special case, and why any number of tails works.
 - **Style presets** (`BubbleStylePreset`: Speech/Shout/Whisper) are pure
-  `bounds -> anchors` generator functions plus a default tail shape/stroke —
-  the "ease of use" default path. The anchor model itself is the escape
-  hatch for arbitrary hand-edited shapes later.
-- Deferred: text/lettering rendering, thought-bubble style (disjoint circle
-  chain — breaks the single-polygon-per-tail union model), colour slots,
-  character-bound tail targets, persistence, NativeAOT publish validation.
-  See the design discussion in this repo's history for the full reasoning
-  (bezier outlines, boolean-union tails, Avalonia+AOT tradeoffs, AGPL
-  licensing check on the dependency stack).
+  `bounds -> anchors` generator functions plus a default tail kind and stroke —
+  the "ease of use" default path. `BubbleEditing.SetStyle(bubble, style)`
+  regenerates the shape from current bounds under the new preset while
+  preserving tail attachment/target so they don't jump. The anchor model
+  itself is the escape hatch for arbitrary hand-edited shapes later.
+- Deferred: text/lettering interactive editing (rendering exists in
+  `BubbleTextRenderer`), thought-bubble style (disjoint circle chain — breaks
+  the single-polygon-per-tail union model), colour slots, character-bound tail
+  targets, NativeAOT publish validation. See the design discussion in this
+  repo's history for the full reasoning (bezier outlines, boolean-union tails,
+  Avalonia+AOT tradeoffs, AGPL licensing check on the dependency stack).
 
 ## Project & data model (implemented)
 
@@ -132,14 +156,47 @@ features will read and write.
   preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
   (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
   not its own preset table entry, since bleed isn't part of a paper size).
-- **Not yet designed**: bubble persistence (`Panel.Bubbles` is a placeholder
-  `IReadOnlyList<BubbleId>` — Stanley.Bubbles has no JSON format yet),
-  `sticker.json`'s exact schema beyond what's implemented here (the design
-  doc doesn't draw one explicitly), any convenience "create new project/
-  character/issue" helpers beyond `ProjectRepository.Initialize` and raw
-  `SaveX`/`LoadX`, and NativeAOT publish validation (same deferral as the
-  bubble POC — analyzer-clean under `IsAotCompatible`, not yet published via
-  a real `PublishAot` executable).
+- **Not yet designed**: `sticker.json`'s exact schema beyond what's
+  implemented here (the design doc doesn't draw one explicitly), any
+  convenience "create new project/character/issue" helpers beyond
+  `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and NativeAOT
+  publish validation (analyzer-clean under `IsAotCompatible`, not yet
+  published via a real `PublishAot` executable).
+
+## Editor architecture
+
+Editing pipeline layers, bottom to top:
+
+- **`Stanley.Editing.Abstractions`**: one type (`EditResult<T>`), zero
+  dependencies — the shared vocabulary between editing logic and the editor
+  framework, kept here so EditorFramework never has to reference Editing.
+- **`Stanley.Editing`**: pure editing functions over immutable document
+  values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`).
+  Avalonia-free by design — a future `stanley` subcommand could invoke the
+  same logic headlessly, with no recompilation needed.
+- **`Stanley.EditorFramework`**: `EditorHistory` (one shared undo/redo stack
+  per open project, not per pane, storing closures for before/after states)
+  and `EditorViewModel<TDocument>` (gesture lifecycle: `BeginGesture()`
+  captures state, `UpdateGesture(result)` applies on every pointer move for
+  live preview, `CommitGesture()` records in history, `CancelGesture()` reverts
+  to baseline). Allows Avalonia coupling (extends Dock.Avalonia's `Document`
+  directly) since undo/redo and pane lifecycle have no lower-level reuse
+  requirement. `TDocument` must be immutable (`record` satisfies this).
+- **`Stanley.Editors`**: concrete editor implementations (`PageEditorViewModel`
+  extends `EditorViewModel<PageDocument>`, `PageEditorView` is the UI, `PageEditorHost`
+  builds the demo page + history + layout at startup). Supports panel resize,
+  panel split, boundary drag between adjacent panels, bubble insertion/resize/style-change.
+  Panels in the page editor are always axis-aligned rectangles (an arbitrary
+  hand-edited `PanelShape` remains a data-model escape hatch, just unreachable
+  through this editor's drag interactions — future editors could expose it).
+- **`Stanley.App`**: wires `EditorHistory` + `PageEditorHost.CreateDemoLayout()`
+  into `MainWindow`'s Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
+  bound globally to history's undo/redo commands.
+
+The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a
+future editor or subcommand can reach `BubbleEditing`, `PanelLayoutEditing`
+etc. without pulling in Avalonia dependencies. `EditorHistory` has no such
+reuse requirement, so it's fine for it to couple to Avalonia/MVVM.
 
 ## Command-line interface (implemented)
 

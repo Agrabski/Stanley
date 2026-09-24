@@ -7,4 +7,8 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="4.152.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
+  </ItemGroup>
+
 </Project>
