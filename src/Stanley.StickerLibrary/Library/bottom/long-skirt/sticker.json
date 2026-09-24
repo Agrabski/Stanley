@@ -1,0 +1,33 @@
+{
+  "colors": {
+    "bottom": "#1f618d"
+  },
+  "id": "library",
+  "name": "Long skirt",
+  "parts": [
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0.6,
+        "to": 1
+      },
+      "name": "waist",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "bottom",
+        "ease": 0.01,
+        "flare": 0.35,
+        "from": 0,
+        "to": 0.92
+      },
+      "name": "skirt",
+      "region": "skirt"
+    }
+  ],
+  "slot": "bottom",
+  "variants": [
+    "default"
+  ]
+}

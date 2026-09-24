@@ -138,7 +138,18 @@ public sealed class ComicProject
 
         (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: true);
         if (characters != null)
-            _savedCharacters = WriteCharacters(repository, characters, prune: true);
+            _savedCharacters = WriteCharacters(repository, Tidied(characters, pages), prune: true);
+    }
+
+    /// <summary>
+    /// The characters as they're written: without library stickers that were tried on but
+    /// aren't worn anywhere - not by the character, a named look or any panel - so trying
+    /// things on leaves no files behind (docs/sticker-system.md §11).
+    /// </summary>
+    private static IReadOnlyList<CharacterDefinition> Tidied(IReadOnlyList<CharacterDefinition> characters, IReadOnlyList<(PageId Id, PageDocument Document)> pages)
+    {
+        var instances = pages.SelectMany(p => p.Document.Panels.Values.SelectMany(panel => panel.CharacterInstances)).ToList();
+        return characters.Select(c => LookEditing.TidyWardrobe(c, LookEditing.WornElsewhere(c, instances))).ToList();
     }
 
     private HashSet<CharacterId> WriteCharacters(ProjectRepository repository, IReadOnlyList<CharacterDefinition> characters, bool prune)
@@ -165,7 +176,7 @@ public sealed class ComicProject
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim);
         WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: false);
-        WriteCharacters(repository, characters ?? Characters, prune: false);
+        WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
     }
 
     /// <summary>

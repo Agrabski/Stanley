@@ -27,7 +27,7 @@ public sealed record SkinSwatch(string Name, ColorValue Color)
 /// <see cref="EndSliderDrag"/> on release, so one drag is one undo step. A value set
 /// outside a drag (keyboard, a spin box) is its own undo step.
 /// </summary>
-public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefinition>
+public sealed partial class CharacterEditorViewModel : EditorViewModel<CharacterDefinition>
 {
     private bool _showLineUp = true;
     private ViewAngle _previewAngle = ViewAngle.Front;
@@ -52,10 +52,14 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
                 SetSkin(swatch.Color);
         });
         BackToPageCommand = new RelayCommand(() => Library?.ReturnToPage(), () => Library != null);
+        InitializeLook();
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(Working))
+            {
                 RaiseBodyChanged();
+                RaiseLookChanged();
+            }
         };
         if (library != null)
             library.CharactersChanged += () =>
@@ -225,8 +229,8 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
         Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
     public string Hint =>
-        "Pick a body type, then fine-tune with the sliders. Every panel this character is in updates as you go. " +
-        "Relative heights: 100% is an average adult.";
+        "Pick a body type and fine-tune it with the sliders; dress them on the Look tab, and click something they wear to adjust it. " +
+        "Every panel this character is in updates as you go.";
 
     private static readonly IReadOnlyList<SkinSwatch> Swatches =
     [

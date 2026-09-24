@@ -1,0 +1,32 @@
+{
+  "colors": {
+    "top": "#3b6fd8"
+  },
+  "id": "library",
+  "name": "T-shirt",
+  "parts": [
+    {
+      "cover": {
+        "color": "top",
+        "ease": 0.014,
+        "from": 0,
+        "to": 0.86
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "top",
+        "from": 0,
+        "to": 0.34
+      },
+      "name": "sleeves",
+      "region": "arm"
+    }
+  ],
+  "slot": "top",
+  "variants": [
+    "default"
+  ]
+}

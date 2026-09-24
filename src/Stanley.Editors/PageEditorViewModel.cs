@@ -1097,10 +1097,10 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>A placed character's bounding box on the page.</summary>
     public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(InstanceExtent(instance));
 
-    /// <summary>An instance's figure-space bounding box as it stands - view and pose included.</summary>
+    /// <summary>An instance's figure-space bounding box as it stands - view, pose and what it wears included.</summary>
     private Rect2D InstanceExtent(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
-            ? CharacterPosing.Figure(character, instance).Extent
+            ? Rendering.CharacterRenderers.Default.Extent(character, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, instance.RevisionOverride)
             : BodyRig.Extent(BodyShape.Default, instance.Pose.ViewAngle);
 
     /// <summary>

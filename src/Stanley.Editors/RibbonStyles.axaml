@@ -169,6 +169,30 @@
     <Setter Property="Foreground" Value="{DynamicResource StanleyCharacterTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.sticker">
+    <Setter Property="Background" Value="#1FF58A07" />
+  </Style>
+  <Style Selector="TextBlock.stickerHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <!-- A slot's gallery on the Look tab: label and what's worn, opening the choices. -->
+  <Style Selector="DropDownButton.slotGallery">
+    <Setter Property="Width" Value="84" />
+    <Setter Property="Height" Value="64" />
+    <Setter Property="Padding" Value="4,2" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="DropDownButton.colorSlot">
+    <Setter Property="Height" Value="26" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Button.choice.worn">
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
   <!-- A labelled slider row in the character ribbon: name, slider, value. -->
   <Style Selector="Slider.body">
     <Setter Property="Width" Value="130" />

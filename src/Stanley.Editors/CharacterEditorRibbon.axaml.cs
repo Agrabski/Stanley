@@ -13,7 +13,7 @@ public partial class CharacterEditorRibbon : UserControl
 
         // One slider drag = one undo step: the gesture opens on press (before the slider
         // jumps to the pointer) and commits on release.
-        foreach (var slider in new[] { HeightSlider, WeightSlider, MuscleSlider, HeadSlider, FrameSlider })
+        foreach (var slider in new[] { HeightSlider, WeightSlider, MuscleSlider, HeadSlider, FrameSlider, LengthSlider, SleevesSlider, FitSlider })
         {
             slider.AddHandler(PointerPressedEvent, (_, _) => ViewModel?.BeginSliderDrag(), RoutingStrategies.Tunnel, handledEventsToo: true);
             slider.AddHandler(PointerReleasedEvent, (_, _) => ViewModel?.EndSliderDrag(), RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
@@ -36,6 +36,25 @@ public partial class CharacterEditorRibbon : UserControl
     }
 
     private CharacterEditorViewModel? ViewModel => DataContext as CharacterEditorViewModel;
+
+    private CharacterEditorViewModel? _subscribed;
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (_subscribed != null)
+            _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
+        _subscribed = ViewModel;
+        if (_subscribed != null)
+            _subscribed.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    /// <summary>Like the page ribbon: the Sticker tab appears with a selection but isn't forced open; if it goes away while shown, back to Look.</summary>
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CharacterEditorViewModel.HasSelectedSticker) && ViewModel is { HasSelectedSticker: false } && Tabs.SelectedItem == StickerTab)
+            Tabs.SelectedItem = LookTab;
+    }
 
     /// <summary>Exposed for headless UI tests.</summary>
     public TabControl TabControl => Tabs;

@@ -175,3 +175,110 @@ public class FigureLayerRenderingTests
             return Math.Sqrt(x * x + y * y);
         });
 }
+
+public class CoverStickerRenderingTests
+{
+    private static readonly ColorValue Top = ColorValue.FromHex("#0000ff");
+
+    /// <summary>A character wearing one sticker made of cover parts, all in the "top" colour slot.</summary>
+    private static CharacterDefinition Wearing(params StickerPart[] parts)
+    {
+        var sticker = new Sticker(StickerId.New(), "Top", StickerSlots.Top, parts, new SortedDictionary<string, ColorValue> { ["top"] = Top }, ["default"]);
+        var character = CharacterDefinition.Create("A") with
+        {
+            Stickers = new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Top] = [sticker.Id] },
+        };
+        return character with { Wardrobe = character.Wardrobe.With(new StickerAsset(sticker, new Dictionary<string, ArtFile>())) };
+    }
+
+    private static SKBitmap Render(CharacterDefinition character, PoseData pose, CharacterInstanceOverrides? overrides = null)
+    {
+        var bitmap = new SKBitmap(400, 440);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(new Point2D(200, 420), 400, false), 2f, pose.ViewAngle, pose, overrides);
+        return bitmap;
+    }
+
+    private static SKColor At(SKBitmap bitmap, Point2D figure) => bitmap.GetPixel((int)Math.Round(200 + figure.X * 400), (int)Math.Round(420 + figure.Y * 400));
+
+    private static Point2D Along(BodyCapsule c, double t) => new(c.From.X + (c.To.X - c.From.X) * t, c.From.Y + (c.To.Y - c.From.Y) * t);
+
+    [Fact]
+    public void A_t_shirt_colours_the_chest_and_the_top_of_the_arms_but_leaves_the_forearms_bare()
+    {
+        var character = Wearing(
+            new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 0.86)),
+            new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover("top", 0, 0.35)));
+        var pose = new PoseData(ViewAngle.Front, [], []);
+        var figure = BodyRig.Build(character.Body);
+        var chest = figure.Regions.Torso.ToFigure(new Point2D(0, figure.Regions.Torso.Top + 0.1));
+
+        using var bitmap = Render(character, pose);
+
+        Assert.Equal(new SKColor(0, 0, 255), At(bitmap, chest));
+        Assert.Equal(new SKColor(0, 0, 255), At(bitmap, Along(figure.Regions.LeftArm.Upper, 0.35)));
+        Assert.Equal(FigureGeometry.ToSk(character.Skin), At(bitmap, Along(figure.Regions.RightArm.Lower, 0.5)));
+    }
+
+    [Fact]
+    public void A_long_sleeve_bends_with_the_elbow()
+    {
+        var character = Wearing(new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover("top", 0, 1)));
+        // The forearm folded in across the body.
+        var pose = new PoseData(ViewAngle.Front, [new BoneRotation(HumanoidBone.LeftLowerArm, 100)], []);
+        var forearm = BodyRig.Build(character.Body, ViewAngle.Front, null, pose).Regions.LeftArm.Lower;
+
+        using var bitmap = Render(character, pose);
+
+        Assert.Equal(new SKColor(0, 0, 255), At(bitmap, Along(forearm, 0.5)));
+        Assert.Equal(new SKColor(0, 0, 255), At(bitmap, Along(forearm, 0.9)));
+    }
+
+    [Fact]
+    public void A_panel_override_takes_the_sticker_off_for_that_panel_only()
+    {
+        var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var pose = new PoseData(ViewAngle.Front, [], []);
+        var figure = BodyRig.Build(character.Body);
+        var chest = figure.Regions.Torso.ToFigure(new Point2D(0, figure.Regions.Torso.Top + 0.1));
+        var off = new CharacterInstanceOverrides(new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Top] = [] }, null);
+
+        using var dressed = Render(character, pose);
+        using var bare = Render(character, pose, off);
+
+        Assert.Equal(new SKColor(0, 0, 255), At(dressed, chest));
+        Assert.Equal(FigureGeometry.ToSk(character.Skin), At(bare, chest));
+    }
+
+    [Fact]
+    public void The_characters_own_colour_wins_over_the_stickers_default()
+    {
+        var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        character = character with { ColorSlots = new SortedDictionary<string, ColorValue>(character.ColorSlots) { ["top"] = ColorValue.FromHex("#ff0000") } };
+        var figure = BodyRig.Build(character.Body);
+
+        using var bitmap = Render(character, new PoseData(ViewAngle.Front, [], []));
+
+        Assert.Equal(new SKColor(255, 0, 0), At(bitmap, figure.Regions.Torso.ToFigure(new Point2D(0, figure.Regions.Torso.Top + 0.1))));
+    }
+
+    [Theory]
+    [InlineData(ViewAngle.Front)]
+    [InlineData(ViewAngle.Profile)]
+    public void A_skirt_hangs_between_the_legs_and_hit_testing_includes_it(ViewAngle view)
+    {
+        var character = Wearing(new StickerPart("skirt", BodyRegion.Skirt, Cover: new PartCover("top", 0, 0.6, Flare: 0.3)));
+        var figure = BodyRig.Build(character.Body, view);
+        var (left, right) = (figure.Regions.LeftLeg.At(0.4).Point, figure.Regions.RightLeg.At(0.4).Point);
+        var between = new Point2D((left.X + right.X) / 2, (left.Y + right.Y) / 2);
+        var placement = new CharacterPlacement(new Point2D(200, 420), 400, false);
+
+        using var bitmap = Render(character, new PoseData(view, [], []));
+        using var outline = CharacterRenderers.Default.BuildSilhouette(character, placement, view);
+        var widest = figure.Extent;
+
+        Assert.Equal(new SKColor(0, 0, 255), At(bitmap, between));
+        Assert.True(outline.TightBounds.Width >= placement.ToPage(widest).Width - 0.5);
+    }
+}
