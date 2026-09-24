@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Stanley.App.Documents;
+using Stanley.App.Updates;
 using Stanley.EditorFramework;
 using Stanley.Editors;
 
@@ -21,12 +22,20 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        ViewModel = viewModel ?? new MainWindowViewModel(
-            new AvaloniaFileDialogs(this),
-            new RecentProjects(AppPaths.RecentProjectsFile),
-            settings: new AppSettings(AppPaths.SettingsFile),
-            recovery: new RecoveryStore(AppPaths.RecoveryDirectory),
-            scheduler: new DispatcherDelayScheduler());
+        if (viewModel is null)
+        {
+            var settings = new AppSettings(AppPaths.SettingsFile);
+            var tokenStore = new GithubTokenStore(AppPaths.GithubTokenFile);
+            viewModel = new MainWindowViewModel(
+                new AvaloniaFileDialogs(this),
+                new RecentProjects(AppPaths.RecentProjectsFile),
+                settings: settings,
+                recovery: new RecoveryStore(AppPaths.RecoveryDirectory),
+                scheduler: new DispatcherDelayScheduler(),
+                tokenStore: tokenStore,
+                updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel));
+        }
+        ViewModel = viewModel;
         DataContext = ViewModel;
         ViewModel.PropertyChanged += (_, e) =>
         {

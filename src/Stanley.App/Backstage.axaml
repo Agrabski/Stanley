@@ -173,6 +173,25 @@
             <RadioButton Name="DarkThemeButton" GroupName="Theme" IsChecked="{Binding IsDarkTheme}" Content="Dark" />
           </StackPanel>
           <TextBlock Text="Pages always stay white, so what you see is what prints." Opacity="0.7" Margin="0,8,0,0" />
+
+          <TextBlock Classes="backstageSubheading" Text="Updates" Margin="0,24,0,8" />
+          <CheckBox Name="AutoCheckForUpdatesBox" Content="Check for updates automatically" IsChecked="{Binding AutoCheckForUpdates}" />
+          <StackPanel Spacing="4" Margin="0,8,0,0">
+            <RadioButton Name="StableChannelButton" GroupName="UpdateChannel" IsChecked="{Binding IsStableChannel}" Content="Stable - tagged releases only" />
+            <RadioButton Name="NightlyChannelButton" GroupName="UpdateChannel" IsChecked="{Binding IsNightlyChannel}" Content="Nightly - every change to develop, for testers" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <TextBlock Text="GitHub token" VerticalAlignment="Center" />
+            <TextBox Name="GithubTokenBox" Text="{Binding GithubToken}" PasswordChar="•" Width="320"
+                      PlaceholderText="Personal access token, read access to this repository" />
+          </StackPanel>
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,4,0,0"
+                      Text="Stanley is a private repository, so checking for updates needs your own GitHub personal access token (read access to this repository is enough). It's kept on this machine only, and only ever sent to GitHub." />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <Button Name="CheckForUpdatesButton" Content="Check now" Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding CanCheckForUpdates}" />
+            <Button Name="InstallUpdateButton" Content="Install and restart" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding HasUpdateAvailable}" />
+            <TextBlock Name="UpdateStatusText" Text="{Binding UpdateStatus}" VerticalAlignment="Center" Opacity="0.8" />
+          </StackPanel>
         </StackPanel>
       </StackPanel>
     </ScrollViewer>

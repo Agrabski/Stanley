@@ -1,122 +1,107 @@
-# Auto-update from nightly builds (investigation, not implemented)
+# Auto-update from nightly builds
 
-Findings as of 2026-09. `docs/automatic-builds.md` already covers how nightly
-builds are produced; this covers what it would take for a running copy of
-Stanley to update itself, instead of a person re-downloading the archive.
+Status as of 2026-09-24: the **app side is implemented** (File › Options ›
+Updates, backed by Velopack). **CI doesn't produce anything for it to
+download yet** — see "What's left" below, which is a retention-model
+decision, not just more code.
 
-## Nightly cadence: already correct
+## What's implemented
 
-The second half of this investigation's brief was to confirm nightlies are
-*actually* nightly. `.github/workflows/ci.yml` already does this correctly and
-needed no change:
+- **Velopack** (MIT, AGPL-compatible) is wired in: `Program.cs` calls
+  `VelopackApp.Build().Run()` first thing, before the existing
+  no-args-vs-CLI-args dispatch.
+- **Each user supplies their own GitHub personal access token** (File ›
+  Options › Updates), not a token baked into the build. Stanley is a private
+  repository, so there's no anonymous feed to poll; a shared embedded token
+  would mean anyone who obtains a build could extract it and read the
+  private source, which defeats the point of the repo being private. A
+  per-user token (read access to this repo is enough) has the same blast
+  radius as the person already being a collaborator - see "Getting the
+  builds" in `docs/automatic-builds.md`. It's stored in its own file
+  (`Stanley.App.Updates.GithubTokenStore`, `github-token.txt` under
+  `AppPaths.DataDirectory`), owner-only permissions on POSIX, kept separate
+  from the plain-text `settings.txt` preferences file so it's never
+  casually copied alongside them.
+- **Channel picker**: Stable (tagged releases) or Nightly (every change to
+  `develop`), `AppSettings.UpdateChannel`. `VelopackUpdateService.ResolveChannel`
+  maps it to the channel name a build would be packed under: the OS
+  (`win`/`osx`/`linux`) plus `-nightly` for the nightly track, so the two
+  can never cross-update into each other.
+- **`Stanley.App.Updates.IUpdateService`** is the seam between the real
+  `VelopackUpdateService` and `MainWindowViewModel`, so the check/install
+  flow is unit-testable without a real Velopack install (`tests/Stanley.App.Tests/UpdatesTests.cs`)
+  — a dev build or test host is never "installed" the way a packaged,
+  self-updating build is (`UpdateManager.IsInstalled`), so the update
+  controls disable themselves gracefully rather than offering a check that
+  can never find anything.
+- **Applying an update goes through the same Save / Don't Save / Cancel
+  gate** as Close (`MainWindowViewModel.ConfirmDiscardAsync`) before
+  restarting - never swaps the running build out from under an open,
+  unsaved comic.
+- An automatic startup check (`AppSettings.AutoCheckForUpdates`, off by
+  default - it needs a token configured first, so turning it on is a
+  deliberate opt-in) runs a few seconds after the window opens, through the
+  same `IDelayScheduler` AutoSave and crash recovery already use.
 
-- `schedule: "0 2 * * *"` (02:00 UTC daily) plus `workflow_dispatch`.
-- The repository's default branch is `develop` (confirmed via the GitHub API),
-  which is required — GitHub only fires a scheduled workflow from the copy of
-  the file on the default branch.
-- `nightly-gate` compares `develop`'s current commit against the commit the
-  `nightly` tag currently points at (i.e. the last successful nightly) and
-  sets `build=false` when they match, so a quiet day is skipped. A manual
-  `workflow_dispatch` always builds regardless. This is exactly "every day, if
-  there are changes since the last one" — no gap to fix.
+## What's left: CI has to actually publish something to update to
 
-## What "auto-update" needs
+None of the above has anything to check *against* yet. Today's `publish` /
+`nightly-release` / `release-assets` jobs in `.github/workflows/ci.yml`
+produce a plain `dotnet publish` folder as `tar.gz`/`zip` - not a Velopack
+release feed. Wiring in `vpk pack` + `vpk upload github` isn't just more
+CI steps; it runs into a real conflict with how the nightly job works today,
+worth the project owner's call before it's built:
 
-Stanley ships as a self-contained `dotnet publish` output (`tar.gz`/`zip`) per
-RID (`linux-x64`, `win-x64`, `osx-arm64`), attached to GitHub Releases: the
-rolling `nightly` pre-release and tagged `vX.Y.Z` releases. None of that is an
-installer, so there's nothing today for a running instance to invoke to
-replace itself. Four things are needed regardless of library choice:
+- **Velopack's GitHub feed is meant to accumulate, not be replaced.** Delta
+  updates work by diffing against whatever earlier versions are still in
+  the release's assets, so `vpk upload github --merge` is designed to add
+  to a channel's history over time, across many CI runs.
+- **The current nightly job does the opposite on purpose**: `nightly-release`
+  in `ci.yml` explicitly deletes the previous `nightly` release and its tag
+  every run ("Replace the rolling nightly pre-release") so the download
+  page always shows exactly one, current build. Doing that to a Velopack
+  channel would delete its delta history every single night, so every
+  "nightly update" would silently fall back to a full download - most of
+  the point of Velopack, gone, without it ever being obvious from the CI
+  logs.
 
-1. **A packaging format with an in-place update primitive** (an installer or
-   a self-replacing folder layout) — a bare `tar.gz` of a self-contained
-   publish can't be swapped out from under a running process on Windows, and
-   has no delta/rollback story anywhere.
-2. **A feed the app can query for "is there something newer than me, on my
-   channel."** MinVer already gives every build an unambiguous, ordered
-   version (`0.2.1-alpha.0.<n>` for nightlies, `0.2.0` for the release it
-   follows), so the ordering problem is solved; what's missing is a client
-   that reads it.
-3. **A channel concept.** Nightly and stable are two different audiences
-   (testers who want every change vs. everyone else) and must never
-   cross-update into each other by accident.
-4. **A safe apply point.** Stanley already has an unsaved-changes prompt
-   (Save / Don't Save / Cancel) for New/Open/Close/window-close and a
-   crash-recovery snapshot; applying an update mid-edit needs to go through
-   the same gate, not just swap files under an open document.
+Two honest ways to resolve this, worth deciding rather than picking
+silently:
 
-## Library options
+1. **Split the tags.** Keep today's `nightly` release exactly as-is (the
+   human "grab the latest build" download, wiped and replaced each run) and
+   give Velopack's own channel packages a separate, never-deleted tag (e.g.
+   `nightly-vpk`) that only `vpk upload github --merge` touches. Two release
+   entries under *Releases* instead of one; a bit more to explain in
+   `docs/automatic-builds.md`.
+2. **Let Velopack own the nightly release outright**, retire the manual
+   `tar.gz`/`zip` archives, and prune old assets from it on a schedule (or
+   accept the storage growth - packages are small, and GitHub Releases has
+   no published per-repo cap). Simpler infra, but changes what "download
+   the nightly" means for someone not using auto-update at all.
 
-| Option | License | Platforms | Fit |
-|---|---|---|---|
-| **[Velopack](https://velopack.io/)** | MIT | Windows, macOS, Linux | Built for exactly this: a `GithubSource` reads releases/channels directly from a GitHub repo (no separate feed server to run), ships delta patches, and its CLI (`vpk`) replaces the publish step. Actively maintained successor to Squirrel/Clowd.Squirrel. |
-| Clowd.Squirrel / Squirrel.Windows | MIT | Windows only (Squirrel.Windows unmaintained) | Windows-only rules it out — Stanley ships three platforms. |
-| NetSparkle | MIT | Windows, macOS, Linux | Needs its own signed appcast XML feed hosted somewhere; more moving parts than Velopack's direct-from-GitHub-Releases model for no real gain here. |
-| Roll-your-own (poll GitHub Releases API, download, replace files) | — | All | Doable but reinvents delta packages, atomic replace-while-running, and rollback that Velopack already solves; only worth it for the "just tell me there's an update" version below. |
+Either is buildable; this doc stops short of choosing because it changes
+the release process people already rely on, not just the app.
 
-**Recommendation: Velopack**, if/when the blockers below are resolved. MIT is
-AGPL-compatible (same check this repo already applies to every dependency,
-per `CLAUDE.md`'s licensing constraint), it targets all three RIDs Stanley
-already builds, and its channel feature maps directly onto nightly vs. stable
-without inventing a parallel mechanism.
+## Platform caveats, unchanged since the original investigation
 
-## Blockers worth resolving before writing code
-
-These are decisions for the project owner, not implementation details:
-
-- **The repository is private.** Velopack's `GithubSource` (and a plain HTTP
-  poll of the Releases API) both need to read release assets; a private
-  repo means either shipping a token in every client (a real credential-
-  leak risk — anyone with the built app gets a token with whatever scope it
-  was granted) or making the repository (or at least its Releases) public.
-  This is a visibility call, not a coding one.
-- **Nothing is code-signed today.** An unsigned Velopack installer still
-  installs and updates, but: Windows SmartScreen warns on first run of an
-  unsigned installer, and macOS Gatekeeper will quarantine/re-warn on an
-  unsigned `.app` on every update unless it's signed *and* notarized with an
-  Apple Developer account. Nightly builds aimed at testers can probably
-  live with the Windows warning; macOS auto-update is unpleasant without
-  notarization. Budget for a certificate (and Apple Developer Program
-  membership, $99/yr) is an owner decision.
+- **Nothing is code-signed.** Windows SmartScreen warns on first run of an
+  unsigned Velopack installer; macOS Gatekeeper will quarantine/re-warn on
+  an unsigned `.app` on every update unless it's signed *and* notarized
+  with an Apple Developer account ($99/yr). Fine for a nightly channel aimed
+  at testers who already tolerate warnings; unpleasant for a stable-channel
+  default.
 - **Linux packaging isn't installer-shaped yet.** Velopack's Linux target
   expects an AppImage; CI currently produces a bare self-contained folder.
   `docs/linux-packaging.md` already recommends adding an AppImage build for
-  distribution reasons — doing that first means auto-update on Linux falls
-  out of it rather than needing its own packaging change.
+  distribution reasons independent of auto-update - doing that first means
+  Linux auto-update falls out of it rather than needing its own change.
 
-## If code lands, roughly this shape
+## Reference: why Velopack over the alternatives
 
-- `Program.Main` calls `VelopackApp.Build().Run(args)` as the very first
-  line, before the existing no-args-vs-CLI-args dispatch — Velopack hooks
-  install/uninstall/update lifecycle events through its own recognized args,
-  and needs first refusal on `args` before `System.CommandLine` sees them.
-- Two new `AppSettings` keys, next to `AutoSave`/`Theme` (same
-  `key=value`, unknown-keys-preserved store): `AutoCheckForUpdates` (bool,
-  on by default for stable, off by default for nightly — testers opt in) and
-  `UpdateChannel` (`Stable`/`Nightly` enum, same shape as `AppTheme`).
-- A "Updates" section in File › Options, next to Appearance, mirroring its
-  layout: current version, a channel picker, a "Check now" button, last
-  checked time.
-- The actual check runs async off the startup path (never blocks opening a
-  document) and, like AutoSave/recovery timers, goes through
-  `IDelayScheduler` so tests can control it instead of real time.
-- Applying a downloaded update reuses the existing Save/Don't Save/Cancel
-  prompt (`MainWindowViewModel`) before calling
-  `UpdateManager.ApplyUpdatesAndRestart` — never restarts out from under an
-  unsaved comic.
-- CI: the `publish` job's `dotnet publish` + tar/zip step is replaced with
-  `vpk pack --channel nightly` (or the default channel for tagged releases)
-  per RID, and a `vpk upload github` step targets the existing `nightly` /
-  `vX.Y.Z` releases these jobs already create — no new hosting.
-
-## Cheaper interim step, if full auto-update stalls on the blockers above
-
-A plain "there's a newer nightly" **notice** needs none of the above: poll
-`GET /repos/agrabski/stanley/releases/tags/nightly` (or the newest `vX.Y.Z`)
-on startup, compare its tag/commit against the running MinVer version, and
-show a dismissible line in the title bar or backstage Info page linking to
-the download — no packaging change, no installer, no signing. It still needs
-the private-repo answer (an unauthenticated request to that endpoint 404s on
-a private repo today), but is otherwise buildable immediately and gets most
-of the "ease of use" benefit for testers who'd otherwise not know a nightly
-moved.
+| Option | License | Platforms | Fit |
+|---|---|---|---|
+| **[Velopack](https://velopack.io/)** (chosen) | MIT | Windows, macOS, Linux | `GithubSource` reads releases/channels directly from a GitHub repo, ships delta patches, and its CLI (`vpk`) replaces the publish step. Actively maintained successor to Squirrel/Clowd.Squirrel. |
+| Clowd.Squirrel / Squirrel.Windows | MIT | Windows only | Rules it out - Stanley ships three platforms. |
+| NetSparkle | MIT | Windows, macOS, Linux | Needs its own signed appcast XML feed hosted somewhere; more moving parts than Velopack's direct-from-GitHub-Releases model for no gain here. |
+| Roll-your-own (poll the Releases API, download, replace files) | — | All | Reinvents delta packages, atomic replace-while-running, and rollback that Velopack already solves. |
