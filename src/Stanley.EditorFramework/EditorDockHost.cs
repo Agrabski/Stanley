@@ -33,7 +33,7 @@ public static class EditorDockHost
             var toolDock = factory.CreateToolDock();
             toolDock.Id = "LeftTools";
             toolDock.Alignment = Alignment.Left;
-            toolDock.Proportion = 0.13;
+            toolDock.Proportion = 0.15;
             toolDock.VisibleDockables = factory.CreateList(leftTools.ToArray());
             toolDock.ActiveDockable = leftTools[0];
 

@@ -110,6 +110,28 @@
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Bubbles" />
         </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group" IsVisible="{Binding HasPageNumbering}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{StaticResource PageNumberIcon}" Width="22" Height="22" VerticalAlignment="Top" Margin="4,6,0,0" />
+            <StackPanel Spacing="4" Margin="0,2,0,0">
+              <ComboBox Name="PageNumberPositionBox" ItemsSource="{Binding PageNumberOptions}" SelectedItem="{Binding PageNumberOption}"
+                        Width="190" Height="26" FontSize="12" Focusable="False"
+                        ToolTip.Tip="Print page numbers on every page of the comic (not just this one)" />
+              <StackPanel Orientation="Horizontal" Spacing="10" IsEnabled="{Binding PageNumbersEnabled}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="Start at" FontSize="12" VerticalAlignment="Center" />
+                  <NumericUpDown Name="PageNumberStartInput" Minimum="0" Maximum="9999" Increment="1" FormatString="0" Width="110" Height="26" FontSize="12"
+                                 ToolTip.Tip="The number the first page would carry - to continue numbering from an earlier book" />
+                </StackPanel>
+                <CheckBox Name="NumberFirstPageCheck" IsChecked="{Binding NumberFirstPage}" Focusable="False" FontSize="12" Content="On first page"
+                          ToolTip.Tip="Covers usually aren't numbered; the cover still counts as page 1" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Page numbers" />
+        </DockPanel>
       </StackPanel>
     </TabItem>
 

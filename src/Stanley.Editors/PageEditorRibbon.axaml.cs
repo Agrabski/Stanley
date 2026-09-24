@@ -39,6 +39,11 @@ public partial class PageEditorRibbon : UserControl
             if (ViewModel is { } vm && e.NewValue is { } value)
                 vm.GutterMm = (double)value;
         };
+        PageNumberStartInput.ValueChanged += (_, e) =>
+        {
+            if (ViewModel is { } vm && e.NewValue is { } value)
+                vm.PageNumberStart = (int)value;
+        };
     }
 
     private PageEditorViewModel? ViewModel => DataContext as PageEditorViewModel;
@@ -59,12 +64,17 @@ public partial class PageEditorRibbon : UserControl
         {
             MarginInput.Value = (decimal)vm.MarginMm;
             GutterInput.Value = (decimal)vm.GutterMm;
+            PageNumberStartInput.Value = vm.PageNumberStart;
         }
     }
 
     /// <summary>Like Word: a contextual tab appears with its selection but isn't forced open; if the one you're on goes away (selection cleared), fall back to Home.</summary>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // Undo/redo can change the start number underneath the box.
+        if (e.PropertyName == nameof(PageEditorViewModel.PageNumberStart) && ViewModel is { } current && PageNumberStartInput.Value != current.PageNumberStart)
+            PageNumberStartInput.Value = current.PageNumberStart;
+
         if (e.PropertyName is not (nameof(PageEditorViewModel.IsPanelContext) or nameof(PageEditorViewModel.IsBubbleContext)) || ViewModel is not { } vm)
             return;
         // Read the view model rather than the tabs' IsVisible: those bindings may not have

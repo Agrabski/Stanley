@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Mvvm.Controls;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
 
 namespace Stanley.Editors;
 
@@ -43,14 +44,16 @@ public sealed class PageItem : ObservableObject
 /// Ctrl+Z undoes "deleted page 3" as naturally as "moved a bubble". Undoing an edit made
 /// on another page switches to that page first, so the change is never invisible.
 /// </summary>
-public sealed class PageNavigatorViewModel : Tool
+public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
 {
     private readonly EditorHistory _history;
     private PageItem _currentPage;
+    private PageNumbering _pageNumbering;
 
-    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages)
+    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null)
     {
         _history = history;
+        _pageNumbering = pageNumbering ?? PageNumbering.Off;
         Id = "Pages";
         Title = "Pages";
         CanClose = false;
@@ -101,6 +104,30 @@ public sealed class PageNavigatorViewModel : Tool
     public IRelayCommand<PageItem?> DeletePageCommand { get; }
     public IRelayCommand<PageItem?> MovePageUpCommand { get; }
     public IRelayCommand<PageItem?> MovePageDownCommand { get; }
+
+    /// <summary>The comic's page numbering; each page's <see cref="PageEditorViewModel.Folio"/> follows it and the page order.</summary>
+    public PageNumbering PageNumbering => _pageNumbering;
+
+    public event Action? PageNumberingChanged;
+
+    public void SetPageNumbering(PageNumbering numbering)
+    {
+        numbering = numbering with { StartAt = Math.Max(0, numbering.StartAt) };
+        if (numbering == _pageNumbering)
+            return;
+
+        var before = _pageNumbering;
+        ApplyPageNumbering(numbering);
+        _history.Push("Page numbers", () => ApplyPageNumbering(before), () => ApplyPageNumbering(numbering), this);
+    }
+
+    private void ApplyPageNumbering(PageNumbering numbering)
+    {
+        _pageNumbering = numbering;
+        Renumber();
+        OnPropertyChanged(nameof(PageNumbering));
+        PageNumberingChanged?.Invoke();
+    }
 
     /// <summary>Every page's committed content, in order - what Save writes.</summary>
     public IReadOnlyList<(PageId Id, PageDocument Document)> Snapshot() =>
@@ -210,7 +237,10 @@ public sealed class PageNavigatorViewModel : Tool
     private void Renumber()
     {
         for (var i = 0; i < Pages.Count; i++)
+        {
             Pages[i].Number = i + 1;
+            Pages[i].Editor.Folio = PageFolios.For(_pageNumbering, i);
+        }
     }
 
     private void OnHistoryRestored(object? source)
@@ -232,7 +262,8 @@ public sealed class PageNavigatorViewModel : Tool
         {
             Id = $"page-{id.Value}",
             CanClose = false,
-            CanFloat = false
+            CanFloat = false,
+            NumberingHost = this
         };
         if (settingsFrom != null)
         {

@@ -25,7 +25,8 @@ public sealed record PageCanvasScene(
     IReadOnlyList<SnapGuide> Guides,
     Rect2D? RubberBand,
     bool RubberBandIsBubble,
-    bool ShowMarginGuides = true);
+    bool ShowMarginGuides = true,
+    PageFolio? Folio = null);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -112,6 +113,8 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             .Where(_scene.Document.Panels.ContainsKey)
             .Select(id => _scene.Document.Panels[id])
             .ToList());
+        if (_scene.Folio != null)
+            PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }
 
     // ---------------------------------------------------------------- screen space (px)

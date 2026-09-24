@@ -215,15 +215,27 @@ Editing pipeline layers, bottom to top:
   - **Page navigator** (`PageNavigatorViewModel` + `PageNavigatorView`): a dock
     *tool* pane on the left (`EditorWorkspace(history, panes, leftTools)`), not an
     editor, so focusing it never changes `ActiveEditor` and the ribbon stays put.
-    Live thumbnails (`PageThumbnail`, drawing through `PageRenderer` and
-    redrawing on the page's `Working` changes), click to show a page, drag to
-    reorder, right-click / Delete / Ctrl+D / Ctrl+Up/Down for page actions, "New
-    page" at the bottom. Each page has its own `PageEditorViewModel`, all sharing
+    Live thumbnails, three to a row with the page's position underneath
+    (`PageThumbnail`, drawing through `PageRenderer` and redrawing on the page's
+    `Working`/`Folio` changes), click to show a page, drag to reorder (drop
+    position is the gap nearest the pointer in reading order), right-click /
+    Delete / Ctrl+D / Ctrl+Left/Right for page actions, "New page" at the bottom. Each page has its own `PageEditorViewModel`, all sharing
     the one `EditorHistory`; showing a page swaps which editor is in the editor
     area (`EditorWorkspace.SwitchTo` — one page at a time, not a row of tabs).
     Page add/duplicate/delete/move are history entries too. History entries carry
     their source (`EditorHistory.Push(..., source)` / `Restored`), so undoing an
     edit made on another page switches to that page first.
+  - **Page numbers** (folios): an issue-level `PageNumbering` (ProjectModel:
+    position None / BottomCenter / BottomOuter / TopOuter, `StartAt`,
+    `NumberFirstPage` — off by default since covers aren't numbered), stored on
+    `Issue.PageNumbering` (absent when off, so older files read unchanged). The
+    navigator owns it (`IPageNumberingHost`, undoable) and sets each page
+    editor's `Folio` (`PageFolios.For`: odd numbers are right-hand pages, so
+    "outer" flips sides). Changed from the Insert tab's "Page numbers" group via
+    the shown page editor's `PageNumberOption`/`PageNumberStart`/`NumberFirstPage`
+    (they write through to the host, so they apply to every page). Drawn by
+    `PageRenderer.DrawFolio` in the margin — on the canvas, thumbnails and
+    exports alike.
   - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
     bar with a one-line hint for the current tool/selection plus the last
     validation error. Right-click gives a context menu for the thing under the

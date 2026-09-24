@@ -13,7 +13,7 @@ public static class PageEditorHost
     public static (EditorWorkspace Workspace, PageNavigatorViewModel Navigator) CreateWorkspace(ComicProject project)
     {
         var history = new EditorHistory();
-        var navigator = new PageNavigatorViewModel(history, project.Pages);
+        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering);
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator]);
         navigator.CurrentPageChanged += page => workspace.SwitchTo(page.Editor);
         return (workspace, navigator);

@@ -52,13 +52,13 @@ public partial class PageNavigatorView : UserControl
         var position = e.GetPosition(PageList);
         if (!_dragging)
         {
-            if (Math.Abs(position.Y - _pressPoint.Y) < DragThresholdPx)
+            if (Math.Abs(position.X - _pressPoint.X) < DragThresholdPx && Math.Abs(position.Y - _pressPoint.Y) < DragThresholdPx)
                 return;
             _dragging = true;
             e.Pointer.Capture(PageList);
         }
 
-        _dropIndex = DropIndexAt(position.Y);
+        _dropIndex = DropIndexAt(position);
         ShowDropIndicator(_dropIndex);
         e.Handled = true;
     }
@@ -91,38 +91,73 @@ public partial class PageNavigatorView : UserControl
         DropIndicator.IsVisible = false;
     }
 
-    /// <summary>Which gap between pages (0 = before the first, Count = after the last) the pointer is nearest.</summary>
-    private int DropIndexAt(double y)
+    /// <summary>
+    /// Which gap between pages (0 = before the first, Count = after the last) the pointer
+    /// is at, in reading order across the grid: the page under the pointer (or the nearest
+    /// one in its row), before it if on its left half, after it if on its right half.
+    /// </summary>
+    private int DropIndexAt(Point point)
     {
         var count = ViewModel?.Pages.Count ?? 0;
+        var best = -1;
+        var bestDistance = double.MaxValue;
         for (var i = 0; i < count; i++)
         {
-            if (PageList.ContainerFromIndex(i) is not { } container)
+            if (ContainerBounds(i) is not { } bounds)
                 continue;
-            var top = container.TranslatePoint(new Point(0, 0), PageList)?.Y ?? 0;
-            if (y < top + container.Bounds.Height / 2)
-                return i;
+            // Rows first (vertical distance dominates), then horizontal within the row.
+            var dy = point.Y < bounds.Top ? bounds.Top - point.Y : point.Y > bounds.Bottom ? point.Y - bounds.Bottom : 0;
+            var dx = Math.Abs(point.X - bounds.Center.X);
+            var distance = dy * 10_000 + dx;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = i;
+            }
         }
-        return count;
+
+        if (best < 0)
+            return count;
+        return point.X < ContainerBounds(best)!.Value.Center.X ? best : best + 1;
     }
 
+    private Rect? ContainerBounds(int index)
+    {
+        if (PageList.ContainerFromIndex(index) is not { } container || container.TranslatePoint(new Point(0, 0), PageList) is not { } topLeft)
+            return null;
+        return new Rect(topLeft, container.Bounds.Size);
+    }
+
+    /// <summary>A vertical bar in the gap the page would drop into: at the left of the page after the gap, or the right of the page before it when the gap ends a row.</summary>
     private void ShowDropIndicator(int index)
     {
         var count = ViewModel?.Pages.Count ?? 0;
-        if (count == 0)
-            return;
+        var after = index < count ? ContainerBounds(index) : null;
+        var before = index > 0 ? ContainerBounds(index - 1) : null;
 
-        double y;
-        if (index < count && PageList.ContainerFromIndex(index) is { } before)
-            y = before.TranslatePoint(new Point(0, 0), PageList)?.Y ?? 0;
-        else if (PageList.ContainerFromIndex(count - 1) is { } last)
-            y = (last.TranslatePoint(new Point(0, 0), PageList)?.Y ?? 0) + last.Bounds.Height;
+        // Prefer the page before the gap when the gap is at the end of its row (the next
+        // page starts a new row below), so the bar sits where the pointer is.
+        Rect anchor;
+        double x;
+        if (before is { } b && (after is not { } a || a.Top > b.Top + 1))
+        {
+            anchor = b;
+            x = b.Right;
+        }
+        else if (after is { } a2)
+        {
+            anchor = a2;
+            x = a2.Left;
+        }
         else
+        {
+            DropIndicator.IsVisible = false;
             return;
+        }
 
-        Canvas.SetLeft(DropIndicator, 28);
-        Canvas.SetTop(DropIndicator, y - 1.5);
-        DropIndicator.Width = Math.Max(0, PageList.Bounds.Width - 44);
+        Canvas.SetLeft(DropIndicator, x - 1.5);
+        Canvas.SetTop(DropIndicator, anchor.Top + 4);
+        DropIndicator.Height = Math.Max(0, anchor.Height - 8);
         DropIndicator.IsVisible = true;
     }
 
@@ -151,8 +186,8 @@ public partial class PageNavigatorView : UserControl
                 Item("New page after", vm.AddPageCommand),
                 Item("Duplicate page", vm.DuplicatePageCommand, "Ctrl+D"),
                 new Separator(),
-                Item("Move up", vm.MovePageUpCommand, "Ctrl+Up"),
-                Item("Move down", vm.MovePageDownCommand, "Ctrl+Down"),
+                Item("Move earlier", vm.MovePageUpCommand, "Ctrl+Left"),
+                Item("Move later", vm.MovePageDownCommand, "Ctrl+Right"),
                 new Separator(),
                 Item("Delete page", vm.DeletePageCommand, "Delete")
             }
@@ -175,10 +210,10 @@ public partial class PageNavigatorView : UserControl
             case Key.D when ctrl:
                 vm.DuplicatePageCommand.Execute(null);
                 break;
-            case Key.Up when ctrl:
+            case Key.Up or Key.Left when ctrl:
                 vm.MovePageUpCommand.Execute(null);
                 break;
-            case Key.Down when ctrl:
+            case Key.Down or Key.Right when ctrl:
                 vm.MovePageDownCommand.Execute(null);
                 break;
             default:

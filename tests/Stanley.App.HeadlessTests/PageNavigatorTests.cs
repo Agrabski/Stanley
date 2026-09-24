@@ -67,23 +67,59 @@ public class PageNavigatorTests
     }
 
     [Fact]
-    public void DraggingAThumbnail_ReordersThePages()
+    public void Thumbnails_AreLaidOutThreeToARow_InReadingOrder()
     {
-        var (window, view, navigator) = Open(pages: 3);
+        var (window, view, _) = Open(pages: 5);
+        var tops = Enumerable.Range(0, 5).Select(i => ((Control)view.List.ContainerFromIndex(i)!).TranslatePoint(new Point(0, 0), window)!.Value).ToList();
+
+        Assert.Equal(tops[0].Y, tops[1].Y, 1);
+        Assert.Equal(tops[0].Y, tops[2].Y, 1);
+        Assert.True(tops[0].X < tops[1].X && tops[1].X < tops[2].X);
+        Assert.True(tops[3].Y > tops[0].Y, "the fourth page starts a second row");
+        Assert.Equal(tops[0].X, tops[3].X, 1);
+
+        var thumbnail = view.GetVisualDescendants().OfType<PageThumbnail>().First();
+        Assert.True(thumbnail.Bounds.Width * 3 <= view.Bounds.Width, "three thumbnails fit across the pane");
+    }
+
+    [Fact]
+    public void DraggingAThumbnail_ToTheRightHalfOfAPageInTheNextRow_DropsItAfterThatPage()
+    {
+        var (window, view, navigator) = Open(pages: 5);
         var first = navigator.Pages[0];
+        var fourth = navigator.Pages[3];
 
         var start = CenterOf((Control)view.List.ContainerFromIndex(0)!, window);
-        var last = (Control)view.List.ContainerFromIndex(2)!;
-        var end = last.TranslatePoint(new Point(last.Bounds.Width / 2, last.Bounds.Height - 4), window)!.Value;
+        var target = (Control)view.List.ContainerFromIndex(3)!; // first in the second row
+        var end = target.TranslatePoint(new Point(target.Bounds.Width * 0.8, target.Bounds.Height / 2), window)!.Value;
         window.MouseDown(start, MouseButton.Left);
-        window.MouseMove(new Point(start.X, start.Y + 20));
+        window.MouseMove(new Point(start.X + 10, start.Y + 10));
         window.MouseMove(end);
         window.MouseUp(end, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Same(first, navigator.Pages[2]);
-        Assert.Equal(3, first.Number);
+        Assert.Equal(3, navigator.Pages.IndexOf(first));
+        Assert.Equal(2, navigator.Pages.IndexOf(fourth));
+        Assert.Equal(4, first.Number);
         Assert.True(window.History.CanUndo);
+    }
+
+    [Fact]
+    public void RibbonPageNumbers_NumberEveryPage()
+    {
+        var (window, _, navigator) = Open(pages: 3);
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "InsertTab");
+        Dispatcher.UIThread.RunJobs();
+        var box = ribbon.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "PageNumberPositionBox");
+
+        box.SelectedItem = PageNumberOption.All.Single(o => o.Position == Stanley.ProjectModel.Issues.PageNumberPosition.BottomOuter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(Stanley.ProjectModel.Issues.PageNumberPosition.BottomOuter, navigator.PageNumbering.Position);
+        Assert.Null(navigator.Pages[0].Editor.Folio); // cover unnumbered by default
+        Assert.Equal("3", navigator.Pages[2].Editor.Folio!.Text);
+        Assert.True(window.ViewModel.IsDirty);
     }
 
     [Fact]

@@ -62,6 +62,9 @@ public sealed class ComicProject
     /// <summary>The pages as they were opened, in reading order - the editor's starting point.</summary>
     public IReadOnlyList<ComicPage> Pages { get; }
 
+    /// <summary>The issue's printed page numbers, as opened.</summary>
+    public PageNumbering PageNumbering => _issue.PageNumbering ?? PageNumbering.Off;
+
     /// <summary>A brand-new, unsaved comic with one page: either one panel filling the live area or tiled with <paramref name="layout"/>.</summary>
     public static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout = null, PanelGrid? grid = null)
     {
@@ -109,7 +112,7 @@ public sealed class ComicProject
     /// manifest title, the issue's page list, every page and panel - and deletes the
     /// folders/files of pages and panels removed since the last save.
     /// </summary>
-    public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages)
+    public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -122,7 +125,12 @@ public sealed class ComicProject
         var issueIds = manifest.IssueIds.Contains(_issue.Id) ? manifest.IssueIds : [.. manifest.IssueIds, _issue.Id];
         repository.SaveManifest(manifest with { Title = Title, IssueIds = issueIds });
 
-        _issue = _issue with { PageIds = pages.Select(p => p.Id).ToList() };
+        _issue = _issue with
+        {
+            PageIds = pages.Select(p => p.Id).ToList(),
+            // "Off" is stored as absent, so turning numbers off leaves the file as it was before they existed.
+            PageNumbering = (pageNumbering ?? PageNumbering) is { Position: not PageNumberPosition.None } numbering ? numbering : null
+        };
         repository.SaveIssue(_issue);
 
         var records = new Dictionary<PageId, Page>();
@@ -160,7 +168,7 @@ public sealed class ComicProject
     /// (other issues, characters, art), since a project is a folder, not one file.
     /// Returns the folder actually saved to.
     /// </summary>
-    public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages)
+    public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
@@ -173,22 +181,22 @@ public sealed class ComicProject
             CopyProject(source, target);
 
         Location = target;
-        Save(pages);
+        Save(pages, pageNumbering);
         return target;
     }
 
     /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
-    public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document)> pages)
+    public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document))).ToList());
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList());
     }
 
     /// <summary>One page as a PNG.</summary>
-    public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300)
+    public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi);
+        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>

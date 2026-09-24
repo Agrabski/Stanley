@@ -64,7 +64,7 @@ public sealed class PageThumbnail : Control
 
     private void OnPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PageEditorViewModel.Working))
+        if (e.PropertyName is nameof(PageEditorViewModel.Working) or nameof(PageEditorViewModel.Folio))
             InvalidateVisual();
     }
 
@@ -79,10 +79,10 @@ public sealed class PageThumbnail : Control
     {
         if (Page is not { } page)
             return;
-        context.Custom(new ThumbnailDrawOperation(new Rect(Bounds.Size), page.PageBounds, page.Working));
+        context.Custom(new ThumbnailDrawOperation(new Rect(Bounds.Size), page.PageBounds, page.Working, page.Folio));
     }
 
-    private sealed class ThumbnailDrawOperation(Rect bounds, Rect2D pageBounds, PageDocument document) : ICustomDrawOperation
+    private sealed class ThumbnailDrawOperation(Rect bounds, Rect2D pageBounds, PageDocument document, PageFolio? folio) : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
 
@@ -107,7 +107,7 @@ public sealed class PageThumbnail : Control
             PageRenderer.Draw(canvas, pageBounds, document.PanelOrder
                 .Where(document.Panels.ContainsKey)
                 .Select(id => document.Panels[id])
-                .ToList());
+                .ToList(), folio);
             canvas.Restore();
         }
     }

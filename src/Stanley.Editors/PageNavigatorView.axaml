@@ -1,5 +1,6 @@
 <!--
-  The page navigator pane (docked left): a live thumbnail per page, PowerPoint-style.
+  The page navigator pane (docked left): live page thumbnails, three to a row like a
+  print-shop page sorter, each with its page number underneath.
   Click to go to a page, drag to reorder, right-click for page actions, Delete removes
   the selected page, "New page" at the bottom. Lives in the dock area, below the ribbon,
   and is not an editor - the ribbon keeps showing the page being edited.
@@ -11,7 +12,8 @@
              x:DataType="local:PageNavigatorViewModel">
   <UserControl.Styles>
     <Style Selector="ListBox#PageList ListBoxItem">
-      <Setter Property="Padding" Value="4,8,12,8" />
+      <Setter Property="Padding" Value="5,6,5,4" />
+      <Setter Property="VerticalContentAlignment" Value="Top" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
     <!-- The thumbnail's own blue frame marks the current page; the row itself only gets a faint tint. -->
@@ -52,20 +54,25 @@
     </Border>
     <Grid>
       <ListBox Name="PageList" ItemsSource="{Binding Pages}" SelectedItem="{Binding CurrentPage}" Background="Transparent"
-               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+               ScrollViewer.HorizontalScrollBarVisibility="Disabled" Padding="4">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="3" VerticalAlignment="Top" />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="local:PageItem">
-            <Grid ColumnDefinitions="26,*">
-              <TextBlock Classes="pageNumber" Text="{Binding Number}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,8,0" />
-              <Border Grid.Column="1" Classes="thumbFrame">
+            <StackPanel Spacing="3">
+              <Border Classes="thumbFrame">
                 <local:PageThumbnail Page="{Binding Editor}" />
               </Border>
-            </Grid>
+              <TextBlock Classes="pageNumber" Text="{Binding Number}" FontSize="11" HorizontalAlignment="Center" />
+            </StackPanel>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
       <Canvas IsHitTestVisible="False">
-        <Border Name="DropIndicator" Height="3" CornerRadius="1.5" Background="#1E5AA8" IsVisible="False" />
+        <Border Name="DropIndicator" Width="3" CornerRadius="1.5" Background="#1E5AA8" IsVisible="False" />
       </Canvas>
     </Grid>
   </DockPanel>

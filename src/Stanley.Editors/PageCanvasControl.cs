@@ -153,7 +153,7 @@ public sealed class PageCanvasControl : Control
         if (e.PropertyName is nameof(PageEditorViewModel.Working) or nameof(PageEditorViewModel.Committed)
             or nameof(PageEditorViewModel.SelectedPanelId) or nameof(PageEditorViewModel.SelectedBubbleIndex)
             or nameof(PageEditorViewModel.ActiveGuides) or nameof(PageEditorViewModel.Grid)
-            or nameof(PageEditorViewModel.ShowMarginGuides))
+            or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -180,7 +180,8 @@ public sealed class PageCanvasControl : Control
             _viewModel.ActiveGuides,
             _rubberBand,
             _drag == DragKind.CreateBubble,
-            _viewModel.ShowMarginGuides)));
+            _viewModel.ShowMarginGuides,
+            _viewModel.Folio)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>

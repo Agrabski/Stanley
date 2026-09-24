@@ -7,6 +7,7 @@ using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.Rendering;
 
 namespace Stanley.Editors;
 
@@ -44,6 +45,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     private PanelId _pendingPanelId;
     private double _zoomPercent = 100;
     private bool _showMarginGuides = true;
+    private PageFolio? _folio;
+    private IPageNumberingHost? _numberingHost;
 
     public Rect2D PageBounds { get; }
 
@@ -223,6 +226,78 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             Grid = Grid with { GutterMm = Math.Max(0, value) };
             OnPropertyChanged();
         }
+    }
+
+    // ---------------------------------------------------------------- page numbers
+
+    /// <summary>The number printed on this page (set by whoever knows the page's position - the navigator), or null for none.</summary>
+    public PageFolio? Folio
+    {
+        get => _folio;
+        set => SetProperty(ref _folio, value);
+    }
+
+    /// <summary>Where the comic's page-numbering setting lives; null for a page edited on its own, which then has no page-number controls.</summary>
+    public IPageNumberingHost? NumberingHost
+    {
+        get => _numberingHost;
+        set
+        {
+            if (_numberingHost != null)
+                _numberingHost.PageNumberingChanged -= RaisePageNumberingChanged;
+            _numberingHost = value;
+            if (_numberingHost != null)
+                _numberingHost.PageNumberingChanged += RaisePageNumberingChanged;
+            RaisePageNumberingChanged();
+        }
+    }
+
+    public bool HasPageNumbering => _numberingHost != null;
+
+    public IReadOnlyList<PageNumberOption> PageNumberOptions => PageNumberOption.All;
+
+    private PageNumbering CurrentNumbering => _numberingHost?.PageNumbering ?? PageNumbering.Off;
+
+    /// <summary>Insert tab: page-number position for the whole comic (every page, not just this one).</summary>
+    public PageNumberOption PageNumberOption
+    {
+        get => PageNumberOption.All.First(o => o.Position == CurrentNumbering.Position);
+        set
+        {
+            if (value != null && value.Position != CurrentNumbering.Position)
+                _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = value.Position });
+        }
+    }
+
+    public int PageNumberStart
+    {
+        get => CurrentNumbering.StartAt;
+        set
+        {
+            if (value != CurrentNumbering.StartAt)
+                _numberingHost?.SetPageNumbering(CurrentNumbering with { StartAt = value });
+        }
+    }
+
+    public bool NumberFirstPage
+    {
+        get => CurrentNumbering.NumberFirstPage;
+        set
+        {
+            if (value != CurrentNumbering.NumberFirstPage)
+                _numberingHost?.SetPageNumbering(CurrentNumbering with { NumberFirstPage = value });
+        }
+    }
+
+    public bool PageNumbersEnabled => CurrentNumbering.Position != PageNumberPosition.None;
+
+    private void RaisePageNumberingChanged()
+    {
+        OnPropertyChanged(nameof(HasPageNumbering));
+        OnPropertyChanged(nameof(PageNumberOption));
+        OnPropertyChanged(nameof(PageNumberStart));
+        OnPropertyChanged(nameof(NumberFirstPage));
+        OnPropertyChanged(nameof(PageNumbersEnabled));
     }
 
     /// <summary>Whether the canvas draws the dashed margin (live area) guide.</summary>

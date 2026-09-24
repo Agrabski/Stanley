@@ -136,7 +136,7 @@ public sealed class ComicProjectTests : IDisposable
         var pdf = Path.Combine(_root, "comic.pdf");
         var png = Path.Combine(_root, "page.png");
 
-        ComicProject.ExportPdf(pdf, navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed)));
+        ComicProject.ExportPdf(pdf, navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)));
         ComicProject.ExportPng(png, project.PageBounds, project.Pages[0].Document, dpi: 100);
 
         var pdfText = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(pdf));
@@ -145,5 +145,18 @@ public sealed class ComicProjectTests : IDisposable
         using var image = SkiaSharp.SKBitmap.Decode(png);
         Assert.Equal((int)Math.Round(210 * 100 / 25.4), image.Width);
         Assert.Equal((int)Math.Round(297 * 100 / 25.4), image.Height);
+    }
+
+    [Fact]
+    public void PageNumbering_IsSavedWithTheIssueAndReopened()
+    {
+        var project = ComicProject.CreateNew();
+        var numbering = new ProjectModel.Issues.PageNumbering(ProjectModel.Issues.PageNumberPosition.TopOuter, StartAt: 3);
+        var navigator = new PageNavigatorViewModel(new EditorHistory(), project.Pages, numbering);
+        var folder = Path.Combine(_root, "numbered");
+
+        project.SaveAs(folder, navigator.Snapshot(), navigator.PageNumbering);
+
+        Assert.Equal(numbering, ComicProject.Open(folder).PageNumbering);
     }
 }

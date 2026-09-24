@@ -273,7 +273,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot());
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering);
             MarkSaved();
             return true;
         }
@@ -295,7 +295,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            var saved = _project.SaveAs(folder, _navigator.Snapshot());
+            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering);
             MarkSaved();
             Message = $"Saved to {saved}";
             return true;
@@ -334,9 +334,9 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed)));
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)));
             else
-                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed);
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio);
             Message = $"Exported to {path}";
             IsBackstageOpen = false;
         }
