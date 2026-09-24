@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
+    <ProjectReference Include="..\Stanley.Editing.Abstractions\Stanley.Editing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

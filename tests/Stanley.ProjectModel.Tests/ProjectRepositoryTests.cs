@@ -1,4 +1,5 @@
 using Stanley.ProjectModel.Backgrounds;
+using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -150,7 +151,12 @@ public class ProjectRepositoryTests : IDisposable
             new PanelShape([new ShapeAnchor(new Point2D(0, 0), new Point2D(0, 0), new Point2D(10, 0), AnchorHandleKind.Corner)]),
             new InlineBackground("splash.png"),
             [new CharacterInstance(characterId, RevisionOverride: null, new PoseData(ViewAngle.Front, [], []), Overrides: null)],
-            [BubbleId.New()]);
+            [new Bubble(
+                BubbleId.New(),
+                BubbleStylePresets.GenerateShape(BubbleStylePreset.Speech, new Rect2D(20, 20, 120, 60)),
+                BubbleStylePreset.Speech,
+                [new BubbleTail(0.75, new Point2D(10, 120), TailKind.SmoothTriangle)],
+                "Hello!")]);
         repository.SavePanel(issue.Id, page.Id, panel);
 
         Assert.Equivalent(issue, repository.LoadIssue(issue.Id), strict: true);

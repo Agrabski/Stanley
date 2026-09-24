@@ -239,9 +239,9 @@ public readonly record struct PanelId : IStrongId<PanelId>, IParsable<PanelId>, 
 }
 
 /// <summary>
-/// Identifies a speech bubble placed in a panel. Placeholder: bubble persistence isn't
-/// designed yet (Stanley.Bubbles has no JSON format), so panels only reference bubble
-/// ids for now.
+/// Identifies a speech bubble within the one panel that embeds it
+/// (<c>Panel.Bubbles</c>) - stable only within that panel, not project-wide, the same
+/// way a <c>CharacterInstance</c> has no id of its own.
 /// </summary>
 [JsonConverter(typeof(StrongIdJsonConverter<BubbleId>))]
 public readonly record struct BubbleId : IStrongId<BubbleId>, IParsable<BubbleId>, IComparable<BubbleId>
