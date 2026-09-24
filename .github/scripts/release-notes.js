@@ -2,8 +2,9 @@
 //
 // Run from CI with actions/github-script (see .github/workflows/ci.yml):
 //   draftRelease  - on every push to main: keeps ONE draft GitHub Release
-//                   ("vX.Y.Z") listing everything merged since the last release.
-//                   Publishing that draft is how a release is made.
+//                   ("vX.Y.Z") listing every PR merged into develop or main since
+//                   the last release that main now contains. Publishing that
+//                   draft is how a release is made.
 //   checkPullRequest - on pull requests: says which issues the PR closes and what
 //                   that means for the next version (a notice, never a failure).
 //
@@ -14,6 +15,9 @@
 // The first release is always 0.1.0.
 
 const MARKER = '<!-- stanley-release-draft -->';
+
+/** Where feature PRs land. PRs *between* these (develop -> main, back-merges) are release plumbing, not changes. */
+const BRANCHES = ['develop', 'main'];
 
 const BREAKING_LABELS = ['breaking', 'breaking change'];
 const FEATURE_LABELS = ['enhancement', 'feature'];
@@ -78,7 +82,8 @@ function renderNotes(prs, previousTag) {
 // ------------------------------------------------------------------ GitHub queries
 
 const PR_FIELDS = `
-  number title mergedAt
+  number title mergedAt headRefName
+  mergeCommit { oid }
   closingIssuesReferences(first: 25) {
     nodes { number title labels(first: 20) { nodes { name } } issueType { name } }
   }`;
@@ -88,6 +93,8 @@ function toPr(node) {
     number: node.number,
     title: node.title,
     mergedAt: node.mergedAt,
+    headRefName: node.headRefName,
+    mergeCommit: node.mergeCommit?.oid ?? null,
     issues: node.closingIssuesReferences.nodes.map((i) => ({
       number: i.number,
       title: i.title,
@@ -123,7 +130,25 @@ async function mergedPrsSince(github, owner, repo, branch, since) {
     if (!page.pageInfo.hasNextPage || (since && oldest && oldest.updatedAt <= since)) break;
     cursor = page.pageInfo.endCursor;
   }
-  return prs.sort((a, b) => a.mergedAt.localeCompare(b.mergedAt));
+  return prs;
+}
+
+/** True if `sha` is `head` or one of its ancestors. */
+async function contains(github, owner, repo, head, sha) {
+  const { data } = await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: `${sha}...${head}`, per_page: 1 });
+  return data.status === 'ahead' || data.status === 'identical';
+}
+
+/** Change PRs (into develop, or hotfixes straight into main) merged since `since` whose merge commit `head` contains, oldest first. */
+async function changesSince(github, owner, repo, head, since) {
+  const byNumber = new Map();
+  for (const branch of BRANCHES) {
+    for (const pr of await mergedPrsSince(github, owner, repo, branch, since)) {
+      if (BRANCHES.includes(pr.headRefName) || !pr.mergeCommit) continue;
+      if (await contains(github, owner, repo, head, pr.mergeCommit)) byNumber.set(pr.number, pr);
+    }
+  }
+  return [...byNumber.values()].sort((a, b) => a.mergedAt.localeCompare(b.mergedAt));
 }
 
 /** The newest published, non-prerelease vX.Y.Z release, or null. */
@@ -139,11 +164,10 @@ async function latestRelease(github, owner, repo) {
 
 async function draftRelease({ github, context, core }) {
   const { owner, repo } = context.repo;
-  const branch = context.ref.replace('refs/heads/', '');
   const { latest, releases } = await latestRelease(github, owner, repo);
   const drafts = releases.filter((r) => r.draft && (r.body ?? '').includes(MARKER));
 
-  const prs = await mergedPrsSince(github, owner, repo, branch, latest?.published_at ?? null);
+  const prs = await changesSince(github, owner, repo, context.sha, latest?.published_at ?? null);
   if (prs.length === 0) {
     for (const d of drafts) await github.rest.repos.deleteRelease({ owner, repo, release_id: d.id });
     core.notice('Nothing merged since the last release; no draft release.');
@@ -180,6 +204,10 @@ async function checkPullRequest({ github, context, core }) {
     { owner, repo, number: context.payload.pull_request.number },
   );
   const pr = toPr({ ...data.repository.pullRequest, mergedAt: '' });
+  if (BRANCHES.includes(pr.headRefName)) {
+    core.notice(`${pr.headRefName} -> ${context.payload.pull_request.base.ref}: release plumbing, its changes are counted from the PRs it carries.`);
+    return;
+  }
   if (pr.issues.length === 0) {
     core.warning('This PR closes no issue, so it will be listed under "Other changes" and only bump the patch version. '
       + 'Link the issue it resolves ("Closes #123" in the description, or the Development box).');
