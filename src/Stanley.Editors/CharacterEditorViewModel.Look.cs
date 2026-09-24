@@ -34,10 +34,134 @@ public sealed record ColorSwatchChoice(string Slot, string Name, ColorValue Colo
     internal static string ColorHex(ColorValue c) => c.Hex.Length == 9 ? "#" + c.Hex[7..] + c.Hex[1..7] : c.Hex;
 }
 
-/// <summary>One colour slot the character's clothes use, with its colour and the swatches to pick from.</summary>
-public sealed record ColorSlotEditor(string Slot, string Label, ColorValue Color, IReadOnlyList<ColorSwatchChoice> Swatches, System.Windows.Input.ICommand SetColor)
+/// <summary>A pattern or texture on offer for a colour slot (or none), previewed in the slot's colour.</summary>
+public sealed record FabricChoice(string Label, ColorValue Ground, Fabric Preview, PatternKind? Pattern, TextureKind? Texture, bool IsCurrent);
+
+/// <summary>
+/// One colour slot the character's clothes use, on the Look tab: its colour, and - for
+/// clothes - its fabric (pattern, texture, their size, angle and strength). Kept alive
+/// across edits and refreshed in place, so its dropdown stays open while you drag its
+/// sliders; each drag is one undo step.
+/// </summary>
+public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.ObservableObject, IDragGesture
 {
-    public IBrush Brush { get; } = new SolidColorBrush(Avalonia.Media.Color.Parse(ColorSwatchChoice.ColorHex(Color)));
+    private readonly CharacterEditorViewModel _owner;
+    private ColorValue _color;
+    private Fabric? _fabric;
+
+    internal ColorSlotEditor(CharacterEditorViewModel owner, string slot, IReadOnlyList<ColorSwatchChoice> swatches)
+    {
+        _owner = owner;
+        Slot = slot;
+        Label = CharacterEditorViewModel.ColorSlotLabel(slot);
+        Swatches = swatches;
+        SetColor = new RelayCommand<ColorSwatchChoice>(c => { if (c != null) owner.SetSlotColor(Slot, c.Color); });
+        SetPatternColor = new RelayCommand<ColorSwatchChoice>(c =>
+        {
+            if (c != null)
+                owner.EditFabric(Slot, f => f with { Pattern = f.Pattern is { } p ? p with { Colors = [c.Color, .. p.Colors.Skip(1)] } : null });
+        });
+        SetPattern = new RelayCommand<FabricChoice>(c =>
+        {
+            if (c != null)
+                owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? new PatternFill(kind, f.Pattern?.Colors is { Count: > 0 } colors ? colors : [], f.Pattern?.Size, f.Pattern?.Angle) : null });
+        });
+        SetTexture = new RelayCommand<FabricChoice>(c =>
+        {
+            if (c != null)
+                owner.EditFabric(Slot, f => f with { Texture = c.Texture is { } kind ? new TextureFill(kind, f.Texture?.Strength, f.Texture?.Size) : null });
+        });
+    }
+
+    public string Slot { get; }
+
+    public string Label { get; }
+
+    /// <summary>Clothes get fabrics; skin and eyes are just colours.</summary>
+    public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or "eyes");
+
+    public IReadOnlyList<ColorSwatchChoice> Swatches { get; }
+
+    /// <summary>Colours for the pattern's own colour.</summary>
+    public IReadOnlyList<ColorSwatchChoice> PatternSwatches => Swatches;
+
+    public System.Windows.Input.ICommand SetColor { get; }
+    public System.Windows.Input.ICommand SetPatternColor { get; }
+    public System.Windows.Input.ICommand SetPattern { get; }
+    public System.Windows.Input.ICommand SetTexture { get; }
+
+    public ColorValue Color => _color;
+
+    public IBrush Brush => new SolidColorBrush(Avalonia.Media.Color.Parse(ColorSwatchChoice.ColorHex(_color)));
+
+    /// <summary>The slot's fabric as worn (the character's own, or the garment's default), or null for plain.</summary>
+    public Fabric? Fabric => _fabric;
+
+    public bool HasPattern => _fabric?.Pattern is not null;
+
+    public bool HasTexture => _fabric?.Texture is not null;
+
+    public IReadOnlyList<FabricChoice> PatternChoices =>
+        new (string Label, PatternKind? Kind)[] { ("None", null), ("Stripes", PatternKind.Stripes), ("Pinstripes", PatternKind.Pinstripes), ("Checks", PatternKind.Checks),
+            ("Plaid", PatternKind.Plaid), ("Dots", PatternKind.Dots), ("Chevron", PatternKind.Chevron) }
+            .Select(p => new FabricChoice(p.Label, _color,
+                new Fabric(p.Kind is { } kind ? new PatternFill(kind, _fabric?.Pattern?.Colors ?? [], Angle: _fabric?.Pattern?.Angle) : null),
+                p.Kind, null, _fabric?.Pattern?.Kind == p.Kind))
+            .ToList();
+
+    public IReadOnlyList<FabricChoice> TextureChoices =>
+        new (string Label, TextureKind? Kind)[] { ("None", null), ("Denim", TextureKind.Denim), ("Knit", TextureKind.Knit), ("Corduroy", TextureKind.Corduroy),
+            ("Wool", TextureKind.Wool), ("Leather", TextureKind.Leather), ("Canvas", TextureKind.Canvas), ("Felt", TextureKind.Felt) }
+            .Select(t => new FabricChoice(t.Label, _color, new Fabric(Texture: t.Kind is { } kind ? new TextureFill(kind, 0.9) : null), null, t.Kind, _fabric?.Texture?.Kind == t.Kind))
+            .ToList();
+
+    /// <summary>Pattern size: one repeat as a percentage of the character's height.</summary>
+    public double PatternSize
+    {
+        get => Math.Round((_fabric?.Pattern?.Size ?? PatternFill.DefaultSize) * 100, 1);
+        set => _owner.EditFabric(Slot, f => f with { Pattern = f.Pattern is { } p ? p with { Size = Math.Round(Math.Clamp(value, 1, 25) / 100, 4) } : null });
+    }
+
+    public double PatternAngle
+    {
+        get => Math.Round(_fabric?.Pattern?.Angle ?? 0);
+        set => _owner.EditFabric(Slot, f => f with { Pattern = f.Pattern is { } p ? p with { Angle = Math.Round(value) } : null });
+    }
+
+    /// <summary>Texture strength, 0-100.</summary>
+    public double TextureStrength
+    {
+        get => Math.Round((_fabric?.Texture?.Strength ?? TextureFill.DefaultStrength) * 100);
+        set => _owner.EditFabric(Slot, f => f with { Texture = f.Texture is { } t ? t with { Strength = Math.Round(Math.Clamp(value, 0, 100) / 100, 3) } : null });
+    }
+
+    public void BeginDrag() => _owner.BeginSliderDrag();
+
+    public void EndDrag() => _owner.EndSliderDrag();
+
+    internal void Refresh(ColorValue color, Fabric? fabric)
+    {
+        var colorChanged = color != _color;
+        var fabricChanged = !Equals(fabric, _fabric);
+        _color = color;
+        _fabric = fabric;
+        if (colorChanged)
+        {
+            OnPropertyChanged(nameof(Color));
+            OnPropertyChanged(nameof(Brush));
+        }
+        if (colorChanged || fabricChanged)
+        {
+            OnPropertyChanged(nameof(Fabric));
+            OnPropertyChanged(nameof(HasPattern));
+            OnPropertyChanged(nameof(HasTexture));
+            OnPropertyChanged(nameof(PatternChoices));
+            OnPropertyChanged(nameof(TextureChoices));
+            OnPropertyChanged(nameof(PatternSize));
+            OnPropertyChanged(nameof(PatternAngle));
+            OnPropertyChanged(nameof(TextureStrength));
+        }
+    }
 }
 
 /// <summary>A worn sticker, for the Sticker tab's picker.</summary>
@@ -68,7 +192,7 @@ public sealed partial class CharacterEditorViewModel
         SetColorCommand = new RelayCommand<ColorSwatchChoice>(choice =>
         {
             if (choice != null)
-                Apply(EditResult<CharacterDefinition>.Success(LookEditing.SetColor(Committed, choice.Slot, choice.Color)));
+                SetSlotColor(choice.Slot, choice.Color);
         });
         TakeOffSelectedCommand = new RelayCommand(() => EditSelected(id => LookEditing.TakeOff(Committed, id)), () => SelectedStickerIsWorn);
         RemoveSelectedCommand = new RelayCommand(() =>
@@ -130,18 +254,48 @@ public sealed partial class CharacterEditorViewModel
 
     // ---------------------------------------------------------------- colours
 
-    /// <summary>A swatch dropdown for each colour slot the worn stickers use (skin first).</summary>
+    private List<ColorSlotEditor> _colorEditors = [];
+
+    /// <summary>A colour (and fabric) dropdown for each colour slot the worn stickers use, skin first.</summary>
     public IReadOnlyList<ColorSlotEditor> ColorEditors
     {
         get
         {
-            var character = Working;
-            var look = CharacterLooks.Resolve(character);
-            return LookEditing.ColorSlotsInUse(character)
-                .Select(slot => new ColorSlotEditor(slot, ColorSlotLabel(slot), look.Color(slot, slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")),
-                    Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList(), SetColorCommand))
-                .ToList();
+            RefreshColorEditors();
+            return _colorEditors;
         }
+    }
+
+    /// <summary>Brings the editors up to date: the same objects while the slots stay the same (so an open dropdown stays open), a new list when they change. True if the list changed.</summary>
+    private bool RefreshColorEditors()
+    {
+        var character = Working;
+        var look = CharacterLooks.Resolve(character);
+        var slots = LookEditing.ColorSlotsInUse(character);
+        var changed = !slots.SequenceEqual(_colorEditors.Select(e => e.Slot));
+        if (changed)
+            _colorEditors = slots.Select(slot => new ColorSlotEditor(this, slot, Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList())).ToList();
+        foreach (var editor in _colorEditors)
+            editor.Refresh(look.Color(editor.Slot, editor.Slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")), look.FabricOf(editor.Slot));
+        return changed;
+    }
+
+    internal void SetSlotColor(string slot, ColorValue color) =>
+        Apply(EditResult<CharacterDefinition>.Success(LookEditing.SetColor(Committed, slot, color)));
+
+    /// <summary>Changes a colour slot's fabric, starting from what it wears now: a live preview inside a slider drag, otherwise one undo step.</summary>
+    internal void EditFabric(string slot, Func<Fabric, Fabric> edit)
+    {
+        var baseline = IsGestureActive ? Working : Committed;
+        var current = CharacterLooks.Resolve(baseline).FabricOf(slot) ?? new Fabric();
+        var next = edit(current);
+        if (Equals(next, current))
+            return;
+        var result = EditResult<CharacterDefinition>.Success(LookEditing.SetFabric(baseline, slot, next));
+        if (IsGestureActive)
+            UpdateGesture(result);
+        else
+            Apply(result);
     }
 
     public static string ColorSlotLabel(string slot) => slot switch
@@ -287,7 +441,8 @@ public sealed partial class CharacterEditorViewModel
             _selectedSticker = null;
         OnPropertyChanged(nameof(ClothesGalleries));
         OnPropertyChanged(nameof(AccessoryGalleries));
-        OnPropertyChanged(nameof(ColorEditors));
+        if (RefreshColorEditors())
+            OnPropertyChanged(nameof(ColorEditors));
         OnPropertyChanged(nameof(WornStickers));
         RaiseSelectedStickerChanged();
     }

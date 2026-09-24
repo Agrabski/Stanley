@@ -107,11 +107,13 @@ internal static class StickerCovers
     /// <summary>A capsule cut square at distances <paramref name="start"/> and <paramref name="end"/> along it, or left round at an end that isn't cut.</summary>
     private static PartPiece SegmentAlong(BodyCapsule capsule, double start, double end, bool capStart, bool capEnd, FigureLayerKind layer)
     {
-        var frame = Frame(capsule.From, AngleOf(capsule.From, capsule.To));
+        var along = AngleOf(capsule.From, capsule.To);
+        var frame = Frame(capsule.From, along);
         using var shape = FigureGeometry.Capsule(capsule);
         using var localBand = Rect(capStart ? -Far : (float)start, -Far, capEnd ? Far : (float)end, Far);
         using var band = FigureGeometry.Transformed(localBand, frame);
-        return new PartPiece(FigureGeometry.Combine(shape, band, SKPathOp.Intersect), layer, frame);
+        // Fabrics lie with "down" along the limb, as on the torso: stripes go round a sleeve.
+        return new PartPiece(FigureGeometry.Combine(shape, band, SKPathOp.Intersect), layer, Frame(capsule.From, along - 90));
     }
 
     /// <summary>A band of the (grown) head, from the crown (0) to the chin (1), turning with the head.</summary>

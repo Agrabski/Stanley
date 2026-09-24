@@ -133,7 +133,7 @@ internal abstract class FigureItem
 /// <see cref="InkMask"/> - the layer's seams where they lie over what's painted before it -
 /// the outline is left out, so joints read as one body.
 /// </summary>
-internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, StickerId? owner = null) : FigureItem
+internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, StickerId? owner = null, FabricFill? fabric = null) : FigureItem
 {
     public SKPath Path { get; } = path;
 
@@ -144,8 +144,20 @@ internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, Stic
 
     public override void Draw(SKCanvas canvas, SKPaint ink)
     {
-        using (var paint = new SKPaint { Color = fill, Style = SKPaintStyle.Fill, IsAntialias = true })
+        if (fabric is null)
+        {
+            using var paint = new SKPaint { Color = fill, Style = SKPaintStyle.Fill, IsAntialias = true };
             canvas.DrawPath(Path, paint);
+        }
+        else
+        {
+            // Each piece in its own region's frame (a sleeve's stripes turn with the arm),
+            // all inside the item's outline, so its cuts stay cut.
+            canvas.Save();
+            canvas.ClipPath(Path, antialias: true);
+            fabric.Draw(canvas, fill);
+            canvas.Restore();
+        }
         if (InkMask is { IsEmpty: false } mask)
         {
             canvas.Save();
@@ -156,6 +168,49 @@ internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, Stic
         else
         {
             canvas.DrawPath(Path, ink);
+        }
+    }
+}
+
+/// <summary>
+/// A fabric (pattern and/or texture) over an item's colour: the pieces it's laid out in,
+/// each with its region's frame. Shaders are made once and shared by every draw.
+/// </summary>
+internal sealed class FabricFill
+{
+    private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
+    private readonly float _strength;
+
+    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, SKPicture?> tiles)
+    {
+        _pieces = pieces.Select(p => (p.Path,
+            fabric.Pattern is { } pattern ? FabricShaders.Pattern(pattern, ground, p.Frame, height, tiles) : null,
+            fabric.Texture is { } texture ? FabricShaders.Texture(texture, p.Frame, height, tiles) : null)).ToList();
+        _strength = (float)Math.Clamp(fabric.Texture?.Strength ?? TextureFill.DefaultStrength, 0, 1);
+    }
+
+    public void Draw(SKCanvas canvas, SKColor ground)
+    {
+        using var paint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+        foreach (var (path, pattern, texture) in _pieces)
+        {
+            paint.Shader = null;
+            paint.BlendMode = SKBlendMode.SrcOver;
+            paint.Color = ground;
+            canvas.DrawPath(path, paint);
+            if (pattern != null)
+            {
+                paint.Color = SKColors.Black;
+                paint.Shader = pattern;
+                canvas.DrawPath(path, paint);
+            }
+            if (texture != null)
+            {
+                paint.Shader = texture;
+                paint.BlendMode = SKBlendMode.Multiply;
+                paint.Color = SKColors.White.WithAlpha((byte)(_strength * 255));
+                canvas.DrawPath(path, paint);
+            }
         }
     }
 }
@@ -252,6 +307,7 @@ public sealed class FigureRenderer : ICharacterRenderer
     {
         var height = character.Body.Normalized().Height;
         var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
+        var tiles = TileLookup(character);
         var pieces = look.Stickers.Select(w => StickerPieces(figure, w, height)).ToList();
         var bodySkin = FigureGeometry.Empty();
         foreach (var layer in figure.Layers.Where(l => l.HasBody))
@@ -276,7 +332,7 @@ public sealed class FigureRenderer : ICharacterRenderer
             {
                 var mask = SeamMask(layer, belowOwn[i]);
                 var own = FigureGeometry.Empty();
-                foreach (var item in StickerItems(look.Stickers[i], pieces[i], layer.Kind, look, bodySkin, mask))
+                foreach (var item in StickerItems(look.Stickers[i], pieces[i], layer.Kind, look, bodySkin, mask, height, tiles))
                 {
                     items.Add(item);
                     own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Path));
@@ -306,7 +362,7 @@ public sealed class FigureRenderer : ICharacterRenderer
 
     /// <summary>What one worn sticker paints in one layer: its painted pieces merged per colour slot, minus its cuts, clipped as asked.</summary>
     private static IEnumerable<ShapeItem> StickerItems(WornSticker worn, List<(StickerPart Part, PartPiece Piece)> pieces, FigureLayerKind layer,
-        CharacterLook look, SKPath bodySkin, SKPath? mask)
+        CharacterLook look, SKPath bodySkin, SKPath? mask, double height, Func<string, SKPicture?> tiles)
     {
         var here = pieces.Where(p => p.Piece.Layer == layer).ToList();
         if (here.Count == 0)
@@ -336,14 +392,22 @@ public sealed class FigureRenderer : ICharacterRenderer
                 path.Dispose();
                 path = cut;
             }
-            if (!path.IsEmpty)
-                yield return new ShapeItem(path, FigureGeometry.ToSk(look.Color(group.Key, fallback)), mask, worn.Asset.Id);
-            else
+            if (path.IsEmpty)
+            {
                 path.Dispose();
+                continue;
+            }
+            var ground = FigureGeometry.ToSk(look.Color(group.Key, fallback));
+            var fabric = look.FabricOf(group.Key) is { } f ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles) : null;
+            yield return new ShapeItem(path, ground, mask, worn.Asset.Id, fabric);
         }
         cuts.Dispose();
         own.Dispose();
     }
+
+    /// <summary>The character's pattern tiles, as pictures one repeat (a unit square) in size.</summary>
+    private static Func<string, SKPicture?> TileLookup(CharacterDefinition character) =>
+        name => character.Wardrobe.Tiles.TryGetValue(name, out var file) ? ArtPictures.Tile(file) : null;
 
     /// <summary>Where a layer's ink is left out: its seams, where they lie over what's already painted.</summary>
     internal static SKPath? SeamMask(FigureLayer layer, SKPath below)

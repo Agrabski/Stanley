@@ -282,3 +282,121 @@ public class CoverStickerRenderingTests
         Assert.True(outline.TightBounds.Width >= placement.ToPage(widest).Width - 0.5);
     }
 }
+
+public class FabricRenderingTests
+{
+    private static readonly SKColor Blue = new(0, 0, 255);
+    private static readonly SKColor White = new(255, 255, 255);
+
+    private static CharacterDefinition Wearing(Fabric fabric, params StickerPart[] parts)
+    {
+        var sticker = new Sticker(StickerId.New(), "Top", StickerSlots.Top, parts, new SortedDictionary<string, ColorValue> { ["top"] = ColorValue.FromHex("#0000ff") }, ["default"]);
+        var character = CharacterDefinition.Create("A") with
+        {
+            Stickers = new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Top] = [sticker.Id] },
+            Fabrics = new SortedDictionary<string, Fabric> { ["top"] = fabric },
+        };
+        return character with { Wardrobe = character.Wardrobe.With(new StickerAsset(sticker, new Dictionary<string, ArtFile>())) };
+    }
+
+    private static SKBitmap Render(CharacterDefinition character, PoseData pose)
+    {
+        var bitmap = new SKBitmap(400, 440);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(new Point2D(200, 420), 400, false), 2f, pose.ViewAngle, pose);
+        return bitmap;
+    }
+
+    private static SKColor At(SKBitmap bitmap, Point2D figure) => bitmap.GetPixel((int)Math.Round(200 + figure.X * 400), (int)Math.Round(420 + figure.Y * 400));
+
+    private static bool Near(SKColor a, SKColor b) => Math.Abs(a.Red - b.Red) + Math.Abs(a.Green - b.Green) + Math.Abs(a.Blue - b.Blue) < 40;
+
+    /// <summary>How many times the colour flips between <paramref name="a"/> and <paramref name="b"/> sampling from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    private static int Alternations(SKBitmap bitmap, Point2D from, Point2D to, SKColor a, SKColor b)
+    {
+        int flips = 0, last = 0;
+        for (var i = 0; i <= 200; i++)
+        {
+            var p = new Point2D(from.X + (to.X - from.X) * i / 200, from.Y + (to.Y - from.Y) * i / 200);
+            var c = At(bitmap, p);
+            var which = Near(c, a) ? 1 : Near(c, b) ? 2 : 0;
+            if (which != 0 && last != 0 && which != last)
+                flips++;
+            if (which != 0)
+                last = which;
+        }
+        return flips;
+    }
+
+    [Fact]
+    public void Stripes_run_across_the_chest_in_the_pattern_colour_over_the_slot_colour()
+    {
+        var character = Wearing(new Fabric(new PatternFill(PatternKind.Stripes, [ColorValue.FromHex("#ffffff")], Size: 0.04)),
+            new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var torso = BodyRig.Build(character.Body).Regions.Torso;
+
+        using var bitmap = Render(character, new PoseData(ViewAngle.Front, [], []));
+
+        var top = torso.ToFigure(new Point2D(0, torso.Top + 0.05));
+        var bottom = torso.ToFigure(new Point2D(0, torso.Bottom - 0.08));
+        Assert.True(Alternations(bitmap, top, bottom, Blue, White) >= 6, "stripes down the chest");
+        var left = torso.ToFigure(new Point2D(-0.05, torso.Top + 0.15));
+        var right = torso.ToFigure(new Point2D(0.05, torso.Top + 0.15));
+        Assert.True(Alternations(bitmap, left, right, Blue, White) == 0, "each stripe runs straight across");
+    }
+
+    [Fact]
+    public void A_sleeves_stripes_go_round_the_arm_and_turn_with_it()
+    {
+        var character = Wearing(new Fabric(new PatternFill(PatternKind.Stripes, [ColorValue.FromHex("#ffffff")], Size: 0.03)),
+            new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover("top", 0, 1)));
+        var pose = new PoseData(ViewAngle.Front, [new BoneRotation(HumanoidBone.LeftUpperArm, -80)], []);
+        var arm = BodyRig.Build(character.Body, ViewAngle.Front, null, pose).Regions.LeftArm.Upper;
+
+        using var bitmap = Render(character, pose);
+
+        var along = (From: new Point2D(arm.From.X + (arm.To.X - arm.From.X) * 0.2, arm.From.Y + (arm.To.Y - arm.From.Y) * 0.2), To: new Point2D(arm.From.X + (arm.To.X - arm.From.X) * 0.9, arm.From.Y + (arm.To.Y - arm.From.Y) * 0.9));
+        Assert.True(Alternations(bitmap, along.From, along.To, Blue, White) >= 3, "stripes along the raised arm");
+    }
+
+    [Fact]
+    public void A_texture_darkens_the_colour_a_little_without_changing_its_hue()
+    {
+        var plain = Wearing(new Fabric(), new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var denim = Wearing(new Fabric(Texture: new TextureFill(TextureKind.Denim, 1)), new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var torso = BodyRig.Build(plain.Body).Regions.Torso;
+        var chest = torso.ToFigure(new Point2D(0, torso.Top + 0.12));
+
+        using var a = Render(plain, new PoseData(ViewAngle.Front, [], []));
+        using var b = Render(denim, new PoseData(ViewAngle.Front, [], []));
+
+        Assert.Equal(Blue, At(a, chest));
+        long sum = 0;
+        var samples = 0;
+        for (var dx = -20; dx <= 20; dx += 2)
+            for (var dy = -20; dy <= 20; dy += 2)
+            {
+                var c = b.GetPixel((int)(200 + chest.X * 400) + dx, (int)(420 + chest.Y * 400) + dy);
+                Assert.True(c.Red < 30 && c.Green < 30, $"still blue: {c}");
+                sum += c.Blue;
+                samples++;
+            }
+        Assert.InRange(sum / samples, 120, 250);
+    }
+
+    [Fact]
+    public void Patterned_characters_export_to_pdf()
+    {
+        var character = Wearing(new Fabric(new PatternFill(PatternKind.Plaid, [ColorValue.FromHex("#ff0000"), ColorValue.FromHex("#ffff00")]), new TextureFill(TextureKind.Wool)),
+            new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var instance = new CharacterInstance(character.Id, new CharacterPlacement(new Point2D(50, 90), 70, false), null, new PoseData(ViewAngle.Front, [], []), null);
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 100, 100)), null, [instance], []);
+        using var stream = new MemoryStream();
+
+        PageRenderer.ExportPdf(stream, new Rect2D(0, 0, 100, 100), [panel], characters: new Dictionary<CharacterId, CharacterDefinition> { [character.Id] = character });
+
+        Assert.True(stream.Length > 1000);
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(stream.ToArray(), 0, 4));
+    }
+}

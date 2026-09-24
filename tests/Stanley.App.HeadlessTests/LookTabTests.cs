@@ -84,6 +84,29 @@ public class LookTabTests
         Assert.Equal("None", editor.Gallery(StickerSlots.Top).Current);
     }
 
+    [Fact]
+    public void A_colour_dropdown_offers_patterns_and_textures_and_stays_open_while_you_pick()
+    {
+        var (window, editor, ribbon) = OpenCharacter();
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
+        Dispatcher.UIThread.RunJobs();
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Top).Choices.Single(c => c.Label == "T-shirt"));
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Bottom).Choices.Single(c => c.Label == "Jeans"));
+        Dispatcher.UIThread.RunJobs();
+
+        var top = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is ColorSlotEditor { Slot: "top" });
+        top.Flyout!.ShowAt(top);
+        Dispatcher.UIThread.RunJobs();
+        var content = (Control)((Flyout)top.Flyout!).Content!;
+        var stripes = content.GetLogicalDescendants().OfType<Button>().First(b => b.DataContext is FabricChoice { Label: "Stripes" });
+        stripes.Command!.Execute(stripes.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(top.Flyout!.IsOpen);
+        Assert.Equal(PatternKind.Stripes, ((ColorSlotEditor)top.DataContext!).Fabric?.Pattern?.Kind);
+        Snapshot(window, "look-fabric-dropdown");
+    }
+
     private static Point FindPoint(Control control, Func<Point, bool> test)
     {
         for (var y = 0.0; y < control.Bounds.Height; y += 4)

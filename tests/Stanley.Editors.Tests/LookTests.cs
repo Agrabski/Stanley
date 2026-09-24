@@ -139,3 +139,70 @@ public sealed class LookTests : IDisposable
         Assert.Equal(2, Directory.GetDirectories(Path.Combine(Directory.GetDirectories(Path.Combine(folder, "characters")).Single(), "stickers")).Length);
     }
 }
+
+public sealed class FabricEditingTests
+{
+    private static (EditorSession Session, CharacterEditorViewModel Editor) Dressed(params string[] items)
+    {
+        var session = PageEditorHost.CreateWorkspace(ComicProject.CreateNew());
+        var created = session.Characters.CreateCharacter();
+        var editor = session.Characters.Items.Single(i => i.Id == created.Id).Editor;
+        foreach (var name in items)
+        {
+            var slot = StickerLibrary.StickerLibrary.All.Single(s => s.Name == name).Slot;
+            editor.WearCommand.Execute(editor.Gallery(slot).Choices.Single(c => c.Label == name));
+        }
+        return (session, editor);
+    }
+
+    [Fact]
+    public void Jeans_come_in_denim_and_picking_a_pattern_is_one_undo_step()
+    {
+        var (session, editor) = Dressed("Jeans", "T-shirt");
+        var bottom = editor.ColorEditors.Single(e => e.Slot == "bottom");
+        Assert.Equal(TextureKind.Denim, bottom.Fabric?.Texture?.Kind);
+
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Stripes"));
+
+        Assert.Same(top, editor.ColorEditors.Single(e => e.Slot == "top")); // the same editor, so its dropdown stays open
+        Assert.Equal(PatternKind.Stripes, top.Fabric?.Pattern?.Kind);
+        Assert.True(top.PatternChoices.Single(c => c.Label == "Stripes").IsCurrent);
+        session.Workspace.History.Undo();
+        Assert.Null(top.Fabric);
+    }
+
+    [Fact]
+    public void A_pattern_colour_and_a_size_drag_each_make_one_undo_step_and_the_pattern_survives_a_change_of_top()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Dots"));
+        top.SetPatternColor.Execute(top.PatternSwatches.Single(s => s.Name == "Yellow"));
+
+        top.BeginDrag();
+        top.PatternSize = 8;
+        top.PatternSize = 12;
+        top.EndDrag();
+
+        Assert.Equal(12, top.PatternSize);
+        Assert.Equal(ColorValue.FromHex("#f1c40f"), top.Fabric!.Pattern!.Colors[0]);
+        session.Workspace.History.Undo();
+        Assert.Equal(PatternFill.DefaultSize * 100, top.PatternSize);
+
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Top).Choices.Single(c => c.Label == "Hoodie"));
+        Assert.Equal(PatternKind.Dots, editor.ColorEditors.Single(e => e.Slot == "top").Fabric?.Pattern?.Kind);
+    }
+
+    [Fact]
+    public void Plain_denim_can_be_asked_for_and_skin_has_no_fabric()
+    {
+        var (_, editor) = Dressed("Jeans");
+        var bottom = editor.ColorEditors.Single(e => e.Slot == "bottom");
+
+        bottom.SetTexture.Execute(bottom.TextureChoices.Single(c => c.Label == "None"));
+
+        Assert.Null(bottom.Fabric);
+        Assert.False(editor.ColorEditors.Single(e => e.Slot == "skin").CanHaveFabric);
+    }
+}
