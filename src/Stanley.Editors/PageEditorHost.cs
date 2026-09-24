@@ -4,15 +4,18 @@ namespace Stanley.Editors;
 
 public static class PageEditorHost
 {
-    /// <summary>A fresh editing session for <paramref name="project"/>: its own undo history (clean, i.e. "saved"), and a page editor pane on the project's page.</summary>
-    public static (EditorWorkspace Workspace, PageEditorViewModel Editor) CreateWorkspace(ComicProject project)
+    /// <summary>
+    /// A fresh editing session for <paramref name="project"/>: one undo history (clean,
+    /// i.e. "saved") shared by every page, the page navigator docked on the left, and the
+    /// first page's editor in the editor area. Picking a page in the navigator swaps which
+    /// page editor is shown; the ribbon follows the shown page editor, never the navigator.
+    /// </summary>
+    public static (EditorWorkspace Workspace, PageNavigatorViewModel Navigator) CreateWorkspace(ComicProject project)
     {
         var history = new EditorHistory();
-        var editor = new PageEditorViewModel(history, project.PageBounds, project.Document);
-        return (new EditorWorkspace(history, editor), editor);
+        var navigator = new PageNavigatorViewModel(history, project.Pages);
+        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator]);
+        navigator.CurrentPageChanged += page => workspace.SwitchTo(page.Editor);
+        return (workspace, navigator);
     }
-
-    /// <summary>A blank, unsaved A4 comic - what the app opens with, like a blank Word document.</summary>
-    public static (EditorWorkspace Workspace, PageEditorViewModel Editor) CreateDemoWorkspace() =>
-        CreateWorkspace(ComicProject.CreateNew());
 }

@@ -12,6 +12,10 @@
     <DataTemplate DataType="editors:PageEditorViewModel">
       <editors:PageEditorView />
     </DataTemplate>
+    <!-- Side pane: the page navigator. -->
+    <DataTemplate DataType="editors:PageNavigatorViewModel">
+      <editors:PageNavigatorView />
+    </DataTemplate>
   </Window.DataTemplates>
 
   <Grid>

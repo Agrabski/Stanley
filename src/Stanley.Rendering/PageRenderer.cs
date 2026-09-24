@@ -52,16 +52,23 @@ public static class PageRenderer
     }
 
     /// <summary>Writes the page as a one-page vector PDF at its real trim size.</summary>
-    public static void ExportPdf(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder)
+    public static void ExportPdf(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder) =>
+        ExportPdf(output, [(pageBounds, panelsInOrder)]);
+
+    /// <summary>Writes every page, in order, into one vector PDF, each at its real trim size.</summary>
+    public static void ExportPdf(Stream output, IEnumerable<(Rect2D Bounds, IEnumerable<Panel> PanelsInOrder)> pages)
     {
         const float pointsPerMm = 72f / 25.4f;
         using var document = SKDocument.CreatePdf(output)
             ?? throw new InvalidOperationException("PDF export isn't available on this platform.");
-        var canvas = document.BeginPage((float)pageBounds.Width * pointsPerMm, (float)pageBounds.Height * pointsPerMm);
-        canvas.Scale(pointsPerMm);
-        canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
-        Draw(canvas, pageBounds, panelsInOrder);
-        document.EndPage();
+        foreach (var (pageBounds, panels) in pages)
+        {
+            var canvas = document.BeginPage((float)pageBounds.Width * pointsPerMm, (float)pageBounds.Height * pointsPerMm);
+            canvas.Scale(pointsPerMm);
+            canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
+            Draw(canvas, pageBounds, panels);
+            document.EndPage();
+        }
         document.Close();
     }
 

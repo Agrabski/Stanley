@@ -25,8 +25,8 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
-snapping) all exist. The GUI opens/saves real project folders (one page of one issue
-for now — see "Documents" below). No character rendering yet.
+snapping, page navigator) all exist. The GUI opens/saves real project folders (the
+pages of one issue for now — see "Documents" below). No character rendering yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -212,6 +212,18 @@ Editing pipeline layers, bottom to top:
     Ribbon buttons are non-focusable so shortcuts keep reaching the page. Shared
     look and icon geometries: `RibbonStyles.axaml`, included from `App.axaml`.
     Group labels are pinned to the bottom (`DockPanel.group`).
+  - **Page navigator** (`PageNavigatorViewModel` + `PageNavigatorView`): a dock
+    *tool* pane on the left (`EditorWorkspace(history, panes, leftTools)`), not an
+    editor, so focusing it never changes `ActiveEditor` and the ribbon stays put.
+    Live thumbnails (`PageThumbnail`, drawing through `PageRenderer` and
+    redrawing on the page's `Working` changes), click to show a page, drag to
+    reorder, right-click / Delete / Ctrl+D / Ctrl+Up/Down for page actions, "New
+    page" at the bottom. Each page has its own `PageEditorViewModel`, all sharing
+    the one `EditorHistory`; showing a page swaps which editor is in the editor
+    area (`EditorWorkspace.SwitchTo` — one page at a time, not a row of tabs).
+    Page add/duplicate/delete/move are history entries too. History entries carry
+    their source (`EditorHistory.Push(..., source)` / `Restored`), so undoing an
+    edit made on another page switches to that page first.
   - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
     bar with a one-line hint for the current tool/selection plus the last
     validation error. Right-click gives a context menu for the thing under the
@@ -245,16 +257,20 @@ Editing pipeline layers, bottom to top:
 ### Documents (File view, open/save)
 
 Modelled on Word. `ComicProject` (Stanley.Editors) is "the document": a project
-folder on disk (or untitled, `Location == null`) plus the one page the editor edits —
-the first page of the first issue, created on the fly for a project with none (e.g.
-straight from `stanley init`). `Save` writes the manifest title, the issue/page
-entries and every panel file, and deletes files of panels removed since the last
-save (`ProjectRepository.DeletePanel`); nothing else in the folder is touched.
+folder on disk (or untitled, `Location == null`) plus the pages the editor edits —
+all pages of the first issue, with a blank one created on the fly for a project with
+none (e.g. straight from `stanley init`). `Save(pages)` (from
+`PageNavigatorViewModel.Snapshot()`) writes the manifest title, the issue's page
+order, every page and panel, and deletes the folders/files of pages and panels
+removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`);
+nothing else in the folder is touched. A page's label and trim override survive a
+save. Multi-issue navigation isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
 and never writes into a non-empty folder — it uses a subfolder named after the title
 instead. An untitled comic takes its folder's name as title on first save. Export
-(PDF at trim size, PNG at 300 dpi) goes through `PageRenderer` (Stanley.Rendering),
-the same code the canvas draws with.
+(all pages as one PDF at trim size; the current page as a 300 dpi PNG) goes through
+`PageRenderer` (Stanley.Rendering), the same code the canvas and thumbnails draw
+with.
 
 `MainWindowViewModel` (Stanley.App) runs New / Open / Save / Save As / Close /
 Export and the File ("backstage") view, `Backstage.axaml`: full-window, blue command

@@ -35,7 +35,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly RecentProjects _recent;
     private ComicProject? _project;
     private EditorWorkspace? _workspace;
-    private PageEditorViewModel? _editor;
+    private PageNavigatorViewModel? _navigator;
     private bool _titleDirty;
     private bool _isBackstageOpen;
     private BackstagePage _backstagePage = BackstagePage.New;
@@ -71,7 +71,10 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public ComicProject? Project => _project;
     public EditorWorkspace? Workspace => _workspace;
-    public PageEditorViewModel? Editor => _editor;
+    public PageNavigatorViewModel? Navigator => _navigator;
+
+    /// <summary>The page being edited (the navigator's current page).</summary>
+    public PageEditorViewModel? Editor => _navigator?.CurrentPage.Editor;
     public bool HasDocument => _project is not null;
 
     /// <summary>Unsaved edits (anything undoable since the last save) or an unsaved title change.</summary>
@@ -118,11 +121,13 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         get
         {
-            if (_editor is null)
+            if (_navigator is null)
                 return "";
-            var panels = _editor.Working.PanelOrder.Count;
-            var bubbles = _editor.Working.Panels.Values.Sum(p => p.Bubbles.Count);
-            return $"{panels} panel{(panels == 1 ? "" : "s")}, {bubbles} bubble{(bubbles == 1 ? "" : "s")}";
+            var pages = _navigator.Pages.Count;
+            var documents = _navigator.Pages.Select(p => p.Editor.Working).ToList();
+            var panels = documents.Sum(d => d.PanelOrder.Count);
+            var bubbles = documents.Sum(d => d.Panels.Values.Sum(p => p.Bubbles.Count));
+            return $"{Plural(pages, "page")}, {Plural(panels, "panel")}, {Plural(bubbles, "bubble")}";
         }
     }
 
@@ -261,14 +266,14 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <summary>Ctrl+S. An untitled comic goes through Save As, like Word's first save. Returns whether it was saved.</summary>
     public async Task<bool> SaveAsync()
     {
-        if (_project is null || _editor is null)
+        if (_project is null || _navigator is null)
             return false;
         if (_project.IsUntitled)
             return await SaveAsAsync();
 
         try
         {
-            _project.Save(_editor.Committed);
+            _project.Save(_navigator.Snapshot());
             MarkSaved();
             return true;
         }
@@ -281,7 +286,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public async Task<bool> SaveAsAsync()
     {
-        if (_project is null || _editor is null)
+        if (_project is null || _navigator is null)
             return false;
 
         var folder = await _dialogs.PickFolderAsync("Save the comic in a folder");
@@ -290,7 +295,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            var saved = _project.SaveAs(folder, _editor.Committed);
+            var saved = _project.SaveAs(folder, _navigator.Snapshot());
             MarkSaved();
             Message = $"Saved to {saved}";
             return true;
@@ -313,13 +318,14 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public async Task ExportAsync(string format)
     {
-        if (_project is null || _editor is null)
+        if (_project is null || _navigator is null)
             return;
 
         var isPdf = format == "pdf";
+        var current = _navigator.CurrentPage;
         var path = await _dialogs.PickExportFileAsync(
-            isPdf ? "Export page as PDF" : "Export page as PNG",
-            $"{DocumentTitle}.{format}",
+            isPdf ? "Export all pages as PDF" : "Export this page as PNG",
+            isPdf ? $"{DocumentTitle}.pdf" : $"{DocumentTitle} - page {current.Number}.png",
             format,
             isPdf ? "PDF document" : "PNG image");
         if (path is null)
@@ -328,9 +334,9 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                _project.ExportPdf(path, _editor.Committed);
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed)));
             else
-                _project.ExportPng(path, _editor.Committed);
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed);
             Message = $"Exported to {path}";
             IsBackstageOpen = false;
         }
@@ -360,15 +366,16 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         Unload();
         _project = project;
-        (_workspace, _editor) = PageEditorHost.CreateWorkspace(project);
+        (_workspace, _navigator) = PageEditorHost.CreateWorkspace(project);
         _workspace.History.PropertyChanged += OnHistoryChanged;
-        _editor.PropertyChanged += OnEditorChanged;
+        _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _titleDirty = false;
         Message = null;
         SetProperty(ref _isBackstageOpen, false, nameof(IsBackstageOpen));
         RaiseDocumentChanged();
         OnPropertyChanged(nameof(Workspace));
         OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(Navigator));
         OnPropertyChanged(nameof(Project));
     }
 
@@ -376,15 +383,16 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (_workspace != null)
             _workspace.History.PropertyChanged -= OnHistoryChanged;
-        if (_editor != null)
-            _editor.PropertyChanged -= OnEditorChanged;
+        if (_navigator != null)
+            _navigator.CurrentPageChanged -= OnCurrentPageChanged;
         _project = null;
         _workspace = null;
-        _editor = null;
+        _navigator = null;
         _titleDirty = false;
         RaiseDocumentChanged();
         OnPropertyChanged(nameof(Workspace));
         OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(Navigator));
         OnPropertyChanged(nameof(Project));
     }
 
@@ -403,6 +411,8 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (e.PropertyName is nameof(EditorHistory.IsDirty))
             RaiseDocumentChanged();
+        if (e.PropertyName is nameof(EditorHistory.CanUndo))
+            OnPropertyChanged(nameof(PanelCountText)); // every edit, undo and redo passes through here
         if (e.PropertyName is nameof(EditorHistory.CanUndo) or nameof(EditorHistory.CanRedo))
         {
             UndoCommand.NotifyCanExecuteChanged();
@@ -410,11 +420,9 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void OnEditorChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(PageEditorViewModel.Working))
-            OnPropertyChanged(nameof(PanelCountText));
-    }
+    private void OnCurrentPageChanged(PageItem page) => OnPropertyChanged(nameof(Editor));
+
+    private static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
 
     private void RaiseDocumentChanged()
     {

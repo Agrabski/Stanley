@@ -9,13 +9,18 @@ using PanelModel = Stanley.ProjectModel.Issues.Panel;
 
 namespace Stanley.Editors;
 
+/// <summary>One page as the editor sees it: its id, its print size, and its content.</summary>
+public sealed record ComicPage(PageId Id, PageTrim Trim, PageDocument Document)
+{
+    public Rect2D Bounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
+}
+
 /// <summary>
 /// An open comic - the thing File &gt; New/Open/Save act on, the way Word acts on a
 /// document. On disk it's a Stanley project folder (see <see cref="ProjectRepository"/>);
-/// the page editor edits one page of it (for now, the first page of the first issue -
-/// created on the fly for a project that has none yet, e.g. one fresh from
-/// <c>stanley init</c>). Everything else in the folder is left untouched by a save, and
-/// carried along by Save As.
+/// the editor works on the pages of its first issue (created on the fly for a project
+/// that has none yet, e.g. one fresh from <c>stanley init</c>). Everything else in the
+/// folder is left untouched by a save, and carried along by Save As.
 /// </summary>
 public sealed class ComicProject
 {
@@ -23,18 +28,22 @@ public sealed class ComicProject
     public const double DefaultBleedMm = 3;
 
     private Issue _issue;
-    private Page _page;
-    private HashSet<PanelId> _savedPanelIds;
+    // What's on disk (at Location) as of the last open/save: page records (kept so a
+    // page's label and trim override survive a save) and each page's panel ids, so a
+    // save can delete the files of pages and panels removed since.
+    private Dictionary<PageId, Page> _pageRecords;
+    private Dictionary<PageId, HashSet<PanelId>> _savedPanels;
 
-    private ComicProject(string? location, string title, PageTrim trim, Issue issue, Page page, PageDocument document, IEnumerable<PanelId> savedPanelIds)
+    private ComicProject(string? location, string title, PageTrim trim, Issue issue, IReadOnlyList<ComicPage> pages,
+        Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels)
     {
         Location = location;
         Title = title;
         Trim = trim;
         _issue = issue;
-        _page = page;
-        Document = document;
-        _savedPanelIds = [.. savedPanelIds];
+        Pages = pages;
+        _pageRecords = pageRecords;
+        _savedPanels = savedPanels;
     }
 
     /// <summary>The project folder, or null for a comic that has never been saved (Save then behaves as Save As).</summary>
@@ -45,20 +54,20 @@ public sealed class ComicProject
     /// <summary>The series title (<c>stanley.json</c>'s title); shown in the window title and editable from File &gt; Info.</summary>
     public string Title { get; set; }
 
+    /// <summary>The project's default page size - what new pages get.</summary>
     public PageTrim Trim { get; }
-
-    /// <summary>The page as it was opened - the editor's starting document.</summary>
-    public PageDocument Document { get; }
 
     public Rect2D PageBounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 
-    /// <summary>A brand-new, unsaved comic: one page, either one panel filling the live area or tiled with <paramref name="layout"/>.</summary>
+    /// <summary>The pages as they were opened, in reading order - the editor's starting point.</summary>
+    public IReadOnlyList<ComicPage> Pages { get; }
+
+    /// <summary>A brand-new, unsaved comic with one page: either one panel filling the live area or tiled with <paramref name="layout"/>.</summary>
     public static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout = null, PanelGrid? grid = null)
     {
-        var issue = new Issue(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
-        var page = new Page(PageId.New(), "Page 1", TrimOverride: null, []);
-        var bounds = new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm);
-        return new ComicProject(null, UntitledTitle, trim, issue, page, BlankDocument(bounds, grid ?? PanelGrid.Default, layout), []);
+        var issue = NewIssue();
+        var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
+        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], []);
     }
 
     public static ComicProject CreateNew(MetricPaperSize paper = MetricPaperSize.A4, PanelLayoutPreset? layout = null) =>
@@ -72,27 +81,35 @@ public sealed class ComicProject
 
         var repository = new ProjectRepository(folder);
         var manifest = repository.LoadManifest();
+        var issue = manifest.IssueIds.Count > 0 ? repository.LoadIssue(manifest.IssueIds[0]) : NewIssue();
 
-        var issue = manifest.IssueIds.Count > 0
-            ? repository.LoadIssue(manifest.IssueIds[0])
-            : new Issue(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
-
-        if (issue.PageIds.Count == 0)
+        var pages = new List<ComicPage>();
+        var records = new Dictionary<PageId, Page>();
+        var saved = new Dictionary<PageId, HashSet<PanelId>>();
+        foreach (var pageId in issue.PageIds)
         {
-            var newPage = new Page(PageId.New(), "Page 1", TrimOverride: null, []);
-            var bounds = new Rect2D(0, 0, manifest.DefaultPageTrim.Size.WidthMm, manifest.DefaultPageTrim.Size.HeightMm);
-            return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, newPage,
-                BlankDocument(bounds, PanelGrid.Default, null), []);
+            var page = repository.LoadPage(issue.Id, pageId);
+            var panels = page.PanelIds.ToDictionary(id => id, id => repository.LoadPanel(issue.Id, page.Id, id));
+            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels)));
+            records[page.Id] = page;
+            saved[page.Id] = [.. page.PanelIds];
         }
 
-        var page = repository.LoadPage(issue.Id, issue.PageIds[0]);
-        var panels = page.PanelIds.ToDictionary(id => id, id => repository.LoadPanel(issue.Id, page.Id, id));
-        return new ComicProject(repository.RootDirectory, manifest.Title, page.TrimOverride ?? manifest.DefaultPageTrim,
-            issue, page, new PageDocument(page.PanelIds, panels), page.PanelIds);
+        if (pages.Count == 0)
+            pages.Add(NewPage(manifest.DefaultPageTrim));
+
+        return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, pages, records, saved);
     }
 
-    /// <summary>Writes the edited page (and the manifest/issue entries pointing at it) back to <see cref="Location"/>.</summary>
-    public void Save(PageDocument document)
+    /// <summary>A blank page at the project's size: one panel filling the live area.</summary>
+    public ComicPage CreateBlankPage(PanelGrid? grid = null) => NewPage(Trim, grid);
+
+    /// <summary>
+    /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
+    /// manifest title, the issue's page list, every page and panel - and deletes the
+    /// folders/files of pages and panels removed since the last save.
+    /// </summary>
+    public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -105,18 +122,34 @@ public sealed class ComicProject
         var issueIds = manifest.IssueIds.Contains(_issue.Id) ? manifest.IssueIds : [.. manifest.IssueIds, _issue.Id];
         repository.SaveManifest(manifest with { Title = Title, IssueIds = issueIds });
 
-        if (!_issue.PageIds.Contains(_page.Id))
-            _issue = _issue with { PageIds = [.. _issue.PageIds, _page.Id] };
+        _issue = _issue with { PageIds = pages.Select(p => p.Id).ToList() };
         repository.SaveIssue(_issue);
 
-        _page = _page with { PanelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList() };
-        repository.SavePage(_issue.Id, _page);
-        foreach (var id in _page.PanelIds)
-            repository.SavePanel(_issue.Id, _page.Id, document.Panels[id]);
+        var records = new Dictionary<PageId, Page>();
+        var saved = new Dictionary<PageId, HashSet<PanelId>>();
+        for (var i = 0; i < pages.Count; i++)
+        {
+            var (id, document) = pages[i];
+            var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
+            var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, $"Page {i + 1}", TrimOverride: null, []))
+                with { PanelIds = panelIds };
+            repository.SavePage(_issue.Id, record);
+            foreach (var panelId in panelIds)
+                repository.SavePanel(_issue.Id, id, document.Panels[panelId]);
+            if (_savedPanels.TryGetValue(id, out var before))
+            {
+                foreach (var removed in before.Except(panelIds))
+                    repository.DeletePanel(_issue.Id, id, removed);
+            }
+            records[id] = record;
+            saved[id] = [.. panelIds];
+        }
 
-        foreach (var removed in _savedPanelIds.Except(_page.PanelIds))
-            repository.DeletePanel(_issue.Id, _page.Id, removed);
-        _savedPanelIds = [.. _page.PanelIds];
+        foreach (var removedPage in _savedPanels.Keys.Except(saved.Keys))
+            repository.DeletePage(_issue.Id, removedPage);
+
+        _pageRecords = records;
+        _savedPanels = saved;
     }
 
     /// <summary>
@@ -127,38 +160,44 @@ public sealed class ComicProject
     /// (other issues, characters, art), since a project is a folder, not one file.
     /// Returns the folder actually saved to.
     /// </summary>
-    public string SaveAs(string folder, PageDocument document)
+    public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
             Title = Path.GetFileName(target);
 
-        // The copy carries this page's panel files as last saved, so _savedPanelIds still
-        // describes what's on disk and Save prunes deleted panels in the new copy too.
-        // (An untitled comic has nothing to copy, and no saved panels.)
+        // The copy carries the pages as last saved, so _savedPanels still describes what's
+        // on disk and Save prunes removed pages/panels in the new copy too. (An untitled
+        // comic has nothing to copy, and nothing saved.)
         if (Location is { } source && Directory.Exists(source))
             CopyProject(source, target);
 
         Location = target;
-        Save(document);
+        Save(pages);
         return target;
     }
 
-    /// <summary>Exports the page at its trim size (bleed isn't drawn yet).</summary>
-    public void ExportPdf(string path, PageDocument document)
+    /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
+    public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document)> pages)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, PageBounds, InOrder(document));
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document))).ToList());
     }
 
-    public void ExportPng(string path, PageDocument document, int dpi = 300)
+    /// <summary>One page as a PNG.</summary>
+    public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, PageBounds, InOrder(document), dpi);
+        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>
         document.PanelOrder.Where(document.Panels.ContainsKey).Select(id => document.Panels[id]).ToList();
+
+    private static Issue NewIssue() => new(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
+
+    private static ComicPage NewPage(PageTrim trim, PanelGrid? grid = null) =>
+        new(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, null));
 
     private string ChooseTargetFolder(string folder)
     {
@@ -180,20 +219,18 @@ public sealed class ComicProject
         if (string.Equals(Path.GetFullPath(source), target, StringComparison.Ordinal))
             return;
 
+        Directory.CreateDirectory(target);
         foreach (var dir in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(source, dir);
-            if (IsGitPath(relative))
-                continue;
-            Directory.CreateDirectory(Path.Combine(target, relative));
+            if (!IsGitPath(relative))
+                Directory.CreateDirectory(Path.Combine(target, relative));
         }
-        Directory.CreateDirectory(target);
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(source, file);
-            if (IsGitPath(relative))
-                continue;
-            File.Copy(file, Path.Combine(target, relative), overwrite: true);
+            if (!IsGitPath(relative))
+                File.Copy(file, Path.Combine(target, relative), overwrite: true);
         }
     }
 
@@ -201,7 +238,7 @@ public sealed class ComicProject
     private static bool IsGitPath(string relative) =>
         relative == ".git" || relative.StartsWith(".git" + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
-    private static PageDocument BlankDocument(Rect2D pageBounds, PanelGrid grid, PanelLayoutPreset? layout)
+    internal static PageDocument BlankDocument(Rect2D pageBounds, PanelGrid grid, PanelLayoutPreset? layout)
     {
         var rects = layout is null
             ? [grid.LiveArea(pageBounds)]

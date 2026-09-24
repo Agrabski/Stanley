@@ -38,13 +38,17 @@ public sealed class EditorHistory : ObservableObject
         OnPropertyChanged(nameof(IsDirty));
     }
 
+    /// <summary>Raised after an undo or redo, with the <c>source</c> the entry was pushed with.</summary>
+    public event Action<object?>? Restored;
+
     public IRelayCommand UndoCommand { get; }
     public IRelayCommand RedoCommand { get; }
 
     /// <summary>Records one committed edit. <paramref name="restoreBefore"/>/<paramref name="restoreAfter"/> must each fully restore the affected pane's state - they are the entire undo/redo implementation for this entry.</summary>
-    public void Push(string description, Action restoreBefore, Action restoreAfter)
+    /// <param name="source">Who made the edit (usually the editor pane). Reported by <see cref="Restored"/> so undoing an edit made elsewhere - on another page, say - can bring that place back into view first.</param>
+    public void Push(string description, Action restoreBefore, Action restoreAfter, object? source = null)
     {
-        _undo.Push(new HistoryEntry(description, restoreBefore, restoreAfter));
+        _undo.Push(new HistoryEntry(description, restoreBefore, restoreAfter, source));
         _redo.Clear();
         NotifyChanged();
     }
@@ -58,6 +62,7 @@ public sealed class EditorHistory : ObservableObject
         entry.RestoreBefore();
         _redo.Push(entry);
         NotifyChanged();
+        Restored?.Invoke(entry.Source);
     }
 
     public void Redo()
@@ -69,6 +74,7 @@ public sealed class EditorHistory : ObservableObject
         entry.RestoreAfter();
         _undo.Push(entry);
         NotifyChanged();
+        Restored?.Invoke(entry.Source);
     }
 
     private void NotifyChanged()
@@ -80,5 +86,5 @@ public sealed class EditorHistory : ObservableObject
         RedoCommand.NotifyCanExecuteChanged();
     }
 
-    private sealed record HistoryEntry(string Description, Action RestoreBefore, Action RestoreAfter);
+    private sealed record HistoryEntry(string Description, Action RestoreBefore, Action RestoreAfter, object? Source);
 }

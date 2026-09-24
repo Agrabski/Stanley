@@ -118,13 +118,13 @@
             <Button Name="ExportPdfButton" Classes="tile" Command="{Binding ExportPdfCommand}" Width="180" Height="110">
               <StackPanel Spacing="6">
                 <TextBlock Text="PDF" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                <TextBlock Text="Vector, at print size. For printers and sharing." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+                <TextBlock Text="Every page, vector, at print size. For printers and sharing." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
               </StackPanel>
             </Button>
             <Button Name="ExportPngButton" Classes="tile" Command="{Binding ExportPngCommand}" Width="180" Height="110">
               <StackPanel Spacing="6">
                 <TextBlock Text="PNG" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                <TextBlock Text="Image at 300 dpi. For the web and social media." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+                <TextBlock Text="The current page at 300 dpi. For the web and social media." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
               </StackPanel>
             </Button>
           </StackPanel>

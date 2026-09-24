@@ -107,7 +107,7 @@ public abstract class EditorViewModel<TDocument> : Document, IEditorPane
 
         var before = _gestureBaseline;
         var after = Working;
-        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after);
+        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after, this);
         Committed = after;
     }
 
@@ -136,7 +136,7 @@ public abstract class EditorViewModel<TDocument> : Document, IEditorPane
         if (before.Equals(after))
             return;
 
-        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after);
+        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after, this);
         Working = Committed = after;
     }
 }
