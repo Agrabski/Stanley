@@ -1,25 +1,34 @@
+<!--
+  The page editor pane: the zoomable page, an inline text editor that opens over a
+  bubble, and a status bar. Its ribbon is not in here - it's PageEditorRibbon, shown in
+  the window's ribbon bar above the dock area whenever this pane is the active one.
+-->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
-             x:Class="Stanley.Editors.PageEditorView">
-  <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
-    <!-- Controls bar -->
-    <Border Grid.Row="0" Padding="8" BorderBrush="LightGray" BorderThickness="0,0,0,1">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Name="AddBubbleButton" Click="OnAddBubbleClick">Add Bubble</Button>
-        <Button Name="SplitPanelButton" Click="OnSplitPanelClick">Split Panel</Button>
-      </StackPanel>
-    </Border>
-
-    <!-- Main canvas -->
-    <Grid Grid.Row="1">
+             x:Class="Stanley.Editors.PageEditorView"
+             x:DataType="local:PageEditorViewModel">
+  <Grid RowDefinitions="*,Auto">
+    <!-- Page -->
+    <Grid Grid.Row="0">
       <local:PageCanvasControl x:Name="PageCanvas" />
-
-      <!-- Text editing box (overlaid, positioned outside canvas typically) -->
-      <StackPanel Margin="8" VerticalAlignment="Top" HorizontalAlignment="Right" Width="200">
-        <TextBlock Text="Bubble Text:" Margin="0,0,0,4" />
-        <TextBox Name="BubbleTextBox" Height="100" TextWrapping="Wrap" LostFocus="OnBubbleTextLostFocus" />
-      </StackPanel>
+      <Canvas Name="Overlay">
+        <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
+                 VerticalContentAlignment="Center" Background="#F2FFFFFF" Foreground="Black" BorderThickness="2" MaxLength="500"
+                 PlaceholderText="Type the dialogue…  (Enter = done, Shift+Enter = new line, Esc = cancel)" />
+      </Canvas>
     </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="#C62828" FontSize="12" VerticalAlignment="Center"
+                     IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <TextBlock Name="PageInfoText" Grid.Column="1" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
   </Grid>
 </UserControl>

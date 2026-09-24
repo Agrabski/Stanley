@@ -70,3 +70,43 @@ public class EditorHistoryTests
         Assert.Equal(["undo-second", "undo-first"], log);
     }
 }
+
+public class EditorHistoryDirtyTests
+{
+    [Fact]
+    public void NewHistory_IsClean_AndAnEditMakesItDirty()
+    {
+        var history = new EditorHistory();
+        Assert.False(history.IsDirty);
+
+        history.Push("edit", () => { }, () => { });
+        Assert.True(history.IsDirty);
+    }
+
+    [Fact]
+    public void MarkSaved_ThenUndoAndRedoBackToTheSavedState_IsCleanAgain()
+    {
+        var history = new EditorHistory();
+        history.Push("a", () => { }, () => { });
+        history.MarkSaved();
+        Assert.False(history.IsDirty);
+
+        history.Undo();
+        Assert.True(history.IsDirty);
+
+        history.Redo();
+        Assert.False(history.IsDirty);
+    }
+
+    [Fact]
+    public void EditAfterUndoingPastTheSavePoint_StaysDirty()
+    {
+        var history = new EditorHistory();
+        history.Push("a", () => { }, () => { });
+        history.MarkSaved();
+        history.Undo();
+        history.Push("b", () => { }, () => { });
+
+        Assert.True(history.IsDirty);
+    }
+}

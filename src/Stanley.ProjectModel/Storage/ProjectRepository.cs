@@ -211,6 +211,21 @@ public sealed class ProjectRepository
         ProjectJson.Write(ProjectPaths.PanelFilePath(panelsDir, panel.Id), panel);
     }
 
+    /// <summary>Removes a page's folder (its page.json and all its panels), e.g. after the page was deleted in the editor. A no-op if it was never saved. The caller removes it from its issue's <c>PageIds</c>.</summary>
+    public void DeletePage(IssueId issueId, PageId pageId)
+    {
+        if (ProjectPaths.FindEntityDir(PagesDir(issueId), pageId) is { } dir)
+            Directory.Delete(dir, recursive: true);
+    }
+
+    /// <summary>Removes a panel's file, e.g. after the panel was deleted in the editor. A no-op if it was never saved.</summary>
+    public void DeletePanel(IssueId issueId, PageId pageId, PanelId panelId)
+    {
+        var path = ProjectPaths.PanelFilePath(Path.Combine(PageDirOrThrow(issueId, pageId), ProjectPaths.PanelsDirName), panelId);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
     private static string DisplayName(string number, string title) => string.IsNullOrWhiteSpace(title) ? number : $"{number} {title}";
 
     private static DirectoryNotFoundException NotFoundDir(string kind, string id) =>

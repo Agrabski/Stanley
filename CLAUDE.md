@@ -24,7 +24,9 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
-concrete page/panel/bubble editor all exist. No character rendering yet.
+concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
+snapping, page navigator) all exist. The GUI opens/saves real project folders (the
+pages of one issue for now — see "Documents" below). No character rendering yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -38,7 +40,7 @@ src/Stanley.EditorFramework/      # undo/redo (EditorHistory), gesture lifecycle
 src/Stanley.Editors/              # concrete editors (PageEditorViewModel, PageEditorView, PageEditorHost)
 src/Stanley.ProjectModel/         # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
 src/Stanley.Rendering/            # pure SkiaSharp rendering (bubble/panel path-building, text, drawing)
-src/Stanley.App/                  # the `stanley` executable: Avalonia GUI host + CLI (Commands/)
+src/Stanley.App/                  # the `stanley` executable: Avalonia GUI host (window, File view, Documents/) + CLI (Commands/)
 tests/Stanley.App.HeadlessTests/   # xunit v3, UI smoke tests
 tests/Stanley.App.Tests/           # xunit v3, CLI command unit tests
 tests/Stanley.Editing.Tests/       # xunit v3, editing operation unit tests
@@ -171,7 +173,8 @@ Editing pipeline layers, bottom to top:
   dependencies — the shared vocabulary between editing logic and the editor
   framework, kept here so EditorFramework never has to reference Editing.
 - **`Stanley.Editing`**: pure editing functions over immutable document
-  values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`).
+  values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`,
+  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`).
   Avalonia-free by design — a future `stanley` subcommand could invoke the
   same logic headlessly, with no recompilation needed.
 - **`Stanley.EditorFramework`**: `EditorHistory` (one shared undo/redo stack
@@ -184,13 +187,143 @@ Editing pipeline layers, bottom to top:
   requirement. `TDocument` must be immutable (`record` satisfies this).
 - **`Stanley.Editors`**: concrete editor implementations (`PageEditorViewModel`
   extends `EditorViewModel<PageDocument>`, `PageEditorView` is the UI, `PageEditorHost`
-  builds the demo page + history + layout at startup). Supports panel resize,
-  panel split, boundary drag between adjacent panels, bubble insertion/resize/style-change.
-  Panels in the page editor are always axis-aligned rectangles (an arbitrary
-  hand-edited `PanelShape` remains a data-model escape hatch, just unreachable
-  through this editor's drag interactions — future editors could expose it).
-- **`Stanley.App`**: wires `EditorHistory` + `PageEditorHost.CreateDemoLayout()`
-  into `MainWindow`'s Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
+  builds the demo page + history + layout at startup). Panels in the page editor are
+  always axis-aligned rectangles (an arbitrary hand-edited `PanelShape` remains a
+  data-model escape hatch, just unreachable through this editor's drag interactions).
+  The page editor UI:
+  - **Ribbon** (Word-style): one ribbon in the window, above the dock area — not
+    inside a pane. Rows: a blue title bar with the quick access toolbar (Save,
+    Undo, Redo) and the "<title> - saved / unsaved changes" caption; then the tab
+    strip with the window-level **File** button laid over its left end; then the
+    active tab's groups (fixed height, so the page never moves). The tabs come from
+    the active pane: `EditorWorkspace.ActiveEditor` (EditorFramework; follows the
+    dock factory's active/focused dockable) is the ribbon host's content, and a
+    `DataTemplate` scoped to that host maps each editor view-model type to its
+    ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
+    editor type adds its own tabs the same way. Page editor tabs: Home (tools,
+    bubble style, add/edit/delete), Insert (panel, speech/shout/whisper bubble),
+    Layout (inline preset gallery, margin/gutter, snap, split), View (fit/actual
+    size/zoom, margin guides), plus contextual **Panel** (blue) and **Bubble**
+    (orange) tabs visible only for that selection (`IsPanelContext` /
+    `IsBubbleContext`); like Word they aren't forced open, and if the selected one
+    disappears the ribbon falls back to Home. The ribbon only talks to its pane
+    through the view model: commands plus events for view-only work
+    (`ViewportRequested` for zoom, `TextEditRequested` for the inline text editor).
+    Ribbon buttons are non-focusable so shortcuts keep reaching the page. Shared
+    look and icon geometries: `RibbonStyles.axaml`, included from `App.axaml`.
+    Group labels are pinned to the bottom (`DockPanel.group`).
+  - **Page navigator** (`PageNavigatorViewModel` + `PageNavigatorView`): a dock
+    *tool* pane on the left (`EditorWorkspace(history, panes, leftTools)`), not an
+    editor, so focusing it never changes `ActiveEditor` and the ribbon stays put.
+    Live thumbnails, three to a row with the page's position underneath
+    (`PageThumbnail`, drawing through `PageRenderer` and redrawing on the page's
+    `Working`/`Folio` changes), click to show a page, drag to reorder (drop
+    position is the gap nearest the pointer in reading order), right-click /
+    Delete / Ctrl+D / Ctrl+Left/Right for page actions, "New page" at the bottom. Each page has its own `PageEditorViewModel`, all sharing
+    the one `EditorHistory`; showing a page swaps which editor is in the editor
+    area (`EditorWorkspace.SwitchTo` — one page at a time, not a row of tabs).
+    Page add/duplicate/delete/move are history entries too. History entries carry
+    their source (`EditorHistory.Push(..., source)` / `Restored`), so undoing an
+    edit made on another page switches to that page first.
+  - **Page numbers** (folios): an issue-level `PageNumbering` (ProjectModel:
+    position None / BottomCenter / BottomOuter / TopOuter, `StartAt`,
+    `NumberFirstPage` — off by default since covers aren't numbered), stored on
+    `Issue.PageNumbering` (absent when off, so older files read unchanged). The
+    navigator owns it (`IPageNumberingHost`, undoable) and sets each page
+    editor's `Folio` (`PageFolios.For`: odd numbers are right-hand pages, so
+    "outer" flips sides). Changed from the Insert tab's "Page numbers" group via
+    the shown page editor's `PageNumberOption`/`PageNumberStart`/`NumberFirstPage`
+    (they write through to the host, so they apply to every page). Drawn by
+    `PageRenderer.DrawFolio` in the margin — on the canvas, thumbnails and
+    exports alike.
+  - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
+    bar with a one-line hint for the current tool/selection plus the last
+    validation error. Right-click gives a context menu for the thing under the
+    pointer.
+  - **Zoom**: the document is in millimetres; `PageCanvasControl` owns the mm→screen
+    transform. 100% = the page at its printed size on a 96 DPI screen
+    (`ActualSizeZoom`); starts in fit-page mode (re-fits on resize until the user
+    zooms/pans). Ctrl+scroll zooms at the cursor, scroll/Space-drag/middle-drag pans.
+    `PageCanvasDrawOperation` draws artwork in page space (mm values:
+    `FontSizeMm`, `BubbleStrokeMm`, …) and handles/guides in screen space so they
+    stay grabbable at any zoom.
+  - **Bubbles belong to their panel**: every bubble edit goes through
+    `BubbleEditing.KeepInside` (slide/shrink into the panel, clamp tail targets),
+    rendering clips bubbles to their panel, and panel resize/move/split/layout carry
+    bubbles along (`BubbleEditing.Refit`, split sends each bubble to the half its
+    centre is in). Double-click in a panel (or the Bubble tool, or "Add bubble")
+    creates a bubble with a tail already aimed into free space, and opens an inline
+    text editor over it (Enter = done, Shift+Enter = newline, Esc = cancel).
+  - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm):
+    panel edges snap to the page margin, one gutter from neighbours, and into line
+    with neighbours' edges; Alt disables it for one drag. Gutter drags
+    (`PanelGutters.FindAt`) move the whole aligned run of panels on both sides,
+    keeping the gutter width (`PanelBoundaryDrag.Gap`).
+  - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
+    `Working`, so a drag is a pure function of the current pointer position.
+- **`Stanley.App`**: `MainWindow` + `MainWindowViewModel` own the document
+  lifecycle (below) and swap a fresh `EditorWorkspace` (history + dock layout +
+  active pane, from `PageEditorHost.CreateWorkspace(ComicProject)`) into the
+  ribbon bar and Dock.Avalonia `DockControl` whenever a comic is created/opened.
+
+### Documents (File view, open/save)
+
+Modelled on Word. `ComicProject` (Stanley.Editors) is "the document": a project
+folder on disk (or untitled, `Location == null`) plus the pages the editor edits —
+all pages of the first issue, with a blank one created on the fly for a project with
+none (e.g. straight from `stanley init`). `Save(pages)` (from
+`PageNavigatorViewModel.Snapshot()`) writes the manifest title, the issue's page
+order, every page and panel, and deletes the folders/files of pages and panels
+removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`);
+nothing else in the folder is touched. A page's label and trim override survive a
+save. Multi-issue navigation isn't implemented yet.
+`SaveAs` copies the whole project folder (minus `.git`) to the new location first,
+and never writes into a non-empty folder — it uses a subfolder named after the title
+instead. An untitled comic takes its folder's name as title on first save. Export
+(all pages as one PDF at trim size; the current page as a 300 dpi PNG) goes through
+`PageRenderer` (Stanley.Rendering), the same code the canvas and thumbnails draw
+with.
+
+`MainWindowViewModel` (Stanley.App) runs New / Open / Save / Save As / Close /
+Export and the File ("backstage") view, `Backstage.axaml`: full-window, blue command
+rail, pages New (paper size + layout tiles), Open (Browse + Recent), Info (editable
+title, location, size), Save As, Export. With no comic open the window *is* the File
+view. Dirty state is `EditorHistory.IsDirty` (undo-stack top vs. the top at
+`MarkSaved()`, so undoing back to the saved state is clean again) or an unsaved title
+edit; New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
+the File view, not modals. OS dialogs sit behind `IFileDialogs`
+(`AvaloniaFileDialogs` for real; tests script a fake). Recent comics:
+`RecentProjects`, a plain text file under the user's app-data folder.
+
+**AutoSave, crash recovery, logging** (all under `AppPaths.DataDirectory` —
+`<AppData>/Stanley`, overridable with `STANLEY_DATA_DIR`, which the headless tests
+point at a temp folder):
+- *AutoSave*: the title-bar switch left of Save (`AutoSaveEnabled`), a persisted
+  preference (`AppSettings`, `settings.txt`, on by default) that only applies once
+  the comic has a folder; switching it on for an untitled comic runs Save As first.
+  Saves `AutoSaveDelay` (2 s) after the last change (debounced), and with it on,
+  New/Open/Close/window-close save instead of prompting. Failures are logged and
+  shown in the title bar, never as a prompt.
+- *Crash recovery* (`RecoveryStore`, `Recovery/<session>/`): each session holds an
+  exclusively-locked `session.lock`; while there are unsaved changes a snapshot
+  (`ComicProject.WriteCopy` — same issue/page ids — written beside the old one then
+  swapped in) plus `info.txt` is kept at most `RecoveryDelay` (5 s) stale. Saving or
+  deliberately discarding clears it; a clean exit (`MainWindowViewModel.EndSession`,
+  from `MainWindow.OnClosed`) deletes the session folder. On start, session folders
+  whose lock can be taken belong to dead processes: their snapshots appear under
+  File › Open › *Recovered* (the File view opens there), with Open
+  (`ComicProject.OpenRecovered`: the snapshot's pages, back at the original folder,
+  marked unsaved) or Discard. An unhandled UI-thread exception writes one last
+  snapshot before the process goes down (`App`).
+- *Logging* (`Diagnostics/AppLog`): `Logs/stanley-yyyy-MM-dd.log`, append-and-close
+  per line (nothing lost in a crash), pruned after 14 days, a no-op until
+  `Initialize` (so the CLI and tests don't log). Records startup environment,
+  every open/save/autosave/export/recovery with failures' exceptions, and all
+  unhandled exceptions (`Program`: AppDomain + unobserved tasks; `App`: UI thread).
+  Timers go through `IDelayScheduler` (`DispatcherDelayScheduler` for real; tests
+  use a manual one). Shortcuts:
+Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S / F12 save as, Alt+F File view,
+Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
 
 The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a

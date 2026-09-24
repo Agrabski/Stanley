@@ -1,28 +1,21 @@
-using Dock.Model.Controls;
 using Stanley.EditorFramework;
-using Stanley.ProjectModel.Geometry;
-using Stanley.ProjectModel.Ids;
-using Stanley.ProjectModel.Issues;
-using PanelModel = Stanley.ProjectModel.Issues.Panel;
 
 namespace Stanley.Editors;
 
 public static class PageEditorHost
 {
-    public static (EditorHistory History, IRootDock Layout, PageEditorViewModel Editor) CreateDemoLayout()
+    /// <summary>
+    /// A fresh editing session for <paramref name="project"/>: one undo history (clean,
+    /// i.e. "saved") shared by every page, the page navigator docked on the left, and the
+    /// first page's editor in the editor area. Picking a page in the navigator swaps which
+    /// page editor is shown; the ribbon follows the shown page editor, never the navigator.
+    /// </summary>
+    public static (EditorWorkspace Workspace, PageNavigatorViewModel Navigator) CreateWorkspace(ComicProject project)
     {
         var history = new EditorHistory();
-        var pageBounds = new Rect2D(0, 0, 210, 297); // A4 in mm
-        var panelId = PanelId.New();
-        var panel = new PanelModel(
-            panelId,
-            PanelShapes.Rectangle(pageBounds),
-            Background: null,
-            CharacterInstances: [],
-            Bubbles: []);
-        var document = new PageDocument([panelId], new Dictionary<PanelId, PanelModel> { [panelId] = panel });
-        var editor = new PageEditorViewModel(history, pageBounds, document);
-        var (_, layout) = EditorDockHost.CreateLayout(editor);
-        return (history, layout, editor);
+        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering);
+        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator]);
+        navigator.CurrentPageChanged += page => workspace.SwitchTo(page.Editor);
+        return (workspace, navigator);
     }
 }

@@ -1,0 +1,164 @@
+<!--
+  The File view, after Word's "backstage": a full-window page with a coloured command
+  rail on the left (New, Open, Info, Save, Save As, Export, Close) and the chosen page
+  on the right. It's also what the window shows when no comic is open.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:Stanley.App"
+             xmlns:documents="using:Stanley.App.Documents"
+             x:Class="Stanley.App.Backstage"
+             x:DataType="app:MainWindowViewModel">
+  <Grid ColumnDefinitions="200,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+    <Border Classes="backstageRail">
+      <StackPanel Margin="0,12,0,0">
+        <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page (Esc)" Padding="20,10" Margin="0,0,0,12">
+          <PathIcon Data="{StaticResource BackIcon}" Width="22" Height="22" />
+        </Button>
+        <RadioButton Name="NewPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsNewPage}">
+          <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource NewIcon}" /><TextBlock Text="New" /></StackPanel>
+        </RadioButton>
+        <RadioButton Name="OpenPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOpenPage}">
+          <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Open" /></StackPanel>
+        </RadioButton>
+        <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
+        <RadioButton Name="InfoPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsInfoPage}" IsEnabled="{Binding HasDocument}">
+          <TextBlock Text="Info" Margin="26,0,0,0" />
+        </RadioButton>
+        <Button Name="SaveButton" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
+          <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource SaveIcon}" /><TextBlock Text="Save" /></StackPanel>
+        </Button>
+        <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}">
+          <TextBlock Text="Save As" Margin="26,0,0,0" />
+        </RadioButton>
+        <RadioButton Name="ExportPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsExportPage}" IsEnabled="{Binding HasDocument}">
+          <TextBlock Text="Export" Margin="26,0,0,0" />
+        </RadioButton>
+        <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
+        <Button Name="CloseButton" Command="{Binding CloseDocumentCommand}">
+          <TextBlock Text="Close" Margin="26,0,0,0" />
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Column="1">
+      <StackPanel Margin="48,32,48,32" MaxWidth="920" HorizontalAlignment="Left">
+        <TextBlock Name="MessageText" Text="{Binding Message}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   Foreground="#B3261E" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
+
+        <!-- New -->
+        <StackPanel IsVisible="{Binding IsNewPage}">
+          <TextBlock Classes="backstageHeading" Text="New" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+            <TextBlock Text="Paper" VerticalAlignment="Center" />
+            <ComboBox Name="PaperSizeBox" ItemsSource="{Binding PaperSizes}" SelectedItem="{Binding NewPaperSize}" MinWidth="90" />
+            <TextBlock Text="Pick a starting layout - you can change it any time from the Layout tab." Opacity="0.7" VerticalAlignment="Center" Margin="12,0,0,0" />
+          </StackPanel>
+          <WrapPanel Name="NewTiles" />
+        </StackPanel>
+
+        <!-- Open -->
+        <StackPanel IsVisible="{Binding IsOpenPage}">
+          <TextBlock Classes="backstageHeading" Text="Open" />
+
+          <!-- Crash recovery, like Word's Document Recovery pane. -->
+          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="#FFF4E0" BorderBrush="#F0B35A" BorderThickness="1"
+                  CornerRadius="4" Padding="16,12" Margin="0,0,0,24" MaxWidth="720" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Recovered" FontSize="15" FontWeight="SemiBold" />
+              <TextBlock Text="Stanley didn't shut down properly last time. This unsaved work was kept - open it to carry on, then save." TextWrapping="Wrap" FontSize="13" />
+              <ItemsControl Name="RecoveredList" ItemsSource="{Binding RecoveredEntries}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="documents:RecoveredComic">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,4">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                        <TextBlock FontSize="12" Opacity="0.75">
+                          <Run Text="{Binding SavedAtText}" /><Run Text=" · " /><Run Text="{Binding LocationText}" />
+                        </TextBlock>
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="accent" Content="Open" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).OpenRecoveredCommand}" CommandParameter="{Binding}" />
+                      <Button Grid.Column="2" Content="Discard" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).DiscardRecoveredCommand}" CommandParameter="{Binding}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Button Name="BrowseOpenButton" Command="{Binding OpenCommand}" Padding="14,10">
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Browse for a comic folder…" /></StackPanel>
+          </Button>
+          <TextBlock Text="A Stanley comic is a folder (the one containing stanley.json)." Opacity="0.7" Margin="0,8,0,0" />
+          <TextBlock Classes="backstageSubheading" Text="Recent" />
+          <TextBlock Text="Comics you open or save show up here." Opacity="0.7" IsVisible="{Binding !HasRecent}" />
+          <ItemsControl Name="RecentList" ItemsSource="{Binding RecentEntries}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="app:RecentProjectEntry">
+                <Button Classes="listEntry" Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).OpenRecentCommand}" CommandParameter="{Binding Path}">
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <PathIcon Data="{StaticResource FolderIcon}" Width="20" Height="20" Foreground="#C9A227" />
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Path}" FontSize="12" Opacity="0.7" />
+                    </StackPanel>
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Info -->
+        <StackPanel IsVisible="{Binding IsInfoPage}">
+          <TextBlock Classes="backstageHeading" Text="Info" />
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="12" MaxWidth="640" HorizontalAlignment="Left">
+            <TextBlock Text="Title" VerticalAlignment="Center" Opacity="0.7" />
+            <TextBox Name="TitleBox" Grid.Column="1" Text="{Binding DocumentTitle}" MinWidth="320" />
+            <TextBlock Grid.Row="1" Text="Location" Opacity="0.7" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LocationText}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="2" Text="Page size" Opacity="0.7" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PageSizeText}" />
+            <TextBlock Grid.Row="3" Text="Contents" Opacity="0.7" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PanelCountText}" />
+            <TextBlock Grid.Row="4" Text="Status" Opacity="0.7" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DocumentCaption}" />
+          </Grid>
+        </StackPanel>
+
+        <!-- Save As -->
+        <StackPanel IsVisible="{Binding IsSaveAsPage}">
+          <TextBlock Classes="backstageHeading" Text="Save As" />
+          <TextBlock Text="Current location" Opacity="0.7" />
+          <TextBlock Text="{Binding LocationText}" Margin="0,4,0,20" TextWrapping="Wrap" />
+          <Button Name="BrowseSaveAsButton" Command="{Binding SaveAsCommand}" Padding="14,10">
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Choose a folder…" /></StackPanel>
+          </Button>
+          <TextBlock Text="Pick an empty folder, or any folder to save the comic into a new folder inside it, named after its title. The whole comic is copied - nothing at the old location changes."
+                     Opacity="0.7" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" />
+        </StackPanel>
+
+        <!-- Export -->
+        <StackPanel IsVisible="{Binding IsExportPage}">
+          <TextBlock Classes="backstageHeading" Text="Export" />
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button Name="ExportPdfButton" Classes="tile" Command="{Binding ExportPdfCommand}" Width="180" Height="110">
+              <StackPanel Spacing="6">
+                <TextBlock Text="PDF" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="Every page, vector, at print size. For printers and sharing." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+              </StackPanel>
+            </Button>
+            <Button Name="ExportPngButton" Classes="tile" Command="{Binding ExportPngCommand}" Width="180" Height="110">
+              <StackPanel Spacing="6">
+                <TextBlock Text="PNG" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="The current page at 300 dpi. For the web and social media." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

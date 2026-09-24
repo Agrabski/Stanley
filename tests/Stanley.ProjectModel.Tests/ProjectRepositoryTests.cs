@@ -168,6 +168,27 @@ public class ProjectRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void Issue_page_numbering_round_trips_and_is_absent_when_unset()
+    {
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
+        var plain = new Issue(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
+        var numbered = new Issue(IssueId.New(), "2", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>(),
+            new PageNumbering(PageNumberPosition.BottomOuter, StartAt: 5, NumberFirstPage: true));
+
+        repository.SaveIssue(plain);
+        repository.SaveIssue(numbered);
+
+        Assert.Null(repository.LoadIssue(plain.Id).PageNumbering);
+        Assert.Equal(numbered.PageNumbering, repository.LoadIssue(numbered.Id).PageNumbering);
+        var plainJson = File.ReadAllText(Directory.GetFiles(Path.Combine(_root, "issues"), "issue.json", SearchOption.AllDirectories)
+            .Single(f => f.Contains(plain.Id.Value, StringComparison.Ordinal)));
+        Assert.DoesNotContain("pageNumbering", plainJson, StringComparison.Ordinal);
+        var numberedJson = File.ReadAllText(Directory.GetFiles(Path.Combine(_root, "issues"), "issue.json", SearchOption.AllDirectories)
+            .Single(f => f.Contains(numbered.Id.Value, StringComparison.Ordinal)));
+        Assert.Contains("\"bottomOuter\"", numberedJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Loading_an_unknown_id_throws()
     {
         var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));

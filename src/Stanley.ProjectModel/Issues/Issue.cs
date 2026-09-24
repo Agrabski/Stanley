@@ -9,9 +9,11 @@ namespace Stanley.ProjectModel.Issues;
 /// is therefore a free-form display label, not a sequential integer.
 /// </summary>
 /// <param name="CharacterRevisions">Default characterId -&gt; revisionId map for this issue; a panel's character instance can still override it per-panel.</param>
+/// <param name="PageNumbering">Printed page numbers for this issue; absent (null) means none, so older issue files read unchanged.</param>
 public sealed record Issue(
     IssueId Id,
     string Number,
     string Title,
     IReadOnlyList<PageId> PageIds,
-    SortedDictionary<CharacterId, CharacterRevisionId> CharacterRevisions);
+    SortedDictionary<CharacterId, CharacterRevisionId> CharacterRevisions,
+    PageNumbering? PageNumbering = null);

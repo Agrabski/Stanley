@@ -92,6 +92,62 @@ public static class BubbleEditing
         return EditResult<Bubble>.Success(bubble with { Tails = tails });
     }
 
+    /// <summary>Translates the shape (and with it every tail's base). Tail targets stay put, so a tail keeps pointing at whoever is speaking while the bubble moves.</summary>
+    public static EditResult<Bubble> Move(Bubble bubble, double dx, double dy)
+    {
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var moved = bounds with { X = bounds.X + dx, Y = bounds.Y + dy };
+        return EditResult<Bubble>.Success(bubble with { Shape = new BubbleShape(AnchorRing.Rescale(bubble.Shape.Anchors, bounds, moved)) });
+    }
+
+    /// <summary>
+    /// Pulls a bubble fully inside <paramref name="container"/> (its panel): shrinks it if
+    /// it's bigger than the panel, slides it in if it pokes out, and clamps every tail
+    /// target into the panel too. Always succeeds - it's the normaliser every panel/bubble
+    /// edit runs through so a bubble can never drift out of the panel it belongs to.
+    /// </summary>
+    public static Bubble KeepInside(Bubble bubble, Rect2D container)
+    {
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var width = Math.Min(bounds.Width, container.Width);
+        var height = Math.Min(bounds.Height, container.Height);
+        var left = Math.Clamp(bounds.Left, container.Left, container.Right - width);
+        var top = Math.Clamp(bounds.Top, container.Top, container.Bottom - height);
+        var fitted = new Rect2D(left, top, width, height);
+
+        var shape = fitted == bounds ? bubble.Shape : new BubbleShape(AnchorRing.Rescale(bubble.Shape.Anchors, bounds, fitted));
+        var tails = bubble.Tails.Select(t => t with { Target = Clamp(t.Target, container) }).ToList();
+        return bubble with { Shape = shape, Tails = tails };
+    }
+
+    /// <summary>Carries a bubble along when its panel moves or resizes from <paramref name="oldContainer"/> to <paramref name="newContainer"/>: its centre and tail targets keep the same relative position within the panel, its size is kept (unless the panel became too small for it).</summary>
+    public static Bubble Refit(Bubble bubble, Rect2D oldContainer, Rect2D newContainer)
+    {
+        if (oldContainer.Width <= 0 || oldContainer.Height <= 0)
+            return KeepInside(bubble, newContainer);
+
+        Point2D Map(Point2D p) => new(
+            newContainer.Left + (p.X - oldContainer.Left) / oldContainer.Width * newContainer.Width,
+            newContainer.Top + (p.Y - oldContainer.Top) / oldContainer.Height * newContainer.Height);
+
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var center = Map(new Point2D(bounds.MidX, bounds.MidY));
+        var moved = bubble with
+        {
+            Shape = new BubbleShape(AnchorRing.Rescale(bubble.Shape.Anchors, bounds, bounds with
+            {
+                X = center.X - bounds.Width / 2,
+                Y = center.Y - bounds.Height / 2
+            })),
+            Tails = bubble.Tails.Select(t => t with { Target = Map(t.Target) }).ToList()
+        };
+        return KeepInside(moved, newContainer);
+    }
+
+    public static Point2D Clamp(Point2D point, Rect2D container) => new(
+        Math.Clamp(point.X, container.Left, container.Right),
+        Math.Clamp(point.Y, container.Top, container.Bottom));
+
     public static EditResult<Bubble> SetText(Bubble bubble, string text)
     {
         if (text.Length > MaxTextLength)

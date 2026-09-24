@@ -15,7 +15,7 @@ namespace Stanley.EditorFramework;
 /// undo stack by value, so a mutable reference type here would let later mutation
 /// corrupt history silently.
 /// </summary>
-public abstract class EditorViewModel<TDocument> : Document
+public abstract class EditorViewModel<TDocument> : Document, IEditorPane
     where TDocument : notnull, IEquatable<TDocument>
 {
     private readonly EditorHistory _history;
@@ -24,6 +24,7 @@ public abstract class EditorViewModel<TDocument> : Document
     private TDocument _gestureBaseline;
     private bool _gestureActive;
     private bool _gestureDirty;
+    private string? _lastError;
 
     protected EditorViewModel(EditorHistory history, string title, TDocument initial)
     {
@@ -50,7 +51,14 @@ public abstract class EditorViewModel<TDocument> : Document
     }
 
     /// <summary>The most recent validation failure from <see cref="UpdateGesture"/>/<see cref="Apply"/>, or null. An invalid result during a gesture leaves <see cref="Working"/> at its last valid value rather than advancing the preview.</summary>
-    public string? LastError { get; private set; }
+    public string? LastError
+    {
+        get => _lastError;
+        private set => SetProperty(ref _lastError, value);
+    }
+
+    /// <summary>The shared undo/redo stack this editor commits into, so a pane's toolbar can offer undo/redo without being handed it separately.</summary>
+    public EditorHistory History => _history;
 
     public bool IsGestureActive => _gestureActive;
 
@@ -99,7 +107,7 @@ public abstract class EditorViewModel<TDocument> : Document
 
         var before = _gestureBaseline;
         var after = Working;
-        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after);
+        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after, this);
         Committed = after;
     }
 
@@ -128,7 +136,7 @@ public abstract class EditorViewModel<TDocument> : Document
         if (before.Equals(after))
             return;
 
-        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after);
+        _history.Push(Title, () => Working = Committed = before, () => Working = Committed = after, this);
         Working = Committed = after;
     }
 }

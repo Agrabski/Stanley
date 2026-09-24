@@ -25,7 +25,10 @@ public static class BubbleTextRenderer
         if (maxWidth <= 0 || maxHeight <= 0)
             return;
 
-        using var font = new SKFont(SKTypeface.Default, fontSize);
+        // Linear metrics + subpixel positioning: the page editor draws at a few units per
+        // glyph (millimetres) under a zoom transform, where hinted metrics would snap
+        // widths to whole units and throw the wrapping off.
+        using var font = new SKFont(SKTypeface.Default, fontSize) { LinearMetrics = true, Subpixel = true };
         using var paint = new SKPaint { Color = color ?? SKColors.Black, IsAntialias = true };
 
         var lines = WrapLines(bubble.Text, font, paint, maxWidth);
@@ -37,7 +40,7 @@ public static class BubbleTextRenderer
         if (totalHeight > maxHeight && lines.Count > 0)
         {
             var scale = maxHeight / totalHeight;
-            font.Size = Math.Max(fontSize * scale, 6f);
+            font.Size = Math.Max(fontSize * scale, fontSize / 3);
             lines = WrapLines(bubble.Text, font, paint, maxWidth);
             lineHeight = font.Spacing;
             totalHeight = lineHeight * lines.Count;

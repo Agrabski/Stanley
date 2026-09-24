@@ -1,0 +1,271 @@
+<!--
+  The ribbon's look, shared by the window's ribbon bar (quick-access undo/redo) and each
+  editor's ribbon content. Included once, application-wide, from App.axaml.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <StreamGeometry x:Key="SpeechIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z</StreamGeometry>
+    <StreamGeometry x:Key="ShoutIcon">M12,1 L14.5,6.5 L20.5,4 L18.5,10 L23,13 L17,14.5 L18.5,21 L12,17.5 L5.5,21 L7,14.5 L1,13 L5.5,10 L3.5,4 L9.5,6.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="WhisperIcon">M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z</StreamGeometry>
+    <StreamGeometry x:Key="AddBubbleIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z M11,7 V10 H8 V12 H11 V15 H13 V12 H16 V10 H13 V7 Z</StreamGeometry>
+    <StreamGeometry x:Key="TextIcon">M4,3 H20 V8 H18 V5 H13 V19 H16 V21 H8 V19 H11 V5 H6 V8 H4 Z</StreamGeometry>
+    <StreamGeometry x:Key="DeleteIcon">M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z</StreamGeometry>
+    <StreamGeometry x:Key="ColumnsIcon">M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z</StreamGeometry>
+    <StreamGeometry x:Key="RowsIcon">M3,2 H21 V11 H3 Z M3,13 H21 V22 H3 Z</StreamGeometry>
+    <StreamGeometry x:Key="UndoIcon">M12.5,8 C9.9,8 7.5,9 5.6,10.6 L2,7 V16 H11 L7.4,12.4 C8.8,11.2 10.5,10.5 12.5,10.5 C16,10.5 19,12.8 20.1,16 L22.5,15.2 C21.1,11 17.2,8 12.5,8 Z</StreamGeometry>
+    <StreamGeometry x:Key="RedoIcon">M18.4,10.6 C16.5,9 14.1,8 11.5,8 C6.8,8 2.9,11 1.5,15.2 L3.9,16 C5,12.8 8,10.5 11.5,10.5 C13.5,10.5 15.2,11.2 16.6,12.4 L13,16 H22 V7 Z</StreamGeometry>
+    <StreamGeometry x:Key="SaveIcon">M17,3 H5 C3.9,3 3,3.9 3,5 V19 C3,20.1 3.9,21 5,21 H19 C20.1,21 21,20.1 21,19 V7 Z M12,19 C10.3,19 9,17.7 9,16 C9,14.3 10.3,13 12,13 C13.7,13 15,14.3 15,16 C15,17.7 13.7,19 12,19 Z M15,9 H5 V5 H15 Z</StreamGeometry>
+    <StreamGeometry x:Key="FolderIcon">M10,4 H4 C2.9,4 2,4.9 2,6 V18 C2,19.1 2.9,20 4,20 H20 C21.1,20 22,19.1 22,18 V8 C22,6.9 21.1,6 20,6 H12 Z</StreamGeometry>
+    <StreamGeometry x:Key="NewIcon">M14,2 H6 C4.9,2 4,2.9 4,4 V20 C4,21.1 4.9,22 6,22 H18 C19.1,22 20,21.1 20,20 V8 Z M13,9 V3.5 L18.5,9 Z</StreamGeometry>
+    <StreamGeometry x:Key="PageNumberIcon">M5,2 H19 V22 H5 Z M7,4 V20 H17 V4 Z M11,15 H12.5 V11 L11.3,11.6 L10.9,10.7 L12.8,9.6 H13.9 V15 H15 V16.4 H11 Z</StreamGeometry>
+    <StreamGeometry x:Key="BackIcon">M20,11 H7.8 L13.4,5.4 L12,4 L4,12 L12,20 L13.4,18.6 L7.8,13 H20 Z</StreamGeometry>
+  </Styles.Resources>
+  <Style Selector="Border.ribbon">
+    <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="6,4" />
+  </Style>
+  <!-- A ribbon group: its controls along the top, its name pinned to the bottom, so
+       every group's label lines up the way Word's do. -->
+  <Style Selector="StackPanel.group">
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="Spacing" Value="2" />
+  </Style>
+  <Style Selector="DockPanel.group">
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="LastChildFill" Value="False" />
+  </Style>
+  <Style Selector="DockPanel.group > :is(Control)">
+    <Setter Property="DockPanel.Dock" Value="Top" />
+  </Style>
+  <Style Selector="DockPanel.group > TextBlock.groupLabel">
+    <Setter Property="DockPanel.Dock" Value="Bottom" />
+    <Setter Property="Margin" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="TextBlock.groupLabel">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+  <Style Selector="Rectangle.divider">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Margin" Value="2,4" />
+    <Setter Property="Fill" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+  </Style>
+
+  <!-- A contextual section: groups that only appear for the current selection, marked
+       with a coloured band and title the way Office marks contextual tabs. -->
+  <Style Selector="Border.context">
+    <Setter Property="BorderThickness" Value="0,3,0,0" />
+    <Setter Property="Margin" Value="4,0" />
+    <Setter Property="Padding" Value="0,0,0,0" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+  <Style Selector="Border.context.panel">
+    <Setter Property="BorderBrush" Value="#257AE8" />
+    <Setter Property="Background" Value="#10257AE8" />
+  </Style>
+  <Style Selector="Border.context.bubble">
+    <Setter Property="BorderBrush" Value="#F58A07" />
+    <Setter Property="Background" Value="#12F58A07" />
+  </Style>
+  <Style Selector="TextBlock.contextTitle">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Margin" Value="8,1,0,0" />
+  </Style>
+  <Style Selector="Border.context.panel TextBlock.contextTitle">
+    <Setter Property="Foreground" Value="#257AE8" />
+  </Style>
+  <Style Selector="Border.context.bubble TextBlock.contextTitle">
+    <Setter Property="Foreground" Value="#C96F00" />
+  </Style>
+
+  <!-- Word-style tab strip: compact headers, the content row a fixed height so the page
+       below doesn't move when switching tabs. -->
+  <Style Selector="TabControl.ribbonTabs">
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.panel">
+    <Setter Property="Background" Value="#1A257AE8" />
+  </Style>
+  <Style Selector="TextBlock.panelHeader">
+    <Setter Property="Foreground" Value="#1D63C2" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.bubble">
+    <Setter Property="Background" Value="#1FF58A07" />
+  </Style>
+  <Style Selector="TextBlock.bubbleHeader">
+    <Setter Property="Foreground" Value="#B86500" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="StackPanel.tabContent">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Height" Value="92" />
+    <Setter Property="Margin" Value="4,4,4,2" />
+  </Style>
+
+  <!-- Title row with the quick access toolbar. -->
+  <Style Selector="Border.titleBar">
+    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Height" Value="32" />
+  </Style>
+  <Style Selector="ToggleSwitch.autoSave">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,-4,0,-4" />
+  </Style>
+  <Style Selector="Button.qat">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Button.qat PathIcon">
+    <Setter Property="Width" Value="15" />
+    <Setter Property="Height" Value="15" />
+  </Style>
+  <Style Selector="Button.qat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.qat:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="#70FFFFFF" />
+  </Style>
+
+  <!-- The File button: Word's coloured tab that opens the backstage view. -->
+  <Style Selector="Button.fileTab">
+    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Width" Value="58" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Button.fileTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+
+  <!-- Backstage (File) view -->
+  <Style Selector="Border.backstageRail">
+    <Setter Property="Background" Value="#1E5AA8" />
+  </Style>
+  <Style Selector="Border.backstageRail :is(Button)">
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="24,10" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Border.backstageRail :is(Button):pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Border.backstageRail :is(Button):checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#174A8C" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Border.backstageRail :is(Button):disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="#80FFFFFF" />
+  </Style>
+  <Style Selector="Border.backstageRail PathIcon">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="TextBlock.backstageHeading">
+    <Setter Property="FontSize" Value="30" />
+    <Setter Property="FontWeight" Value="Light" />
+    <Setter Property="Margin" Value="0,0,0,18" />
+  </Style>
+  <Style Selector="TextBlock.backstageSubheading">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,18,0,8" />
+  </Style>
+  <Style Selector="Button.tile">
+    <Setter Property="Width" Value="120" />
+    <Setter Property="Height" Value="150" />
+    <Setter Property="Margin" Value="0,0,12,12" />
+    <Setter Property="Padding" Value="8" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+  </Style>
+  <Style Selector="Button.listEntry">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,6" />
+  </Style>
+
+  <!-- Ribbon buttons never take keyboard focus, so Delete/arrow keys/shortcuts keep
+       going to the page after a ribbon click. -->
+  <Style Selector=":is(Button).tool, :is(Button).small">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).tool">
+    <Setter Property="MinWidth" Value="58" />
+    <Setter Property="Height" Value="56" />
+    <Setter Property="Padding" Value="4,4" />
+    <Setter Property="Margin" Value="1,0" />
+  </Style>
+  <Style Selector=":is(Button).tool PathIcon">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).tool TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,3,0,0" />
+  </Style>
+  <Style Selector=":is(Button).small">
+    <Setter Property="Height" Value="24" />
+    <Setter Property="MinWidth" Value="28" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector=":is(Button).small PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+  </Style>
+</Styles>

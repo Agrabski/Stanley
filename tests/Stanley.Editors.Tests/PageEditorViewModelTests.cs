@@ -212,4 +212,201 @@ public class PageEditorViewModelTests
         Assert.Equal(originalBounds.Width, restoredBounds.Width);
         Assert.Equal(originalBounds.Height, restoredBounds.Height);
     }
+
+    private static (EditorHistory History, PageEditorViewModel ViewModel, PanelId PanelId) NewEditor(Rect2D? panelBounds = null)
+    {
+        var history = new EditorHistory();
+        var document = CreateSinglePanelDocument(panelBounds);
+        return (history, new PageEditorViewModel(history, new Rect2D(0, 0, 210, 297), document), document.PanelOrder[0]);
+    }
+
+    private static Rect2D BubbleBounds(PageEditorViewModel vm, PanelId panelId, int index) =>
+        AnchorRing.BoundingBox(vm.Working.Panels[panelId].Bubbles[index].Shape.Anchors);
+
+    [Fact]
+    public void CreateBubble_AddsASelectedBubbleWithATailInsideItsPanel()
+    {
+        var (_, vm, panelId) = NewEditor();
+
+        var index = vm.CreateBubble(panelId, new Point2D(15, 15));
+
+        Assert.Equal(0, index);
+        Assert.Equal(panelId, vm.SelectedPanelId);
+        Assert.Equal(0, vm.SelectedBubbleIndex);
+        var bubble = vm.Working.Panels[panelId].Bubbles[0];
+        var tail = Assert.Single(bubble.Tails);
+        var panelBounds = vm.PanelBounds(panelId);
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        Assert.True(bounds.Left >= panelBounds.Left && bounds.Top >= panelBounds.Top, "a click near the corner still lands the bubble inside the panel");
+        Assert.True(tail.Target.Y > bounds.Bottom, "first tail points down, at the speaker below");
+    }
+
+    [Fact]
+    public void MoveBubble_StopsAtThePanelEdge()
+    {
+        var (_, vm, panelId) = NewEditor();
+        var index = vm.CreateBubble(panelId, new Point2D(60, 60));
+
+        vm.BeginMoveBubble(panelId, index);
+        vm.UpdateMoveBubble(panelId, index, 500, 0);
+        vm.EndGesture(commit: true);
+
+        Assert.Equal(vm.PanelBounds(panelId).Right, BubbleBounds(vm, panelId, index).Right, 6);
+    }
+
+    [Fact]
+    public void ResizePanelGesture_ShrinkThenGrowBack_RestoresBubbleExactly()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 190, 190));
+        var index = vm.CreateBubble(panelId, new Point2D(170, 170));
+        var before = BubbleBounds(vm, panelId, index);
+
+        vm.BeginResizePanel(panelId);
+        vm.UpdateResizePanel(panelId, new Rect2D(10, 10, 40, 40));
+        vm.UpdateResizePanel(panelId, new Rect2D(10, 10, 190, 190));
+        vm.EndGesture(commit: true);
+
+        var after = BubbleBounds(vm, panelId, index);
+        Assert.Equal(before.Left, after.Left, 6);
+        Assert.Equal(before.Width, after.Width, 6);
+    }
+
+    [Fact]
+    public void ResizePanel_WithSnapping_LandsOnTheMarginAndReportsAGuide()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 100, 100));
+
+        vm.BeginResizePanel(panelId);
+        vm.UpdateResizePanel(panelId, Rect2D.FromEdges(10, 10, 198.5, 110), RectEdges.Right, snapTolerance: 3);
+
+        Assert.Equal(200, vm.PanelBounds(panelId).Right, 6);
+        Assert.NotEmpty(vm.ActiveGuides);
+
+        vm.EndGesture(commit: true);
+        Assert.Empty(vm.ActiveGuides);
+    }
+
+    [Fact]
+    public void ApplyLayoutPreset_ReusesExistingPanelsSoTheirBubblesSurvive()
+    {
+        var (history, vm, panelId) = NewEditor();
+        vm.CreateBubble(panelId, new Point2D(50, 50));
+
+        vm.ApplyLayoutPreset(PanelLayoutPresets.All.First(p => p.ColumnsPerRow.Sum() == 6));
+
+        Assert.Equal(6, vm.Working.PanelOrder.Count);
+        Assert.Equal(panelId, vm.Working.PanelOrder[0]);
+        Assert.Single(vm.Working.Panels[panelId].Bubbles);
+
+        history.Undo();
+        Assert.Single(vm.Working.PanelOrder);
+    }
+
+    [Fact]
+    public void CreatePanelGesture_AddsASnappedPanelAndSelectsIt()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 100, 100));
+
+        vm.BeginCreatePanel();
+        vm.UpdateCreatePanel(Rect2D.FromEdges(115, 11, 199, 109), snapTolerance: 3);
+        Assert.True(vm.CommitCreatePanel());
+
+        var created = vm.SelectedPanelId!.Value;
+        Assert.NotEqual(panelId, created);
+        var bounds = vm.PanelBounds(created);
+        Assert.Equal(114, bounds.Left, 6); // one 4mm gutter after the existing panel
+        Assert.Equal(200, bounds.Right, 6); // on the right margin
+        Assert.Equal(10, bounds.Top, 6); // aligned with the existing panel's top
+    }
+
+    [Fact]
+    public void CurrentBubbleStyle_RestylesTheSelectedBubble()
+    {
+        var (_, vm, panelId) = NewEditor();
+        var index = vm.CreateBubble(panelId, new Point2D(50, 50));
+
+        vm.IsShoutStyle = true;
+
+        Assert.Equal(BubbleStylePreset.Shout, vm.Working.Panels[panelId].Bubbles[index].Style);
+        Assert.True(vm.IsShoutStyle);
+        Assert.False(vm.IsSpeechStyle);
+    }
+
+    [Fact]
+    public void DeleteSelection_ThenUndo_KeepsSelectionValid()
+    {
+        var (history, vm, panelId) = NewEditor();
+        vm.CreateBubble(panelId, new Point2D(50, 50));
+
+        vm.DeleteSelection();
+        Assert.Empty(vm.Working.Panels[panelId].Bubbles);
+        Assert.False(vm.HasSelectedBubble);
+        Assert.True(vm.HasSelectedPanel);
+
+        history.Undo();
+        history.Undo(); // back past the bubble's creation too
+        Assert.Empty(vm.Working.Panels[panelId].Bubbles);
+        Assert.Equal(-1, vm.SelectedBubbleIndex);
+    }
+
+    [Fact]
+    public void AddBubbleTail_WithoutATarget_AimsAwayFromTheExistingTail()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 190, 190));
+        var index = vm.CreateBubble(panelId, new Point2D(100, 60));
+
+        vm.AddBubbleTail(panelId, index);
+
+        var tails = vm.Working.Panels[panelId].Bubbles[index].Tails;
+        Assert.Equal(2, tails.Count);
+        var distance = Math.Sqrt(Math.Pow(tails[0].Target.X - tails[1].Target.X, 2) + Math.Pow(tails[0].Target.Y - tails[1].Target.Y, 2));
+        Assert.True(distance > 15, $"second tail should point somewhere else, but its tip is only {distance:0.0}mm from the first");
+    }
+
+    [Fact]
+    public void RibbonCommands_AreOnlyEnabledForTheMatchingSelection()
+    {
+        var (_, vm, panelId) = NewEditor();
+
+        Assert.False(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.False(vm.EditTextCommand.CanExecute(null));
+        Assert.False(vm.IsPanelContext);
+        Assert.False(vm.IsBubbleContext);
+
+        vm.Select(panelId);
+        Assert.True(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.False(vm.EditTextCommand.CanExecute(null));
+        Assert.True(vm.IsPanelContext);
+
+        vm.CreateBubble(panelId, new Point2D(50, 50));
+        Assert.True(vm.EditTextCommand.CanExecute(null));
+        Assert.True(vm.IsBubbleContext);
+        Assert.False(vm.IsPanelContext);
+    }
+
+    [Fact]
+    public void AddBubbleCommand_CreatesABubbleAndAsksForTheTextEditor()
+    {
+        var (_, vm, panelId) = NewEditor();
+        (PanelId Panel, int Index)? requested = null;
+        vm.TextEditRequested += (p, i) => requested = (p, i);
+
+        vm.AddBubbleCommand.Execute(null);
+
+        Assert.Single(vm.Working.Panels[panelId].Bubbles);
+        Assert.Equal((panelId, 0), requested);
+    }
+
+    [Fact]
+    public void ZoomCommands_AreForwardedToTheView()
+    {
+        var (_, vm, _) = NewEditor();
+        var requests = new List<ViewportRequest>();
+        vm.ViewportRequested += requests.Add;
+
+        vm.ZoomInCommand.Execute(null);
+        vm.FitPageCommand.Execute(null);
+
+        Assert.Equal([ViewportRequest.ZoomIn, ViewportRequest.FitPage], requests);
+    }
 }

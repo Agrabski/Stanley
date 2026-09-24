@@ -5,5 +5,6 @@
   <Application.Styles>
     <FluentTheme />
     <dockFluent:DockFluentTheme />
+    <StyleInclude Source="avares://Stanley.Editors/RibbonStyles.axaml" />
   </Application.Styles>
 </Application>
