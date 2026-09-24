@@ -3,7 +3,9 @@
   with a little figure, its name, height and where it's used. Click to edit its body,
   drag onto a panel to place it there, right-click for more, "New character" at the
   bottom. Like the page navigator it's not an editor - the ribbon keeps showing
-  whatever is being edited.
+  whatever is being edited. The list's selection only *shows* which character is
+  open: opening happens on a click's release (or Enter), never on press, so pressing
+  to drag a character out leaves the page on screen to drop it onto.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -42,7 +44,7 @@
     <Grid>
       <TextBlock Text="No characters yet. Create one, then drag it onto a panel." TextWrapping="Wrap" Opacity="0.7" FontSize="12"
                  Margin="12" IsVisible="{Binding HasNoCharacters}" />
-      <ListBox Name="CharacterList" ItemsSource="{Binding Items}" SelectedItem="{Binding Current}" Background="Transparent"
+      <ListBox Name="CharacterList" ItemsSource="{Binding Items}" SelectedItem="{Binding Current, Mode=OneWay}" Background="Transparent"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="local:CharacterItem">

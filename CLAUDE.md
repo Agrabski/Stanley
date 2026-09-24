@@ -470,7 +470,10 @@ body and placement only.
   undo step via `BeginSliderDrag`/`EndSliderDrag` — skin, name, line-up, Close).
   Page editor: `SelectedCharacterIndex`, contextual green **Character** tab,
   Insert › Characters gallery + New character, drag from the pane onto a panel
-  (`CharacterDrag.Format`), double-click opens the body editor.
+  (`CharacterDrag.Format`; feet land at the drop point), double-click opens the body
+  editor. The pane opens a character on click *release* (or Enter), never on press —
+  its list selection is OneWay from `Current` — so a drag starts with the page still
+  on screen to drop onto.
   `PageEditorHost.CreateWorkspace` returns an `EditorSession(Workspace, Navigator,
   Characters)`.
 - **Persistence**: `ProjectRepository.ListCharacters()` (scans `characters/`, no

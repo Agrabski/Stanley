@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Input.Raw;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Stanley.Editors;
@@ -87,6 +88,66 @@ public class CharacterTests
         window.MouseUp(chest, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
         Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
+    }
+
+    private static (CharacterLibraryView Pane, Point ItemCenter) ShowPane(MainWindow window, CharacterLibraryViewModel characters)
+    {
+        window.Workspace.Factory.SetActiveDockable(characters);
+        Dispatcher.UIThread.RunJobs();
+        var pane = Single<CharacterLibraryView>(window);
+        var item = (Control)pane.List.ContainerFromIndex(0)!;
+        return (pane, item.TranslatePoint(new Point(item.Bounds.Width / 2, item.Bounds.Height / 2), window)!.Value);
+    }
+
+    [Fact]
+    public void Pressing_a_character_in_the_pane_to_drag_it_leaves_the_page_showing_and_a_click_opens_it()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        var (_, itemCenter) = ShowPane(window, characters);
+
+        // Press and start moving: the start of a drag onto the page. The page must stay
+        // on screen - there'd be nowhere to drop it otherwise.
+        window.MouseDown(itemCenter, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+        window.MouseMove(new Point(itemCenter.X + 40, itemCenter.Y));
+        Dispatcher.UIThread.RunJobs();
+        window.MouseUp(new Point(itemCenter.X + 40, itemCenter.Y), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+
+        // A plain click (no drag) opens the character.
+        window.MouseDown(itemCenter, MouseButton.Left);
+        window.MouseUp(itemCenter, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(characters.Items[0].Editor, window.Workspace.ActiveEditor);
+    }
+
+    [Fact]
+    public void Dropping_a_character_from_the_pane_onto_a_panel_places_it_standing_where_it_was_dropped()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        var canvas = Single<PageCanvasControl>(window);
+        var bounds = page.PanelBounds(panelId);
+        var dropPage = new ProjectModel.Geometry.Point2D(bounds.Left + bounds.Width * 0.3, bounds.Top + bounds.Height * 0.7);
+        var drop = canvas.TranslatePoint(canvas.PageToControl(dropPage), window)!.Value;
+
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(CharacterDrag.Format, created.Id.Value));
+        window.DragDrop(drop, RawDragEventType.DragEnter, data, DragDropEffects.Copy);
+        window.DragDrop(drop, RawDragEventType.DragOver, data, DragDropEffects.Copy);
+        window.DragDrop(drop, RawDragEventType.Drop, data, DragDropEffects.Copy);
+        Dispatcher.UIThread.RunJobs();
+
+        var placed = Assert.Single(page.Working.Panels[panelId].CharacterInstances);
+        Assert.Equal(created.Id, placed.CharacterId);
+        Assert.Equal(dropPage.X, placed.Placement.Ground.X, 1);
+        Assert.Equal(dropPage.Y, placed.Placement.Ground.Y, 1);
+        Assert.Equal(0, page.SelectedCharacterIndex);
     }
 
     [Fact]

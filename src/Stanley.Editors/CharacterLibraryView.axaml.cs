@@ -62,17 +62,26 @@ public partial class CharacterLibraryView : UserControl
             _dragging = false;
             _pressedItem = null;
             _pressArgs = null;
+            ShowCurrentSelection();
         }
     }
 
     private void OnListPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        // Clicking the character that's already current still brings its editor back
-        // (e.g. after going back to the page).
+        // A click - press and release on the same character without dragging - opens it
+        // (the one already current too, e.g. after going back to the page).
         if (!_dragging && _pressedItem is { } item && ViewModel is { } vm && ItemFrom(e.Source) == item)
             vm.Show(item);
         _pressedItem = null;
         _pressArgs = null;
+        ShowCurrentSelection();
+    }
+
+    /// <summary>The list box selects on press; put its highlight back on the character that's actually open (or none) when that press didn't open one.</summary>
+    private void ShowCurrentSelection()
+    {
+        if (ViewModel is { } vm && !ReferenceEquals(CharacterList.SelectedItem, vm.Current))
+            CharacterList.SelectedItem = vm.Current;
     }
 
     private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -97,7 +106,13 @@ public partial class CharacterLibraryView : UserControl
 
     private void OnListKeyDown(object? sender, KeyEventArgs e)
     {
-        if (ViewModel is not { Current: { } current } vm)
+        if (e.Key == Key.Enter && ViewModel is { } opener && CharacterList.SelectedItem is CharacterItem selected)
+        {
+            opener.Show(selected);
+            e.Handled = true;
+            return;
+        }
+        if (ViewModel is not { } vm || (CharacterList.SelectedItem as CharacterItem ?? vm.Current) is not { } current)
             return;
         if (e.Key == Key.Delete && vm.DeleteCharacterCommand.CanExecute(current))
         {
