@@ -429,6 +429,35 @@ public class PageEditorTests
         }
     }
 
+    /// <summary>File &gt; Options &gt; Dark switches the whole app, Stanley's own chrome colours included, and back again.</summary>
+    [Fact]
+    public void DarkTheme_AppliesToTheApp_AndTheTitleBarFollows()
+    {
+        var app = Application.Current!;
+        try
+        {
+            var window = new MainWindow(new MainWindowViewModel(new ScriptedDialogs(Path.GetTempPath()), new Stanley.App.Documents.RecentProjects(null)));
+            window.Show();
+            var titleBar = window.FindControl<Border>("TitleBar")!;
+            var lightBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+
+            window.ViewModel.IsDarkTheme = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(Avalonia.Styling.ThemeVariant.Dark, app.ActualThemeVariant);
+            var darkBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+            Assert.NotEqual(lightBrush, darkBrush);
+
+            window.ViewModel.IsLightTheme = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(lightBrush, ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color);
+        }
+        finally
+        {
+            app.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Default;
+        }
+    }
+
     /// <summary>File &gt; Close empties the window down to the File view; File &gt; New brings a fresh page (and its ribbon tabs) back.</summary>
     [Fact]
     public void CloseThenNew_SwapsTheWholeEditorAndRibbon()

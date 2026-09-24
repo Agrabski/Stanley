@@ -5,6 +5,43 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Styles.Resources>
+    <ResourceDictionary>
+    <!-- Stanley's own colours, per theme. Everything else comes from FluentTheme's
+         system brushes, which already follow light/dark. -->
+    <ResourceDictionary.ThemeDictionaries>
+      <ResourceDictionary x:Key="Light">
+        <SolidColorBrush x:Key="StanleyChromeBrush" Color="#1E5AA8" />
+        <SolidColorBrush x:Key="StanleyChromeHoverBrush" Color="#2A6FC9" />
+        <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#174A8C" />
+        <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#1D63C2" />
+        <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#B86500" />
+        <SolidColorBrush x:Key="StanleyErrorBrush" Color="#B3261E" />
+        <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#FFF4E0" />
+        <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#F0B35A" />
+        <SolidColorBrush x:Key="StanleySelectionBrush" Color="#1E5AA8" />
+        <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#1A1E5AA8" />
+        <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#261E5AA8" />
+        <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#0F000000" />
+        <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#C8C8C8" />
+        <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#FFFFFF" />
+      </ResourceDictionary>
+      <ResourceDictionary x:Key="Dark">
+        <SolidColorBrush x:Key="StanleyChromeBrush" Color="#1F3F66" />
+        <SolidColorBrush x:Key="StanleyChromeHoverBrush" Color="#2C5687" />
+        <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#162E4D" />
+        <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#7DB3FF" />
+        <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#FFB35C" />
+        <SolidColorBrush x:Key="StanleyErrorBrush" Color="#FF8A80" />
+        <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#3A2F1C" />
+        <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#8C6A2E" />
+        <SolidColorBrush x:Key="StanleySelectionBrush" Color="#6FA8F0" />
+        <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#2E5B9BEA" />
+        <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#405B9BEA" />
+        <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#5A5A5A" />
+        <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#232427" />
+      </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
     <StreamGeometry x:Key="SpeechIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z</StreamGeometry>
     <StreamGeometry x:Key="ShoutIcon">M12,1 L14.5,6.5 L20.5,4 L18.5,10 L23,13 L17,14.5 L18.5,21 L12,17.5 L5.5,21 L7,14.5 L1,13 L5.5,10 L3.5,4 L9.5,6.5 Z</StreamGeometry>
     <StreamGeometry x:Key="WhisperIcon">M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z</StreamGeometry>
@@ -20,6 +57,7 @@
     <StreamGeometry x:Key="NewIcon">M14,2 H6 C4.9,2 4,2.9 4,4 V20 C4,21.1 4.9,22 6,22 H18 C19.1,22 20,21.1 20,20 V8 Z M13,9 V3.5 L18.5,9 Z</StreamGeometry>
     <StreamGeometry x:Key="PageNumberIcon">M5,2 H19 V22 H5 Z M7,4 V20 H17 V4 Z M11,15 H12.5 V11 L11.3,11.6 L10.9,10.7 L12.8,9.6 H13.9 V15 H15 V16.4 H11 Z</StreamGeometry>
     <StreamGeometry x:Key="BackIcon">M20,11 H7.8 L13.4,5.4 L12,4 L4,12 L12,20 L13.4,18.6 L7.8,13 H20 Z</StreamGeometry>
+    </ResourceDictionary>
   </Styles.Resources>
   <Style Selector="Border.ribbon">
     <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
@@ -77,10 +115,10 @@
     <Setter Property="Margin" Value="8,1,0,0" />
   </Style>
   <Style Selector="Border.context.panel TextBlock.contextTitle">
-    <Setter Property="Foreground" Value="#257AE8" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyPanelTextBrush}" />
   </Style>
   <Style Selector="Border.context.bubble TextBlock.contextTitle">
-    <Setter Property="Foreground" Value="#C96F00" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
   </Style>
 
   <!-- Word-style tab strip: compact headers, the content row a fixed height so the page
@@ -101,14 +139,14 @@
     <Setter Property="Background" Value="#1A257AE8" />
   </Style>
   <Style Selector="TextBlock.panelHeader">
-    <Setter Property="Foreground" Value="#1D63C2" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyPanelTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TabControl.ribbonTabs TabItem.contextual.bubble">
     <Setter Property="Background" Value="#1FF58A07" />
   </Style>
   <Style Selector="TextBlock.bubbleHeader">
-    <Setter Property="Foreground" Value="#B86500" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="StackPanel.tabContent">
@@ -119,7 +157,7 @@
 
   <!-- Title row with the quick access toolbar. -->
   <Style Selector="Border.titleBar">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
     <Setter Property="Height" Value="32" />
   </Style>
   <Style Selector="ToggleSwitch.autoSave">
@@ -145,7 +183,7 @@
     <Setter Property="Height" Value="15" />
   </Style>
   <Style Selector="Button.qat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Button.qat:disabled /template/ ContentPresenter#PART_ContentPresenter">
@@ -155,7 +193,7 @@
 
   <!-- The File button: Word's coloured tab that opens the backstage view. -->
   <Style Selector="Button.fileTab">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
     <Setter Property="Foreground" Value="White" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Width" Value="58" />
@@ -168,13 +206,13 @@
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="Button.fileTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
 
   <!-- Backstage (File) view -->
   <Style Selector="Border.backstageRail">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button)">
     <Setter Property="Foreground" Value="White" />
@@ -188,11 +226,11 @@
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):checked /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#174A8C" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeCheckedBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):disabled /template/ ContentPresenter#PART_ContentPresenter">

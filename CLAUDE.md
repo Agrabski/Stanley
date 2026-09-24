@@ -315,6 +315,13 @@ point at a temp folder):
   (`ComicProject.OpenRecovered`: the snapshot's pages, back at the original folder,
   marked unsaved) or Discard. An unhandled UI-thread exception writes one last
   snapshot before the process goes down (`App`).
+- *Dark mode*: File › Options › Appearance (System / Light / Dark; `AppSettings.Theme`,
+  System by default) sets `Application.RequestedThemeVariant` via `ThemeSwitcher`.
+  Stanley's own colours are `Stanley*Brush` keys in `RibbonStyles.axaml`'s
+  `ThemeDictionaries` — use `{DynamicResource ...}` for them, never hex literals that only
+  suit one theme. The page (paper), thumbnails and the inline text editor
+  (`ThemeVariantScope` forced Light) stay white; only the canvas pasteboard darkens
+  (`PageCanvasScene.DarkChrome`).
 - *Logging* (`Diagnostics/AppLog`): `Logs/stanley-yyyy-MM-dd.log`, append-and-close
   per line (nothing lost in a crash), pruned after 14 days, a no-op until
   `Initialize` (so the CLI and tests don't log). Records startup environment,

@@ -9,7 +9,7 @@
              xmlns:documents="using:Stanley.App.Documents"
              x:Class="Stanley.App.Backstage"
              x:DataType="app:MainWindowViewModel">
-  <Grid ColumnDefinitions="200,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+  <Grid ColumnDefinitions="200,*" Background="{DynamicResource StanleyBackstageBrush}">
     <Border Classes="backstageRail">
       <StackPanel Margin="0,12,0,0">
         <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page (Esc)" Padding="20,10" Margin="0,0,0,12">
@@ -38,13 +38,17 @@
         <Button Name="CloseButton" Command="{Binding CloseDocumentCommand}">
           <TextBlock Text="Close" Margin="26,0,0,0" />
         </Button>
+        <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
+        <RadioButton Name="OptionsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOptionsPage}">
+          <TextBlock Text="Options" Margin="26,0,0,0" />
+        </RadioButton>
       </StackPanel>
     </Border>
 
     <ScrollViewer Grid.Column="1">
       <StackPanel Margin="48,32,48,32" MaxWidth="920" HorizontalAlignment="Left">
         <TextBlock Name="MessageText" Text="{Binding Message}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
-                   Foreground="#B3261E" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
+                   Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
 
         <!-- New -->
         <StackPanel IsVisible="{Binding IsNewPage}">
@@ -62,7 +66,7 @@
           <TextBlock Classes="backstageHeading" Text="Open" />
 
           <!-- Crash recovery, like Word's Document Recovery pane. -->
-          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="#FFF4E0" BorderBrush="#F0B35A" BorderThickness="1"
+          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="{DynamicResource StanleyNoticeBackgroundBrush}" BorderBrush="{DynamicResource StanleyNoticeBorderBrush}" BorderThickness="1"
                   CornerRadius="4" Padding="16,12" Margin="0,0,0,24" MaxWidth="720" HorizontalAlignment="Left">
             <StackPanel Spacing="8">
               <TextBlock Text="Recovered" FontSize="15" FontWeight="SemiBold" />
@@ -157,6 +161,18 @@
               </StackPanel>
             </Button>
           </StackPanel>
+        </StackPanel>
+
+        <!-- Options -->
+        <StackPanel IsVisible="{Binding IsOptionsPage}">
+          <TextBlock Classes="backstageHeading" Text="Options" />
+          <TextBlock Classes="backstageSubheading" Text="Appearance" Margin="0,0,0,8" />
+          <StackPanel Spacing="4">
+            <RadioButton Name="SystemThemeButton" GroupName="Theme" IsChecked="{Binding IsSystemTheme}" Content="Match my system (light or dark)" />
+            <RadioButton Name="LightThemeButton" GroupName="Theme" IsChecked="{Binding IsLightTheme}" Content="Light" />
+            <RadioButton Name="DarkThemeButton" GroupName="Theme" IsChecked="{Binding IsDarkTheme}" Content="Dark" />
+          </StackPanel>
+          <TextBlock Text="Pages always stay white, so what you see is what prints." Opacity="0.7" Margin="0,8,0,0" />
         </StackPanel>
       </StackPanel>
     </ScrollViewer>

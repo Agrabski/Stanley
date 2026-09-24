@@ -18,27 +18,27 @@
     </Style>
     <!-- The thumbnail's own blue frame marks the current page; the row itself only gets a faint tint. -->
     <Style Selector="ListBox#PageList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#1A1E5AA8" />
+      <Setter Property="Background" Value="{DynamicResource StanleySelectedTintBrush}" />
     </Style>
     <Style Selector="ListBox#PageList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#261E5AA8" />
+      <Setter Property="Background" Value="{DynamicResource StanleySelectedHoverTintBrush}" />
     </Style>
     <Style Selector="ListBox#PageList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#0F000000" />
+      <Setter Property="Background" Value="{DynamicResource StanleyHoverTintBrush}" />
     </Style>
     <Style Selector="Border.thumbFrame">
-      <Setter Property="BorderBrush" Value="#C8C8C8" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StanleyThumbBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Background" Value="White" />
       <Setter Property="BoxShadow" Value="0 1 3 0 #30000000" />
     </Style>
     <Style Selector="ListBox#PageList ListBoxItem:selected Border.thumbFrame">
-      <Setter Property="BorderBrush" Value="#1E5AA8" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
       <Setter Property="BorderThickness" Value="2" />
     </Style>
     <Style Selector="ListBox#PageList ListBoxItem:selected TextBlock.pageNumber">
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="#1E5AA8" />
+      <Setter Property="Foreground" Value="{DynamicResource StanleySelectionBrush}" />
     </Style>
   </UserControl.Styles>
 
@@ -72,7 +72,7 @@
         </ListBox.ItemTemplate>
       </ListBox>
       <Canvas IsHitTestVisible="False">
-        <Border Name="DropIndicator" Width="3" CornerRadius="1.5" Background="#1E5AA8" IsVisible="False" />
+        <Border Name="DropIndicator" Width="3" CornerRadius="1.5" Background="{DynamicResource StanleySelectionBrush}" IsVisible="False" />
       </Canvas>
     </Grid>
   </DockPanel>

@@ -159,6 +159,20 @@ public sealed class AutoSaveAndRecoveryTests : IDisposable
         Assert.False(new AppSettings(path).AutoSave);
     }
 
+    [Fact]
+    public void Settings_Theme_DefaultsToSystemAndPersists()
+    {
+        var path = Path.Combine(_root, "settings.txt");
+        Assert.Equal(AppTheme.System, new AppSettings(path).Theme);
+
+        var vm = NewViewModel(new AppSettings(path));
+        vm.IsDarkTheme = true;
+
+        Assert.Equal(AppTheme.Dark, vm.Theme);
+        Assert.False(vm.IsSystemTheme);
+        Assert.Equal(AppTheme.Dark, new AppSettings(path).Theme);
+    }
+
     // ---------------------------------------------------------------- crash recovery
 
     [Fact]

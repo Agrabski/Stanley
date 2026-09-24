@@ -12,18 +12,21 @@
     <!-- Page -->
     <Grid Grid.Row="0">
       <local:PageCanvasControl x:Name="PageCanvas" />
+      <!-- The text editor sits on the (always white) paper, so it stays light in dark mode too. -->
+      <ThemeVariantScope RequestedThemeVariant="Light">
       <Canvas Name="Overlay">
         <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
                  VerticalContentAlignment="Center" Background="#F2FFFFFF" Foreground="Black" BorderThickness="2" MaxLength="500"
                  PlaceholderText="Type the dialogue…  (Enter = done, Shift+Enter = new line, Esc = cancel)" />
       </Canvas>
+      </ThemeVariantScope>
     </Grid>
 
     <!-- Status bar -->
     <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
       <Grid ColumnDefinitions="*,Auto">
         <StackPanel Orientation="Horizontal" Spacing="12">
-          <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="#C62828" FontSize="12" VerticalAlignment="Center"
+          <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12" VerticalAlignment="Center"
                      IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </StackPanel>

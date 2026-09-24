@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Stanley.Editing;
 using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
@@ -56,6 +57,7 @@ public sealed class PageCanvasControl : Control
     {
         ClipToBounds = true;
         Focusable = true;
+        ActualThemeVariantChanged += (_, _) => InvalidateVisual();
     }
 
     /// <summary>Raised when zoom or pan changes, so the ribbon's zoom readout and any overlay (the inline text editor) can follow.</summary>
@@ -181,7 +183,8 @@ public sealed class PageCanvasControl : Control
             _rubberBand,
             _drag == DragKind.CreateBubble,
             _viewModel.ShowMarginGuides,
-            _viewModel.Folio)));
+            _viewModel.Folio,
+            ActualThemeVariant == ThemeVariant.Dark)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
