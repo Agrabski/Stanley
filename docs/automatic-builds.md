@@ -47,11 +47,13 @@ Unpack it and run `stanley` (`stanley.exe` on Windows). Nothing needs
 installing, because the .NET runtime is included. Run `stanley --version` to
 see which build you have.
 
-Self-updating builds (File › Options › Updates, backed by Velopack) are wired
-into the app, but CI doesn't publish a Velopack feed yet — see
-[`docs/auto-update.md`](auto-update.md) for what's implemented and the
-release-retention decision still needed before it works end to end. Until
-then, to update, download the file again from the same place.
+Stanley can also update itself: File › Options › Updates, backed by Velopack
+(each of these releases carries a matching set of Velopack packages
+alongside the archives above). It needs your own GitHub personal access
+token, since the repository is private — see [`docs/auto-update.md`](auto-update.md)
+for how that's stored and how CI publishes the feed it reads. Without a
+token configured, or on the Windows/macOS legs before their first verified
+run (see that doc), download the file again from the same place instead.
 
 ## Day to day
 

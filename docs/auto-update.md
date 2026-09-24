@@ -1,9 +1,11 @@
 # Auto-update from nightly builds
 
-Status as of 2026-09-24: the **app side is implemented** (File › Options ›
-Updates, backed by Velopack). **CI doesn't produce anything for it to
-download yet** — see "What's left" below, which is a retention-model
-decision, not just more code.
+Status as of 2026-09-24: implemented end to end - the app (File › Options ›
+Updates) and CI (`.github/workflows/ci.yml`) both ship. The Windows and
+macOS legs of the CI packaging are **unverified**: this was built and
+exercised on a Linux-only environment, so only the `linux-x64` `vpk pack`
+step has actually been run. See "How CI publishes it" for what to watch on
+the first real nightly/release run on those platforms.
 
 ## What's implemented
 
@@ -43,45 +45,58 @@ decision, not just more code.
   deliberate opt-in) runs a few seconds after the window opens, through the
   same `IDelayScheduler` AutoSave and crash recovery already use.
 
-## What's left: CI has to actually publish something to update to
+## How CI publishes it
 
-None of the above has anything to check *against* yet. Today's `publish` /
-`nightly-release` / `release-assets` jobs in `.github/workflows/ci.yml`
-produce a plain `dotnet publish` folder as `tar.gz`/`zip` - not a Velopack
-release feed. Wiring in `vpk pack` + `vpk upload github` isn't just more
-CI steps; it runs into a real conflict with how the nightly job works today,
-worth the project owner's call before it's built:
+The `publish` job (matrix, one per RID) now also packs a Velopack release
+alongside the existing plain `dotnet publish` output:
 
-- **Velopack's GitHub feed is meant to accumulate, not be replaced.** Delta
-  updates work by diffing against whatever earlier versions are still in
-  the release's assets, so `vpk upload github --merge` is designed to add
-  to a channel's history over time, across many CI runs.
-- **The current nightly job does the opposite on purpose**: `nightly-release`
-  in `ci.yml` explicitly deletes the previous `nightly` release and its tag
-  every run ("Replace the rolling nightly pre-release") so the download
-  page always shows exactly one, current build. Doing that to a Velopack
-  channel would delete its delta history every single night, so every
-  "nightly update" would silently fall back to a full download - most of
-  the point of Velopack, gone, without it ever being obvious from the CI
-  logs.
+- Installs `vpk` (pinned to `1.2.158`, matching the `Velopack` NuGet package
+  version `Stanley.App.csproj` references, so the client and the packer
+  agree on the package format) and, on Linux, `squashfs-tools` (`vpk`
+  packages Linux as an AppImage, which needs `mksquashfs`).
+- Computes the channel: the OS (`win`/`osx`/`linux`) plus `-nightly` for a
+  schedule/`workflow_dispatch` run, exactly matching
+  `VelopackUpdateService.ResolveChannel` on the client side.
+- `vpk pack --delta None ...` produces a full package only, no delta patch,
+  uploaded as a short-lived (3-day) `velopack-<rid>` build artifact - not a
+  release yet, so three parallel matrix jobs never race each other pushing
+  to the same GitHub release.
+- The **existing plain `tar.gz`/`zip` archives are untouched** (still the
+  30-day `stanley-<rid>` artifact, still the manual "download it yourself"
+  path `docs/automatic-builds.md` describes) - only the Velopack packaging
+  is new.
 
-Two honest ways to resolve this, worth deciding rather than picking
-silently:
+A single new `velopack-release` job (one runner, so uploads to the same
+release never race) then downloads all three platforms' packed output and
+uploads them for real:
 
-1. **Split the tags.** Keep today's `nightly` release exactly as-is (the
-   human "grab the latest build" download, wiped and replaced each run) and
-   give Velopack's own channel packages a separate, never-deleted tag (e.g.
-   `nightly-vpk`) that only `vpk upload github --merge` touches. Two release
-   entries under *Releases* instead of one; a bit more to explain in
-   `docs/automatic-builds.md`.
-2. **Let Velopack own the nightly release outright**, retire the manual
-   `tar.gz`/`zip` archives, and prune old assets from it on a schedule (or
-   accept the storage growth - packages are small, and GitHub Releases has
-   no published per-repo cap). Simpler infra, but changes what "download
-   the nightly" means for someone not using auto-update at all.
+- **A stable `vX.Y.Z` release is a fresh tag every time** - `vpk upload
+  github --merge` just adds that version's three channel packages to the
+  release the draft-release flow already published, then the job merges the
+  tag back into `develop` (same as before).
+- **The `nightly` release/tag is reused every run**, which is exactly the
+  case Velopack's GitHub feed is designed for: delta updates work by
+  diffing against whatever earlier packages are still attached to the
+  release, so the feed is meant to accumulate, not be wiped. The job no
+  longer deletes and recreates the `nightly` release the way it used to
+  (that would silently erase delta history every night, defeating half of
+  Velopack's point); instead it **prunes each channel's previous packages
+  first** (`gh release delete-asset`), then uploads the new ones - so the
+  release/tag itself is permanent, but doesn't grow without bound. Real
+  delta chains (packing against the previous nightly's package instead of
+  `--delta None`) are a follow-up, not done here: it needs downloading the
+  previous channel's package into the pack step before running `vpk pack`,
+  which is more CI plumbing than this pass covers.
 
-Either is buildable; this doc stops short of choosing because it changes
-the release process people already rely on, not just the app.
+## What to verify on the first real run
+
+This was built and tested in a Linux-only sandbox: the full app-side test
+suite passes, and `vpk pack` for `linux-x64` was run and inspected by hand
+(`Releases/RELEASES-<channel>`, the `.nupkg`, and the `.AppImage` all
+produced correctly). The `win-x64` and `osx-arm64` `vpk pack` steps, and
+every `vpk upload github` / `gh release delete-asset` call against the real
+repository, are **unverified** - watch the first scheduled nightly (or run
+it manually via `workflow_dispatch`) for those legs specifically.
 
 ## Platform caveats, unchanged since the original investigation
 
