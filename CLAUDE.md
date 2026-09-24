@@ -426,6 +426,11 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 that file is the plan, not implemented yet; this section stays the short
 summary.
 
+The first implementation step, a **character authoring POC** (parametric body —
+height/weight/head size/frame — rendered as a generated mannequin, plus placing
+characters on panels), is designed in
+[`docs/character-authoring-poc.md`](docs/character-authoring-poc.md).
+
 ## Builds, versioning & releases
 
 **Versions and release notes come from the issues each PR closes**, not from
