@@ -1,4 +1,5 @@
 using System.Globalization;
+using Stanley.App.Updates;
 
 namespace Stanley.App.Documents;
 
@@ -57,6 +58,23 @@ public sealed class AppSettings
             ? theme
             : AppTheme.System;
         set => Set(nameof(Theme), value.ToString());
+    }
+
+    /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - it needs a
+    /// GitHub token configured first (Stanley is a private repository), so turning it on is a deliberate opt-in.</summary>
+    public bool AutoCheckForUpdates
+    {
+        get => _values.TryGetValue(nameof(AutoCheckForUpdates), out var value) && bool.TryParse(value, out var on) && on;
+        set => Set(nameof(AutoCheckForUpdates), value.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Stable (tagged releases only) or Nightly (every change to `develop`) release track.</summary>
+    public AppUpdateChannel UpdateChannel
+    {
+        get => _values.TryGetValue(nameof(UpdateChannel), out var value) && Enum.TryParse<AppUpdateChannel>(value, ignoreCase: true, out var channel) && Enum.IsDefined(channel)
+            ? channel
+            : AppUpdateChannel.Stable;
+        set => Set(nameof(UpdateChannel), value.ToString());
     }
 
     private void Set(string key, string value)

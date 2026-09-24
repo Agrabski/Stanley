@@ -38,9 +38,9 @@ come later behind the same interfaces.
 
 ## Builds and releases
 
-Test builds come out nightly and releases are made automatically; see
-[Automatic builds and releases](docs/automatic-builds.md) for the one-time
-setup, where to download builds, and how versions are chosen.
+Test builds come out nightly; see
+[Getting and installing Stanley](docs/automatic-builds.md) for how to
+download, install and self-update.
 
 ## Licence
 

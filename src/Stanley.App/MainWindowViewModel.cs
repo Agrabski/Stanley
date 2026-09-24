@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Stanley.App.Diagnostics;
 using Stanley.App.Documents;
+using Stanley.App.Updates;
 using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.Editors;
@@ -44,9 +45,15 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly AppSettings _settings;
     private readonly RecoveryStore? _recovery;
     private readonly IDelayScheduler? _scheduler;
+    private readonly GithubTokenStore _tokenStore;
+    private readonly IUpdateService? _updates;
     private IDisposable? _pendingAutoSave;
     private IDisposable? _pendingRecovery;
+    private IDisposable? _pendingUpdateCheck;
     private bool _recoveredUnsaved;
+    private bool _isCheckingForUpdates;
+    private string? _updateStatus;
+    private AvailableUpdate? _availableUpdate;
     private ComicProject? _project;
     private EditorWorkspace? _workspace;
     private PageNavigatorViewModel? _navigator;
@@ -59,20 +66,26 @@ public sealed class MainWindowViewModel : ObservableObject
 
     /// <param name="settings">User preferences (AutoSave); in-memory defaults if null.</param>
     /// <param name="recovery">Crash recovery; none if null.</param>
-    /// <param name="scheduler">Runs AutoSave and recovery snapshots after a delay; without one, neither runs on its own (tests drive them directly).</param>
+    /// <param name="scheduler">Runs AutoSave, recovery snapshots and the startup update check after a delay; without one, none of them run on their own (tests drive them directly).</param>
+    /// <param name="tokenStore">The user's GitHub token for update checks; in-memory-only default if null.</param>
+    /// <param name="updates">Checks for/applies app updates; update controls are hidden entirely if null.</param>
     public MainWindowViewModel(
         IFileDialogs dialogs,
         RecentProjects recent,
         bool startWithBlankComic = true,
         AppSettings? settings = null,
         RecoveryStore? recovery = null,
-        IDelayScheduler? scheduler = null)
+        IDelayScheduler? scheduler = null,
+        GithubTokenStore? tokenStore = null,
+        IUpdateService? updates = null)
     {
         _dialogs = dialogs;
         _recent = recent;
         _settings = settings ?? new AppSettings(null);
         _recovery = recovery;
         _scheduler = scheduler;
+        _tokenStore = tokenStore ?? new GithubTokenStore(null);
+        _updates = updates;
         ThemeSwitcher.Apply(_settings.Theme);
 
         OpenBackstageCommand = new RelayCommand<BackstagePage?>(page => ShowBackstage(page ?? (HasDocument ? BackstagePage.Info : BackstagePage.New)));
@@ -88,6 +101,8 @@ public sealed class MainWindowViewModel : ObservableObject
         UndoCommand = new RelayCommand(() => _workspace?.History.Undo(), () => _workspace?.History.CanUndo ?? false);
         RedoCommand = new RelayCommand(() => _workspace?.History.Redo(), () => _workspace?.History.CanRedo ?? false);
         OpenRecoveredCommand = new AsyncRelayCommand<RecoveredComic>(comic => comic is null ? Task.CompletedTask : OpenRecoveredAsync(comic));
+        CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
+        InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, () => HasUpdateAvailable);
         DiscardRecoveredCommand = new RelayCommand<RecoveredComic>(comic =>
         {
             if (comic is null)
@@ -111,6 +126,9 @@ public sealed class MainWindowViewModel : ObservableObject
             AppLog.Warn($"Found {RecoveredEntries.Count} recovered comic(s) from a session that didn't shut down properly.");
             ShowBackstage(BackstagePage.Open);
         }
+
+        if (_scheduler is not null && AutoCheckForUpdates && CanCheckForUpdates)
+            _pendingUpdateCheck = _scheduler.Schedule(TimeSpan.FromSeconds(5), () => _ = CheckForUpdatesCommand.ExecuteAsync(null));
     }
 
     // ---------------------------------------------------------------- document state
@@ -277,6 +295,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         _pendingAutoSave?.Dispose();
         _pendingRecovery?.Dispose();
+        _pendingUpdateCheck?.Dispose();
         _recovery?.Dispose();
         AppLog.Info("Session ended cleanly.");
     }
@@ -301,6 +320,116 @@ public sealed class MainWindowViewModel : ObservableObject
             _pendingAutoSave = _scheduler.Schedule(AutoSaveDelay, AutoSaveNow);
         }
         _pendingRecovery ??= _scheduler.Schedule(RecoveryDelay, WriteRecoverySnapshot);
+    }
+
+    // ---------------------------------------------------------------- updates
+
+    /// <summary>
+    /// The user's own GitHub personal access token (read access to this repository is
+    /// enough): Stanley is private, so there's no anonymous release feed to check. Kept on
+    /// this machine only (<see cref="Updates.GithubTokenStore"/>), never in
+    /// <see cref="AppSettings"/>.
+    /// </summary>
+    public string? GithubToken
+    {
+        get => _tokenStore.Token;
+        set
+        {
+            if (value == _tokenStore.Token)
+                return;
+            _tokenStore.Token = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanCheckForUpdates));
+        }
+    }
+
+    /// <summary>Stable (tagged releases) or Nightly (every change to `develop`, for testers).</summary>
+    public AppUpdateChannel UpdateChannel
+    {
+        get => _settings.UpdateChannel;
+        set
+        {
+            if (value == _settings.UpdateChannel)
+                return;
+            _settings.UpdateChannel = value;
+            AppLog.Info($"Update channel set to {value}.");
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsStableChannel));
+            OnPropertyChanged(nameof(IsNightlyChannel));
+        }
+    }
+
+    public bool IsStableChannel { get => UpdateChannel == AppUpdateChannel.Stable; set { if (value) UpdateChannel = AppUpdateChannel.Stable; } }
+    public bool IsNightlyChannel { get => UpdateChannel == AppUpdateChannel.Nightly; set { if (value) UpdateChannel = AppUpdateChannel.Nightly; } }
+
+    /// <summary>File &gt; Options &gt; Updates: check automatically on startup, a moment after the window opens.</summary>
+    public bool AutoCheckForUpdates
+    {
+        get => _settings.AutoCheckForUpdates;
+        set
+        {
+            if (value == AutoCheckForUpdates)
+                return;
+            _settings.AutoCheckForUpdates = value;
+            AppLog.Info($"Automatic update checks turned {(value ? "on" : "off")}.");
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Whether there's anything to check with: an update service (a real install, not a dev/test build) and a token.</summary>
+    public bool CanCheckForUpdates => _updates is { IsInstalled: true } && !string.IsNullOrWhiteSpace(GithubToken);
+
+    public bool IsCheckingForUpdates { get => _isCheckingForUpdates; private set => SetProperty(ref _isCheckingForUpdates, value); }
+
+    public string? UpdateStatus { get => _updateStatus; private set => SetProperty(ref _updateStatus, value); }
+
+    public bool HasUpdateAvailable => _availableUpdate is not null;
+
+    public IAsyncRelayCommand CheckForUpdatesCommand { get; }
+    public IAsyncRelayCommand InstallUpdateCommand { get; }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        if (_updates is null || _isCheckingForUpdates)
+            return;
+
+        IsCheckingForUpdates = true;
+        UpdateStatus = null;
+        try
+        {
+            _availableUpdate = await _updates.CheckForUpdatesAsync();
+            OnPropertyChanged(nameof(HasUpdateAvailable));
+            InstallUpdateCommand.NotifyCanExecuteChanged();
+            UpdateStatus = _availableUpdate is null ? "Stanley is up to date." : $"Version {_availableUpdate.Version} is available.";
+            AppLog.Info(_availableUpdate is null ? "Checked for updates: up to date." : $"Checked for updates: {_availableUpdate.Version} available.");
+        }
+        catch (Exception e)
+        {
+            AppLog.Error("Checking for updates failed.", e);
+            UpdateStatus = $"Couldn't check for updates: {e.Message}";
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+        }
+    }
+
+    /// <summary>Goes through the same Save / Don't Save / Cancel gate as Close - never restarts out from under unsaved work.</summary>
+    private async Task InstallUpdateAsync()
+    {
+        if (_updates is null || !HasUpdateAvailable || !await ConfirmDiscardAsync())
+            return;
+
+        UpdateStatus = "Downloading the update...";
+        try
+        {
+            await _updates.DownloadAndApplyAsync();
+        }
+        catch (Exception e)
+        {
+            AppLog.Error("Installing the update failed.", e);
+            UpdateStatus = $"Couldn't install the update: {e.Message}";
+        }
     }
 
     public string WindowTitle => HasDocument ? $"{DocumentTitle}{(IsDirty ? " •" : "")} - Stanley" : "Stanley";
