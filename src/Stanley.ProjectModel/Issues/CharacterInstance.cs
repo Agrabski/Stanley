@@ -15,10 +15,13 @@ public sealed record CharacterInstanceOverrides(
 /// <see cref="RevisionOverride"/> is null), plus the ad hoc pose it's posed in for this
 /// panel - not a library <see cref="Pose"/> reference, since most panel poses are
 /// one-off drags rather than saved library entries. Not itself a stable-id entity: it's
-/// embedded directly in the one file (panel.json) that ever references it.
+/// embedded directly in the one file (panel.json) that ever references it, and
+/// addressed by its index in <see cref="Panel.CharacterInstances"/> (which is also its
+/// z-order, back to front) - the same way bubbles are.
 /// </summary>
 public sealed record CharacterInstance(
     CharacterId CharacterId,
+    CharacterPlacement Placement,
     CharacterRevisionId? RevisionOverride,
     PoseData Pose,
     CharacterInstanceOverrides? Overrides);

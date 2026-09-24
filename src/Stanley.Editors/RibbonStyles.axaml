@@ -15,6 +15,7 @@
         <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#174A8C" />
         <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#1D63C2" />
         <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#B86500" />
+        <SolidColorBrush x:Key="StanleyCharacterTextBrush" Color="#1E7A45" />
         <SolidColorBrush x:Key="StanleyErrorBrush" Color="#B3261E" />
         <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#FFF4E0" />
         <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#F0B35A" />
@@ -31,6 +32,7 @@
         <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#162E4D" />
         <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#7DB3FF" />
         <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#FFB35C" />
+        <SolidColorBrush x:Key="StanleyCharacterTextBrush" Color="#7FDCA4" />
         <SolidColorBrush x:Key="StanleyErrorBrush" Color="#FF8A80" />
         <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#3A2F1C" />
         <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#8C6A2E" />
@@ -56,6 +58,9 @@
     <StreamGeometry x:Key="FolderIcon">M10,4 H4 C2.9,4 2,4.9 2,6 V18 C2,19.1 2.9,20 4,20 H20 C21.1,20 22,19.1 22,18 V8 C22,6.9 21.1,6 20,6 H12 Z</StreamGeometry>
     <StreamGeometry x:Key="NewIcon">M14,2 H6 C4.9,2 4,2.9 4,4 V20 C4,21.1 4.9,22 6,22 H18 C19.1,22 20,21.1 20,20 V8 Z M13,9 V3.5 L18.5,9 Z</StreamGeometry>
     <StreamGeometry x:Key="PageNumberIcon">M5,2 H19 V22 H5 Z M7,4 V20 H17 V4 Z M11,15 H12.5 V11 L11.3,11.6 L10.9,10.7 L12.8,9.6 H13.9 V15 H15 V16.4 H11 Z</StreamGeometry>
+    <StreamGeometry x:Key="CharacterIcon">M12,2 A3,3 0 1 1 11.99,2 Z M8,8.5 H16 A2,2 0 0 1 18,10.5 V15 H16 V22 H13 V16 H11 V22 H8 V15 H6 V10.5 A2,2 0 0 1 8,8.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="FlipIcon">M11,2 H13 V22 H11 Z M9,6 V18 L2,18 Z M15,6 L22,18 H15 Z M16.5,11 V16.5 H19.7 Z</StreamGeometry>
+    <StreamGeometry x:Key="CloseIcon">M5.6,4.2 L12,10.6 L18.4,4.2 L19.8,5.6 L13.4,12 L19.8,18.4 L18.4,19.8 L12,13.4 L5.6,19.8 L4.2,18.4 L10.6,12 L4.2,5.6 Z</StreamGeometry>
     <StreamGeometry x:Key="BackIcon">M20,11 H7.8 L13.4,5.4 L12,4 L4,12 L12,20 L13.4,18.6 L7.8,13 H20 Z</StreamGeometry>
     </ResourceDictionary>
   </Styles.Resources>
@@ -148,6 +153,23 @@
   <Style Selector="TextBlock.bubbleHeader">
     <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.character">
+    <Setter Property="Background" Value="#1A2E9E5B" />
+  </Style>
+  <Style Selector="TextBlock.characterHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyCharacterTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <!-- A labelled slider row in the character ribbon: name, slider, value. -->
+  <Style Selector="Slider.body">
+    <Setter Property="Width" Value="130" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="StackPanel.tabContent">
     <Setter Property="Orientation" Value="Horizontal" />

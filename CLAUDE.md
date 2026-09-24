@@ -26,7 +26,9 @@ The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
 snapping, page navigator) all exist. The GUI opens/saves real project folders (the
-pages of one issue for now — see "Documents" below). No character rendering yet.
+pages of one issue for now — see "Documents" below). Characters exist as a
+**body-only POC** (sliders + a generated flat mannequin, placed on panels — see
+"Characters (POC, implemented)" below); no stickers, posing or view angles yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -426,10 +428,49 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 that file is the plan, not implemented yet; this section stays the short
 summary.
 
-The first implementation step, a **character authoring POC** (parametric body —
-height/weight/head size/frame — rendered as a generated mannequin, plus placing
-characters on panels), is designed in
-[`docs/character-authoring-poc.md`](docs/character-authoring-poc.md).
+### Characters (POC, implemented)
+
+Designed in [`docs/character-authoring-poc.md`](docs/character-authoring-poc.md);
+body and placement only.
+
+- **Body = numbers**: `BodyShape` (ProjectModel/Characters) — `Height` (relative:
+  1.0 = average adult, never cm), `Build` (shown as "Weight"), `Muscle`,
+  `HeadsTall`, `Frame` (shoulders ↔ hips); `BodyPresets` (Toddler … Chibi).
+  Stored as `CharacterDefinition.Body`; `CharacterDefinition.Skeleton` is now a
+  sparse joint *override* on the generated rest layout (empty from the UI).
+  `CharacterDefinition.Create(name)` makes a default one; `Skin` reads the `skin`
+  colour slot.
+- **`BodyRig.Build(body, overrides)`**: pure math → `BodyFigure` (VRM rest layout
+  + torso outline, limb capsules, head/hand/foot ellipses) in *figure space* (unit
+  = relative height, y down, origin = ground between the feet; head top at
+  `-Height`). Heights depend only on `Height`/`HeadsTall`.
+- **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
+  `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
+  figure path per definition). `PageRenderer.Draw/DrawPanels/Export*` take an
+  optional character dictionary and draw background → characters → bubbles inside
+  the panel clip; a missing character draws a dashed placeholder.
+- **Placement**: `CharacterInstance.Placement` = `CharacterPlacement(Ground,
+  UnitHeightMm, Mirrored)` (page mm; `ToPage` maps figure space). One scale per
+  panel by default: `CharacterPlacementEditing` (Stanley.Editing) places new ones
+  at the panel's scale/floor, resizes "together" (everyone sharing the scale) or
+  alone, keeps them reachable (may hang out of the panel — cropping is fine), and
+  `PanelLayoutEditing` carries them through panel resize/move/split.
+- **Editors**: `CharacterLibraryViewModel` (the **Characters** tool pane, tab next
+  to Pages; also the `ICharacterCatalog` page editors draw from, live incl.
+  mid-drag) owns one `CharacterEditorViewModel` per character (all in the shared
+  history; showing one swaps it into the editor area, `ReturnToPage`/Close swaps
+  back; undoing a body edit re-opens that character). Placed characters can't be
+  deleted. `CharacterEditorRibbon` = Body tab (presets, sliders — one drag = one
+  undo step via `BeginSliderDrag`/`EndSliderDrag` — skin, name, line-up, Close).
+  Page editor: `SelectedCharacterIndex`, contextual green **Character** tab,
+  Insert › Characters gallery + New character, drag from the pane onto a panel
+  (`CharacterDrag.Format`), double-click opens the body editor.
+  `PageEditorHost.CreateWorkspace` returns an `EditorSession(Workspace, Navigator,
+  Characters)`.
+- **Persistence**: `ProjectRepository.ListCharacters()` (scans `characters/`, no
+  index file) / `DeleteCharacter`; `ComicProject.Characters`, and
+  `Save`/`SaveAs`/`WriteCopy` take the characters (null = leave disk alone) and
+  prune deleted ones.
 
 ## Builds, versioning & releases
 

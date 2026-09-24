@@ -12,9 +12,15 @@
     <DataTemplate DataType="editors:PageEditorViewModel">
       <editors:PageEditorView />
     </DataTemplate>
-    <!-- Side pane: the page navigator. -->
+    <DataTemplate DataType="editors:CharacterEditorViewModel">
+      <editors:CharacterEditorView />
+    </DataTemplate>
+    <!-- Side panes: the page navigator and the Characters pane. -->
     <DataTemplate DataType="editors:PageNavigatorViewModel">
       <editors:PageNavigatorView />
+    </DataTemplate>
+    <DataTemplate DataType="editors:CharacterLibraryViewModel">
+      <editors:CharacterLibraryView />
     </DataTemplate>
   </Window.DataTemplates>
 
@@ -79,6 +85,9 @@
             <ContentControl.DataTemplates>
               <DataTemplate DataType="editors:PageEditorViewModel">
                 <editors:PageEditorRibbon />
+              </DataTemplate>
+              <DataTemplate DataType="editors:CharacterEditorViewModel">
+                <editors:CharacterEditorRibbon />
               </DataTemplate>
             </ContentControl.DataTemplates>
           </ContentControl>

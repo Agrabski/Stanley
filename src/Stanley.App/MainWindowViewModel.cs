@@ -50,6 +50,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private ComicProject? _project;
     private EditorWorkspace? _workspace;
     private PageNavigatorViewModel? _navigator;
+    private CharacterLibraryViewModel? _characters;
     private bool _titleDirty;
     private bool _isBackstageOpen;
     private BackstagePage _backstagePage = BackstagePage.New;
@@ -117,6 +118,9 @@ public sealed class MainWindowViewModel : ObservableObject
     public ComicProject? Project => _project;
     public EditorWorkspace? Workspace => _workspace;
     public PageNavigatorViewModel? Navigator => _navigator;
+
+    /// <summary>The open comic's Characters pane (its characters and their editors), or null with no comic open.</summary>
+    public CharacterLibraryViewModel? Characters => _characters;
 
     /// <summary>The page being edited (the navigator's current page).</summary>
     public PageEditorViewModel? Editor => _navigator?.CurrentPage.Editor;
@@ -205,7 +209,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
             AppLog.Info($"AutoSaved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
         }
@@ -234,7 +238,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering);
+            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
         }
         catch (Exception e) when (IsFileProblem(e))
         {
@@ -497,7 +501,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
             AppLog.Info($"Saved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
             return true;
@@ -521,7 +525,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering);
+            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             MarkSaved();
             Message = $"Saved to {saved}";
@@ -564,9 +568,9 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)));
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters());
             else
-                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio);
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters());
             Message = $"Exported to {path}";
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
@@ -602,12 +606,15 @@ public sealed class MainWindowViewModel : ObservableObject
 
     // ---------------------------------------------------------------- helpers
 
+    private IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Characters.CharacterDefinition>? CommittedCharacters() =>
+        _characters?.Snapshot().ToDictionary(c => c.Id);
+
     private void Load(ComicProject project)
     {
         Unload();
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
-        (_workspace, _navigator) = PageEditorHost.CreateWorkspace(project);
+        (_workspace, _navigator, _characters) = PageEditorHost.CreateWorkspace(project);
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _titleDirty = false;
@@ -617,6 +624,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(Workspace));
         OnPropertyChanged(nameof(Editor));
         OnPropertyChanged(nameof(Navigator));
+        OnPropertyChanged(nameof(Characters));
         OnPropertyChanged(nameof(Project));
     }
 
@@ -629,6 +637,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _project = null;
         _workspace = null;
         _navigator = null;
+        _characters = null;
         _titleDirty = false;
         _recoveredUnsaved = false;
         _pendingAutoSave?.Dispose();
@@ -640,6 +649,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(Workspace));
         OnPropertyChanged(nameof(Editor));
         OnPropertyChanged(nameof(Navigator));
+        OnPropertyChanged(nameof(Characters));
         OnPropertyChanged(nameof(Project));
     }
 

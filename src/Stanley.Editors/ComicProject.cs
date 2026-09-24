@@ -1,5 +1,6 @@
 using Stanley.Editing;
 using Stanley.ProjectModel;
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
@@ -19,8 +20,9 @@ public sealed record ComicPage(PageId Id, PageTrim Trim, PageDocument Document)
 /// An open comic - the thing File &gt; New/Open/Save act on, the way Word acts on a
 /// document. On disk it's a Stanley project folder (see <see cref="ProjectRepository"/>);
 /// the editor works on the pages of its first issue (created on the fly for a project
-/// that has none yet, e.g. one fresh from <c>stanley init</c>). Everything else in the
-/// folder is left untouched by a save, and carried along by Save As.
+/// that has none yet, e.g. one fresh from <c>stanley init</c>), plus the project's
+/// characters. Everything else in the folder is left untouched by a save, and carried
+/// along by Save As.
 /// </summary>
 public sealed class ComicProject
 {
@@ -33,10 +35,15 @@ public sealed class ComicProject
     // save can delete the files of pages and panels removed since.
     private Dictionary<PageId, Page> _pageRecords;
     private Dictionary<PageId, HashSet<PanelId>> _savedPanels;
+    // Characters on disk as of the last open/save, so a save can delete removed ones.
+    private HashSet<CharacterId> _savedCharacters;
 
     private ComicProject(string? location, string title, PageTrim trim, Issue issue, IReadOnlyList<ComicPage> pages,
-        Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels)
+        Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels,
+        IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters)
     {
+        Characters = characters;
+        _savedCharacters = savedCharacters;
         Location = location;
         Title = title;
         Trim = trim;
@@ -62,6 +69,9 @@ public sealed class ComicProject
     /// <summary>The pages as they were opened, in reading order - the editor's starting point.</summary>
     public IReadOnlyList<ComicPage> Pages { get; }
 
+    /// <summary>The project's characters as they were opened, sorted by name.</summary>
+    public IReadOnlyList<CharacterDefinition> Characters { get; }
+
     /// <summary>The issue's printed page numbers, as opened.</summary>
     public PageNumbering PageNumbering => _issue.PageNumbering ?? PageNumbering.Off;
 
@@ -70,7 +80,7 @@ public sealed class ComicProject
     {
         var issue = NewIssue();
         var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
-        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], []);
+        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], [], [], []);
     }
 
     public static ComicProject CreateNew(MetricPaperSize paper = MetricPaperSize.A4, PanelLayoutPreset? layout = null) =>
@@ -101,7 +111,9 @@ public sealed class ComicProject
         if (pages.Count == 0)
             pages.Add(NewPage(manifest.DefaultPageTrim));
 
-        return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, pages, records, saved);
+        var characters = repository.ListCharacters();
+        return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, pages, records, saved,
+            characters, [.. characters.Select(c => c.Id)]);
     }
 
     /// <summary>A blank page at the project's size: one panel filling the live area.</summary>
@@ -110,9 +122,12 @@ public sealed class ComicProject
     /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
     /// manifest title, the issue's page list, every page and panel - and deletes the
-    /// folders/files of pages and panels removed since the last save.
+    /// folders/files of pages and panels removed since the last save. With
+    /// <paramref name="characters"/>, writes every character too and deletes the ones
+    /// removed since; without, leaves the characters on disk alone.
     /// </summary>
-    public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
+    public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
+        IReadOnlyList<CharacterDefinition>? characters = null)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -122,6 +137,21 @@ public sealed class ComicProject
             : ProjectRepository.Initialize(Location, Title, Trim);
 
         (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: true);
+        if (characters != null)
+            _savedCharacters = WriteCharacters(repository, characters, prune: true);
+    }
+
+    private HashSet<CharacterId> WriteCharacters(ProjectRepository repository, IReadOnlyList<CharacterDefinition> characters, bool prune)
+    {
+        foreach (var character in characters)
+            repository.SaveCharacter(character);
+        var saved = characters.Select(c => c.Id).ToHashSet();
+        if (prune)
+        {
+            foreach (var removed in _savedCharacters.Except(saved))
+                repository.DeleteCharacter(removed);
+        }
+        return saved;
     }
 
     /// <summary>
@@ -130,10 +160,12 @@ public sealed class ComicProject
     /// snapshot. Same issue and page ids as the real thing, so <see cref="OpenRecovered"/>
     /// can line it back up with the original folder.
     /// </summary>
-    public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
+    public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
+        IReadOnlyList<CharacterDefinition>? characters = null)
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim);
         WritePages(repository, pages, pageNumbering ?? PageNumbering, prune: false);
+        WriteCharacters(repository, characters ?? Characters, prune: false);
     }
 
     /// <summary>
@@ -148,9 +180,10 @@ public sealed class ComicProject
         if (originalLocation != null && ProjectRepository.IsInitialized(originalLocation))
         {
             var original = Open(originalLocation);
-            return new ComicProject(original.Location, copy.Title, original.Trim, copy._issue, copy.Pages, original._pageRecords, original._savedPanels);
+            return new ComicProject(original.Location, copy.Title, original.Trim, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
+                copy.Characters, original._savedCharacters);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], []);
+        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], [], copy.Characters, []);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
@@ -208,7 +241,8 @@ public sealed class ComicProject
     /// (other issues, characters, art), since a project is a folder, not one file.
     /// Returns the folder actually saved to.
     /// </summary>
-    public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null)
+    public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
+        IReadOnlyList<CharacterDefinition>? characters = null)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
@@ -221,22 +255,24 @@ public sealed class ComicProject
             CopyProject(source, target);
 
         Location = target;
-        Save(pages, pageNumbering);
+        Save(pages, pageNumbering, characters);
         return target;
     }
 
     /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
-    public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages)
+    public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages,
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList());
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters);
     }
 
     /// <summary>One page as a PNG.</summary>
-    public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null)
+    public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null,
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio);
+        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>

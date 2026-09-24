@@ -1,0 +1,116 @@
+<!--
+  The character editor's ribbon: one "Body" tab - body-type gallery, the five body
+  sliders, skin colour, name, the line-up toggle and Close (back to the page). Shown in
+  the window's ribbon bar whenever a character editor is the active pane.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterEditorRibbon"
+             x:DataType="local:CharacterEditorViewModel">
+  <TabControl Name="Tabs" Classes="ribbonTabs">
+    <TabControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" Margin="64,0,0,0" />
+      </ItemsPanelTemplate>
+    </TabControl.ItemsPanel>
+
+    <TabItem Name="BodyTab" Classes="contextual character">
+      <TabItem.Header><TextBlock Classes="characterHeader" Text="Body" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <ItemsControl Name="PresetGallery" ItemsSource="{Binding Presets}" Height="72">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="2" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:BodyPresetChoice">
+                <Button Classes="small" Width="44" Height="72" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ApplyPresetCommand}"
+                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='{}{0} body - fine-tune with the sliders'}">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" />
+                    <local:CharacterFigure Character="{Binding Preview}" />
+                  </DockPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Body type" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="14">
+            <Grid ColumnDefinitions="Auto,Auto,48" RowDefinitions="24,24,24" ColumnSpacing="6">
+              <TextBlock Text="Height" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="HeightSlider" Grid.Column="1" Classes="body" Minimum="{Binding MinHeightPercent}" Maximum="{Binding MaxHeightPercent}"
+                      Value="{Binding HeightPercent}" ToolTip.Tip="How tall, relative to an average adult (100%)" />
+              <TextBlock Grid.Column="2" Text="{Binding HeightText}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="1" Text="Weight" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="WeightSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="0" Maximum="100"
+                      Value="{Binding Weight}" ToolTip.Tip="Slim to heavy" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Weight, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="2" Text="Muscle" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="MuscleSlider" Grid.Row="2" Grid.Column="1" Classes="body" Minimum="0" Maximum="100"
+                      Value="{Binding Muscle}" ToolTip.Tip="Soft to muscular - shoulders, arms, chest and thighs" />
+              <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Muscle, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,Auto,58" RowDefinitions="24,24,24" ColumnSpacing="6">
+              <TextBlock Text="Head size" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="HeadSlider" Grid.Column="1" Classes="body" Minimum="{Binding MinHeadsTall}" Maximum="{Binding MaxHeadsTall}" IsDirectionReversed="True"
+                      Value="{Binding HeadsTall}" ToolTip.Tip="Big head (chibi, child) to small head (heroic) - measured in heads tall" />
+              <TextBlock Grid.Column="2" Text="{Binding HeadsTallText}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="1" Text="Shape" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="FrameSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="0" Maximum="100"
+                      Value="{Binding Frame}" ToolTip.Tip="Broad shoulders (left) to wide hips (right)" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Frame, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+            </Grid>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Proportions" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="84">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:SkinSwatch">
+                <Button Classes="small" Width="26" Height="22" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetSkinCommand}"
+                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                  <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Skin" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Spacing="6" Margin="0,4,0,0">
+            <TextBox Name="NameBox" Width="150" Height="26" FontSize="12" Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                     ToolTip.Tip="The character's name (Enter to apply)" />
+            <CheckBox Name="LineUpCheck" IsChecked="{Binding ShowLineUp}" Focusable="False" FontSize="12" Content="Compare with others" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Character" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <Button Name="BackToPageButton" Classes="tool" Command="{Binding BackToPageCommand}" ToolTip.Tip="Back to the page (the Pages pane works too)">
+            <StackPanel><PathIcon Data="{StaticResource CloseIcon}" /><TextBlock Text="Close" /></StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Back to page" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+  </TabControl>
+</UserControl>

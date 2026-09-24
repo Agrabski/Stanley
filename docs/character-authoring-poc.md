@@ -1,5 +1,10 @@
 # Character authoring POC — design
 
+**Status: implemented.** The open questions in §9 were answered: flat cartoon
+look, *relative* sizes (no cm), a muscle slider from day one, and every character
+in a panel sharing one scale by default. Where this document originally said
+otherwise it has been updated; §10 lists what was actually built.
+
 Scope: **body only** (height, weight, proportions) and **placing characters on a
 page**. No stickers/art, no posing, no expressions, no revisions UI. The point is to
 get characters into the project and onto panels end to end: authored, saved,
@@ -35,12 +40,15 @@ authoring surface, and page-editor interactions for instances.
    sticker art yet, this is also the only way a character can look like anything.
    It's the "sensible defaults / sliders" path; the stored `Skeleton` becomes a
    sparse override on top (the rig-editor escape hatch, unused by the POC UI).
-2. **Real-world units for the character, mm for the page.** Height is in cm, so
-   "Alice is 162 cm, Bob is 190 cm" means something and survives any panel size.
-   Each placed instance has its own page scale (mm on the page per cm of
-   character). **Default rule:** a character placed into a panel that already has
-   characters takes their scale, so relative heights are correct without the user
-   doing anything. Resizing one on purpose (foreground/background depth) is allowed.
+2. **Relative sizes for the character, mm for the page.** Height is relative to
+   an average adult (1.0 = 100%), so what the numbers say is "Bob is a head taller
+   than Alice" and it survives any panel size. Each placed instance stores its page
+   scale (`UnitHeightMm`: how tall a 100% character is drawn). **Default rule: one
+   scale per panel.** A character placed into a panel takes the panel's scale;
+   resizing any character resizes every character sharing its scale (each about
+   its own feet), so relative heights hold without the user doing anything.
+   Shift-resizing just one (foreground/background depth) is the deliberate
+   exception, and "Match size" puts it back.
 3. **The mannequin renderer is V1's `ICharacterRenderer`.** Per-bone rounded
    capsules + torso + head, unioned with `SKPath.Op(Union)` (the same trick bubble
    tails use), filled with the character's skin colour, stroked in panel ink. Later
@@ -63,24 +71,27 @@ authoring surface, and page-editor interactions for instances.
 ### 3.1 `BodyShape` (new, `Stanley.ProjectModel/Characters/BodyShape.cs`)
 
 ```csharp
-/// Source data for a generated body. All values are clamped by BodyShape.Normalize.
+/// Source data for a generated body. All values are clamped by BodyShape.Normalized().
 public sealed record BodyShape(
-    double HeightCm,   // 45–250,  default 175  — ground to top of head
-    double Build,      // 0–1,     default 0.35 — "Weight": slim → heavy
-    double HeadsTall,  // 3–9,     default 7.5  — head size: chibi → heroic
-    double Frame);     // 0–1,     default 0.5  — shoulders ↔ hips (V → A silhouette)
+    double Height,     // 0.3–1.6, default 1.0 — relative to an average adult
+    double Build,      // 0–1,     default 0.3 — "Weight": slim → heavy
+    double Muscle,     // 0–1,     default 0.3 — soft → muscular
+    double HeadsTall,  // 3–9,     default 7.5 — head size: chibi → heroic
+    double Frame);     // 0–1,     default 0.5 — shoulders ↔ hips (V → A silhouette)
 ```
 
 - `Build` keeps the meaning the plan already gives it (0 slim – 1 heavy), so the
   existing `CharacterRevision.Build` and the future stretch/breakpoint stickers key
-  off the same number. The UI labels it **Weight** and shows an *approximate* kg
-  readout derived from height + build (BMI ≈ 17 → 40 across the slider). It's a
-  readout, not stored: storing kg would make a height change silently change build.
+  off the same number. The UI labels it **Weight** (0–100). No kg readout: with
+  relative heights a weight in kg would mean nothing.
+- `Muscle` widens mostly shoulders, chest, arms and thighs; `Build` mostly the
+  belly, hips and limbs. Neither ever changes a height.
 - `HeadsTall` covers age as well as style: child ≈ 5, adult ≈ 7.5, heroic ≈ 8.5,
   chibi ≈ 3. No separate age parameter.
 - **Presets** (`BodyPresets`, same enum + static lookup shape as
   `BubbleStylePresets`/`MetricPaperSizes`): Toddler, Child, Teen, Adult, Heavy,
-  Heroic, Chibi. Applying one sets all four values; sliders adjust afterwards.
+  Strong, Heroic, Elderly, Chibi. Applying one sets all five values; sliders
+  adjust afterwards.
 
 ### 3.2 `CharacterDefinition` changes
 
@@ -90,11 +101,12 @@ public sealed record CharacterDefinition(
     string Name,
     BodyShape Body,                 // NEW
     Skeleton Skeleton,              // now: sparse manual override on the generated rest layout (empty in the POC)
-    SortedDictionary<string, ColorValue> ColorSlots,        // POC uses "skin" only
+    SortedDictionary<string, ColorValue> ColorSlots,        // POC uses "skin" only (lower-case slot name)
     SortedDictionary<string, StickerSlotDefinition> StickerSlots);  // empty in the POC
 ```
 
-`Skeleton` changes meaning from "the rest layout" to "overrides on the generated rest
+A `character.json` written before bodies existed (no `"body"`) loads with the
+default body. `Skeleton` changes meaning from "the rest layout" to "overrides on the generated rest
 layout". The plan's "files store source data only" rule argues for this: the joint
 positions are derived from `Body`, so they aren't written out. Nothing reads
 `Skeleton` today, and there's no file-format version yet (0.x), so no migration is
@@ -104,7 +116,7 @@ needed.
 
 `instance override → revision (CharacterRevision.Build / ProportionOverride) → definition.Body`.
 When revisions become editable, `CharacterRevision.Build` generalises to a sparse
-`BodyShapeOverride(double? HeightCm, double? Build, …)`; `CharacterInstanceOverrides`
+`BodyShapeOverride(double? Height, double? Build, …)`; `CharacterInstanceOverrides`
 gets the same for the one-off "bloat gag" panel. A `CharacterResolver` in
 Rendering does the resolution so renderer and editor agree.
 
@@ -112,9 +124,9 @@ Rendering does the resolution so renderer and editor agree.
 
 ```csharp
 public sealed record CharacterPlacement(
-    Point2D Ground,    // page mm: the point on the floor between the feet
-    double Scale,      // page mm per character cm (0.5 = a 175 cm character is 87.5 mm tall)
-    bool Mirrored);    // flipped horizontally about Ground.X
+    Point2D Ground,      // page mm: the point on the floor between the feet
+    double UnitHeightMm, // page mm a 100%-height character stands (the panel's "camera distance")
+    bool Mirrored);      // flipped horizontally about Ground.X
 
 public sealed record CharacterInstance(
     CharacterId CharacterId,
@@ -146,18 +158,18 @@ public sealed record CharacterInstance(
 Same home and style as `AnchorRing`/`PanelShapes`: dependency-free math next to the
 data it reads.
 
-- `BodyRig.RestLayout(BodyShape, ViewAngle) → ViewAngleRestLayout` in **cm, y-down,
-  origin at the ground point** — joints for the required VRM bones (hips, spine,
+- `BodyRig.Build(BodyShape, Skeleton? overrides) → BodyFigure` — rest layout plus shapes, in
+  **figure space: unit = relative height, y-down, origin at the ground point** — joints for the required VRM bones (hips, spine,
   chest, neck, head, shoulders, arms, legs, feet; no fingers/toes/eyes).
   `Skeleton` overrides are then applied by bone.
-- `BodyRig.Segments(BodyShape, layout) → (bone, from, to, radiusFrom, radiusTo)` —
-  limb thickness, torso/hip/belly widths as functions of `Build` and `Frame`.
-- `BodyRig.Extent(BodyShape) → Rect2D` (cm, relative to ground) — used by
+- The shapes: a smoothed torso outline, tapered limb capsules, and ellipses for
+  head, hands and feet — widths as functions of `Build`, `Muscle` and `Frame`.
+- `BodyRig.Extent(BodyShape) → Rect2D` (figure space) — used by
   hit-testing fallback, selection box, default placement and `KeepReachable`.
 
-Invariants the tests pin down (the exact proportion constants are tuned in the PR):
-top of head is exactly `HeightCm` above ground; head height is
-`HeightCm / HeadsTall`; build and frame change widths only, never heights; the
+Invariants the tests pin down (the exact proportion constants are tuned in the code):
+top of head is exactly `Height` above ground; head height is
+`Height / HeadsTall`; build and frame change widths only, never heights; the
 layout is left/right symmetric; widths are monotonic in `Build`.
 
 ### 4.2 Renderer (`Stanley.Rendering`)
@@ -170,9 +182,9 @@ public interface ICharacterRenderer
 }
 ```
 
-- `MannequinRenderer`: capsules/ellipses per segment, unioned into one path, filled
-  with the `skin` colour slot (default a neutral warm grey), stroked at
-  `PanelBorderMm`-ish weight. Placement = translate to `Ground`, scale by `Scale`,
+- `MannequinRenderer`: capsules/ellipses per segment, unioned into one path (cached
+  per definition value), filled with the `skin` colour slot, inked at
+  `CharacterStrokeMm`. Placement = translate to `Ground`, scale by `UnitHeightMm`,
   `-1` x-scale when mirrored.
 - `PageRenderer.DrawPanels` gains a character lookup
   (`Func<CharacterId, CharacterDefinition?>` or a small `ICharacterLookup`) and
@@ -189,7 +201,7 @@ public interface ICharacterRenderer
   `WriteCopy` write them (writing an unchanged character is a byte-identical no-op,
   so no dirty tracking is needed) and delete removed ones. Recovery snapshots
   therefore include characters.
-- `CharacterLibrary` (Stanley.Editors, observable): the open comic's characters by
+- `CharacterLibraryViewModel` (Stanley.Editors, observable; the Characters pane and the `ICharacterCatalog`): the open comic's characters by
   id, `Changed` event. Page editors, thumbnails and the Characters pane all read
   it; a definition change redraws every page that shows that character.
 
@@ -197,9 +209,9 @@ public interface ICharacterRenderer
 
 ```
 ┌ Pages │ Characters ┐
-│ [fig] Alice  162cm │   ← mannequin thumbnail, name, height
-│ [fig] Bob    190cm │
-│ [fig] Kid    128cm │
+│ [fig] Alice  100%  │   ← mannequin thumbnail, name, height, usage
+│ [fig] Bob    108%  │
+│ [fig] Kid     72%  │
 │  + New character   │
 └────────────────────┘
 ```
@@ -214,18 +226,17 @@ public interface ICharacterRenderer
 
 ### 5.3 Character editor (`CharacterEditorViewModel : EditorViewModel<CharacterDefinition>`)
 
-Pane: the character full height on a cm grid (lines every 10 cm, labels every
-50 cm), with the project's **other characters faded behind it in a line-up** so
+Pane: the character full height on a height grid (lines every 25% of an average
+adult), with the project's **other characters faded behind it in a line-up** so
 height comparisons are immediate (toggle on the View tab). Nothing else in the pane:
 all controls are on the ribbon.
 
 Ribbon (`CharacterEditorRibbon`, mapped by `DataTemplate` like `PageEditorRibbon`):
 
-- **Body** tab: *Body type* preset gallery (Toddler … Chibi, thumbnails) ·
-  *Height* slider + cm spin box · *Weight* slider (slim ↔ heavy, "≈ 74 kg" readout)
-  · *Head size* slider (labelled by heads tall) · *Shoulders/hips* slider ·
-  *Skin* colour swatches + custom · *Name* text box.
-- **View** tab: fit / zoom, line-up on/off.
+- **Body** tab (the only one): *Body type* preset gallery (Toddler … Chibi,
+  thumbnails in the character's skin) · *Height* (%), *Weight*, *Muscle*,
+  *Head size* (heads tall), *Shape* (shoulders ↔ hips) sliders · *Skin* swatches ·
+  *Name* box and "Compare with others" (line-up) · *Close* (back to the page).
 
 Each slider drag is one gesture (`BeginGesture` on press, `UpdateGesture` on move
 for live preview everywhere, `CommitGesture` on release) → one undo entry per drag.
@@ -237,20 +248,21 @@ change switches to the character (existing behaviour).
 - **Insert › Character** gallery (the library's thumbnails + "New character…"):
   places into the selected panel (else the panel under the viewport centre).
 - **Default placement:** scale = the panel's existing characters' scale if any,
-  otherwise fit the figure to ~80% of the panel height; ground at ~90% of panel
-  height; x = to the right of the rightmost existing character, else panel centre.
+  otherwise fit the figure to 80% of the panel height; ground at 90% of panel
+  height (or the others' floor); x = to the right of the rightmost existing
+  character, else panel centre.
 - **Select** by clicking the silhouette (path hit-test via `Silhouette`, not the
   bounding box, since characters overlap). Hit priority: bubbles > characters >
   panel.
-- **Move**: drag. **Resize**: top-corner handles, uniform, about the ground point.
-  **Flip**: button / `H`. **Delete**: Del. **Order**: bring forward/send back.
-  **Double-click**: opens the character editor.
+- **Move**: drag. **Resize**: top-corner handles, uniform, about the ground point,
+  resizing everyone at the same scale (Shift: just this one). **Flip**, **Bigger /
+  Smaller**, **Match size**: ribbon or right-click. **Delete**: Del. **Order**: to
+  front / to back (always behind bubbles). **Double-click**: opens the character editor.
 - **Snapping** (reusing `SnapGuide` drawing, Alt disables): ground snaps to
-  panel-mates' ground line ("same floor"); resize snaps to panel-mates' scale
-  ("same distance"). Implemented in `CharacterPlacementSnapping` in
-  `Stanley.Editing`.
-- **Contextual "Character" tab** (green, like Panel/Bubble): Flip, Match size,
-  Bring forward/Send back, Edit character, Delete.
+  panel-mates' floor ("same floor"); a Shift-resize snaps back onto the panel's
+  scale when close. Done in `PageEditorViewModel` with `PanelSnapping.SnapValue`.
+- **Contextual "Character" tab** (green, like Panel/Bubble): Edit body, Flip,
+  Bigger / Smaller / Match size, To front / To back, Remove.
 - **Panel ops carry characters along** (`CharacterPlacementEditing` in
   `Stanley.Editing`, mirroring `BubbleEditing.Refit`): panel move/resize maps the
   ground point affinely and **keeps scale** (people don't squash); split sends each
@@ -266,8 +278,8 @@ change switches to the character (existing behaviour).
 |---|---|
 | ProjectModel | `BodyShape`, `BodyPresets`, `BodyRig`; `CharacterDefinition.Body`; `CharacterPlacement` + `CharacterInstance.Placement`; `ProjectRepository.ListCharacters/DeleteCharacter` |
 | Rendering | `ICharacterRenderer`, `MannequinRenderer`, `CharacterResolver`; `PageRenderer` character layer + lookup |
-| Editing | `CharacterPlacementEditing` (place, move, scale, flip, reorder, refit, split, keep-reachable), `CharacterPlacementSnapping` |
-| Editors | `CharacterLibrary`, `CharacterEditorViewModel/View/Ribbon`, `CharactersPaneViewModel/View`, page-editor instance selection/gestures/Character tab, Insert › Character, drop target; `ComicProject` load/save characters; `PageEditorHost` adds the pane |
+| Editing | `CharacterPlacementEditing` (default placement, move, resize together/alone, panel scale, flip, reorder, refit, keep-reachable); `PanelLayoutEditing` carries characters through resize/split |
+| Editors | `ICharacterCatalog`, `CharacterLibraryViewModel/View` (the Characters pane, also the catalog), `CharacterEditorViewModel/View/Ribbon`, `CharacterFigure` (thumbnails, gallery, line-up stage), page-editor instance selection/gestures/Character tab, Insert › Characters, drop target; `ComicProject` load/save characters; `PageEditorHost` returns an `EditorSession` |
 | App | Nothing structural (workspace already hosted); File › Info could show the character count |
 
 ## 7. Delivery slices (each a PR, each green on its own)
@@ -275,9 +287,9 @@ change switches to the character (existing behaviour).
 1. **Model:** `BodyShape`/presets/`BodyRig`, definition + instance fields, repository
    list/delete. Tests: rig invariants, JSON shape (sorted, camelCase), round-trip.
 2. **Rendering:** `MannequinRenderer` + page character layer. Tests: silhouette
-   bounds match `BodyRig.Extent × Scale`, mirroring, missing-character placeholder,
+   bounds match `BodyRig.Extent` mapped through the placement, mirroring, missing-character placeholder,
    draw order (pixel probe).
-3. **Document:** `ComicProject`/`CharacterLibrary` load/save/recovery. Tests:
+3. **Document:** `ComicProject`/`CharacterLibraryViewModel` load/save/recovery. Tests:
    save → open round-trip with an instance, delete removes folder, unchanged save is
    byte-identical.
 4. **Character authoring UI:** Characters pane + character editor + ribbon.
@@ -297,16 +309,24 @@ Stickers/art import, faces/expressions, posing/IK, view angles other than front,
 revisions UI and per-issue revision picking, per-instance body overrides, a rig
 editor, character CLI subcommands, cross-project character libraries.
 
-## 9. Open questions (worth confirming before slice 4)
+## 9. Decisions taken (were open questions)
 
-- **Mannequin look:** neutral grey artist's-mannequin (clearly a placeholder) vs. a
-  simple flat cartoon silhouette with the skin colour (usable for thumbnails/roughs
-  on its own). The design assumes the latter; it's a renderer-only choice.
-- **Absolute heights:** is a real cm height the right mental model, or would users
-  rather think only in relative terms ("a head taller than Bob")? cm is proposed
-  because it makes relative heights automatic and is what a model sheet shows.
-- **Slider set:** Height / Weight / Head size / Shoulders–hips. Is muscularity
-  (distinct from weight) needed from day one, or can it wait for stickers?
-- **Per-panel scale rule:** "new characters inherit the panel's scale" — right
-  default, or should scale be a single panel-level camera value that instances
-  only offset by depth?
+- **Mannequin look:** flat cartoon silhouette in the skin colour.
+- **Sizes:** relative (100% = average adult), not cm.
+- **Sliders:** Height, Weight, Muscle, Head size, Shape (shoulders ↔ hips).
+- **Scale:** the same for every character in a panel by default; resizing one
+  resizes the group, Shift resizes one alone.
+
+## 10. What was built
+
+All five slices landed together. Tests: `BodyRigTests` / `CharacterListingTests`
+(ProjectModel), `CharacterPlacementEditingTests` (Editing),
+`CharacterRendererTests` (Rendering), `CharacterEditingTests` (Editors: scale
+sharing, resize together/alone, floor snap, one-undo-step slider drags, presets,
+open/close, delete rules, save/open/prune), `CharacterTests` (headless UI: pane,
+editor ribbon, click/double-click on the page).
+
+Known limits of the POC: the torso ignores skeleton overrides (limbs, head and
+neck follow them); mirroring shows no difference until the body is asymmetric
+(posing, stickers, profile view); a new character is placed from the page but
+creating one from the Insert tab takes two undo steps (create, place).
