@@ -1,0 +1,24 @@
+using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Poses;
+
+namespace Stanley.ProjectModel.Issues;
+
+/// <summary>Sparse per-panel overrides on top of a character instance's revision (e.g. sunglasses for one shot).</summary>
+public sealed record CharacterInstanceOverrides(
+    SortedDictionary<string, IReadOnlyList<StickerId>>? ActiveStickerOverrides,
+    SortedDictionary<string, ColorValue>? ColorSlotOverrides);
+
+/// <summary>
+/// One character placed in a panel: a reference to a definition + revision (falling
+/// back to the issue's default revision for that character when
+/// <see cref="RevisionOverride"/> is null), plus the ad hoc pose it's posed in for this
+/// panel - not a library <see cref="Pose"/> reference, since most panel poses are
+/// one-off drags rather than saved library entries. Not itself a stable-id entity: it's
+/// embedded directly in the one file (panel.json) that ever references it.
+/// </summary>
+public sealed record CharacterInstance(
+    CharacterId CharacterId,
+    CharacterRevisionId? RevisionOverride,
+    PoseData Pose,
+    CharacterInstanceOverrides? Overrides);

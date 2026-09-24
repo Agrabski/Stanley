@@ -21,20 +21,23 @@ ships — .NET 11 doesn't exist as a stable release yet), rendering via
 in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 (the newer XML-free format).
 
-Only the speech-bubble POC exists so far (see below) — no character system,
-no document/page model, no persistence.
+The speech-bubble POC (see below) and the project/data model (persistence only —
+no editor UI yet) exist so far. No character rendering, no document/page editor.
 
 ```
-src/Stanley.Bubbles/    # bubble geometry model, no Avalonia dependency (SkiaSharp only)
-src/Stanley.App/        # Avalonia POC host (single-bubble editor)
-tests/Stanley.Bubbles.Tests/     # xunit v2, geometry unit tests
-tests/Stanley.App.HeadlessTests/ # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
+src/Stanley.Bubbles/      # bubble geometry model, no Avalonia dependency (SkiaSharp only)
+src/Stanley.ProjectModel/ # project/data model + JSON persistence, no Avalonia/SkiaSharp dependency
+src/Stanley.App/          # Avalonia POC host (single-bubble editor)
+tests/Stanley.Bubbles.Tests/       # xunit v2, geometry unit tests
+tests/Stanley.ProjectModel.Tests/  # xunit v2, id/serialization/repository unit tests
+tests/Stanley.App.HeadlessTests/   # xunit v3 (Avalonia.Headless.XUnit requires it), UI smoke tests
 ```
 
 Build/test/run:
 ```
 dotnet build Stanley.slnx
 dotnet test tests/Stanley.Bubbles.Tests/Stanley.Bubbles.Tests.csproj
+dotnet test tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj
 dotnet test tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj
 dotnet run --project src/Stanley.App
 ```
@@ -72,6 +75,54 @@ switching between style presets, and adding/moving any number of tails.
   See the design discussion in this repo's history for the full reasoning
   (bezier outlines, boolean-union tails, Avalonia+AOT tradeoffs, AGPL
   licensing check on the dependency stack).
+
+## Project & data model (implemented)
+
+Implemented in `Stanley.ProjectModel`, the persistence layer described under
+"Project & data model" in `docs/character-and-project-plan.md`. No editor UI
+consumes it yet; `ProjectRepository` is a `dotnet build`/`dotnet test`-only
+persistence layer so far. Character rendering (rig, stickers-as-pixels,
+posing, IK) itself is not implemented — this is the *data model* those
+features will read and write.
+
+- **One id struct per stable-id entity** (`CharacterId`, `PanelId`, etc., in
+  `Ids/`), each a validated opaque token — non-empty, no path separators, no
+  `-` (reserved as the folder-name id/slug delimiter, so an id can never be a
+  false-positive prefix match for another, longer id). `FromValue`/`Parse`
+  bring an id in from disk or JSON; `New()` mints one. Each has its own
+  `StrongIdJsonConverter<TId>` (value form and, for id-keyed maps like
+  `Issue.CharacterRevisions`, property-name form) — no reflection, so this
+  stays NativeAOT-safe under source-generated `System.Text.Json`.
+- **Folder structure is enforced, not optional**: `ProjectRepository` computes
+  every path from `ProjectPaths`; callers only ever pass ids and entity
+  values, never a path. Most entities get a `<id>-slug` folder/file (the slug
+  is cosmetic, recomputed only when an entity is first created — renaming
+  later doesn't move or rename its folder, so a rename never cascades into
+  unrelated diffs); panels are the one exception (`<id>.json`, no slug, since
+  panels aren't user-named).
+- **JSON conventions** (`Serialization/`): 2-space indent, alphabetically
+  sorted object keys (a `JsonTypeInfo` modifier over the source-generated
+  `StanleyJsonContext`, so declaration order in C# can stay readable while
+  the JSON output stays sorted), camelCase property *and* enum-value names,
+  trailing newline. `SortedDictionary` is used wherever a map's key order
+  isn't itself meaningful (colour slots, id-keyed maps); an explicit ordered
+  id array (never dictionary/filename/folder-position order) is used
+  wherever order *is* meaningful (z-order, reading order, stacking order).
+- **Geometry/skeleton is plain data, no SkiaSharp/Avalonia dependency**:
+  `Point2D`/`PanelShape` reimplement the anchor-ring model `BubbleOutline`
+  uses (deliberately not shared, to keep this project dependency-free);
+  `HumanoidBone` is the full VRM 1.0 humanoid bone set; bone rest
+  poses/rotations are `IReadOnlyList<(bone, value)>`, not
+  `Dictionary<HumanoidBone, T>`, to sidestep enum-as-dictionary-key edge
+  cases entirely.
+- **Not yet designed**: bubble persistence (`Panel.Bubbles` is a placeholder
+  `IReadOnlyList<BubbleId>` — Stanley.Bubbles has no JSON format yet),
+  `sticker.json`'s exact schema beyond what's implemented here (the design
+  doc doesn't draw one explicitly), any convenience "create new project/
+  character/issue" helpers beyond `ProjectRepository.Initialize` and raw
+  `SaveX`/`LoadX`, and NativeAOT publish validation (same deferral as the
+  bubble POC — analyzer-clean under `IsAotCompatible`, not yet published via
+  a real `PublishAot` executable).
 
 ## Character system design (proposed, not final)
 
