@@ -4,6 +4,7 @@ using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Poses;
 
 namespace Stanley.Rendering;
 
@@ -15,9 +16,9 @@ namespace Stanley.Rendering;
 public interface ICharacterRenderer
 {
     /// <summary>The character's whole outline in page millimetres, seen from <paramref name="angle"/> - what a click hit-tests against. The caller disposes it.</summary>
-    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front);
+    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null);
 
-    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front);
+    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null);
 }
 
 public static class CharacterRenderers
@@ -29,7 +30,7 @@ public static class CharacterRenderers
     {
         if (characters != null && characters.TryGetValue(instance.CharacterId, out var character))
         {
-            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle);
+            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose.BoneRotations);
             return;
         }
 
@@ -55,32 +56,34 @@ public static class CharacterRenderers
 public sealed class MannequinRenderer : ICharacterRenderer
 {
     // Building the union is the expensive part; definitions are immutable, so the
-    // figure-space outlines are cached per definition value (and view) and only
-    // transformed per draw.
-    private readonly ConditionalWeakTable<CharacterDefinition, Dictionary<ViewAngle, FigurePaths>> _figures = new();
+    // figure-space outlines are cached per definition value (and view and pose) and
+    // only transformed per draw. A limb drag makes a new pose on every pointer move, so
+    // each definition's cache is dropped when it grows past a small bound.
+    private const int MaxPosesPerCharacter = 64;
+    private readonly ConditionalWeakTable<CharacterDefinition, Dictionary<string, FigurePaths>> _figures = new();
     private readonly Lock _lock = new();
 
     /// <summary>A figure's outlines in figure space: the body, the near arm and foot drawn over it (side view; empty otherwise), and the two unioned - the whole outline, for hit-testing.</summary>
     public sealed record FigurePaths(SKPath Body, SKPath Near, SKPath Outline);
 
-    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front)
+    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null)
     {
         var matrix = ToPage(placement);
         using var builder = new SKPathBuilder();
         lock (_lock)
         {
-            builder.AddPath(Figure(character, angle).Outline, in matrix);
+            builder.AddPath(Figure(character, angle, pose).Outline, in matrix);
         }
         return builder.Detach();
     }
 
-    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front)
+    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, IReadOnlyList<BoneRotation>? pose = null)
     {
         var matrix = ToPage(placement);
         SKPath body, near;
         lock (_lock)
         {
-            var paths = Figure(character, angle);
+            var paths = Figure(character, angle, pose);
             body = Transformed(paths.Body, matrix);
             near = Transformed(paths.Near, matrix);
         }
@@ -107,11 +110,24 @@ public sealed class MannequinRenderer : ICharacterRenderer
         }
     }
 
-    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle)
+    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle, IReadOnlyList<BoneRotation>? pose)
     {
-        var byAngle = _figures.GetValue(character, _ => []);
-        if (!byAngle.TryGetValue(angle, out var paths))
-            byAngle[angle] = paths = BuildPaths(BodyRig.Build(character.Body, angle, character.Skeleton));
+        var cache = _figures.GetValue(character, _ => []);
+        var key = angle + ":" + string.Join(";", (pose ?? []).Select(r => $"{r.Bone}={r.Degrees:R}"));
+        if (!cache.TryGetValue(key, out var paths))
+        {
+            if (cache.Count >= MaxPosesPerCharacter)
+            {
+                foreach (var old in cache.Values)
+                {
+                    old.Body.Dispose();
+                    old.Near.Dispose();
+                    old.Outline.Dispose();
+                }
+                cache.Clear();
+            }
+            cache[key] = paths = BuildPaths(BodyRig.Build(character.Body, angle, character.Skeleton, pose));
+        }
         return paths;
     }
 

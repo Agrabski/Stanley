@@ -1,4 +1,5 @@
 using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Poses;
 
 namespace Stanley.ProjectModel.Characters;
 
@@ -15,12 +16,15 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY)
 /// +x (right); mirroring the placement makes it face left. <see cref="Extent"/> is the
 /// exact bounding box of every shape.
 /// </summary>
+/// <param name="RestLayout">The joints standing at rest (after any skeleton override) - what pose rotations are measured from.</param>
+/// <param name="Layout">The joints as posed - where the shapes are actually drawn. Equal to <paramref name="RestLayout"/> with no pose.</param>
 /// <param name="Torso">A closed outline (clockwise from the neck), meant to be drawn smoothed.</param>
 /// <param name="Limbs">Unioned with the torso and <paramref name="Blobs"/> into the body's one silhouette.</param>
 /// <param name="NearLimbs">The parts nearest the viewer in a side view (the near arm, with <paramref name="NearBlobs"/> its hand and foot): drawn on top as their own outlined shape, so they still read against the body behind them. Empty in the front view.</param>
 public sealed record BodyFigure(
     ViewAngle Angle,
     ViewAngleRestLayout RestLayout,
+    ViewAngleRestLayout Layout,
     IReadOnlyList<Point2D> Torso,
     IReadOnlyList<BodyCapsule> Limbs,
     IReadOnlyList<BodyEllipse> Blobs,
@@ -46,10 +50,55 @@ public static class BodyRig
 {
     public static BodyFigure Build(BodyShape body, Skeleton? overrides = null) => Build(body, ViewAngle.Front, overrides);
 
-    public static BodyFigure Build(BodyShape body, ViewAngle angle, Skeleton? overrides = null)
+    /// <param name="pose">Bone rotations (degrees, clockwise on the page, each relative to its parent) - see <see cref="ApplyPose"/>. Null or empty stands at rest.</param>
+    public static BodyFigure Build(BodyShape body, ViewAngle angle, Skeleton? overrides = null, IReadOnlyList<BoneRotation>? pose = null)
     {
         var m = new Measures(body.Normalized());
-        return angle == ViewAngle.Profile ? BuildProfile(m, overrides) : BuildFront(m, overrides);
+        return angle == ViewAngle.Profile ? BuildProfile(m, overrides, pose) : BuildFront(m, overrides, pose);
+    }
+
+    /// <summary>The four limbs a pose moves, each a root joint, a middle joint and an end joint.</summary>
+    public static IReadOnlyList<(HumanoidBone Root, HumanoidBone Middle, HumanoidBone End)> LimbChains { get; } =
+    [
+        (HumanoidBone.LeftUpperArm, HumanoidBone.LeftLowerArm, HumanoidBone.LeftHand),
+        (HumanoidBone.RightUpperArm, HumanoidBone.RightLowerArm, HumanoidBone.RightHand),
+        (HumanoidBone.LeftUpperLeg, HumanoidBone.LeftLowerLeg, HumanoidBone.LeftFoot),
+        (HumanoidBone.RightUpperLeg, HumanoidBone.RightLowerLeg, HumanoidBone.RightFoot),
+    ];
+
+    /// <summary>
+    /// Poses the limbs: each chain's root bone (upper arm, upper leg) turns about its own
+    /// joint, carrying the rest of the limb with it, and its middle bone (forearm, shin)
+    /// turns about the elbow/knee on top of that - rotations relative to the parent, as
+    /// <see cref="PoseData"/> stores them. Angles are degrees, clockwise on the page, in
+    /// figure space (a mirrored placement mirrors the whole pose with it). Bones outside
+    /// the four limb chains aren't posable yet and are ignored.
+    /// </summary>
+    public static ViewAngleRestLayout ApplyPose(ViewAngleRestLayout rest, IReadOnlyList<BoneRotation>? pose)
+    {
+        if (pose is null || pose.Count == 0)
+            return rest;
+
+        var positions = rest.Bones.ToDictionary(b => b.Bone, b => b.Position);
+        double Degrees(HumanoidBone bone) => pose.LastOrDefault(r => r.Bone == bone)?.Degrees ?? 0;
+        foreach (var (root, middle, end) in LimbChains)
+        {
+            var (a1, a2) = (Degrees(root), Degrees(middle));
+            if (a1 == 0 && a2 == 0 || !positions.TryGetValue(root, out var s) || !positions.TryGetValue(middle, out var e0) || !positions.TryGetValue(end, out var w0))
+                continue;
+            var e = Offset(s, Rotate(new Point2D(e0.X - s.X, e0.Y - s.Y), a1));
+            var w = Offset(e, Rotate(new Point2D(w0.X - e0.X, w0.Y - e0.Y), a1 + a2));
+            positions[middle] = e;
+            positions[end] = w;
+        }
+        return rest with { Bones = rest.Bones.Select(b => b with { Position = positions[b.Bone] }).ToList() };
+    }
+
+    private static Point2D Rotate(Point2D v, double degrees)
+    {
+        var r = degrees * Math.PI / 180;
+        var (cos, sin) = (Math.Cos(r), Math.Sin(r));
+        return new Point2D(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
     }
 
     /// <summary>Everything both views share: heights, lengths, radii.</summary>
@@ -102,7 +151,7 @@ public static class BodyRig
 
     // ---------------------------------------------------------------- front
 
-    private static BodyFigure BuildFront(Measures m, Skeleton? overrides)
+    private static BodyFigure BuildFront(Measures m, Skeleton? overrides, IReadOnlyList<BoneRotation>? pose)
     {
         var (w, build, muscle, frame) = (m.W, m.Build, m.Muscle, m.Frame);
         var shoulderHalf = w * (1.0 - 0.3 * frame + 0.12 * build + 0.3 * muscle);
@@ -134,7 +183,8 @@ public static class BodyRig
             bones.Add(new(side.LowerLeg, Mirror(kneeJoint, sign)));
             bones.Add(new(side.Foot, Mirror(ankleJoint, sign)));
         }
-        var layout = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Front, bones), overrides);
+        var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Front, bones), overrides);
+        var layout = ApplyPose(rest, pose);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
         var torso = new List<Point2D>
@@ -169,7 +219,7 @@ public static class BodyRig
             blobs.Add(new BodyEllipse(new Point2D(ap.X + outward, ap.Y + m.AnkleHeight - m.FootHalfHeight), w * 0.26, m.FootHalfHeight));
         }
 
-        return new BodyFigure(ViewAngle.Front, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]));
+        return new BodyFigure(ViewAngle.Front, rest, layout, torso, limbs, blobs, [], [], ExtentOf(torso, [limbs], [blobs]));
     }
 
     // ---------------------------------------------------------------- side (profile)
@@ -180,7 +230,7 @@ public static class BodyRig
     /// drawn on top of the body as their own shape; the legs merge into it, the far one
     /// set back a little so both feet show.
     /// </summary>
-    private static BodyFigure BuildProfile(Measures m, Skeleton? overrides)
+    private static BodyFigure BuildProfile(Measures m, Skeleton? overrides, IReadOnlyList<BoneRotation>? pose)
     {
         var (w, build, muscle, frame) = (m.W, m.Build, m.Muscle, m.Frame);
         var chestFront = w * (0.5 + 0.15 * build + 0.3 * muscle - 0.12 * frame);
@@ -218,7 +268,8 @@ public static class BodyRig
         bones.Add(new(HumanoidBone.RightUpperLeg, Offset(nearHip, farLeg)));
         bones.Add(new(HumanoidBone.RightLowerLeg, Offset(nearKnee, farLeg)));
         bones.Add(new(HumanoidBone.RightFoot, Offset(nearAnkle, farLeg)));
-        var layout = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Profile, bones), overrides);
+        var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Profile, bones), overrides);
+        var layout = ApplyPose(rest, pose);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
 
         var t = m.TorsoLength;
@@ -269,7 +320,7 @@ public static class BodyRig
             targetBlobs.Add(new BodyEllipse(new Point2D(ap.X + footLength * 0.3, ap.Y + m.AnkleHeight - m.FootHalfHeight), footLength / 2, m.FootHalfHeight));
         }
 
-        return new BodyFigure(ViewAngle.Profile, layout, torso, limbs, blobs, nearLimbs, nearBlobs,
+        return new BodyFigure(ViewAngle.Profile, rest, layout, torso, limbs, blobs, nearLimbs, nearBlobs,
             ExtentOf(torso, [limbs, nearLimbs], [blobs, nearBlobs]));
     }
 
@@ -287,7 +338,8 @@ public static class BodyRig
     public static Rect2D Extent(BodyShape body, Skeleton? overrides = null) => Build(body, overrides).Extent;
 
     /// <summary>The body's bounding box in figure space, seen from <paramref name="angle"/>.</summary>
-    public static Rect2D Extent(BodyShape body, ViewAngle angle, Skeleton? overrides = null) => Build(body, angle, overrides).Extent;
+    public static Rect2D Extent(BodyShape body, ViewAngle angle, Skeleton? overrides = null, IReadOnlyList<BoneRotation>? pose = null) =>
+        Build(body, angle, overrides, pose).Extent;
 
     private static ViewAngleRestLayout ApplyOverrides(ViewAngleRestLayout generated, Skeleton? overrides)
     {

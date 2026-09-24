@@ -151,6 +151,32 @@ public class CharacterTests
     }
 
     [Fact]
+    public void Dragging_a_selected_characters_hand_dot_poses_its_arm()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId); // selected
+        Dispatcher.UIThread.RunJobs();
+        var canvas = Single<PageCanvasControl>(window);
+        var instance = page.Working.Panels[panelId].CharacterInstances[0];
+        var hand = page.LimbHandles(instance).Single(h => h.Limb == Editing.Limb.LeftArm).Point;
+        Point ToWindow(ProjectModel.Geometry.Point2D p) => canvas.TranslatePoint(canvas.PageToControl(p), window)!.Value;
+
+        window.MouseDown(ToWindow(hand), MouseButton.Left);
+        window.MouseMove(ToWindow(new ProjectModel.Geometry.Point2D(hand.X + 15, hand.Y - 40)));
+        window.MouseUp(ToWindow(new ProjectModel.Geometry.Point2D(hand.X + 15, hand.Y - 40)), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var posed = page.Working.Panels[panelId].CharacterInstances[0];
+        Assert.Equal(instance.Placement, posed.Placement); // posed, not moved
+        Assert.NotEmpty(posed.Pose.BoneRotations);
+        Assert.True(page.LimbHandles(posed).Single(h => h.Limb == Editing.Limb.LeftArm).Point.Y < hand.Y - 20);
+        Assert.True(window.Workspace.History.CanUndo);
+    }
+
+    [Fact]
     public void The_character_editor_ribbon_applies_a_body_type_and_renames()
     {
         var (window, characters) = Open();

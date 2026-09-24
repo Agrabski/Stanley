@@ -112,6 +112,26 @@ public class BodyRigTests
     }
 
     [Fact]
+    public void A_pose_turns_each_limb_rigidly_about_its_joint_and_no_pose_is_the_rest_layout()
+    {
+        var rest = BodyRig.Build(BodyShape.Default).Layout;
+        Assert.Equal(rest.Bones, BodyRig.Build(BodyShape.Default, ViewAngle.Front, null, []).Layout.Bones);
+
+        var posed = BodyRig.Build(BodyShape.Default, ViewAngle.Front, null,
+            [new Poses.BoneRotation(HumanoidBone.LeftUpperArm, -90), new Poses.BoneRotation(HumanoidBone.LeftLowerArm, 30)]);
+        Point2D R(HumanoidBone b) => rest.Bones.Single(p => p.Bone == b).Position;
+        Point2D P(HumanoidBone b) => posed.Layout.Bones.Single(p => p.Bone == b).Position;
+        double Len(Point2D a, Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+        Assert.Equal(R(HumanoidBone.LeftUpperArm), P(HumanoidBone.LeftUpperArm)); // the shoulder stays
+        Assert.Equal(Len(R(HumanoidBone.LeftUpperArm), R(HumanoidBone.LeftLowerArm)), Len(P(HumanoidBone.LeftUpperArm), P(HumanoidBone.LeftLowerArm)), 9);
+        Assert.Equal(Len(R(HumanoidBone.LeftLowerArm), R(HumanoidBone.LeftHand)), Len(P(HumanoidBone.LeftLowerArm), P(HumanoidBone.LeftHand)), 9);
+        Assert.True(P(HumanoidBone.LeftHand).Y < R(HumanoidBone.LeftHand).Y - 0.2, "a -90 degree (anticlockwise) upper arm lifts the arm");
+        Assert.Equal(R(HumanoidBone.RightHand), P(HumanoidBone.RightHand));
+        Assert.Equal(rest.Bones, posed.RestLayout.Bones); // rest is what rotations are measured from
+    }
+
+    [Fact]
     public void A_skeleton_override_moves_that_joint_and_the_limb_follows()
     {
         var body = BodyShape.Default;

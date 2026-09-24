@@ -43,6 +43,7 @@ public sealed class PageCanvasControl : Control
     private int _dragBubbleIndex = -1;
     private int _dragCharacterIndex = -1;
     private double _dragStartUnit;
+    private Limb _dragLimb;
     private double _dragStartGroundY;
     private int _dragTailIndex = -1;
     private RectEdges _dragEdges;
@@ -219,7 +220,8 @@ public sealed class PageCanvasControl : Control
             ActualThemeVariant == ThemeVariant.Dark,
             _viewModel.CharacterSnapshot,
             _viewModel.SelectedCharacterIndex,
-            _viewModel.SelectedCharacter is { } selectedCharacter ? _viewModel.CharacterBounds(selectedCharacter) : null)));
+            _viewModel.SelectedCharacter is { } selectedCharacter ? _viewModel.CharacterBounds(selectedCharacter) : null,
+            _viewModel.SelectedCharacter is { } posed ? _viewModel.LimbHandles(posed).Select(h => h.Point).ToList() : null)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
@@ -243,6 +245,7 @@ public sealed class PageCanvasControl : Control
         TailTarget,
         TailBase,
         BubbleHandle,
+        LimbHandle,
         CharacterHandle,
         PanelCorner,
         Gutter,
@@ -258,6 +261,7 @@ public sealed class PageCanvasControl : Control
         int BubbleIndex = -1,
         int TailIndex = -1,
         int CharacterIndex = -1,
+        Limb Limb = Limb.LeftArm,
         RectEdges Edges = RectEdges.None,
         GutterHit? Gutter = null);
 
@@ -292,6 +296,11 @@ public sealed class PageCanvasControl : Control
 
         if (vm.SelectedCharacter is { } character && vm.SelectedPanelId is { } characterPanel)
         {
+            foreach (var (limb, point) in vm.LimbHandles(character))
+            {
+                if (Dist(point, p) <= tol)
+                    return new Hit(HitKind.LimbHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Limb: limb);
+            }
             var box = vm.CharacterBounds(character);
             if (Dist(new Point2D(box.Left, box.Top), p) <= tol)
                 return new Hit(HitKind.CharacterHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Edges: RectEdges.Left | RectEdges.Top);
@@ -534,6 +543,12 @@ public sealed class PageCanvasControl : Control
                 StartDrag(e, DragKind.PendingMoveBubble);
                 break;
 
+            case HitKind.LimbHandle:
+                _dragLimb = hit.Limb;
+                vm.BeginPoseLimb(hit.PanelId!.Value, hit.CharacterIndex, hit.Limb);
+                StartDrag(e, DragKind.PoseLimb);
+                break;
+
             case HitKind.CharacterHandle:
                 var placement = vm.Working.Panels[hit.PanelId!.Value].CharacterInstances[hit.CharacterIndex].Placement;
                 _dragStartUnit = placement.UnitHeightMm;
@@ -608,6 +623,10 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.MoveCharacter:
                 _viewModel.UpdateMoveCharacter(_dragPanelId!.Value, _dragCharacterIndex, dx, dy, snap);
+                break;
+
+            case DragKind.PoseLimb:
+                _viewModel.UpdatePoseLimb(_dragPanelId!.Value, _dragCharacterIndex, _dragLimb, page);
                 break;
 
             case DragKind.ResizeCharacter:
@@ -715,7 +734,7 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
                 or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
-                or DragKind.MoveCharacter or DragKind.ResizeCharacter:
+                or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb:
                 vm.EndGesture(commit);
                 break;
         }
@@ -913,6 +932,8 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Smaller", () => vm.ScaleCharacter(characterPanel, index, 1 / 1.1)));
             if (vm.SelectedCharacterHasOddScale)
                 items.Add(Item("Match size to panel", () => vm.MatchCharacterSize(characterPanel, index)));
+            if (vm.SelectedCharacterIsPosed)
+                items.Add(Item("Reset pose", () => vm.ResetCharacterPose(characterPanel, index)));
             items.Add(new Separator());
             items.Add(Item("Bring to front", () => vm.ReorderCharacter(characterPanel, index, toFront: true)));
             items.Add(Item("Send to back", () => vm.ReorderCharacter(characterPanel, index, toFront: false)));
@@ -976,7 +997,7 @@ public sealed class PageCanvasControl : Control
         else
             type = hit.Kind switch
             {
-                HitKind.TailTarget or HitKind.TailBase => StandardCursorType.Hand,
+                HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle => StandardCursorType.Hand,
                 HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.BubbleBody or HitKind.PanelBody or HitKind.CharacterBody => StandardCursorType.SizeAll,
@@ -1060,6 +1081,7 @@ public sealed class PageCanvasControl : Control
         CreateBubble,
         PendingMoveCharacter,
         MoveCharacter,
-        ResizeCharacter
+        ResizeCharacter,
+        PoseLimb
     }
 }

@@ -114,6 +114,39 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Dragging_a_hand_poses_the_arm_in_one_undo_step_moves_its_bounds_and_is_saved()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+        var instance = page.Working.Panels[left].CharacterInstances[0];
+        var handle = page.LimbHandles(instance).Single(h => h.Limb == Limb.RightArm).Point;
+        var box = page.CharacterBounds(instance);
+        var raised = new Point2D(handle.X - 5, box.Top - 2); // hand up over the head
+
+        page.BeginPoseLimb(left, 0, Limb.RightArm);
+        page.UpdatePoseLimb(left, 0, Limb.RightArm, new Point2D(handle.X - 10, handle.Y - 10));
+        page.UpdatePoseLimb(left, 0, Limb.RightArm, raised);
+        page.EndGesture(commit: true);
+
+        var posed = page.Working.Panels[left].CharacterInstances[0];
+        Assert.True(page.SelectedCharacterIsPosed);
+        Assert.True(page.CharacterBounds(posed).Top < box.Top, "the raised hand is inside the new selection box");
+        var hand = page.LimbHandles(posed).Single(h => h.Limb == Limb.RightArm).Point;
+        Assert.True(Math.Abs(hand.X - raised.X) < 0.1 && Math.Abs(hand.Y - raised.Y) < 0.1);
+
+        var saved = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+        var reopened = ComicProject.Open(saved).Pages[0].Document.Panels.Values.SelectMany(p => p.CharacterInstances).Single();
+        Assert.Equal(posed.Pose.BoneRotations, reopened.Pose.BoneRotations);
+
+        page.ResetPoseCommand.Execute(null);
+        Assert.Empty(page.Working.Panels[left].CharacterInstances[0].Pose.BoneRotations);
+        session.Workspace.History.Undo();
+        session.Workspace.History.Undo();
+        Assert.Empty(page.Working.Panels[left].CharacterInstances[0].Pose.BoneRotations); // the whole drag was one step
+    }
+
+    [Fact]
     public void Moving_a_character_snaps_its_feet_to_the_others_floor()
     {
         var (session, page, left, _) = NewSession();

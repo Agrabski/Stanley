@@ -295,8 +295,11 @@
             <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}" ToolTip.Tip="Face the other way">
               <StackPanel><PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Flip" /></StackPanel>
             </Button>
+            <Button Name="ResetPoseButton" Classes="tool" Command="{Binding ResetPoseCommand}" ToolTip.Tip="Stand at rest again (pose by dragging the green dots on the hands and feet)">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Reset pose" /></StackPanel>
+            </Button>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="View" />
+          <TextBlock Classes="groupLabel" Text="View and pose" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">

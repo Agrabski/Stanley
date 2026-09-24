@@ -15,6 +15,14 @@ public sealed record CharacterPlacement(Point2D Ground, double UnitHeightMm, boo
     public Point2D ToPage(Point2D figure) =>
         new(Ground.X + (Mirrored ? -figure.X : figure.X) * UnitHeightMm, Ground.Y + figure.Y * UnitHeightMm);
 
+    /// <summary>A page point in figure space - the inverse of <see cref="ToPage(Point2D)"/>.</summary>
+    public Point2D ToFigure(Point2D page)
+    {
+        var unit = UnitHeightMm <= 0 ? 1 : UnitHeightMm;
+        var x = (page.X - Ground.X) / unit;
+        return new Point2D(Mirrored ? -x : x, (page.Y - Ground.Y) / unit);
+    }
+
     /// <summary>A figure-space rectangle (e.g. <see cref="BodyFigure.Extent"/>) on the page.</summary>
     public Rect2D ToPage(Rect2D figure)
     {

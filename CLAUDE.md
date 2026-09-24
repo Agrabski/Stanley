@@ -27,9 +27,9 @@ transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
 snapping, page navigator) all exist. The GUI opens/saves real project folders (the
 pages of one issue for now — see "Documents" below). Characters exist as a
-**body-only POC** (sliders + a generated flat mannequin, front or side view,
-placed on panels — see "Characters (POC, implemented)" below); no stickers,
-posing or three-quarter view yet.
+**POC** (sliders + a generated flat mannequin, front or side view, placed on
+panels, limbs posed by dragging hands/feet with two-bone IK — see "Characters
+(POC, implemented)" below); no stickers, torso/head posing or three-quarter view yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -448,9 +448,19 @@ body and placement only.
   arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
   Heights depend only on `Height`/`HeadsTall`, identical in both views;
   `ThreeQuarter` falls back to front. Skeleton overrides are per view.
+  `BodyFigure.RestLayout` is the unposed layout, `Layout` the posed one; the pose
+  (`PoseData.BoneRotations`: degrees, clockwise, relative to the parent) turns the
+  four `BodyRig.LimbChains` (upper arm/forearm, thigh/shin) via `ApplyPose`.
+- **Posing** (`CharacterPosing`, Stanley.Editing): drag a selected character's
+  green hand/foot dot → `Reach` solves two-bone IK exactly (out of reach: points
+  the limb at the target), writing only that limb's two rotations. The bend side is
+  read once per drag (`BendSign`) so joints never flip mid-drag; side view is
+  anatomical (knees forward, elbows back). Hips don't move yet, so feet stay
+  planted. Reset pose on the Character tab / right-click.
 - **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
   `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
-  figure path per definition). `PageRenderer.Draw/DrawPanels/Export*` take an
+  figure path per definition, view and pose — bounded, since a limb drag makes a new
+  pose per pointer move). `PageRenderer.Draw/DrawPanels/Export*` take an
   optional character dictionary and draw background → characters → bubbles inside
   the panel clip; a missing character draws a dashed placeholder.
 - **Placement**: `CharacterInstance.Placement` = `CharacterPlacement(Ground,

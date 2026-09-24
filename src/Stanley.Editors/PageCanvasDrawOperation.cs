@@ -31,7 +31,8 @@ public sealed record PageCanvasScene(
     bool DarkChrome = false,
     IReadOnlyDictionary<CharacterId, CharacterDefinition>? Characters = null,
     int SelectedCharacterIndex = -1,
-    Rect2D? SelectedCharacterBounds = null);
+    Rect2D? SelectedCharacterBounds = null,
+    IReadOnlyList<Point2D>? LimbHandles = null);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -49,6 +50,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
     private static readonly SKColor DarkPasteboard = new(0x2B, 0x2D, 0x31);
     private static readonly SKColor Accent = new(0x25, 0x7A, 0xE8);
     private static readonly SKColor TailHandle = new(0xF5, 0x8A, 0x07);
+    private static readonly SKColor PoseHandle = new(0x2E, 0x9E, 0x5B);
     private static readonly SKColor GuideColor = new(0xE0, 0x2F, 0x8C);
     private static readonly SKColor MarginColor = new(0x5B, 0xC0, 0xDE);
 
@@ -236,6 +238,18 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         }
         DrawSquareHandle(canvas, new SKPoint(rect.Left, rect.Top), Accent);
         DrawSquareHandle(canvas, new SKPoint(rect.Right, rect.Top), Accent);
+
+        // Hands and feet: drag one to pose that limb.
+        using (var limbFill = new SKPaint { Color = PoseHandle, IsAntialias = true })
+        using (var limbRing = Stroke(SKColors.White, 1.5f))
+        {
+            foreach (var handle in _scene.LimbHandles ?? [])
+            {
+                var p = Screen(handle);
+                canvas.DrawCircle(p, 5.5f, limbFill);
+                canvas.DrawCircle(p, 5.5f, limbRing);
+            }
+        }
 
         var ground = Screen(instance.Placement.Ground);
         using var fill = new SKPaint { Color = TailHandle, IsAntialias = true };

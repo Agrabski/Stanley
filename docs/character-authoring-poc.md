@@ -339,6 +339,17 @@ View group (Front / Side / Flip), S and F keys, right-click. The character edito
 has a Front/Side preview toggle (the line-up turns too). Skeleton overrides are
 per view.
 
+**Limb posing (added next, on request).** Drag a selected character's hand or
+foot (green dots) and the arm or leg follows: two-bone inverse kinematics
+(`CharacterPosing.Reach`, law of cosines, exact when in reach, pointing straight
+at the target when not). The result is stored as ordinary `PoseData.BoneRotations`
+(root and middle bone of the limb, degrees relative to the parent, measured from
+the rest layout), so a pose survives body edits and could later move between
+characters or into a pose library. The elbow/knee bend side is fixed for a drag;
+in side view knees bend forward and elbows back. One drag = one undo step; Reset
+pose on the Character tab. Not yet: moving the hips/torso (so no crouching with
+pinned feet), head tilt, rotating hands/feet, mirror pose, pose library.
+
 Known limits of the POC: the torso ignores skeleton overrides (limbs, head and
 neck follow them); no three-quarter view; front-view Flip shows no difference
 until the body is asymmetric (posing, stickers); creating a character from the

@@ -84,6 +84,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         BiggerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1.1), () => HasSelectedCharacter);
         SmallerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1 / 1.1), () => HasSelectedCharacter);
         MatchCharacterSizeCommand = new RelayCommand(() => MatchCharacterSize(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterHasOddScale);
+        ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
         DrawPanelCommand = new RelayCommand(() => Tool = PageEditorTool.Panel);
         InsertBubbleCommand = new RelayCommand<BubbleStylePreset>(style =>
@@ -130,6 +131,9 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public IRelayCommand SmallerCharacterCommand { get; }
     public IRelayCommand MatchCharacterSizeCommand { get; }
     public IRelayCommand EditCharacterCommand { get; }
+
+    /// <summary>Back to standing at rest.</summary>
+    public IRelayCommand ResetPoseCommand { get; }
 
     /// <summary>Insert tab: switches to the panel tool, ready to drag out a new panel.</summary>
     public IRelayCommand DrawPanelCommand { get; }
@@ -514,7 +518,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
-        _ when HasSelectedCharacter => "Drag to move · a top corner resizes the panel's characters together (Shift: just this one) · S side view, F front · double-click to edit the body.",
+        _ when HasSelectedCharacter => "Drag a hand or foot (the dots) to pose · drag the body to move · a top corner resizes the panel's characters together (Shift: just this one) · S side, F front.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
@@ -1033,7 +1037,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             : BodyRig.Extent(BodyShape.Default, angle);
 
     /// <summary>A placed character's bounding box on the page.</summary>
-    public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(FigureExtent(instance.CharacterId, instance.Pose.ViewAngle));
+    public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(InstanceExtent(instance));
+
+    /// <summary>An instance's figure-space bounding box as it stands - view and pose included.</summary>
+    private Rect2D InstanceExtent(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? CharacterPosing.Figure(character, instance).Extent
+            : BodyRig.Extent(BodyShape.Default, instance.Pose.ViewAngle);
 
     /// <summary>
     /// Places <paramref name="characterId"/> in <paramref name="panelId"/> (default: the
@@ -1138,6 +1148,39 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public void SetCharacterView(PanelId panelId, int index, ViewAngle angle) =>
         Apply(EditCharacterInPanel(Working, panelId, index, c => CharacterPlacementEditing.Turn(c, angle)));
 
+    // ---------------------------------------------------------------- posing (drag a hand or foot)
+
+    private int _bendSign = 1;
+
+    /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
+    public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.EndPoint(character, instance, limb))).ToList()
+            : [];
+
+    /// <summary>Starts dragging a hand or foot; the elbow/knee keeps bending the way it bends now for the whole drag.</summary>
+    public void BeginPoseLimb(PanelId panelId, int index, Limb limb)
+    {
+        BeginGesture();
+        if (Committed.Panels.TryGetValue(panelId, out var panel) && index >= 0 && index < panel.CharacterInstances.Count
+            && CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
+    }
+
+    /// <summary>Reaches the hand or foot towards <paramref name="target"/> (page mm) - inverse kinematics, computed from the drag's starting pose.</summary>
+    public void UpdatePoseLimb(PanelId panelId, int index, Limb limb, Point2D target)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPosing.Reach(character, c, limb, target, _bendSign)));
+    }
+
+    public void ResetCharacterPose(PanelId panelId, int index) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, CharacterPosing.ResetPose));
+
+    public bool SelectedCharacterIsPosed => SelectedCharacter is { Pose.BoneRotations.Count: > 0 };
+
     /// <summary>The selected character's view, for the ribbon's Front/Side toggle.</summary>
     public ViewAngle? SelectedCharacterView => SelectedCharacter?.Pose.ViewAngle;
 
@@ -1162,6 +1205,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     private void RaiseCharacterViewChanged()
     {
+        OnPropertyChanged(nameof(SelectedCharacterIsPosed));
+        ResetPoseCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SelectedCharacterView));
         OnPropertyChanged(nameof(IsSelectedCharacterFront));
         OnPropertyChanged(nameof(IsSelectedCharacterSide));
@@ -1210,7 +1255,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 return EditResult<Panel>.Failure("No such character.");
             var list = panel.CharacterInstances.ToList();
             var edited = edit(list[index]);
-            list[index] = CharacterPlacementEditing.KeepReachable(edited, FigureExtent(edited.CharacterId, edited.Pose.ViewAngle), Bounds(panel));
+            list[index] = CharacterPlacementEditing.KeepReachable(edited, InstanceExtent(edited), Bounds(panel));
             return EditResult<Panel>.Success(panel with { CharacterInstances = list });
         });
 
