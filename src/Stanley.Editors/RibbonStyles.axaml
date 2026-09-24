@@ -25,6 +25,8 @@
         <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#0F000000" />
         <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#C8C8C8" />
         <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="StanleyGroupLabelBrush" Color="#1A1A1A" />
+        <SolidColorBrush x:Key="StanleyTabHeaderBrush" Color="#000000" />
       </ResourceDictionary>
       <ResourceDictionary x:Key="Dark">
         <SolidColorBrush x:Key="StanleyChromeBrush" Color="#1F3F66" />
@@ -42,6 +44,8 @@
         <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#14FFFFFF" />
         <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#5A5A5A" />
         <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#232427" />
+        <SolidColorBrush x:Key="StanleyGroupLabelBrush" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="StanleyTabHeaderBrush" Color="#FFFFFF" />
       </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     <StreamGeometry x:Key="SpeechIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z</StreamGeometry>
@@ -91,7 +95,8 @@
   <Style Selector="TextBlock.groupLabel">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="HorizontalAlignment" Value="Center" />
-    <Setter Property="Opacity" Value="0.65" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyGroupLabelBrush}" />
+    <Setter Property="Opacity" Value="0.85" />
   </Style>
   <Style Selector="Rectangle.divider">
     <Setter Property="Width" Value="1" />
@@ -139,6 +144,7 @@
     <Setter Property="Padding" Value="12,0" />
     <Setter Property="Margin" Value="0" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyTabHeaderBrush}" />
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="TabControl.ribbonTabs TabItem.contextual.panel">
