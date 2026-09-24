@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Stanley.Editing;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.Rendering;
 
 namespace Stanley.Editors;
 
@@ -27,6 +28,8 @@ public partial class PageEditorView : UserControl
 
         InlineTextEditor.AddHandler(KeyDownEvent, OnInlineEditorKeyDown, RoutingStrategies.Tunnel);
         InlineTextEditor.LostFocus += (_, _) => EndTextEdit(commit: true);
+        // The box grows with the text (see PositionTextEditor); keep it centred on the bubble.
+        InlineTextEditor.SizeChanged += (_, _) => PositionTextEditor();
     }
 
     private PageEditorViewModel? ViewModel => DataContext as PageEditorViewModel;
@@ -114,7 +117,11 @@ public partial class PageEditorView : UserControl
 
     // ---------------------------------------------------------------- inline text editing
 
-    /// <summary>Opens a text box right over the bubble, sized to it and at the lettering's on-screen size, so editing happens where the text lives.</summary>
+    /// <summary>
+    /// Opens a see-through text box in the bubble's text area, at the lettering's on-screen
+    /// size, so editing happens where the text lives. The canvas stops drawing that bubble's
+    /// lettering and handles meanwhile, so the bubble itself is never covered.
+    /// </summary>
     public void BeginTextEdit(PanelId panelId, int bubbleIndex)
     {
         if (ViewModel is not { } vm || !vm.Working.Panels.TryGetValue(panelId, out var panel) || bubbleIndex < 0 || bubbleIndex >= panel.Bubbles.Count)
@@ -124,8 +131,11 @@ public partial class PageEditorView : UserControl
         vm.Select(panelId, bubbleIndex);
         _editing = (panelId, panel.Bubbles[bubbleIndex].Id);
         InlineTextEditor.Text = panel.Bubbles[bubbleIndex].Text;
+        PageCanvas.EditingBubble = new EditingBubble(panelId, panel.Bubbles[bubbleIndex].Id);
         PositionTextEditor();
         InlineTextEditor.IsVisible = true;
+        HintText.IsVisible = false;
+        TextEditHintText.IsVisible = true;
         InlineTextEditor.Focus();
         InlineTextEditor.SelectAll();
     }
@@ -136,14 +146,18 @@ public partial class PageEditorView : UserControl
             return;
 
         var bubble = vm.Working.Panels[editing.Panel].Bubbles[index];
-        var rect = PageCanvas.PageToControl(AnchorRing.BoundingBox(bubble.Shape.Anchors));
-        var width = Math.Max(rect.Width, 180);
-        var height = Math.Max(rect.Height, 64);
+        var rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(bubble));
+        var fontSize = Math.Clamp(PageCanvasDrawOperation.FontSizeMm * PageCanvas.Zoom * 0.95, 11, 40);
+        // Height follows the text, so no line is ever clipped: when there's more text than
+        // fits (or the bubble is smaller than a readable line at this zoom) it grows past the
+        // bubble - but it's transparent, so only the typed text spills over, never a box.
+        var width = Math.Max(rect.Width, fontSize * 3);
+        InlineTextEditor.Width = width;
+        InlineTextEditor.MinHeight = rect.Height;
+        InlineTextEditor.FontSize = fontSize;
+        var height = Math.Max(InlineTextEditor.Bounds.Height, rect.Height);
         Avalonia.Controls.Canvas.SetLeft(InlineTextEditor, rect.Center.X - width / 2);
         Avalonia.Controls.Canvas.SetTop(InlineTextEditor, rect.Center.Y - height / 2);
-        InlineTextEditor.Width = width;
-        InlineTextEditor.Height = height;
-        InlineTextEditor.FontSize = Math.Clamp(PageCanvasDrawOperation.FontSizeMm * PageCanvas.Zoom * 0.95, 11, 40);
     }
 
     private void OnInlineEditorKeyDown(object? sender, KeyEventArgs e)
@@ -169,6 +183,9 @@ public partial class PageEditorView : UserControl
         _editing = null;
         var text = InlineTextEditor.Text ?? "";
         InlineTextEditor.IsVisible = false;
+        TextEditHintText.IsVisible = false;
+        HintText.IsVisible = true;
+        PageCanvas.EditingBubble = null;
 
         if (commit && ViewModel is { } vm && FindBubbleIndex(editing) is var index and >= 0 &&
             vm.Working.Panels[editing.Panel].Bubbles[index].Text != text)
