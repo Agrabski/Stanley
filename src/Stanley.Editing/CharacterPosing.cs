@@ -113,25 +113,167 @@ public static class CharacterPosing
         return moved;
     }
 
-    /// <summary>Leans the upper body about the hips so the chest handle points at <paramref name="pageTarget"/> (limited to <see cref="BodyRig.MaxLean"/>). Legs and feet don't move.</summary>
-    public static CharacterInstance Lean(CharacterDefinition character, CharacterInstance instance, Point2D pageTarget)
+    /// <summary>
+    /// Bends the back so the chest handle (the base of the neck) goes towards
+    /// <paramref name="pageTarget"/>: inverse kinematics over the lower back, mid back and
+    /// upper chest together (<see cref="BodyRig.SpineJoints"/>), preferring a bend shared
+    /// along the spine to one sharp joint - so the back curves, it doesn't swing about the
+    /// hips like a board. Solved from <paramref name="start"/> (the drag's starting pose);
+    /// the arms keep pointing the way they did, so hanging arms keep hanging. Legs and feet
+    /// don't move.
+    /// </summary>
+    public static CharacterInstance Lean(CharacterDefinition character, CharacterInstance start, Point2D pageTarget)
     {
-        var upright = Figure(character, WithRotation(instance, HumanoidBone.Spine, 0));
-        var hips = Joint(upright.Layout, HumanoidBone.Hips);
-        var neck = Joint(upright.Layout, HumanoidBone.Neck);
-        var target = instance.Placement.ToFigure(pageTarget);
-        var lean = Wrap(AngleOf(hips, target) - AngleOf(hips, neck));
-        return WithRotation(instance, HumanoidBone.Spine, Math.Clamp(lean, -BodyRig.MaxLean, BodyRig.MaxLean));
+        var target = start.Placement.ToFigure(pageTarget);
+        var bent = SolveTrunkChain(character, start, BodyRig.SpineJoints, target, figure => Joint(figure.Layout, HumanoidBone.Neck), smoothness: 0.02);
+        return KeepArmDirections(character, start, bent);
     }
 
-    /// <summary>Tilts the head about the neck so it points at <paramref name="pageTarget"/> (limited to <see cref="BodyRig.MaxHeadTilt"/>).</summary>
-    public static CharacterInstance TiltHead(CharacterDefinition character, CharacterInstance instance, Point2D pageTarget)
+    /// <summary>
+    /// Bends the neck and tilts the head so the top of the head goes towards
+    /// <paramref name="pageTarget"/> - inverse kinematics over both
+    /// (<see cref="BodyRig.NeckJoints"/>), sharing the turn between them. The chest stays.
+    /// </summary>
+    public static CharacterInstance TiltHead(CharacterDefinition character, CharacterInstance start, Point2D pageTarget)
     {
-        var level = Figure(character, WithRotation(instance, HumanoidBone.Head, 0));
-        var neck = Joint(level.Layout, HumanoidBone.Head);
-        var target = instance.Placement.ToFigure(pageTarget);
-        var tilt = Wrap(AngleOf(neck, target) - AngleOf(neck, HeadTop(level)));
-        return WithRotation(instance, HumanoidBone.Head, Math.Clamp(tilt, -BodyRig.MaxHeadTilt, BodyRig.MaxHeadTilt));
+        var target = start.Placement.ToFigure(pageTarget);
+        return SolveTrunkChain(character, start, BodyRig.NeckJoints, target, HeadTop, smoothness: 0.004);
+    }
+
+    /// <summary>
+    /// Damped least-squares inverse kinematics over a few trunk joints: finds rotations
+    /// (within each joint's limit) that bring <paramref name="effector"/> as close to
+    /// <paramref name="target"/> (figure space) as the chain allows, while keeping
+    /// neighbouring joints' bends alike (<paramref name="smoothness"/>, per radian
+    /// squared, against figure units squared of distance). Starts from the instance's
+    /// own rotations, so a drag is a pure function of where it started and the pointer.
+    /// </summary>
+    internal static CharacterInstance SolveTrunkChain(CharacterDefinition character, CharacterInstance start,
+        IReadOnlyList<(HumanoidBone Bone, double Limit)> joints, Point2D target, Func<BodyFigure, Point2D> effector, double smoothness)
+    {
+        var n = joints.Count;
+        var angles = joints.Select(j => start.Pose.BoneRotations.LastOrDefault(r => r.Bone == j.Bone)?.Degrees ?? 0).ToArray();
+        CharacterInstance With(double[] a)
+        {
+            var posed = start;
+            for (var i = 0; i < n; i++)
+                posed = WithRotation(posed, joints[i].Bone, a[i]);
+            return posed;
+        }
+        Point2D Effector(double[] a)
+        {
+            var pose = start.Pose with { BoneRotations = start.Pose.BoneRotations.Where(r => joints.All(j => j.Bone != r.Bone)).Concat(joints.Select((j, i) => new BoneRotation(j.Bone, a[i]))).ToList() };
+            return effector(BodyRig.Build(character.Body, start.Pose.ViewAngle, character.Skeleton, pose));
+        }
+
+        const double step = 0.5; // degrees, for the numeric Jacobian
+        const double damping = 1e-6;
+        for (var iteration = 0; iteration < 40; iteration++)
+        {
+            var at = Effector(angles);
+            var (ex, ey) = (target.X - at.X, target.Y - at.Y);
+            // Jacobian: how the effector moves per radian of each joint.
+            var jx = new double[n];
+            var jy = new double[n];
+            for (var i = 0; i < n; i++)
+            {
+                var nudged = (double[])angles.Clone();
+                nudged[i] += step;
+                var p = Effector(nudged);
+                jx[i] = (p.X - at.X) / (step * Math.PI / 180);
+                jy[i] = (p.Y - at.Y) / (step * Math.PI / 180);
+            }
+            // Normal equations: (JᵀJ + μL + λI) Δ = Jᵀe - μL·a, with L the chain's
+            // difference Laplacian (neighbouring joints alike).
+            var a = new double[n, n];
+            var b = new double[n];
+            var radians = angles.Select(d => d * Math.PI / 180).ToArray();
+            for (var i = 0; i < n; i++)
+            {
+                for (var k = 0; k < n; k++)
+                    a[i, k] = jx[i] * jx[k] + jy[i] * jy[k];
+                a[i, i] += damping;
+                b[i] = jx[i] * ex + jy[i] * ey;
+            }
+            for (var i = 0; i + 1 < n; i++)
+            {
+                a[i, i] += smoothness;
+                a[i + 1, i + 1] += smoothness;
+                a[i, i + 1] -= smoothness;
+                a[i + 1, i] -= smoothness;
+                var difference = radians[i] - radians[i + 1];
+                b[i] -= smoothness * difference;
+                b[i + 1] += smoothness * difference;
+            }
+            var delta = SolveLinear(a, b);
+            var moved = 0.0;
+            for (var i = 0; i < n; i++)
+            {
+                var degrees = delta[i] * 180 / Math.PI;
+                var next = Math.Clamp(angles[i] + Math.Clamp(degrees, -20, 20), -joints[i].Limit, joints[i].Limit);
+                moved = Math.Max(moved, Math.Abs(next - angles[i]));
+                angles[i] = next;
+            }
+            if (moved < 1e-3)
+                break;
+        }
+        return With(angles);
+    }
+
+    /// <summary>
+    /// <paramref name="bent"/> with each arm turned back by however much the body turned
+    /// under its shoulder since <paramref name="start"/> - so arms keep their direction
+    /// (a hanging arm keeps hanging) instead of swinging round with the torso.
+    /// </summary>
+    internal static CharacterInstance KeepArmDirections(CharacterDefinition character, CharacterInstance start, CharacterInstance bent)
+    {
+        var before = Figure(character, start).BaseLayout;
+        var after = Figure(character, bent).BaseLayout;
+        var result = bent;
+        foreach (var limb in new[] { Limb.LeftArm, Limb.RightArm })
+        {
+            var (root, middle, _) = Chain(limb);
+            var turned = Wrap(AngleOf(Joint(after, root), Joint(after, middle)) - AngleOf(Joint(before, root), Joint(before, middle)));
+            if (Math.Abs(turned) < 1e-9)
+                continue;
+            var current = result.Pose.BoneRotations.LastOrDefault(r => r.Bone == root)?.Degrees ?? 0;
+            result = WithRotation(result, root, Wrap(current - turned));
+        }
+        return result;
+    }
+
+    private static double[] SolveLinear(double[,] a, double[] b)
+    {
+        var n = b.Length;
+        var m = (double[,])a.Clone();
+        var x = (double[])b.Clone();
+        for (var col = 0; col < n; col++)
+        {
+            var pivot = col;
+            for (var row = col + 1; row < n; row++)
+                if (Math.Abs(m[row, col]) > Math.Abs(m[pivot, col]))
+                    pivot = row;
+            if (Math.Abs(m[pivot, col]) < 1e-15)
+                continue;
+            if (pivot != col)
+            {
+                for (var k = 0; k < n; k++)
+                    (m[col, k], m[pivot, k]) = (m[pivot, k], m[col, k]);
+                (x[col], x[pivot]) = (x[pivot], x[col]);
+            }
+            for (var row = 0; row < n; row++)
+            {
+                if (row == col)
+                    continue;
+                var f = m[row, col] / m[col, col];
+                for (var k = col; k < n; k++)
+                    m[row, k] -= f * m[col, k];
+                x[row] -= f * x[col];
+            }
+        }
+        for (var i = 0; i < n; i++)
+            x[i] = Math.Abs(m[i, i]) < 1e-15 ? 0 : x[i] / m[i, i];
+        return x;
     }
 
     /// <summary>
@@ -243,7 +385,7 @@ public static class CharacterPosing
     internal static Point2D Joint(ViewAngleRestLayout layout, HumanoidBone bone) => layout.Bones.First(b => b.Bone == bone).Position;
 
     /// <summary>The top of the head: the head ellipse's far end from the neck.</summary>
-    private static Point2D HeadTop(BodyFigure figure)
+    internal static Point2D HeadTop(BodyFigure figure)
     {
         var head = figure.Blobs[0];
         var r = head.RotationDegrees * Math.PI / 180;

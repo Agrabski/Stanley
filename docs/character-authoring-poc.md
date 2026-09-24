@@ -362,8 +362,15 @@ character: each is a set of hand/foot goals relative to that limb's own root and
 length (plus lean, head tilt, hips drop, and the view it needs - Walk, Run and Sit
 turn the character side on), solved with the same IK - so one preset fits a
 toddler, a chibi and a heavy adult alike, and the result is ordinary pose data to
-keep adjusting. Not yet: a saved/user pose library, hand/foot rotation handles,
-arms that hang with gravity when leaning (they turn rigidly with the torso).
+keep adjusting. Not yet: a saved/user pose library, hand/foot rotation handles.
+
+**Trunk by inverse kinematics (added later, on request).** The chest and head rings
+no longer rotate rigid blocks. The back bends at three joints (lower back about the
+hips, mid back, upper chest) and the torso outline follows a smooth blend of them;
+dragging the chest solves all three at once (damped least squares, preferring a bend
+shared along the spine), so the back curves. The arms keep their direction while the
+body bends under them, so hanging arms keep hanging. The head ring bends the neck and
+tilts the head together the same way.
 
 Known limits of the POC: the torso ignores skeleton overrides (limbs, head and
 neck follow them); no three-quarter view; front-view Flip shows no difference

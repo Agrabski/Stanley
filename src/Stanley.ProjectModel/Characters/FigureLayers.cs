@@ -107,12 +107,71 @@ public sealed record LimbFrame(BodyCapsule Upper, BodyCapsule Lower)
 }
 
 /// <summary>
-/// The torso as the rig built it: its outline standing upright (<see cref="RestOutline"/>)
-/// and the trunk pose that places it - a lean of <see cref="LeanDegrees"/> about
-/// <see cref="Pivot"/> (the hips), then a shift. Sticker art is warped row by row through
-/// the upright outline and then posed the same way, so a print leans with the chest.
+/// A rigid move of one spine segment: a point <c>p</c> of it goes to
+/// <c>To + rotate(p - From, Degrees)</c> (degrees clockwise on the page).
 /// </summary>
-public sealed record TorsoFrame(IReadOnlyList<Point2D> RestOutline, Point2D Pivot, double LeanDegrees, Point2D Shift)
+public sealed record SegmentTransform(Point2D From, Point2D To, double Degrees)
+{
+    public static SegmentTransform Identity(Point2D at) => new(at, at, 0);
+
+    public Point2D Apply(Point2D p)
+    {
+        var r = Degrees * Math.PI / 180;
+        var (cos, sin) = (Math.Cos(r), Math.Sin(r));
+        var (dx, dy) = (p.X - From.X, p.Y - From.Y);
+        return new Point2D(To.X + dx * cos - dy * sin, To.Y + dx * sin + dy * cos);
+    }
+}
+
+/// <summary>
+/// How the posed spine bends the upright upper body. <see cref="KnotHeights"/> are the
+/// heights (upright, y down, bottom first) of the hips, spine, chest and neck joints;
+/// <see cref="Transforms"/> are the moves of the segment that ends at each knot (the
+/// pelvis doesn't move). A point between two knots is moved by a blend of the two - so
+/// the torso's outline curves through the bend instead of pivoting like a rigid board -
+/// and then everything is shifted with the hips.
+/// </summary>
+public sealed record TrunkBend(IReadOnlyList<double> KnotHeights, IReadOnlyList<SegmentTransform> Transforms, Point2D Shift)
+{
+    /// <summary>Where a point of the upright upper body goes.</summary>
+    public Point2D Map(Point2D rest)
+    {
+        var (i, t) = Segment(rest.Y);
+        var a = Transforms[i].Apply(rest);
+        var b = t > 0 ? Transforms[i + 1].Apply(rest) : a;
+        return new Point2D(a.X + (b.X - a.X) * t + Shift.X, a.Y + (b.Y - a.Y) * t + Shift.Y);
+    }
+
+    /// <summary>How far the body is turned at upright height <paramref name="y"/> (degrees clockwise) - what an arm attached there turns by.</summary>
+    public double AngleAt(double y)
+    {
+        var (i, t) = Segment(y);
+        var a = Transforms[i].Degrees;
+        return t > 0 ? a + (Transforms[i + 1].Degrees - a) * t : a;
+    }
+
+    /// <summary>The lower knot of the stretch height <paramref name="y"/> is in, and how far up towards the next it is (0-1).</summary>
+    private (int Index, double T) Segment(double y)
+    {
+        if (y >= KnotHeights[0])
+            return (0, 0);
+        for (var i = 0; i + 1 < KnotHeights.Count; i++)
+        {
+            var (low, high) = (KnotHeights[i], KnotHeights[i + 1]);
+            if (y >= high)
+                return (i, low - high < 1e-12 ? 1 : (low - y) / (low - high));
+        }
+        return (KnotHeights.Count - 1, 0);
+    }
+}
+
+/// <summary>
+/// The torso as the rig built it: its outline standing upright (<see cref="RestOutline"/>)
+/// and the spine's bend (<see cref="Bend"/>) that poses it. Sticker art is warped row by
+/// row through the upright outline and then bent the same way, so a print curves with
+/// the back.
+/// </summary>
+public sealed record TorsoFrame(IReadOnlyList<Point2D> RestOutline, TrunkBend Bend)
 {
     /// <summary>The top of the upright outline (the base of the neck).</summary>
     public double Top => RestOutline.Min(p => p.Y);
@@ -121,13 +180,7 @@ public sealed record TorsoFrame(IReadOnlyList<Point2D> RestOutline, Point2D Pivo
     public double Bottom => RestOutline.Max(p => p.Y);
 
     /// <summary>A point of the upright torso, posed.</summary>
-    public Point2D ToFigure(Point2D rest)
-    {
-        var r = LeanDegrees * Math.PI / 180;
-        var (cos, sin) = (Math.Cos(r), Math.Sin(r));
-        var (dx, dy) = (rest.X - Pivot.X, rest.Y - Pivot.Y);
-        return new Point2D(Pivot.X + dx * cos - dy * sin + Shift.X, Pivot.Y + dx * sin + dy * cos + Shift.Y);
-    }
+    public Point2D ToFigure(Point2D rest) => Bend.Map(rest);
 
     /// <summary>
     /// The upright outline's left and right edge at height <paramref name="y"/> (clamped to

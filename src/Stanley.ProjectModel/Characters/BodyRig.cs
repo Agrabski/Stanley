@@ -82,9 +82,11 @@ public static class BodyRig
 
     /// <param name="pose">
     /// The pose (its <see cref="PoseData.ViewAngle"/> is ignored - <paramref name="angle"/> decides):
-    /// <see cref="PoseData.HipsShift"/> moves the hips; a <see cref="HumanoidBone.Spine"/>
-    /// rotation leans everything above them, a <see cref="HumanoidBone.Head"/> rotation
-    /// tilts the head, and limb rotations turn the arms and legs (<see cref="ApplyPose"/>).
+    /// <see cref="PoseData.HipsShift"/> moves the hips; <see cref="HumanoidBone.Spine"/>,
+    /// <see cref="HumanoidBone.Chest"/> and <see cref="HumanoidBone.UpperChest"/> rotations
+    /// bend the back joint by joint (<see cref="SpineJoints"/>) and the upper body curves
+    /// with them; <see cref="HumanoidBone.Neck"/> and <see cref="HumanoidBone.Head"/> bend the
+    /// neck and tilt the head; limb rotations turn the arms and legs (<see cref="ApplyPose"/>).
     /// Degrees, clockwise on the page, each relative to its parent. Null stands at rest.
     /// </param>
     public static BodyFigure Build(BodyShape body, ViewAngle angle, Skeleton? overrides = null, PoseData? pose = null)
@@ -93,43 +95,132 @@ public static class BodyRig
         return angle == ViewAngle.Profile ? BuildProfile(m, overrides, pose) : BuildFront(m, overrides, pose);
     }
 
-    /// <summary>How far the spine may lean, and the head tilt, either way (degrees).</summary>
+    /// <summary>
+    /// How far each trunk joint may bend either way (degrees): the lower back
+    /// (<see cref="HumanoidBone.Spine"/>, about the hips), the mid back
+    /// (<see cref="HumanoidBone.Chest"/>, about the spine joint), the upper chest
+    /// (<see cref="HumanoidBone.UpperChest"/>, about the chest joint), the neck
+    /// (<see cref="HumanoidBone.Neck"/>, about its base) and the head
+    /// (<see cref="HumanoidBone.Head"/>, about the chin).
+    /// </summary>
     public const double MaxLean = 60;
+    public const double MaxBackBend = 35;
+    public const double MaxNeckBend = 40;
     public const double MaxHeadTilt = 50;
+
+    /// <summary>The trunk joints a pose bends, bottom to top, each with its limit.</summary>
+    public static IReadOnlyList<(HumanoidBone Bone, double Limit)> SpineJoints { get; } =
+    [
+        (HumanoidBone.Spine, MaxLean),
+        (HumanoidBone.Chest, MaxBackBend),
+        (HumanoidBone.UpperChest, MaxBackBend),
+    ];
+
+    /// <summary>The neck and head joints, with their limits.</summary>
+    public static IReadOnlyList<(HumanoidBone Bone, double Limit)> NeckJoints { get; } =
+    [
+        (HumanoidBone.Neck, MaxNeckBend),
+        (HumanoidBone.Head, MaxHeadTilt),
+    ];
 
     /// <summary>How far the hips may move, as a fraction of the character's height (y: up / down).</summary>
     public static Rect2D HipsShiftRange { get; } = Rect2D.FromEdges(-0.3, -0.05, 0.3, 0.45);
 
-    /// <summary>The trunk part of a pose: the hips shifted, everything above them leaned about the hips, the head tilted.</summary>
+    /// <summary>
+    /// The trunk part of a pose: the hips shifted, the spine bent joint by joint (each
+    /// rotation relative to the one below), the neck bent at its base and the head tilted
+    /// at the chin. The upper body's outline and the arms' roots follow the bend smoothly
+    /// (<see cref="TrunkBend"/>); each arm turns with the body at its shoulder, rigidly.
+    /// </summary>
     private sealed class Trunk
     {
         public Trunk(Measures m, ViewAngleRestLayout rest, PoseData? pose)
         {
             var rotations = pose?.BoneRotations ?? [];
-            Lean = Math.Clamp(Degrees(rotations, HumanoidBone.Spine), -MaxLean, MaxLean);
-            Tilt = Math.Clamp(Degrees(rotations, HumanoidBone.Head), -MaxHeadTilt, MaxHeadTilt);
             var shift = pose?.HipsShift ?? default;
             Shift = new Point2D(
                 Math.Clamp(shift.X, HipsShiftRange.Left, HipsShiftRange.Right) * m.Height,
                 Math.Clamp(shift.Y, HipsShiftRange.Top, HipsShiftRange.Bottom) * m.Height);
-            Pivot = rest.Bones.FirstOrDefault(b => b.Bone == HumanoidBone.Hips)?.Position ?? new Point2D(0, m.HipY);
+            Point2D RestAt(HumanoidBone bone, Point2D fallback) => rest.Bones.FirstOrDefault(b => b.Bone == bone)?.Position ?? fallback;
+
+            // Knots up the spine: hips, spine, chest, neck base.
+            var knots = new[]
+            {
+                RestAt(HumanoidBone.Hips, new Point2D(0, m.HipY)),
+                RestAt(HumanoidBone.Spine, new Point2D(0, m.HipY - m.TorsoLength * 0.3)),
+                RestAt(HumanoidBone.Chest, new Point2D(0, m.HipY - m.TorsoLength * 0.65)),
+                RestAt(HumanoidBone.Neck, new Point2D(0, m.ShoulderY)),
+            };
+            var chin = RestAt(HumanoidBone.Head, new Point2D(0, m.ChinY));
+
+            // Each joint turns everything above it; the segment ending at knot i+1 is turned by the sum below.
+            var joints = new List<Point2D> { knots[0] };
+            var transforms = new List<SegmentTransform> { SegmentTransform.Identity(knots[0]) };
+            double angle = 0;
+            for (var i = 0; i < SpineJoints.Count; i++)
+            {
+                var (bone, limit) = SpineJoints[i];
+                angle += Math.Clamp(Degrees(rotations, bone), -limit, limit);
+                transforms.Add(new SegmentTransform(knots[i], joints[i], angle));
+                joints.Add(transforms[^1].Apply(knots[i + 1]));
+            }
+            Bend = new TrunkBend(knots.Select(k => k.Y).ToList(), transforms, Shift);
+            SpinePositions = joints.Select(j => Offset(j, Shift)).ToList();
+            Pivot = knots[0];
+
+            NeckAngle = angle + Math.Clamp(Degrees(rotations, HumanoidBone.Neck), -MaxNeckBend, MaxNeckBend);
+            HeadAngle = NeckAngle + Math.Clamp(Degrees(rotations, HumanoidBone.Head), -MaxHeadTilt, MaxHeadTilt);
+            Chin = Offset(Offset(joints[^1], Rotate(new Point2D(chin.X - knots[^1].X, chin.Y - knots[^1].Y), NeckAngle)), Shift);
         }
 
-        public double Lean { get; }
-        public double Tilt { get; }
+        public TrunkBend Bend { get; }
+
         public Point2D Shift { get; }
+
+        /// <summary>The hips joint, upright.</summary>
         public Point2D Pivot { get; }
 
-        /// <summary>A point of the upper body (torso, neck, head, arms): leaned about the hips, then moved with them.</summary>
-        public Point2D Upper(Point2D p) => Offset(RotateAbout(p, Pivot, Lean), Shift);
+        /// <summary>Hips, spine, chest and neck-base joints as posed.</summary>
+        public IReadOnlyList<Point2D> SpinePositions { get; }
+
+        /// <summary>The head joint (the chin) as posed.</summary>
+        public Point2D Chin { get; }
+
+        /// <summary>How far the neck, and the head on it, are turned (degrees clockwise, from upright).</summary>
+        public double NeckAngle { get; }
+        public double HeadAngle { get; }
+
+        /// <summary>A point of the upper body (torso outline, shoulders): bent with the spine, then moved with the hips.</summary>
+        public Point2D Upper(Point2D p) => Bend.Map(p);
 
         /// <summary>A point of the legs: moved with the hips (the limb rotations do the rest).</summary>
         public Point2D Lower(Point2D p) => Offset(p, Shift);
 
-        public ViewAngleRestLayout Apply(ViewAngleRestLayout rest) =>
-            Lean == 0 && Shift == default
-                ? rest
-                : rest with { Bones = rest.Bones.Select(b => b with { Position = IsLeg(b.Bone) ? Lower(b.Position) : Upper(b.Position) }).ToList() };
+        public ViewAngleRestLayout Apply(ViewAngleRestLayout rest)
+        {
+            var positions = rest.Bones.ToDictionary(b => b.Bone, b => b.Position);
+            var posed = new Dictionary<HumanoidBone, Point2D>();
+            foreach (var (bone, p) in positions)
+                posed[bone] = IsLeg(bone) ? Lower(p) : Upper(p);
+            var spineBones = new[] { HumanoidBone.Hips, HumanoidBone.Spine, HumanoidBone.Chest, HumanoidBone.Neck };
+            for (var i = 0; i < spineBones.Length; i++)
+                if (positions.ContainsKey(spineBones[i]))
+                    posed[spineBones[i]] = SpinePositions[i];
+            if (positions.ContainsKey(HumanoidBone.Head))
+                posed[HumanoidBone.Head] = Chin;
+            // An arm moves as one piece with the body where it hangs from: its root follows
+            // the bend, the rest of it turns by the body's angle there.
+            foreach (var (root, middle, end) in LimbChains.Take(2))
+            {
+                if (!positions.TryGetValue(root, out var r))
+                    continue;
+                var turn = Bend.AngleAt(r.Y);
+                foreach (var bone in new[] { middle, end })
+                    if (positions.TryGetValue(bone, out var p))
+                        posed[bone] = Offset(posed[root], Rotate(new Point2D(p.X - r.X, p.Y - r.Y), turn));
+            }
+            return rest with { Bones = rest.Bones.Select(b => b with { Position = posed[b.Bone] }).ToList() };
+        }
 
         private static bool IsLeg(HumanoidBone bone) => LimbChains.Skip(2).Any(c => c.Root == bone || c.Middle == bone || c.End == bone);
     }
@@ -313,7 +404,7 @@ public static class BodyRig
         var neck = new BodyCapsule(At(HumanoidBone.Head), At(HumanoidBone.Neck), m.NeckHalf, m.NeckHalf);
         var limbs = new List<BodyCapsule> { neck };
         var headPoint = At(HumanoidBone.Head);
-        var headTurn = trunk.Lean + trunk.Tilt;
+        var headTurn = trunk.HeadAngle;
         var head = new BodyEllipse(Offset(headPoint, Rotate(new Point2D(0, -m.Head / 2), headTurn)), m.Head * 0.42 * (1 + 0.1 * build), m.Head / 2, headTurn);
         var blobs = new List<BodyEllipse> { head };
 
@@ -350,7 +441,7 @@ public static class BodyRig
                 both.Select(s => Seam(At(s.UpperArm), m.ArmTop * 1.4)).ToList()),
             FigureLayer.Empty(FigureLayerKind.Front),
         };
-        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Pivot, trunk.Lean, trunk.Shift),
+        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Bend),
             arms[Side.Left], arms[Side.Right], hands[Side.Left], hands[Side.Right],
             legs[Side.Left], legs[Side.Right], feet[Side.Left], feet[Side.Right]);
 
@@ -431,7 +522,7 @@ public static class BodyRig
         var torso = restTorso.Select(trunk.Upper).ToList();
 
         var headPoint = At(HumanoidBone.Head);
-        var headTurn = trunk.Lean + trunk.Tilt;
+        var headTurn = trunk.HeadAngle;
         var headCenter = Offset(headPoint, Rotate(new Point2D(m.Head * 0.04, -m.Head / 2), headTurn));
         var headRx = m.Head * 0.47 * (1 + 0.08 * build);
         var neck = new BodyCapsule(headPoint, At(HumanoidBone.Neck), m.NeckHalf * 1.05, m.NeckHalf * 1.05);
@@ -478,7 +569,7 @@ public static class BodyRig
             new(FigureLayerKind.NearArm, null, [arms[nearSide].Upper, arms[nearSide].Lower], [hands[nearSide]], [Seam(At(nearSide.UpperArm), m.ArmTop * 1.4)]),
             FigureLayer.Empty(FigureLayerKind.Front),
         };
-        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Pivot, trunk.Lean, trunk.Shift),
+        var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Bend),
             arms[Side.Left], arms[Side.Right], hands[Side.Left], hands[Side.Right],
             legs[Side.Left], legs[Side.Right], feet[Side.Left], feet[Side.Right]);
 

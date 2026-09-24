@@ -128,36 +128,55 @@ public class TrunkPosingAndPresetTests
     }
 
     [Fact]
-    public void Leaning_moves_the_chest_head_and_arms_but_not_the_feet_and_stops_at_the_limit()
+    public void Dragging_the_chest_bends_the_back_along_the_spine_and_the_arms_keep_hanging()
     {
         var start = Placed(ViewAngle.Profile);
         var hips = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Hips);
         var chest = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Chest);
-        var hand = CharacterPosing.EndPoint(Alice, start, Limb.LeftArm);
         var foot = CharacterPosing.EndPoint(Alice, start, Limb.LeftLeg);
+        Point2D Joint(CharacterInstance c, HumanoidBone b) => c.Placement.ToPage(CharacterPosing.Figure(Alice, c).Layout.Bones.Single(x => x.Bone == b).Position);
+        static double Degrees(CharacterInstance c, HumanoidBone b) => c.Pose.BoneRotations.SingleOrDefault(r => r.Bone == b)?.Degrees ?? 0;
 
-        var forward = CharacterPosing.Lean(Alice, start, new Point2D(chest.X + 20, chest.Y + 5));
-        Assert.True(CharacterPosing.TrunkPoint(Alice, forward, TrunkPart.Chest).X > chest.X + 10);
-        Assert.True(Distance(CharacterPosing.EndPoint(Alice, forward, Limb.LeftArm), hand) > 5, "the arm rides along with the chest");
+        var target = new Point2D(chest.X + 20, chest.Y + 5);
+        var forward = CharacterPosing.Lean(Alice, start, target);
+
+        var reached = CharacterPosing.TrunkPoint(Alice, forward, TrunkPart.Chest);
+        Assert.True(Distance(reached, target) < 4, $"the chest follows the pointer ({reached} vs {target})");
+        // Every joint of the back takes a share of the bend, all the same way - a curve, not a hinge at the hips.
+        foreach (var (bone, limit) in BodyRig.SpineJoints)
+        {
+            Assert.InRange(Degrees(forward, bone), 3, limit);
+        }
+        // The arm hangs as before: same direction, just carried along by the shoulder.
+        double ArmAngle(CharacterInstance c)
+        {
+            var (shoulder, elbow) = (Joint(c, HumanoidBone.LeftUpperArm), Joint(c, HumanoidBone.LeftLowerArm));
+            return Math.Atan2(elbow.Y - shoulder.Y, elbow.X - shoulder.X);
+        }
+        Assert.Equal(ArmAngle(start), ArmAngle(forward), 3);
         Assert.Equal(foot, CharacterPosing.EndPoint(Alice, forward, Limb.LeftLeg));
         Assert.Equal(hips.X, CharacterPosing.TrunkPoint(Alice, forward, TrunkPart.Hips).X, 6);
 
-        var tooFar = CharacterPosing.Lean(Alice, start, new Point2D(hips.X + 50, hips.Y + 10));
-        Assert.Equal(BodyRig.MaxLean, tooFar.Pose.BoneRotations.Single(r => r.Bone == HumanoidBone.Spine).Degrees, 6);
+        var tooFar = CharacterPosing.Lean(Alice, start, new Point2D(hips.X + 80, hips.Y + 30));
+        foreach (var (bone, limit) in BodyRig.SpineJoints)
+            Assert.InRange(Degrees(tooFar, bone), -limit, limit);
     }
 
     [Fact]
-    public void Tilting_the_head_turns_it_about_the_neck_within_its_limit()
+    public void Dragging_the_head_bends_the_neck_and_tilts_the_head_together()
     {
         var start = Placed();
         var top = CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Head);
+        static double Degrees(CharacterInstance c, HumanoidBone b) => c.Pose.BoneRotations.SingleOrDefault(r => r.Bone == b)?.Degrees ?? 0;
 
-        var tilted = CharacterPosing.TiltHead(Alice, start, new Point2D(top.X + 5, top.Y));
-        Assert.True(CharacterPosing.TrunkPoint(Alice, tilted, TrunkPart.Head).X > top.X + 1);
+        var tilted = CharacterPosing.TiltHead(Alice, start, new Point2D(top.X + 5, top.Y + 1));
+        Assert.True(CharacterPosing.TrunkPoint(Alice, tilted, TrunkPart.Head).X > top.X + 3);
+        Assert.True(Degrees(tilted, HumanoidBone.Neck) > 1 && Degrees(tilted, HumanoidBone.Head) > 1, "both the neck and the head turn");
         Assert.Equal(CharacterPosing.TrunkPoint(Alice, start, TrunkPart.Chest), CharacterPosing.TrunkPoint(Alice, tilted, TrunkPart.Chest));
 
         var extreme = CharacterPosing.TiltHead(Alice, start, new Point2D(top.X + 100, top.Y + 100));
-        Assert.Equal(BodyRig.MaxHeadTilt, extreme.Pose.BoneRotations.Single(r => r.Bone == HumanoidBone.Head).Degrees, 6);
+        Assert.InRange(Degrees(extreme, HumanoidBone.Neck), -BodyRig.MaxNeckBend, BodyRig.MaxNeckBend);
+        Assert.InRange(Degrees(extreme, HumanoidBone.Head), -BodyRig.MaxHeadTilt, BodyRig.MaxHeadTilt);
     }
 
     [Fact]

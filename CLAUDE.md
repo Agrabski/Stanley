@@ -507,15 +507,21 @@ body and placement only.
   (limb rotations and IK are measured from it), `Layout` the fully posed one. A pose
   is `PoseData.BoneRotations` (degrees, clockwise, relative to the parent) plus
   `PoseData.HipsShift` (fraction of the character's height, null = standing): the
-  trunk step shifts the hips, leans everything above them (`Spine`, ±`MaxLean`) and
-  tilts the head (`Head`, ±`MaxHeadTilt`); then `ApplyPose` turns the four
+  trunk step shifts the hips and bends the back joint by joint (`BodyRig.SpineJoints`:
+  `Spine` about the hips ±`MaxLean`, `Chest` and `UpperChest` ±`MaxBackBend`; the upper
+  body's outline and the arm roots follow a smooth blend of the segments, `TrunkBend`,
+  so the back curves instead of pivoting like a board), then the neck (`Neck`, about its
+  base) and head (`Head`, about the chin; `NeckJoints`); then `ApplyPose` turns the four
   `BodyRig.LimbChains`. Hands lie along the forearm; a lifted foot tips with its
   shin, a planted one stays flat (`BodyEllipse.RotationDegrees`).
 - **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
   character's handles: green hand/foot dots → `Reach` (two-bone IK, exact in reach,
   pointing at the target out of reach; bend side held per drag via `BendSign`,
   anatomical side on); hollow rings → `MoveHips` (feet pinned by re-solving both
-  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest), `TiltHead`.
+  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest) and `TiltHead`
+  - inverse kinematics too (`SolveTrunkChain`: damped least squares over the spine or
+  neck joints with a smoothness term, so the bend is shared along the chain, never a
+  rigid rotation; `Lean` also keeps the arms' direction, so hanging arms keep hanging).
   `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
   (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
   Walk, Run, Sit) are hand/foot *goals relative to each limb's own root and length*
