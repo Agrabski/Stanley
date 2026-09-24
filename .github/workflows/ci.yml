@@ -1,10 +1,14 @@
-# Test builds for Stanley.
+# Builds, tests and releases for Stanley.
 #
 # - pull_request to main: build + test only.
-# - push to main / workflow_dispatch: build + test, publish self-contained
-#   builds for each platform (workflow artifacts, 30 days), and on main replace
-#   the rolling "nightly" pre-release (Releases > nightly).
-name: Nightly
+# - push to main: release-please keeps the "Release x.y.z" PR up to date (from
+#   feat:/fix: commit messages); build + test; publish self-contained builds
+#   for each platform (workflow artifacts, 30 days); then either
+#     * merging the release PR tagged vX.Y.Z -> attach the builds to that release, or
+#     * any other push -> replace the rolling "nightly" pre-release.
+# - workflow_dispatch: same as a push, without release-please.
+# The version itself comes from MinVer (git tags), see Stanley.App.csproj.
+name: CI
 
 on:
   push:
@@ -30,29 +34,37 @@ env:
   DOTNET_VERSION: "10.0.x"
 
 jobs:
+  # Opens/updates the release PR; when that PR is merged, tags vX.Y.Z and creates
+  # the GitHub Release (without files - release-assets attaches them below).
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   build-and-test:
+    needs: release-please
+    # release-please only runs on pushes; still build when it was skipped.
+    if: ${{ !cancelled() && needs.release-please.result != 'failure' }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      informational_version: ${{ steps.version.outputs.informational_version }}
     steps:
+      # Full history + tags: MinVer derives the version from the latest vX.Y.Z tag
+      # (including one release-please created earlier in this same run).
       - uses: actions/checkout@v7
-
-      # ------------------------------------------------------------------
-      # The ONE place the build version is decided. Every later job reads
-      # needs.build-and-test.outputs.version / .informational_version.
-      # TODO(versioning): placeholder scheme until a versioning scheme is
-      # chosen (e.g. tag-driven SemVer, MinVer/GitVersion). Change only this.
-      # ------------------------------------------------------------------
-      - name: Compute version
-        id: version
-        shell: bash
-        run: |
-          version="0.0.0-nightly.${{ github.run_number }}"
-          sha7="${GITHUB_SHA::7}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "informational_version=$version+$sha7" >> "$GITHUB_OUTPUT"
-          echo "Version: $version+$sha7"
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -67,6 +79,16 @@ jobs:
 
       - name: Build
         run: dotnet build Stanley.slnx -c Release
+
+      # Only used for file names and release titles; the binaries get the same
+      # version from MinVer during their own build.
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(dotnet msbuild src/Stanley.App -t:MinVer -getProperty:MinVerVersion)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
 
       - name: Test
         shell: bash
@@ -88,7 +110,7 @@ jobs:
 
   publish:
     needs: build-and-test
-    if: github.event_name != 'pull_request'
+    if: ${{ !cancelled() && needs.build-and-test.result == 'success' && github.event_name != 'pull_request' }}
     strategy:
       fail-fast: false
       matrix:
@@ -102,9 +124,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       VERSION: ${{ needs.build-and-test.outputs.version }}
-      INFORMATIONAL_VERSION: ${{ needs.build-and-test.outputs.informational_version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -122,9 +145,6 @@ jobs:
         shell: bash
         run: >
           dotnet publish src/Stanley.App -c Release -r ${{ matrix.rid }} --self-contained
-          -p:Version="$VERSION"
-          -p:InformationalVersion="$INFORMATIONAL_VERSION"
-          -p:IncludeSourceRevisionInInformationalVersion=false
           -o "out/stanley-$VERSION-${{ matrix.rid }}"
 
       - name: Smoke test (CLI)
@@ -155,9 +175,34 @@ jobs:
           # Already compressed.
           compression-level: 0
 
+  # A real release (the release PR was just merged): attach the builds to it.
+  release-assets:
+    needs: [release-please, build-and-test, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: stanley-*
+          merge-multiple: true
+
+      - name: Attach builds to the release
+        run: gh release upload "$TAG" dist/* --clobber
+
   nightly-release:
-    needs: [build-and-test, publish]
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [release-please, build-and-test, publish]
+    if: >-
+      ${{ !cancelled() && needs.publish.result == 'success'
+      && github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && needs.release-please.outputs.release_created != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
