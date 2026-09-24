@@ -279,6 +279,15 @@ Editing pipeline layers, bottom to top:
     with neighbours' edges; Alt disables it for one drag. Gutter drags
     (`PanelGutters.FindAt`) move the whole aligned run of panels on both sides,
     keeping the gutter width (`PanelBoundaryDrag.Gap`).
+  - **Layout lock** (`PageDocument.LayoutLocked`, persisted on `Page`, Layout tab's
+    "Lock layout" toggle or the View tab checkbox): while on, panels on that page can't
+    be moved, resized, split, deleted, drawn or re-tiled from a layout preset - every
+    panel-geometry entry point on `PageEditorViewModel` (`Begin*`/`Update*` for
+    resize/move/drag-boundary/create-panel, plus `SplitPanel`/`DeletePanel`/
+    `ApplyLayoutPreset`/the panel branch of `NudgeSelection`) no-ops while locked.
+    Bubbles and characters are unaffected - a deliberately separate code path, so
+    lettering and posing keep working on a protected page. Toggling the lock itself
+    is a normal undoable edit (`IsLayoutLocked` reads/writes through `Working`).
   - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
     `Working`, so a drag is a pure function of the current pointer position.
 - **`Stanley.App`**: `MainWindow` + `MainWindowViewModel` own the document

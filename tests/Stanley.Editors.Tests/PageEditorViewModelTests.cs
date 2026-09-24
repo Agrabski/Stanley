@@ -409,4 +409,187 @@ public class PageEditorViewModelTests
 
         Assert.Equal([ViewportRequest.ZoomIn, ViewportRequest.FitPage], requests);
     }
+
+    // ---------------------------------------------------------------- layout lock
+
+    [Fact]
+    public void IsLayoutLocked_TogglesAsOneUndoEntry()
+    {
+        var (history, vm, _) = NewEditor();
+
+        vm.IsLayoutLocked = true;
+        Assert.True(vm.Working.LayoutLocked);
+        Assert.True(vm.IsLayoutLocked);
+
+        history.Undo();
+        Assert.False(vm.Working.LayoutLocked);
+        Assert.False(vm.IsLayoutLocked);
+
+        history.Redo();
+        Assert.True(vm.IsLayoutLocked);
+    }
+
+    [Fact]
+    public void ResizePanel_WhileLocked_LeavesWorkingUnchanged()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+        var originalBounds = vm.PanelBounds(panelId);
+
+        vm.BeginResizePanel(panelId);
+        vm.UpdateResizePanel(panelId, new Rect2D(10, 10, 90, 90));
+        vm.EndGesture(commit: true);
+
+        Assert.Equal(originalBounds, vm.PanelBounds(panelId));
+        Assert.False(vm.IsGestureActive);
+    }
+
+    [Fact]
+    public void MovePanel_WhileLocked_LeavesWorkingUnchanged()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+        var originalBounds = vm.PanelBounds(panelId);
+
+        vm.BeginMovePanel(panelId);
+        vm.UpdateMovePanel(panelId, 20, 20, snapTolerance: 0);
+        vm.EndGesture(commit: true);
+
+        Assert.Equal(originalBounds, vm.PanelBounds(panelId));
+    }
+
+    [Fact]
+    public void DragBoundary_WhileLocked_LeavesWorkingUnchanged()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5);
+        var firstId = vm.Working.PanelOrder[0];
+        var secondId = vm.Working.PanelOrder[1];
+        var boundary = new PanelBoundaryDrag(BoundaryOrientation.Vertical, [firstId], [secondId]);
+        var originalFirstBounds = vm.PanelBounds(firstId);
+        var originalSecondBounds = vm.PanelBounds(secondId);
+
+        vm.IsLayoutLocked = true;
+        vm.BeginDragBoundary(boundary);
+        vm.UpdateDragBoundary(boundary, originalFirstBounds.Right + 10);
+        vm.EndGesture(commit: true);
+
+        Assert.Equal(originalFirstBounds, vm.PanelBounds(firstId));
+        Assert.Equal(originalSecondBounds, vm.PanelBounds(secondId));
+    }
+
+    [Fact]
+    public void SplitPanel_WhileLocked_DoesNothingAndSetsLastError()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+
+        vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5);
+
+        Assert.Single(vm.Working.Panels);
+        Assert.NotNull(vm.LastError);
+    }
+
+    [Fact]
+    public void DeletePanel_WhileLocked_DoesNothing()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+
+        vm.DeletePanel(panelId);
+
+        Assert.True(vm.Working.Panels.ContainsKey(panelId));
+    }
+
+    [Fact]
+    public void ApplyLayoutPreset_WhileLocked_DoesNothingAndSetsLastError()
+    {
+        var (_, vm, _) = NewEditor();
+        vm.IsLayoutLocked = true;
+
+        vm.ApplyLayoutPreset(PanelLayoutPresets.All.First(p => p.ColumnsPerRow.Sum() == 6));
+
+        Assert.Single(vm.Working.PanelOrder);
+        Assert.NotNull(vm.LastError);
+    }
+
+    [Fact]
+    public void CreatePanelGesture_WhileLocked_DoesNothing()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 100, 100));
+        vm.IsLayoutLocked = true;
+
+        vm.BeginCreatePanel();
+        vm.UpdateCreatePanel(Rect2D.FromEdges(115, 11, 199, 109), snapTolerance: 0);
+        var committed = vm.CommitCreatePanel();
+
+        Assert.False(committed);
+        Assert.Single(vm.Working.Panels);
+        Assert.True(vm.Working.Panels.ContainsKey(panelId));
+        Assert.Null(vm.SelectedPanelId);
+    }
+
+    [Fact]
+    public void NudgeSelection_WhileLocked_DoesNotMoveThePanelButStillMovesABubble()
+    {
+        var (_, vm, panelId) = NewEditor();
+        var bubbleIndex = vm.CreateBubble(panelId, new Point2D(60, 60));
+        var bubbleBefore = BubbleBounds(vm, panelId, bubbleIndex);
+        vm.Select(panelId);
+        var panelBoundsBefore = vm.PanelBounds(panelId);
+        vm.IsLayoutLocked = true;
+
+        vm.NudgeSelection(5, 5);
+        Assert.Equal(panelBoundsBefore, vm.PanelBounds(panelId));
+
+        vm.Select(panelId, bubbleIndex);
+        vm.NudgeSelection(5, 5);
+        var bubbleAfter = BubbleBounds(vm, panelId, bubbleIndex);
+        Assert.NotEqual(bubbleBefore.Left, bubbleAfter.Left);
+    }
+
+    [Fact]
+    public void BubbleAndCharacterEditing_StillWorkWhileLayoutIsLocked()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+
+        var bubbleIndex = vm.CreateBubble(panelId, new Point2D(60, 60));
+        Assert.True(bubbleIndex >= 0);
+        vm.SetBubbleText(panelId, bubbleIndex, "Still works");
+        Assert.Equal("Still works", vm.Working.Panels[panelId].Bubbles[bubbleIndex].Text);
+
+        vm.BeginMoveBubble(panelId, bubbleIndex);
+        vm.UpdateMoveBubble(panelId, bubbleIndex, 5, 5);
+        vm.EndGesture(commit: true);
+    }
+
+    [Fact]
+    public void SplitAndApplyLayoutCommands_AreDisabledWhileLocked()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        Assert.True(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.True(vm.ApplyLayoutCommand.CanExecute(PanelLayoutPresets.All[0]));
+
+        vm.IsLayoutLocked = true;
+
+        Assert.False(vm.SplitColumnsCommand.CanExecute(null));
+        Assert.False(vm.SplitRowsCommand.CanExecute(null));
+        Assert.False(vm.ApplyLayoutCommand.CanExecute(PanelLayoutPresets.All[0]));
+    }
+
+    [Fact]
+    public void DeleteSelectionCommand_StaysEnabledForABubbleButNotAPanelWhileLocked()
+    {
+        var (_, vm, panelId) = NewEditor();
+        var bubbleIndex = vm.CreateBubble(panelId, new Point2D(60, 60));
+        vm.IsLayoutLocked = true;
+
+        vm.Select(panelId, bubbleIndex);
+        Assert.True(vm.DeleteSelectionCommand.CanExecute(null));
+
+        vm.Select(panelId);
+        Assert.False(vm.DeleteSelectionCommand.CanExecute(null));
+    }
 }

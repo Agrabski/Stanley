@@ -5,4 +5,5 @@ namespace Stanley.Editors;
 
 public sealed record PageDocument(
     IReadOnlyList<PanelId> PanelOrder,
-    IReadOnlyDictionary<PanelId, Panel> Panels);
+    IReadOnlyDictionary<PanelId, Panel> Panels,
+    bool LayoutLocked = false);

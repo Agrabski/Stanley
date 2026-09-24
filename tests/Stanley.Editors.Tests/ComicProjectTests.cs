@@ -148,6 +148,20 @@ public sealed class ComicProjectTests : IDisposable
     }
 
     [Fact]
+    public void LayoutLocked_IsSavedWithThePageAndReopened()
+    {
+        var project = ComicProject.CreateNew();
+        var navigator = NavigatorFor(project);
+        navigator.CurrentPage.Editor.IsLayoutLocked = true;
+        var folder = Path.Combine(_root, "locked");
+
+        project.SaveAs(folder, navigator.Snapshot());
+
+        var reopened = ComicProject.Open(folder);
+        Assert.True(reopened.Pages[0].Document.LayoutLocked);
+    }
+
+    [Fact]
     public void PageNumbering_IsSavedWithTheIssueAndReopened()
     {
         var project = ComicProject.CreateNew();
