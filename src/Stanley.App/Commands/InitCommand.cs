@@ -7,12 +7,11 @@ namespace Stanley.App.Commands;
 /// <summary>The <c>stanley init &lt;path&gt;</c> command: creates a brand-new, empty Stanley project.</summary>
 internal static class InitCommand
 {
-    // US comic trim (6.625 x 10.25 in) with a 1/8 in bleed, in millimetres - a sensible
-    // default so `stanley init` works with no page-size flags, per the project's "ease
-    // of use" priority; --page-*-mm overrides it for anything else.
-    private const double DefaultWidthMm = 168.275;
-    private const double DefaultHeightMm = 260.35;
-    private const double DefaultBleedMm = 3.175;
+    // A4 with a 3mm bleed - a sensible metric default so `stanley init` works with no
+    // page-size flags, per the project's "ease of use" priority; --page-*-mm overrides
+    // it for anything else. Always metric: no inch-derived defaults.
+    private static readonly PageSize DefaultSize = MetricPaperSizes.Size(MetricPaperSize.A4);
+    private const double DefaultBleedMm = 3;
 
     public static Command Build()
     {
@@ -27,12 +26,12 @@ internal static class InitCommand
         var widthOption = new Option<double>("--page-width-mm")
         {
             Description = "Default page trim width, in millimetres.",
-            DefaultValueFactory = _ => DefaultWidthMm
+            DefaultValueFactory = _ => DefaultSize.WidthMm
         };
         var heightOption = new Option<double>("--page-height-mm")
         {
             Description = "Default page trim height, in millimetres.",
-            DefaultValueFactory = _ => DefaultHeightMm
+            DefaultValueFactory = _ => DefaultSize.HeightMm
         };
         var bleedOption = new Option<double>("--page-bleed-mm")
         {

@@ -128,8 +128,10 @@ features will read and write.
   it isn't baked into presets. `MetricPaperSize`/`MetricPaperSizes` give the
   ISO 216 "A" series (A0–A6) as portrait `PageSize`s — the same
   enum-plus-static-lookup shape as `BubbleStylePreset`/`BubbleStylePresets`.
-  No US/imperial preset table exists yet; `stanley init`'s US-comic-trim
-  default is just inlined constants in `InitCommand`.
+  **Always metric, project-wide** — no inch-derived defaults or imperial
+  preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
+  (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
+  not its own preset table entry, since bleed isn't part of a paper size).
 - **Not yet designed**: bubble persistence (`Panel.Bubbles` is a placeholder
   `IReadOnlyList<BubbleId>` — Stanley.Bubbles has no JSON format yet),
   `sticker.json`'s exact schema beyond what's implemented here (the design
@@ -165,10 +167,11 @@ it's Microsoft's own, AOT/trim-clean (0 analyzer warnings under this repo's
   the built exe.
 - `stanley init <path>`: creates a new project via
   `ProjectRepository.Initialize`. Defaults the title to the target
-  directory's name and the page trim to US comic trim (6.625 × 10.25 in +
-  1/8 in bleed) so it works with zero flags, per the project's "ease of use"
-  priority; `--title`/`--page-*-mm` override, `--force` is required to
-  overwrite a directory that already has a `stanley.json` (checked via
+  directory's name and the page trim to A4 (`MetricPaperSizes.Size(A4)`)
+  with a 3mm bleed so it works with zero flags, per the project's "ease of
+  use" priority; `--title`/`--page-*-mm` override. Always metric, no
+  inch-derived defaults anywhere. `--force` is required to overwrite a
+  directory that already has a `stanley.json` (checked via
   `ProjectRepository.IsInitialized`).
 - Not yet implemented: any subcommand beyond `init` (add/list
   character/issue/page/panel, etc.), opening a project from the GUI via a

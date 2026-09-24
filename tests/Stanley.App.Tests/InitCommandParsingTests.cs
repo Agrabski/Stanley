@@ -1,4 +1,5 @@
 using Stanley.App.Commands;
+using Stanley.ProjectModel;
 
 namespace Stanley.App.Tests;
 
@@ -38,11 +39,13 @@ public class InitCommandParsingTests
     {
         var result = InitCommand.Build().Parse(["/tmp/my-comic"]);
 
+        var a4 = MetricPaperSizes.Size(MetricPaperSize.A4);
+
         Assert.Empty(result.Errors);
         Assert.Null(result.GetValue<string?>("--title"));
-        Assert.Equal(168.275, result.GetValue<double>("--page-width-mm"));
-        Assert.Equal(260.35, result.GetValue<double>("--page-height-mm"));
-        Assert.Equal(3.175, result.GetValue<double>("--page-bleed-mm"));
+        Assert.Equal(a4.WidthMm, result.GetValue<double>("--page-width-mm"));
+        Assert.Equal(a4.HeightMm, result.GetValue<double>("--page-height-mm"));
+        Assert.Equal(3, result.GetValue<double>("--page-bleed-mm"));
         Assert.False(result.GetValue<bool>("--force"));
     }
 

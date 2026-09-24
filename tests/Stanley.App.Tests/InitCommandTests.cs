@@ -1,4 +1,5 @@
 using Stanley.App.Commands;
+using Stanley.ProjectModel;
 using Stanley.ProjectModel.Storage;
 
 namespace Stanley.App.Tests;
@@ -32,16 +33,15 @@ public class InitCommandTests : IDisposable
     }
 
     [Fact]
-    public void Uses_the_documented_default_page_trim_when_not_overridden()
+    public void Defaults_the_page_trim_to_A4_with_a_3mm_bleed()
     {
         var path = Path.Combine(_root, "trim-defaults");
 
         Assert.Equal(0, Run(path));
 
         var trim = new ProjectRepository(path).LoadManifest().DefaultPageTrim;
-        Assert.Equal(168.275, trim.Size.WidthMm);
-        Assert.Equal(260.35, trim.Size.HeightMm);
-        Assert.Equal(3.175, trim.BleedMm);
+        Assert.Equal(MetricPaperSizes.Size(MetricPaperSize.A4), trim.Size);
+        Assert.Equal(3, trim.BleedMm);
     }
 
     [Fact]
