@@ -15,9 +15,11 @@ public enum BoundaryOrientation
 /// Which panels share a boundary, identified explicitly by the caller (the page editor
 /// already knows its own grid) rather than inferred from geometry: <see cref="PanelsBefore"/>
 /// are the panels whose right (or bottom) edge this boundary is, <see cref="PanelsAfter"/>
-/// the panels whose left (or top) edge it is.
+/// the panels whose left (or top) edge it is. <see cref="Gap"/> is the gutter width kept
+/// between the two sides while dragging (0 for panels that touch).
 /// </summary>
 public sealed record PanelBoundaryDrag(
     BoundaryOrientation Orientation,
     IReadOnlyList<PanelId> PanelsBefore,
-    IReadOnlyList<PanelId> PanelsAfter);
+    IReadOnlyList<PanelId> PanelsAfter,
+    double Gap = 0);

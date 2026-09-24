@@ -61,8 +61,8 @@ public class PageEditorTests
     /// <summary>
     /// Verifies that dragging a panel's bottom-right corner inward shrinks its bounds,
     /// and that the gesture commits so Working == Committed after release. Inward, not
-    /// outward: the demo page starts with one panel filling the entire A4 page, so any
-    /// outward drag would exceed the page bounds and be correctly rejected by
+    /// outward: the demo page starts with one panel filling the A4 page's live area, so a
+    /// large outward drag would exceed the page bounds and be correctly rejected by
     /// PanelLayoutEditing.Resize's validation - there'd be nothing to grow into.
     /// </summary>
     [Fact]
@@ -79,8 +79,7 @@ public class PageEditorTests
         Assert.NotNull(canvas);
 
         // Drag the bottom-right corner inward
-        var cornerWorldPoint = new Point(boundsBefore.Right, boundsBefore.Bottom);
-        var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
+        var cornerWindowPoint = canvas.TranslatePoint(canvas.PageToControl(new Point2D(boundsBefore.Right, boundsBefore.Bottom)), window)!.Value;
         var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
@@ -118,8 +117,7 @@ public class PageEditorTests
         Assert.NotNull(canvas);
 
         // Start dragging the bottom-right corner inward (see DraggingPanelCorner_ResizesThePanelAndCommits for why inward)
-        var cornerWorldPoint = new Point(boundsBefore.Right, boundsBefore.Bottom);
-        var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
+        var cornerWindowPoint = canvas.TranslatePoint(canvas.PageToControl(new Point2D(boundsBefore.Right, boundsBefore.Bottom)), window)!.Value;
         var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
@@ -171,8 +169,7 @@ public class PageEditorTests
 
         // Perform a resize gesture to create an undo entry (inward - see
         // DraggingPanelCorner_ResizesThePanelAndCommits for why not outward)
-        var cornerWorldPoint = new Point(boundsOriginal.Right, boundsOriginal.Bottom);
-        var cornerWindowPoint = canvas.TranslatePoint(cornerWorldPoint, window)!.Value;
+        var cornerWindowPoint = canvas.TranslatePoint(canvas.PageToControl(new Point2D(boundsOriginal.Right, boundsOriginal.Bottom)), window)!.Value;
         var newCornerWindowPoint = new Point(cornerWindowPoint.X - 50, cornerWindowPoint.Y - 40);
 
         window.MouseDown(cornerWindowPoint, MouseButton.Left);
@@ -223,6 +220,108 @@ public class PageEditorTests
         var canvas = GetPageCanvasControl(window);
         Assert.NotNull(canvas);
         Assert.NotNull(canvas.ViewModel);
+    }
+
+    /// <summary>The main "add dialogue" path: double-click inside a panel, type, press Enter.</summary>
+    [Fact]
+    public void DoubleClickInPanel_TypeAndEnter_CreatesALetteredBubbleInThatPanel()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
+        var panelId = window.Editor.Working.PanelOrder[0];
+        var bounds = window.Editor.PanelBounds(panelId);
+
+        var point = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.TextEditor.IsVisible, "the inline text editor should open over the new bubble");
+        window.KeyTextInput("Hello there");
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(view.TextEditor.IsVisible);
+        var bubble = Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
+        Assert.Equal("Hello there", bubble.Text);
+    }
+
+    /// <summary>Picking the bubble tool from the keyboard and clicking places a bubble, then returns to the select tool.</summary>
+    [Fact]
+    public void BubbleToolShortcut_ThenClick_AddsBubbleAndReturnsToSelect()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var panelId = window.Editor.Working.PanelOrder[0];
+        var bounds = window.Editor.PanelBounds(panelId);
+
+        canvas.Focus();
+        window.KeyPress(Key.B, RawInputModifiers.None, PhysicalKey.B, "b");
+        Assert.Equal(PageEditorTool.Bubble, window.Editor.Tool);
+
+        var point = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
+        Assert.Equal(PageEditorTool.Select, window.Editor.Tool);
+    }
+
+    /// <summary>Ctrl+scroll zooms towards the pointer; Fit page brings the whole A4 page back into view.</summary>
+    [Fact]
+    public void CtrlScroll_ZoomsAroundThePointer_AndFitPageRestores()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var fitZoom = canvas.Zoom;
+
+        var pagePoint = new Point2D(50, 60);
+        var screenPoint = canvas.TranslatePoint(canvas.PageToControl(pagePoint), window)!.Value;
+        window.MouseWheel(screenPoint, new Vector(0, 3), RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(canvas.Zoom > fitZoom, "scrolling up with Ctrl should zoom in");
+        var after = canvas.TranslatePoint(canvas.PageToControl(pagePoint), window)!.Value;
+        Assert.Equal(screenPoint.X, after.X, 3);
+        Assert.Equal(screenPoint.Y, after.Y, 3);
+
+        canvas.FitPage();
+        Assert.Equal(fitZoom, canvas.Zoom, 6);
+        var topLeft = canvas.PageToControl(new Point2D(0, 0));
+        var bottomRight = canvas.PageToControl(new Point2D(210, 297));
+        Assert.True(topLeft.X >= 0 && topLeft.Y >= 0 && bottomRight.X <= canvas.Bounds.Width && bottomRight.Y <= canvas.Bounds.Height,
+            "fit page should show the whole A4 page");
+    }
+
+    /// <summary>Dragging the gutter between two panels resizes both and keeps the gutter between them.</summary>
+    [Fact]
+    public void DraggingAGutter_ResizesBothNeighbours()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var editor = window.Editor;
+        editor.SplitPanel(editor.Working.PanelOrder[0], Stanley.Editing.BoundaryOrientation.Vertical, 0.5);
+        var (left, right) = (editor.Working.PanelOrder[0], editor.Working.PanelOrder[1]);
+        var gutterBefore = editor.PanelBounds(right).Left - editor.PanelBounds(left).Right;
+        var leftRightBefore = editor.PanelBounds(left).Right;
+
+        var start = canvas.TranslatePoint(canvas.PageToControl(new Point2D(leftRightBefore + gutterBefore / 2, 100)), window)!.Value;
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(new Point(start.X - 40, start.Y));
+        window.MouseUp(new Point(start.X - 40, start.Y), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(editor.PanelBounds(left).Right < leftRightBefore - 5, "left panel should shrink");
+        Assert.Equal(gutterBefore, editor.PanelBounds(right).Left - editor.PanelBounds(left).Right, 6);
+        Assert.True(window.History.CanUndo);
     }
 
     /// <summary>

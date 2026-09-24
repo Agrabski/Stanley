@@ -4,7 +4,7 @@
         xmlns:editors="using:Stanley.Editors"
         x:Class="Stanley.App.MainWindow"
         Title="Stanley"
-        Width="1100" Height="800">
+        Width="1360" Height="900">
   <Window.DataTemplates>
     <DataTemplate DataType="editors:PageEditorViewModel">
       <editors:PageEditorView />

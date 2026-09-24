@@ -124,4 +124,53 @@ public class BubbleEditingTests
         Assert.True(result.IsValid);
         Assert.Equal("Hello!", result.Value.Text);
     }
+
+    [Fact]
+    public void Move_TranslatesTheShapeButNotTailTargets()
+    {
+        var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(0, 0, 60, 40)), new Point2D(30, 100)).Value;
+
+        var moved = BubbleEditing.Move(bubble, 10, 5).Value;
+
+        var bounds = AnchorRing.BoundingBox(moved.Shape.Anchors);
+        Assert.Equal(10, bounds.Left, 6);
+        Assert.Equal(5, bounds.Top, 6);
+        Assert.Equal(new Point2D(30, 100), moved.Tails[0].Target);
+    }
+
+    [Fact]
+    public void KeepInside_SlidesTheBubbleAndClampsTailTargetsIntoTheContainer()
+    {
+        var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(90, -10, 60, 40)), new Point2D(300, 300)).Value;
+        var container = new Rect2D(0, 0, 120, 120);
+
+        var kept = BubbleEditing.KeepInside(bubble, container);
+
+        var bounds = AnchorRing.BoundingBox(kept.Shape.Anchors);
+        Assert.Equal(60, bounds.Left, 6);
+        Assert.Equal(0, bounds.Top, 6);
+        Assert.Equal(60, bounds.Width, 6);
+        Assert.Equal(new Point2D(120, 120), kept.Tails[0].Target);
+    }
+
+    [Fact]
+    public void KeepInside_ShrinksABubbleBiggerThanTheContainer()
+    {
+        var kept = BubbleEditing.KeepInside(NewBubble(new Rect2D(0, 0, 200, 40)), new Rect2D(0, 0, 100, 100));
+
+        Assert.Equal(100, AnchorRing.BoundingBox(kept.Shape.Anchors).Width, 6);
+    }
+
+    [Fact]
+    public void Refit_KeepsTheBubblesRelativePositionInItsPanel()
+    {
+        var bubble = NewBubble(new Rect2D(40, 40, 20, 20));
+
+        var refit = BubbleEditing.Refit(bubble, new Rect2D(0, 0, 100, 100), new Rect2D(0, 0, 200, 100));
+
+        var bounds = AnchorRing.BoundingBox(refit.Shape.Anchors);
+        Assert.Equal(100, bounds.MidX, 6);
+        Assert.Equal(50, bounds.MidY, 6);
+        Assert.Equal(20, bounds.Width, 6);
+    }
 }

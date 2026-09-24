@@ -1,5 +1,7 @@
 using Dock.Model.Controls;
+using Stanley.Editing;
 using Stanley.EditorFramework;
+using Stanley.ProjectModel;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
@@ -9,14 +11,16 @@ namespace Stanley.Editors;
 
 public static class PageEditorHost
 {
+    /// <summary>An A4 page (the project-wide default trim) holding one panel that fills the live area inside the default margin - a blank page ready to be split or given a layout.</summary>
     public static (EditorHistory History, IRootDock Layout, PageEditorViewModel Editor) CreateDemoLayout()
     {
         var history = new EditorHistory();
-        var pageBounds = new Rect2D(0, 0, 210, 297); // A4 in mm
+        var paper = MetricPaperSizes.Size(MetricPaperSize.A4);
+        var pageBounds = new Rect2D(0, 0, paper.WidthMm, paper.HeightMm);
         var panelId = PanelId.New();
         var panel = new PanelModel(
             panelId,
-            PanelShapes.Rectangle(pageBounds),
+            PanelShapes.Rectangle(PanelGrid.Default.LiveArea(pageBounds)),
             Background: null,
             CharacterInstances: [],
             Bubbles: []);

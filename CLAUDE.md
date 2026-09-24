@@ -24,7 +24,8 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
-concrete page/panel/bubble editor all exist. No character rendering yet.
+concrete page/panel/bubble editor (ribbon UI, zoom, snapping) all exist. The page
+editor still edits an in-memory demo page — it doesn't load/save a project yet. No character rendering yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -171,7 +172,8 @@ Editing pipeline layers, bottom to top:
   dependencies — the shared vocabulary between editing logic and the editor
   framework, kept here so EditorFramework never has to reference Editing.
 - **`Stanley.Editing`**: pure editing functions over immutable document
-  values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`).
+  values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`,
+  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`).
   Avalonia-free by design — a future `stanley` subcommand could invoke the
   same logic headlessly, with no recompilation needed.
 - **`Stanley.EditorFramework`**: `EditorHistory` (one shared undo/redo stack
@@ -184,11 +186,38 @@ Editing pipeline layers, bottom to top:
   requirement. `TDocument` must be immutable (`record` satisfies this).
 - **`Stanley.Editors`**: concrete editor implementations (`PageEditorViewModel`
   extends `EditorViewModel<PageDocument>`, `PageEditorView` is the UI, `PageEditorHost`
-  builds the demo page + history + layout at startup). Supports panel resize,
-  panel split, boundary drag between adjacent panels, bubble insertion/resize/style-change.
-  Panels in the page editor are always axis-aligned rectangles (an arbitrary
-  hand-edited `PanelShape` remains a data-model escape hatch, just unreachable
-  through this editor's drag interactions — future editors could expose it).
+  builds the demo page + history + layout at startup). Panels in the page editor are
+  always axis-aligned rectangles (an arbitrary hand-edited `PanelShape` remains a
+  data-model escape hatch, just unreachable through this editor's drag interactions).
+  The page editor UI:
+  - **Ribbon** (`PageEditorView.axaml`): tools (Select/Panel/Bubble/Pan, also
+    V/P/B/H), undo/redo/delete, page layout presets (`PanelLayoutPresets`, with
+    margin/gutter settings tucked into the same flyout), split into columns/rows,
+    snap toggle, bubble style (one control for "selected bubble" *and* "next new
+    bubble", like a font box), text/tail/z-order actions, zoom. A status bar always
+    shows a one-line hint for the current tool/selection plus the last validation
+    error. Right-click gives a context menu for the thing under the pointer.
+  - **Zoom**: the document is in millimetres; `PageCanvasControl` owns the mm→screen
+    transform. 100% = the page at its printed size on a 96 DPI screen
+    (`ActualSizeZoom`); starts in fit-page mode (re-fits on resize until the user
+    zooms/pans). Ctrl+scroll zooms at the cursor, scroll/Space-drag/middle-drag pans.
+    `PageCanvasDrawOperation` draws artwork in page space (mm values:
+    `FontSizeMm`, `BubbleStrokeMm`, …) and handles/guides in screen space so they
+    stay grabbable at any zoom.
+  - **Bubbles belong to their panel**: every bubble edit goes through
+    `BubbleEditing.KeepInside` (slide/shrink into the panel, clamp tail targets),
+    rendering clips bubbles to their panel, and panel resize/move/split/layout carry
+    bubbles along (`BubbleEditing.Refit`, split sends each bubble to the half its
+    centre is in). Double-click in a panel (or the Bubble tool, or "Add bubble")
+    creates a bubble with a tail already aimed into free space, and opens an inline
+    text editor over it (Enter = done, Shift+Enter = newline, Esc = cancel).
+  - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm):
+    panel edges snap to the page margin, one gutter from neighbours, and into line
+    with neighbours' edges; Alt disables it for one drag. Gutter drags
+    (`PanelGutters.FindAt`) move the whole aligned run of panels on both sides,
+    keeping the gutter width (`PanelBoundaryDrag.Gap`).
+  - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
+    `Working`, so a drag is a pure function of the current pointer position.
 - **`Stanley.App`**: wires `EditorHistory` + `PageEditorHost.CreateDemoLayout()`
   into `MainWindow`'s Dock.Avalonia `DockControl` at startup. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
