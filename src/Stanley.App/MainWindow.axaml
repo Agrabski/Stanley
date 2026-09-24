@@ -1,19 +1,14 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="using:Stanley.App"
+        xmlns:dock="using:Dock.Avalonia.Controls"
+        xmlns:editors="using:Stanley.Editors"
         x:Class="Stanley.App.MainWindow"
-        Title="Stanley — Speech Bubble POC"
-        Width="900" Height="650">
-  <DockPanel>
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="8">
-      <TextBlock Text="Style:" VerticalAlignment="Center" />
-      <RadioButton x:Name="SpeechRadio" Content="Speech" GroupName="Style" IsChecked="True" Click="OnStyleChanged" />
-      <RadioButton x:Name="ShoutRadio" Content="Shout" GroupName="Style" Click="OnStyleChanged" />
-      <RadioButton x:Name="WhisperRadio" Content="Whisper" GroupName="Style" Click="OnStyleChanged" />
-      <Button x:Name="AddTailButton" Content="Add Tail" Click="OnAddTail" Margin="16,0,0,0" />
-      <TextBlock VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.7"
-                 Text="Drag the blue corners to resize. Drag an orange tip to point a tail anywhere; drag a green base to slide it along the outline. Right-click a tip to remove that tail." />
-    </StackPanel>
-    <local:BubbleCanvasControl x:Name="Canvas" />
-  </DockPanel>
+        Title="Stanley"
+        Width="1100" Height="800">
+  <Window.DataTemplates>
+    <DataTemplate DataType="editors:PageEditorViewModel">
+      <editors:PageEditorView />
+    </DataTemplate>
+  </Window.DataTemplates>
+  <dock:DockControl x:Name="EditorDock" />
 </Window>

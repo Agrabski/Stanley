@@ -1,32 +1,32 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
-using Stanley.Bubbles;
+using Avalonia.Input;
+using Stanley.EditorFramework;
+using Stanley.Editors;
 
 namespace Stanley.App;
 
 public partial class MainWindow : Window
 {
+    private readonly EditorHistory _history;
+
     public MainWindow()
     {
         InitializeComponent();
+
+        var (history, layout, editor) = PageEditorHost.CreateDemoLayout();
+        _history = history;
+        EditorDock.Layout = layout;
+        EditorDock.Factory = layout.Factory;
+
+        KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.Z, KeyModifiers.Control), Command = history.UndoCommand });
+        KeyBindings.Add(new KeyBinding { Gesture = new KeyGesture(Key.Z, KeyModifiers.Control | KeyModifiers.Shift), Command = history.RedoCommand });
+
+        Editor = editor;
     }
 
     /// <summary>Exposed for headless UI tests, which live in a separate assembly from the generated x:Name fields.</summary>
-    public BubbleCanvasControl CanvasControl => Canvas;
-    public RadioButton ShoutStyleRadio => ShoutRadio;
-    public Button AddTailButtonControl => AddTailButton;
+    public PageEditorViewModel Editor { get; }
 
-    private void OnStyleChanged(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not RadioButton { IsChecked: true } radio) return;
-        var style = radio.Name switch
-        {
-            nameof(ShoutRadio) => BubbleStylePreset.Shout,
-            nameof(WhisperRadio) => BubbleStylePreset.Whisper,
-            _ => BubbleStylePreset.Speech
-        };
-        Canvas.SetStyle(style);
-    }
-
-    private void OnAddTail(object? sender, RoutedEventArgs e) => Canvas.AddTail();
+    /// <summary>Exposed for headless UI tests, which live in a separate assembly from the generated x:Name fields.</summary>
+    public EditorHistory History => _history;
 }

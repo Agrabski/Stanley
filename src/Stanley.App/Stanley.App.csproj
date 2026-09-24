@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -7,7 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Stanley.Bubbles\Stanley.Bubbles.csproj" />
+    <ProjectReference Include="..\Stanley.Editing\Stanley.Editing.csproj" />
+    <ProjectReference Include="..\Stanley.EditorFramework\Stanley.EditorFramework.csproj" />
+    <ProjectReference Include="..\Stanley.Editors\Stanley.Editors.csproj" />
     <ProjectReference Include="..\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
   </ItemGroup>
 
@@ -16,6 +18,8 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
     <PackageReference Include="Avalonia.Skia" Version="12.1.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Dock.Avalonia" Version="12.1.0.6" />
+    <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="12.1.0.6" />
     <PackageReference Include="System.CommandLine" Version="2.0.12" />
   </ItemGroup>
 
