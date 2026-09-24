@@ -12,6 +12,8 @@
     <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="4.152.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="4.152.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="12.1.0.6" />
+    <PackageReference Include="Dock.Avalonia" Version="12.1.0.6" />
   </ItemGroup>
 
   <ItemGroup>
