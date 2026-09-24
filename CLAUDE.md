@@ -288,6 +288,10 @@ Editing pipeline layers, bottom to top:
     Bubbles and characters are unaffected - a deliberately separate code path, so
     lettering and posing keep working on a protected page. Toggling the lock itself
     is a normal undoable edit (`IsLayoutLocked` reads/writes through `Working`).
+    Panels can't even be *selected* while locked: `Select` turns a panel-only
+    selection into none (and locking clears one), and the canvas offers no panel
+    handles, edges, gutters, hover or selection outline - a click on a panel acts
+    like the pasteboard; double-click still adds a bubble.
   - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
     `Working`, so a drag is a pure function of the current pointer position.
 - **`Stanley.App`**: `MainWindow` + `MainWindowViewModel` own the document

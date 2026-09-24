@@ -434,8 +434,15 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public event Action? SelectionChanged;
 
+    /// <remarks>
+    /// With the layout locked, panels themselves can't be selected: asking for a panel with
+    /// no bubble or character in it clears the selection instead. Bubbles and characters
+    /// inside panels stay selectable.
+    /// </remarks>
     public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1)
     {
+        if (Working.LayoutLocked && bubbleIndex < 0 && characterIndex < 0)
+            panelId = null;
         if (panelId is null)
             bubbleIndex = characterIndex = -1;
         if (bubbleIndex >= 0)
@@ -497,6 +504,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 Select(null);
             else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count)
                 Select(id);
+            else if (Working.LayoutLocked && IsPanelContext)
+                Select(null); // just locked (or redone a lock) with a panel selected
         }
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
         OnPropertyChanged(nameof(IsLayoutLocked));
@@ -547,8 +556,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
-        _ when IsPanelContext && Working.LayoutLocked => "Layout is locked - unlock it on the Layout tab to move, resize, split or delete panels.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
+        _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
     };
 

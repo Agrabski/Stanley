@@ -512,6 +512,41 @@ public class PageEditorTests
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
     }
 
+    /// <summary>Clicking a panel on a locked layout selects nothing - no Panel tab, nothing to drag - while double-click still adds a bubble.</summary>
+    [Fact]
+    public void ClickingAPanel_WhileLayoutIsLocked_DoesNotSelectIt()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var panelId = window.Editor.Working.PanelOrder[0];
+        var bounds = window.Editor.PanelBounds(panelId);
+        window.Editor.IsLayoutLocked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        foreach (var pagePoint in new[] { new Point2D(bounds.MidX, bounds.MidY), new Point2D(bounds.Left + 0.5, bounds.MidY) })
+        {
+            var point = canvas.TranslatePoint(canvas.PageToControl(pagePoint), window)!.Value;
+            window.MouseDown(point, MouseButton.Left);
+            window.MouseMove(new Point(point.X + 30, point.Y + 30));
+            window.MouseUp(new Point(point.X + 30, point.Y + 30), MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Null(window.Editor.SelectedPanelId);
+            Assert.False(window.Editor.IsPanelContext);
+            Assert.Equal(bounds, window.Editor.PanelBounds(panelId));
+        }
+
+        var centre = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
+        window.MouseDown(centre, MouseButton.Left);
+        window.MouseUp(centre, MouseButton.Left);
+        window.MouseDown(centre, MouseButton.Left);
+        window.MouseUp(centre, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
+        Assert.True(window.Editor.IsBubbleContext);
+    }
+
     /// <summary>A ribbon command outside the pane still reaches the pane's view: Add bubble opens the inline text editor.</summary>
     [Fact]
     public void RibbonAddBubble_OpensTheInlineTextEditorInThePane()
