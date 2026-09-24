@@ -58,7 +58,40 @@ public sealed class ProjectRepository
         ProjectPaths.FindEntityDir(CharactersDir, id) ?? throw NotFoundDir("character", id.Value);
 
     public CharacterDefinition LoadCharacter(CharacterId id) =>
-        ProjectJson.Read<CharacterDefinition>(Path.Combine(CharacterDirOrThrow(id), ProjectPaths.CharacterFileName));
+        ReadCharacter(Path.Combine(CharacterDirOrThrow(id), ProjectPaths.CharacterFileName));
+
+    /// <summary>
+    /// Every character in the project, sorted by name. There's no index file: a character
+    /// is whatever <c>characters/&lt;id&gt;-slug/character.json</c> folders exist, so adding
+    /// one never touches a shared file (and never conflicts in a merge).
+    /// </summary>
+    public IReadOnlyList<CharacterDefinition> ListCharacters()
+    {
+        if (!Directory.Exists(CharactersDir))
+            return [];
+
+        return Directory.EnumerateDirectories(CharactersDir)
+            .Select(dir => Path.Combine(dir, ProjectPaths.CharacterFileName))
+            .Where(File.Exists)
+            .Select(ReadCharacter)
+            .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(c => c.Id.Value, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>Removes a character's whole folder (revisions and stickers too). A no-op if it was never saved.</summary>
+    public void DeleteCharacter(CharacterId id)
+    {
+        if (ProjectPaths.FindEntityDir(CharactersDir, id) is { } dir)
+            Directory.Delete(dir, recursive: true);
+    }
+
+    // A character.json written before bodies existed has no "body"; it gets the default one.
+    private static CharacterDefinition ReadCharacter(string path)
+    {
+        var character = ProjectJson.Read<CharacterDefinition>(path);
+        return character.Body is null ? character with { Body = BodyShape.Default } : character;
+    }
 
     public void SaveCharacter(CharacterDefinition character)
     {

@@ -4,6 +4,7 @@ using Stanley.Editing;
 using Stanley.Editing.Abstractions;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Bubbles;
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
@@ -38,6 +39,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     private PageEditorTool _tool = PageEditorTool.Select;
     private PanelId? _selectedPanelId;
     private int _selectedBubbleIndex = -1;
+    private int _selectedCharacterIndex = -1;
+    private ICharacterCatalog? _catalog;
     private BubbleStylePreset _newBubbleStyle = BubbleStylePreset.Speech;
     private PanelGrid _grid = PanelGrid.Default;
     private bool _snapEnabled = true;
@@ -65,8 +68,30 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         RemoveTailCommand = new RelayCommand(
             () => RemoveBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex, SelectedBubble!.Tails.Count - 1),
             () => SelectedBubbleHasTails);
-        BringToFrontCommand = new RelayCommand(() => BringBubbleToFront(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
-        SendToBackCommand = new RelayCommand(() => SendBubbleToBack(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        BringToFrontCommand = new RelayCommand(() => ReorderSelection(toFront: true), () => HasSelectedBubble || HasSelectedCharacter);
+        SendToBackCommand = new RelayCommand(() => ReorderSelection(toFront: false), () => HasSelectedBubble || HasSelectedCharacter);
+        InsertCharacterCommand = new RelayCommand<CharacterDefinition>(character =>
+        {
+            if (character != null)
+                InsertCharacter(character.Id);
+        }, _ => Working.PanelOrder.Count > 0);
+        NewCharacterCommand = new RelayCommand(() =>
+        {
+            if (_catalog != null)
+                InsertCharacter(_catalog.CreateCharacter().Id);
+        }, () => _catalog != null && Working.PanelOrder.Count > 0);
+        FlipCharacterCommand = new RelayCommand(() => FlipCharacter(_selectedPanelId!.Value, _selectedCharacterIndex), () => HasSelectedCharacter);
+        BiggerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1.1), () => HasSelectedCharacter);
+        SmallerCharacterCommand = new RelayCommand(() => ScaleCharacter(_selectedPanelId!.Value, _selectedCharacterIndex, 1 / 1.1), () => HasSelectedCharacter);
+        MatchCharacterSizeCommand = new RelayCommand(() => MatchCharacterSize(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterHasOddScale);
+        ApplyPosePresetCommand = new RelayCommand<PosePresetChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                ApplyPosePreset(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
+        });
+        MirrorPoseCommand = new RelayCommand(() => MirrorCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
+        ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
+        EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
         DrawPanelCommand = new RelayCommand(() => Tool = PageEditorTool.Panel);
         InsertBubbleCommand = new RelayCommand<BubbleStylePreset>(style =>
         {
@@ -101,6 +126,20 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public IRelayCommand BringToFrontCommand { get; }
     public IRelayCommand SendToBackCommand { get; }
     public IRelayCommand<PanelLayoutPreset> ApplyLayoutCommand { get; }
+
+    /// <summary>Insert tab: places the given character in the selected (or first) panel, at the panel's scale.</summary>
+    public IRelayCommand<CharacterDefinition> InsertCharacterCommand { get; }
+
+    /// <summary>Insert tab: a brand-new character (default body), placed in the selected panel - double-click it to shape its body.</summary>
+    public IRelayCommand NewCharacterCommand { get; }
+    public IRelayCommand FlipCharacterCommand { get; }
+    public IRelayCommand BiggerCharacterCommand { get; }
+    public IRelayCommand SmallerCharacterCommand { get; }
+    public IRelayCommand MatchCharacterSizeCommand { get; }
+    public IRelayCommand EditCharacterCommand { get; }
+
+    /// <summary>Back to standing at rest.</summary>
+    public IRelayCommand ResetPoseCommand { get; }
 
     /// <summary>Insert tab: switches to the panel tool, ready to drag out a new panel.</summary>
     public IRelayCommand DrawPanelCommand { get; }
@@ -173,6 +212,13 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         RemoveTailCommand.NotifyCanExecuteChanged();
         BringToFrontCommand.NotifyCanExecuteChanged();
         SendToBackCommand.NotifyCanExecuteChanged();
+        InsertCharacterCommand.NotifyCanExecuteChanged();
+        NewCharacterCommand.NotifyCanExecuteChanged();
+        FlipCharacterCommand.NotifyCanExecuteChanged();
+        BiggerCharacterCommand.NotifyCanExecuteChanged();
+        SmallerCharacterCommand.NotifyCanExecuteChanged();
+        MatchCharacterSizeCommand.NotifyCanExecuteChanged();
+        EditCharacterCommand.NotifyCanExecuteChanged();
     }
 
     // ---------------------------------------------------------------- tool & settings
@@ -327,13 +373,20 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Index into the selected panel's <see cref="Panel.Bubbles"/>, or -1.</summary>
     public int SelectedBubbleIndex => _selectedBubbleIndex;
 
+    /// <summary>Index into the selected panel's <see cref="Panel.CharacterInstances"/>, or -1. At most one of this and <see cref="SelectedBubbleIndex"/> is set.</summary>
+    public int SelectedCharacterIndex => _selectedCharacterIndex;
+
     public bool HasSelectedPanel => _selectedPanelId is not null;
     public bool HasSelectedBubble => SelectedBubble is not null;
+    public bool HasSelectedCharacter => SelectedCharacter is not null;
     public bool HasSelection => HasSelectedPanel;
     public bool SelectedBubbleHasTails => SelectedBubble is { Tails.Count: > 0 };
 
-    /// <summary>A comic panel (and no bubble in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
-    public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble;
+    /// <summary>A comic panel (and nothing in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
+    public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter;
+
+    /// <summary>A placed character is selected: the ribbon shows its "Character" contextual groups.</summary>
+    public bool IsCharacterContext => HasSelectedCharacter;
 
     /// <summary>A bubble is selected: the ribbon shows its "Bubble" contextual groups.</summary>
     public bool IsBubbleContext => HasSelectedBubble;
@@ -351,19 +404,33 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             ? panel.Bubbles[_selectedBubbleIndex]
             : null;
 
+    public CharacterInstance? SelectedCharacter =>
+        SelectedPanel is { } panel && _selectedCharacterIndex >= 0 && _selectedCharacterIndex < panel.CharacterInstances.Count
+            ? panel.CharacterInstances[_selectedCharacterIndex]
+            : null;
+
+    /// <summary>The selected character's name, for the contextual tab.</summary>
+    public string SelectedCharacterName =>
+        SelectedCharacter is { } instance && CharacterSnapshot.TryGetValue(instance.CharacterId, out var character) ? character.Name : "Missing character";
+
     public event Action? SelectionChanged;
 
-    public void Select(PanelId? panelId, int bubbleIndex = -1)
+    public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1)
     {
         if (panelId is null)
-            bubbleIndex = -1;
-        if (Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex)
+            bubbleIndex = characterIndex = -1;
+        if (bubbleIndex >= 0)
+            characterIndex = -1;
+        if (Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex && _selectedCharacterIndex == characterIndex)
             return;
 
         _selectedPanelId = panelId;
         _selectedBubbleIndex = bubbleIndex;
+        _selectedCharacterIndex = characterIndex;
         RaiseSelectionChanged();
     }
+
+    public void SelectCharacter(PanelId panelId, int characterIndex) => Select(panelId, -1, characterIndex);
 
     public void ClearSelection() => Select(null);
 
@@ -371,11 +438,17 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     {
         OnPropertyChanged(nameof(SelectedPanelId));
         OnPropertyChanged(nameof(SelectedBubbleIndex));
+        OnPropertyChanged(nameof(SelectedCharacterIndex));
         OnPropertyChanged(nameof(HasSelectedPanel));
         OnPropertyChanged(nameof(HasSelectedBubble));
+        OnPropertyChanged(nameof(HasSelectedCharacter));
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(IsPanelContext));
         OnPropertyChanged(nameof(IsBubbleContext));
+        OnPropertyChanged(nameof(IsCharacterContext));
+        OnPropertyChanged(nameof(SelectedCharacterName));
+        OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
+        RaiseCharacterViewChanged();
         OnPropertyChanged(nameof(ShowBubbleStyle));
         OnPropertyChanged(nameof(BubbleContextTitle));
         RaiseBubbleDerivedChanged();
@@ -403,9 +476,11 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             if (!Working.Panels.TryGetValue(id, out var panel))
                 Select(null);
-            else if (_selectedBubbleIndex >= panel.Bubbles.Count)
+            else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count)
                 Select(id);
         }
+        OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
+        RaiseCharacterViewChanged();
         RaiseBubbleDerivedChanged();
         NotifyCommands();
     }
@@ -449,9 +524,10 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
+        _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
-        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble."
+        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
     };
 
     public Rect2D PanelBounds(PanelId id) => AnchorRing.BoundingBox(Working.Panels[id].Shape.Anchors);
@@ -776,6 +852,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
         if (HasSelectedBubble)
             Apply(EditBubbleInPanel(Working, panelId, _selectedBubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy)));
+        else if (HasSelectedCharacter)
+            Apply(EditCharacterInPanel(Working, panelId, _selectedCharacterIndex, c => CharacterPlacementEditing.Move(c, dx, dy)));
         else
             Apply(EditPanel(Working, panelId, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
     }
@@ -849,7 +927,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             Select(panelId, newIndex);
     }
 
-    /// <summary>Deletes the selected bubble if there is one, otherwise the selected panel.</summary>
+    /// <summary>Deletes the selected bubble or character if there is one, otherwise the selected panel.</summary>
     public void DeleteSelection()
     {
         if (_selectedPanelId is not { } panelId)
@@ -857,6 +935,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
         if (HasSelectedBubble)
             DeleteBubble(panelId, _selectedBubbleIndex);
+        else if (HasSelectedCharacter)
+            DeleteCharacter(panelId, _selectedCharacterIndex);
         else
             DeletePanel(panelId);
     }
@@ -915,6 +995,344 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         }
         return best;
     }
+
+    // ---------------------------------------------------------------- characters
+
+    /// <summary>Where the comic's characters come from (the Characters pane); null for a page edited on its own, which then draws placeholders and can't insert characters.</summary>
+    public ICharacterCatalog? Characters
+    {
+        get => _catalog;
+        set
+        {
+            if (_catalog != null)
+                _catalog.CharactersChanged -= RaiseCharactersChanged;
+            _catalog = value;
+            if (_catalog != null)
+                _catalog.CharactersChanged += RaiseCharactersChanged;
+            RaiseCharactersChanged();
+        }
+    }
+
+    public bool HasCharacterCatalog => _catalog != null;
+
+    /// <summary>The characters to draw with, as they look right now (a live slider drag in a character editor included).</summary>
+    public IReadOnlyDictionary<CharacterId, CharacterDefinition> CharacterSnapshot =>
+        _catalog?.Characters ?? EmptyCharacters;
+
+    /// <summary>The Insert tab's character gallery.</summary>
+    public IReadOnlyList<CharacterDefinition> CharacterChoices => _catalog?.InOrder ?? [];
+
+    public bool HasCharacterChoices => CharacterChoices.Count > 0;
+
+    private static readonly IReadOnlyDictionary<CharacterId, CharacterDefinition> EmptyCharacters = new Dictionary<CharacterId, CharacterDefinition>();
+
+    private void RaiseCharactersChanged()
+    {
+        OnPropertyChanged(nameof(HasCharacterCatalog));
+        OnPropertyChanged(nameof(CharacterSnapshot));
+        OnPropertyChanged(nameof(CharacterChoices));
+        OnPropertyChanged(nameof(HasCharacterChoices));
+        OnPropertyChanged(nameof(SelectedCharacterName));
+        OnPropertyChanged(nameof(PoseChoices));
+        NotifyCommands();
+    }
+
+    /// <summary>A character's figure-space bounding box; a default body's for a character missing from the catalog (it draws as a placeholder that size).</summary>
+    public Rect2D FigureExtent(CharacterId id, ViewAngle angle = ViewAngle.Front) =>
+        CharacterSnapshot.TryGetValue(id, out var character)
+            ? BodyRig.Extent(character.Body, angle, character.Skeleton)
+            : BodyRig.Extent(BodyShape.Default, angle);
+
+    /// <summary>A placed character's bounding box on the page.</summary>
+    public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(InstanceExtent(instance));
+
+    /// <summary>An instance's figure-space bounding box as it stands - view and pose included.</summary>
+    private Rect2D InstanceExtent(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? CharacterPosing.Figure(character, instance).Extent
+            : BodyRig.Extent(BodyShape.Default, instance.Pose.ViewAngle);
+
+    /// <summary>
+    /// Places <paramref name="characterId"/> in <paramref name="panelId"/> (default: the
+    /// selected panel, else the first) at the panel's scale, beside the characters already
+    /// there - or, with <paramref name="ground"/>, standing there - and selects it.
+    /// Returns its index, or -1.
+    /// </summary>
+    public int InsertCharacter(CharacterId characterId, PanelId? panelId = null, Point2D? ground = null)
+    {
+        var target = panelId ?? _selectedPanelId;
+        if (target is not { } id || !Working.Panels.ContainsKey(id))
+        {
+            if (Working.PanelOrder.Count == 0)
+                return -1;
+            id = Working.PanelOrder[0];
+        }
+
+        var panel = Working.Panels[id];
+        var bounds = Bounds(panel);
+        var figure = FigureExtent(characterId);
+        var others = panel.CharacterInstances.Select(c => (c, CharacterBounds(c))).ToList();
+        var placement = CharacterPlacementEditing.DefaultPlacement(bounds, figure, others);
+        if (ground is { } at)
+            placement = placement with { Ground = at };
+        var instance = CharacterPlacementEditing.KeepReachable(
+            new CharacterInstance(characterId, placement, RevisionOverride: null, new ProjectModel.Poses.PoseData(ViewAngle.Front, [], new SortedDictionary<string, string>()), Overrides: null),
+            figure, bounds);
+
+        var index = panel.CharacterInstances.Count;
+        Apply(EditPanel(Working, id, p => EditResult<Panel>.Success(p with { CharacterInstances = [.. p.CharacterInstances, instance] })));
+        if (Working.Panels[id].CharacterInstances.Count <= index)
+            return -1;
+        SelectCharacter(id, index);
+        return index;
+    }
+
+    public void BeginMoveCharacter(PanelId panelId, int index) => BeginGesture();
+
+    /// <summary>Moves by (<paramref name="dx"/>, <paramref name="dy"/>) from where the character stood when the drag began. Its feet snap onto the floor line of the panel's other characters.</summary>
+    public void UpdateMoveCharacter(PanelId panelId, int index, double dx, double dy, double snapTolerance)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+
+        if (SnapEnabled && snapTolerance > 0)
+        {
+            var ground = panel.CharacterInstances[index].Placement.Ground;
+            var floors = panel.CharacterInstances.Where((_, i) => i != index).Select(c => c.Placement.Ground.Y);
+            var guides = new List<SnapGuide>();
+            dy = PanelSnapping.SnapValue(ground.Y + dy, floors, snapTolerance, BoundaryOrientation.Horizontal, guides) - ground.Y;
+            ActiveGuides = guides;
+        }
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPlacementEditing.Move(c, dx, dy)));
+    }
+
+    public void BeginResizeCharacter(PanelId panelId, int index) => BeginGesture();
+
+    /// <summary>
+    /// Sets the character's size (<see cref="CharacterPlacement.UnitHeightMm"/>), scaling about
+    /// its feet. <paramref name="together"/> (the default drag) resizes every character sharing
+    /// its scale, so the panel's relative heights hold; alone, it snaps to the panel's scale
+    /// when close, so it's easy to line back up.
+    /// </summary>
+    public void UpdateResizeCharacter(PanelId panelId, int index, double unitHeightMm, bool together)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+
+        if (!together && SnapEnabled && CharacterPlacementEditing.PanelScale(panel.CharacterInstances, index) is { } shared
+            && Math.Abs(unitHeightMm - shared) <= shared * 0.04)
+            unitHeightMm = shared;
+        UpdateGesture(EditCharacters(Committed, panelId, list => CharacterPlacementEditing.Resize(list, index, unitHeightMm, together)));
+    }
+
+    /// <summary>Bigger/Smaller on the ribbon: resizes the character and everyone sharing its scale.</summary>
+    public void ScaleCharacter(PanelId panelId, int index, double factor)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+        var unit = panel.CharacterInstances[index].Placement.UnitHeightMm * factor;
+        Apply(EditCharacters(Working, panelId, list => CharacterPlacementEditing.Resize(list, index, unit, together: true)));
+    }
+
+    /// <summary>Whether the selected character has been sized apart from the rest of its panel (so "Match size" has something to do).</summary>
+    public bool SelectedCharacterHasOddScale =>
+        SelectedPanel is { } panel && SelectedCharacter is { } instance
+        && CharacterPlacementEditing.PanelScale(panel.CharacterInstances, _selectedCharacterIndex) is { } shared
+        && !CharacterPlacementEditing.SameScale(shared, instance.Placement.UnitHeightMm);
+
+    /// <summary>Back to the panel's shared scale, after it was resized on its own.</summary>
+    public void MatchCharacterSize(PanelId panelId, int index)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || CharacterPlacementEditing.PanelScale(panel.CharacterInstances, index) is not { } shared)
+            return;
+        Apply(EditCharacters(Working, panelId, list => CharacterPlacementEditing.Resize(list, index, shared, together: false)));
+    }
+
+    public void FlipCharacter(PanelId panelId, int index) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, CharacterPlacementEditing.Flip));
+
+    /// <summary>Front or side view (<see cref="ViewAngle.Profile"/>); the character keeps standing where it was. Flip then turns a side view to face the other way.</summary>
+    public void SetCharacterView(PanelId panelId, int index, ViewAngle angle) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, c => CharacterPlacementEditing.Turn(c, angle)));
+
+    // ---------------------------------------------------------------- posing (drag a hand or foot)
+
+    private int _bendSign = 1;
+    private (CharacterId, ViewAngle) _poseChoicesKey;
+
+    /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
+    public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.EndPoint(character, instance, limb))).ToList()
+            : [];
+
+    /// <summary>Starts dragging a hand or foot; the elbow/knee keeps bending the way it bends now for the whole drag.</summary>
+    public void BeginPoseLimb(PanelId panelId, int index, Limb limb)
+    {
+        BeginGesture();
+        if (Committed.Panels.TryGetValue(panelId, out var panel) && index >= 0 && index < panel.CharacterInstances.Count
+            && CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
+    }
+
+    /// <summary>The hips, chest and head handles of a placed character, on the page.</summary>
+    public IReadOnlyList<(TrunkPart Part, Point2D Point)> TrunkHandles(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? Enum.GetValues<TrunkPart>().Select(part => (part, CharacterPosing.TrunkPoint(character, instance, part))).ToList()
+            : [];
+
+    public void BeginPoseTrunk(PanelId panelId, int index, TrunkPart part) => BeginGesture();
+
+    /// <summary>
+    /// Drags a trunk handle, computed from the drag's starting pose: the hips by
+    /// (<paramref name="pointer"/> - <paramref name="pressedAt"/>) with the feet staying
+    /// planted; the chest and head towards <paramref name="pointer"/> (lean, tilt).
+    /// </summary>
+    public void UpdatePoseTrunk(PanelId panelId, int index, TrunkPart part, Point2D pointer, Point2D pressedAt)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => part switch
+        {
+            TrunkPart.Hips => CharacterPosing.MoveHips(character, c, new Point2D(pointer.X - pressedAt.X, pointer.Y - pressedAt.Y)),
+            TrunkPart.Chest => CharacterPosing.Lean(character, c, pointer),
+            _ => CharacterPosing.TiltHead(character, c, pointer)
+        }));
+    }
+
+    public void MirrorCharacterPose(PanelId panelId, int index) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, CharacterPosing.MirrorPose));
+
+    /// <summary>Poses the character as <paramref name="preset"/> (turning it side on if the preset needs that), in one undo step.</summary>
+    public void ApplyPosePreset(PanelId panelId, int index, PosePresetDefinition preset)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => PosePresets.Apply(character, c, preset)));
+        RaiseCharacterViewChanged();
+    }
+
+    /// <summary>The Character tab's pose gallery: every preset, previewed on the selected character.</summary>
+    public IReadOnlyList<PosePresetChoice> PoseChoices
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+                return [];
+            var standing = new CharacterInstance(character.Id, new CharacterPlacement(default, 1, false), null,
+                new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>()), null);
+            return PosePresets.All
+                .Select(p => new PosePresetChoice(p, character, PosePresets.Apply(character, standing, p).Pose))
+                .ToList();
+        }
+    }
+
+    /// <summary>Reaches the hand or foot towards <paramref name="target"/> (page mm) - inverse kinematics, computed from the drag's starting pose.</summary>
+    public void UpdatePoseLimb(PanelId panelId, int index, Limb limb, Point2D target)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPosing.Reach(character, c, limb, target, _bendSign)));
+    }
+
+    public void ResetCharacterPose(PanelId panelId, int index) =>
+        Apply(EditCharacterInPanel(Working, panelId, index, CharacterPosing.ResetPose));
+
+    public bool SelectedCharacterIsPosed => SelectedCharacter is { } instance && CharacterPosing.IsPosed(instance.Pose);
+
+    public IRelayCommand<PosePresetChoice> ApplyPosePresetCommand { get; }
+    public IRelayCommand MirrorPoseCommand { get; }
+
+    /// <summary>The selected character's view, for the ribbon's Front/Side toggle.</summary>
+    public ViewAngle? SelectedCharacterView => SelectedCharacter?.Pose.ViewAngle;
+
+    public bool IsSelectedCharacterFront
+    {
+        get => SelectedCharacterView == ViewAngle.Front;
+        set => SetSelectedView(ViewAngle.Front, value);
+    }
+
+    public bool IsSelectedCharacterSide
+    {
+        get => SelectedCharacterView == ViewAngle.Profile;
+        set => SetSelectedView(ViewAngle.Profile, value);
+    }
+
+    private void SetSelectedView(ViewAngle angle, bool value)
+    {
+        if (value && SelectedCharacter is { } instance && instance.Pose.ViewAngle != angle)
+            SetCharacterView(_selectedPanelId!.Value, _selectedCharacterIndex, angle);
+        RaiseCharacterViewChanged(); // a toggle that flipped itself off locally hears "no, you're still on"
+    }
+
+    private void RaiseCharacterViewChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCharacterIsPosed));
+        ResetPoseCommand.NotifyCanExecuteChanged();
+        MirrorPoseCommand.NotifyCanExecuteChanged();
+        var key = SelectedCharacter is { } selected ? (selected.CharacterId, selected.Pose.ViewAngle) : default;
+        if (!Equals(key, _poseChoicesKey))
+        {
+            _poseChoicesKey = key;
+            OnPropertyChanged(nameof(PoseChoices));
+        }
+        OnPropertyChanged(nameof(SelectedCharacterView));
+        OnPropertyChanged(nameof(IsSelectedCharacterFront));
+        OnPropertyChanged(nameof(IsSelectedCharacterSide));
+    }
+
+    public void DeleteCharacter(PanelId panelId, int index)
+    {
+        Apply(EditPanel(Working, panelId, p =>
+            index < 0 || index >= p.CharacterInstances.Count
+                ? EditResult<Panel>.Failure("No such character.")
+                : EditResult<Panel>.Success(p with { CharacterInstances = p.CharacterInstances.Where((_, i) => i != index).ToList() })));
+        if (Equals(_selectedPanelId, panelId) && _selectedCharacterIndex == index)
+            Select(panelId);
+    }
+
+    /// <summary>Characters draw in list order (the end is in front) - and always behind the panel's bubbles.</summary>
+    public void ReorderCharacter(PanelId panelId, int index, bool toFront)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+        var (list, newIndex) = CharacterPlacementEditing.Reorder(panel.CharacterInstances, index, toFront);
+        Apply(EditCharacters(Working, panelId, _ => list));
+        if (Equals(_selectedPanelId, panelId) && _selectedCharacterIndex == index)
+            SelectCharacter(panelId, newIndex);
+    }
+
+    private void ReorderSelection(bool toFront)
+    {
+        if (_selectedPanelId is not { } panelId)
+            return;
+        if (HasSelectedBubble)
+            ReorderBubble(panelId, _selectedBubbleIndex, toFront);
+        else if (HasSelectedCharacter)
+            ReorderCharacter(panelId, _selectedCharacterIndex, toFront);
+    }
+
+    /// <summary>How many panels on this page show <paramref name="id"/>.</summary>
+    public int CountPanelsShowing(CharacterId id) =>
+        Committed.Panels.Values.Count(p => p.CharacterInstances.Any(c => c.CharacterId == id));
+
+    /// <summary>Applies <paramref name="edit"/> to one character, then keeps it reachable inside its panel - the single place that enforces "a character belongs to its panel".</summary>
+    private EditResult<PageDocument> EditCharacterInPanel(PageDocument document, PanelId panelId, int index, Func<CharacterInstance, CharacterInstance> edit) =>
+        EditPanel(document, panelId, panel =>
+        {
+            if (index < 0 || index >= panel.CharacterInstances.Count)
+                return EditResult<Panel>.Failure("No such character.");
+            var list = panel.CharacterInstances.ToList();
+            var edited = edit(list[index]);
+            list[index] = CharacterPlacementEditing.KeepReachable(edited, InstanceExtent(edited), Bounds(panel));
+            return EditResult<Panel>.Success(panel with { CharacterInstances = list });
+        });
+
+    private static EditResult<PageDocument> EditCharacters(PageDocument document, PanelId panelId, Func<IReadOnlyList<CharacterInstance>, IReadOnlyList<CharacterInstance>> edit) =>
+        EditPanel(document, panelId, panel => EditResult<Panel>.Success(panel with { CharacterInstances = edit(panel.CharacterInstances) }));
 
     // ---------------------------------------------------------------- helpers
 

@@ -1,0 +1,175 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Platform;
+using Avalonia.Rendering.SceneGraph;
+using Avalonia.Skia;
+using SkiaSharp;
+using Stanley.ProjectModel.Characters;
+using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Issues;
+using Stanley.Rendering;
+
+namespace Stanley.Editors;
+
+/// <summary>
+/// Draws a character standing on the ground, fitted to the control - through the same
+/// <see cref="CharacterRenderers"/> as the page. With a <see cref="LineUp"/>, the other
+/// characters stand faded beside it at the same scale, so heights compare at a glance;
+/// with <see cref="ShowGuides"/>, a ground line and height marks (percent of an average
+/// adult) run behind them. Small ones are the thumbnails in the Characters pane and the
+/// Insert tab's gallery; the big one is the character editor.
+/// </summary>
+public sealed class CharacterFigure : Control
+{
+    public static readonly StyledProperty<CharacterDefinition?> CharacterProperty =
+        AvaloniaProperty.Register<CharacterFigure, CharacterDefinition?>(nameof(Character));
+
+    public static readonly StyledProperty<IReadOnlyList<CharacterDefinition>?> LineUpProperty =
+        AvaloniaProperty.Register<CharacterFigure, IReadOnlyList<CharacterDefinition>?>(nameof(LineUp));
+
+    public static readonly StyledProperty<bool> ShowGuidesProperty =
+        AvaloniaProperty.Register<CharacterFigure, bool>(nameof(ShowGuides));
+
+    public static readonly StyledProperty<ViewAngle> AngleProperty =
+        AvaloniaProperty.Register<CharacterFigure, ViewAngle>(nameof(Angle));
+
+    public static readonly StyledProperty<ProjectModel.Poses.PoseData?> PoseProperty =
+        AvaloniaProperty.Register<CharacterFigure, ProjectModel.Poses.PoseData?>(nameof(Pose));
+
+    static CharacterFigure()
+    {
+        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty);
+    }
+
+    /// <summary>The pose to show the main character in (its view wins over <see cref="Angle"/>); null stands at rest.</summary>
+    public ProjectModel.Poses.PoseData? Pose
+    {
+        get => GetValue(PoseProperty);
+        set => SetValue(PoseProperty, value);
+    }
+
+    /// <summary>Front or side view, for every figure drawn (the line-up too).</summary>
+    public ViewAngle Angle
+    {
+        get => GetValue(AngleProperty);
+        set => SetValue(AngleProperty, value);
+    }
+
+    public CharacterDefinition? Character
+    {
+        get => GetValue(CharacterProperty);
+        set => SetValue(CharacterProperty, value);
+    }
+
+    public IReadOnlyList<CharacterDefinition>? LineUp
+    {
+        get => GetValue(LineUpProperty);
+        set => SetValue(LineUpProperty, value);
+    }
+
+    public bool ShowGuides
+    {
+        get => GetValue(ShowGuidesProperty);
+        set => SetValue(ShowGuidesProperty, value);
+    }
+
+    public override void Render(DrawingContext context)
+    {
+        if (Character is not { } character || Bounds.Width < 2 || Bounds.Height < 2)
+            return;
+        var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
+        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose));
+    }
+
+    private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
+        ProjectModel.Poses.PoseData? pose)
+        : ICustomDrawOperation
+    {
+        public Rect Bounds => bounds;
+
+        public void Dispose() { }
+
+        public bool Equals(ICustomDrawOperation? other) => false;
+
+        public bool HitTest(Point p) => bounds.Contains(p);
+
+        public void Render(ImmediateDrawingContext context)
+        {
+            if (context.TryGetFeature<ISkiaSharpApiLeaseFeature>() is not { } feature)
+                return;
+            using var lease = feature.Lease();
+            var canvas = lease.SkCanvas;
+            canvas.Save();
+            canvas.ClipRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+
+            // Everyone to one scale: the tallest fills most of the height, and the widths
+            // must fit side by side.
+            var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: BodyRig.Extent(c.Body, angle, c.Skeleton, ReferenceEquals(c, main) ? pose : null))).ToList();
+            var tallest = extents.Max(e => e.Extent.Height);
+            var padTop = guides ? 18.0 : 3.0;
+            var padBottom = guides ? 10.0 : 3.0;
+            var gap = 0.08;
+            var totalWidth = extents.Sum(e => e.Extent.Width) + gap * (extents.Count - 1);
+            var unit = Math.Min((bounds.Height - padTop - padBottom) / tallest, (bounds.Width - 6) / totalWidth);
+            if (unit <= 0)
+            {
+                canvas.Restore();
+                return;
+            }
+            var groundY = bounds.Height - padBottom;
+
+            if (guides)
+                DrawGuides(canvas, groundY, unit);
+
+            // Main character in the middle, the others alternating right and left of it.
+            var order = new List<(CharacterDefinition Character, Rect2D Extent, bool Faded)> { (main, extents[0].Extent, false) };
+            var right = new List<(CharacterDefinition, Rect2D, bool)>();
+            var left = new List<(CharacterDefinition, Rect2D, bool)>();
+            for (var i = 1; i < extents.Count; i++)
+                (i % 2 == 1 ? right : left).Add((extents[i].Character, extents[i].Extent, true));
+            left.Reverse();
+            var row = left.Concat(order).Concat(right).ToList();
+            var x = (bounds.Width - totalWidth * unit) / 2;
+            foreach (var (character, extent, faded) in row)
+            {
+                var ground = new Point2D(x - extent.Left * unit, groundY);
+                if (faded)
+                {
+                    using var alpha = new SKPaint { Color = SKColors.White.WithAlpha(90) };
+                    canvas.SaveLayer(alpha);
+                }
+                CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(ground, unit, Mirrored: false),
+                    (float)Math.Clamp(unit * 0.004, 0.8, 2), angle, faded ? null : pose);
+                if (faded)
+                {
+                    canvas.Restore();
+                    if (guides)
+                        Label(canvas, character.Name, (float)ground.X, (float)(groundY - character.Body.Height * unit - 4), SKTextAlign.Center, 10, 140);
+                }
+                x += (extent.Width + gap) * unit;
+            }
+            canvas.Restore();
+        }
+
+        private void DrawGuides(SKCanvas canvas, double groundY, double unit)
+        {
+            using var line = new SKPaint { Color = (dark ? SKColors.White : SKColors.Black).WithAlpha(40), StrokeWidth = 1, IsAntialias = true };
+            using var ground = new SKPaint { Color = (dark ? SKColors.White : SKColors.Black).WithAlpha(110), StrokeWidth = 1.5f, IsAntialias = true };
+            for (var h = 0.25; h * unit < groundY - 4; h += 0.25)
+            {
+                var y = (float)(groundY - h * unit);
+                canvas.DrawLine(0, y, (float)bounds.Width, y, line);
+                Label(canvas, $"{h * 100:0}%", 4, y - 3, SKTextAlign.Left, 10, 120);
+            }
+            canvas.DrawLine(0, (float)groundY, (float)bounds.Width, (float)groundY, ground);
+        }
+
+        private void Label(SKCanvas canvas, string text, float x, float y, SKTextAlign align, float size, byte alpha)
+        {
+            using var font = new SKFont(SKTypeface.Default, size);
+            using var paint = new SKPaint { Color = (dark ? SKColors.White : SKColors.Black).WithAlpha(alpha), IsAntialias = true };
+            canvas.DrawText(text, x, y, align, font, paint);
+        }
+    }
+}

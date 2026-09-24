@@ -1,0 +1,22 @@
+<!--
+  The character editor pane: the character standing on a height grid, with the comic's
+  other characters faded beside it for comparison, and a status bar. Its controls are
+  on CharacterEditorRibbon, in the window's ribbon bar.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterEditorView"
+             x:DataType="local:CharacterEditorViewModel">
+  <Grid RowDefinitions="*,Auto">
+    <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
+      <local:CharacterFigure Name="Stage" Character="{Binding Working}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}" />
+    </Border>
+    <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding HeightText}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

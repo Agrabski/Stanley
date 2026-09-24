@@ -39,6 +39,7 @@ public class ProjectRepositoryTests : IDisposable
         var character = new CharacterDefinition(
             characterId,
             "Alice",
+            BodyPresets.Shape(BodyPreset.Heroic),
             new Skeleton([new ViewAngleRestLayout(ViewAngle.Front, [new BoneRestPose(HumanoidBone.Hips, new Point2D(0, 0))])]),
             new SortedDictionary<string, ColorValue> { ["Skin"] = ColorValue.FromHex("#f0c8a0") },
             new SortedDictionary<string, StickerSlotDefinition> { ["torso"] = new StickerSlotDefinition(0, [stickerId]) });
@@ -84,11 +85,11 @@ public class ProjectRepositoryTests : IDisposable
         var characterId = CharacterId.New();
         var skeleton = new Skeleton([]);
 
-        repository.SaveCharacter(new CharacterDefinition(characterId, "Alice", skeleton, [], []));
+        repository.SaveCharacter(new CharacterDefinition(characterId, "Alice", BodyShape.Default, skeleton, [], []));
         var originalDir = Path.Combine(_root, "characters", $"{characterId.Value}-alice");
         Assert.True(Directory.Exists(originalDir));
 
-        repository.SaveCharacter(new CharacterDefinition(characterId, "Alicia", skeleton, [], []));
+        repository.SaveCharacter(new CharacterDefinition(characterId, "Alicia", BodyShape.Default, skeleton, [], []));
 
         Assert.True(Directory.Exists(originalDir), "renaming should not move the entity's folder");
         Assert.Equal("Alicia", repository.LoadCharacter(characterId).Name);
@@ -150,7 +151,7 @@ public class ProjectRepositoryTests : IDisposable
             panelId,
             new PanelShape([new ShapeAnchor(new Point2D(0, 0), new Point2D(0, 0), new Point2D(10, 0), AnchorHandleKind.Corner)]),
             new InlineBackground("splash.png"),
-            [new CharacterInstance(characterId, RevisionOverride: null, new PoseData(ViewAngle.Front, [], []), Overrides: null)],
+            [new CharacterInstance(characterId, new CharacterPlacement(new Point2D(60, 250), 120, Mirrored: true), RevisionOverride: null, new PoseData(ViewAngle.Front, [], []), Overrides: null)],
             [new Bubble(
                 BubbleId.New(),
                 BubbleStylePresets.GenerateShape(BubbleStylePreset.Speech, new Rect2D(20, 20, 120, 60)),

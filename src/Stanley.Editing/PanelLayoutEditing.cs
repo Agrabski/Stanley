@@ -14,8 +14,9 @@ namespace Stanley.Editing;
 /// is still the escape hatch for panel outlines beyond what this editor covers; it just
 /// isn't draggable through these operations.
 ///
-/// A panel's bubbles belong to it: every operation here carries them along
-/// (<see cref="BubbleEditing.Refit"/>) and keeps them inside the panel's new bounds.
+/// A panel's bubbles and characters belong to it: every operation here carries them along
+/// (<see cref="BubbleEditing.Refit"/>, <see cref="CharacterPlacementEditing.Refit"/>) and
+/// keeps bubbles inside the panel's new bounds.
 /// </summary>
 public static class PanelLayoutEditing
 {
@@ -35,6 +36,7 @@ public static class PanelLayoutEditing
         return EditResult<Panel>.Success(panel with
         {
             Shape = PanelShapes.Rectangle(newBounds),
+            CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Refit(c, oldBounds, newBounds)).ToList(),
             Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList()
         });
     }
@@ -52,8 +54,8 @@ public static class PanelLayoutEditing
     /// Divides one panel into two rectangles along <paramref name="orientation"/>, at
     /// <paramref name="fraction"/> of its current bounds, leaving <paramref name="gutter"/>
     /// between them. Each bubble goes to whichever half its centre lies in (clamped inside
-    /// it); characters and the background stay with the first half, which keeps the
-    /// original id.
+    /// it), each character to the half its feet are in (staying exactly where it was on the
+    /// page); the background stays with the first half, which keeps the original id.
     /// </summary>
     public static EditResult<(Panel First, Panel Second)> Split(Panel panel, BoundaryOrientation orientation, double fraction, double gutter = 0)
     {
@@ -86,16 +88,22 @@ public static class PanelLayoutEditing
             return orientation == BoundaryOrientation.Vertical ? bb.MidX >= secondBounds.Left - halfGutter : bb.MidY >= secondBounds.Top - halfGutter;
         }
 
+        bool CharacterInSecond(CharacterInstance c) =>
+            orientation == BoundaryOrientation.Vertical
+                ? c.Placement.Ground.X >= secondBounds.Left - halfGutter
+                : c.Placement.Ground.Y >= secondBounds.Top - halfGutter;
+
         var first = panel with
         {
             Shape = PanelShapes.Rectangle(firstBounds),
+            CharacterInstances = panel.CharacterInstances.Where(c => !CharacterInSecond(c)).ToList(),
             Bubbles = panel.Bubbles.Where(b => !InSecond(b)).Select(b => BubbleEditing.KeepInside(b, firstBounds)).ToList()
         };
         var second = new Panel(
             PanelId.New(),
             PanelShapes.Rectangle(secondBounds),
             Background: null,
-            CharacterInstances: [],
+            CharacterInstances: panel.CharacterInstances.Where(CharacterInSecond).ToList(),
             Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList());
         return EditResult<(Panel, Panel)>.Success((first, second));
     }

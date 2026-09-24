@@ -9,6 +9,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
              x:Class="Stanley.Editors.PageEditorRibbon"
              x:DataType="local:PageEditorViewModel">
   <TabControl Name="Tabs" Classes="ribbonTabs">
@@ -111,6 +112,37 @@
           <TextBlock Classes="groupLabel" Text="Bubbles" />
         </DockPanel>
         <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group" IsVisible="{Binding HasCharacterCatalog}">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <ScrollViewer MaxWidth="260" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasCharacterChoices}">
+              <ItemsControl Name="CharacterGallery" ItemsSource="{Binding CharacterChoices}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="characters:CharacterDefinition">
+                    <Button Classes="small" Width="48" Height="62" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertCharacterCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel (or drag from the Characters pane)'}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <local:CharacterFigure Character="{Binding}" />
+                      </DockPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <Button Name="NewCharacterButton" Classes="tool" Command="{Binding NewCharacterCommand}" ToolTip.Tip="Create a new character and put it in the selected panel - double-click it to shape its body">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="New character" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Characters" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasCharacterCatalog}" />
 
         <DockPanel Classes="group" IsVisible="{Binding HasPageNumbering}">
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -233,6 +265,98 @@
             </Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Panel" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <!-- ============================== CHARACTER (contextual) ============================== -->
+    <TabItem Name="CharacterTab" Classes="contextual character" IsVisible="{Binding IsCharacterContext}">
+      <TabItem.Header><TextBlock Classes="characterHeader" Text="Character" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="EditCharacterButton" Classes="tool" Command="{Binding EditCharacterCommand}" ToolTip.Tip="Edit this character's body - every panel it's in follows (or double-click it)">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Edit body" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="{Binding SelectedCharacterName}" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Name="FrontViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSelectedCharacterFront}" ToolTip.Tip="Facing the reader (F)">
+              <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="SideViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSelectedCharacterSide}" ToolTip.Tip="Seen from the side (S) - Flip to face the other way">
+              <StackPanel><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
+            </RadioButton>
+            <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}" ToolTip.Tip="Face the other way">
+              <StackPanel><PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Flip" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="View" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ScrollViewer MaxWidth="480" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <ItemsControl Name="PoseGallery" ItemsSource="{Binding PoseChoices}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="local:PosePresetChoice">
+                    <Button Classes="small" Width="41" Height="66" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyPosePresetCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='{}{0} - then adjust by dragging the green dots'}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" />
+                      </DockPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="MirrorPoseButton" Classes="small" Command="{Binding MirrorPoseCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="The same pose the other way round - wave with the other hand">Mirror</Button>
+              <Button Name="ResetPoseButton" Classes="small" Command="{Binding ResetPoseCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Stand at rest again">Reset</Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Pose" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="BiggerCharacterButton" Classes="small" Command="{Binding BiggerCharacterCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Closer to camera - every character in this panel at the same distance grows too, keeping their relative heights">Bigger</Button>
+              <Button Name="SmallerCharacterButton" Classes="small" Command="{Binding SmallerCharacterCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Further from camera - together with the panel's other characters">Smaller</Button>
+              <Button Name="MatchSizeButton" Classes="small" Command="{Binding MatchCharacterSizeCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Back to the same scale as the panel's other characters (after resizing it on its own with Shift)">Match size</Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Size" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of the panel's other characters (bubbles stay on top)" HorizontalAlignment="Stretch">To front</Button>
+              <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind the panel's other characters" HorizontalAlignment="Stretch">To back</Button>
+            </StackPanel>
+            <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
         </DockPanel>
       </StackPanel>
     </TabItem>

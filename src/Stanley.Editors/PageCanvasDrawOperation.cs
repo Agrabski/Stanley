@@ -5,6 +5,7 @@ using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using SkiaSharp;
 using Stanley.Editing;
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.Rendering;
@@ -27,7 +28,12 @@ public sealed record PageCanvasScene(
     bool RubberBandIsBubble,
     bool ShowMarginGuides = true,
     PageFolio? Folio = null,
-    bool DarkChrome = false);
+    bool DarkChrome = false,
+    IReadOnlyDictionary<CharacterId, CharacterDefinition>? Characters = null,
+    int SelectedCharacterIndex = -1,
+    Rect2D? SelectedCharacterBounds = null,
+    IReadOnlyList<Point2D>? LimbHandles = null,
+    IReadOnlyList<Point2D>? TrunkHandles = null);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -45,6 +51,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
     private static readonly SKColor DarkPasteboard = new(0x2B, 0x2D, 0x31);
     private static readonly SKColor Accent = new(0x25, 0x7A, 0xE8);
     private static readonly SKColor TailHandle = new(0xF5, 0x8A, 0x07);
+    private static readonly SKColor PoseHandle = new(0x2E, 0x9E, 0x5B);
     private static readonly SKColor GuideColor = new(0xE0, 0x2F, 0x8C);
     private static readonly SKColor MarginColor = new(0x5B, 0xC0, 0xDE);
 
@@ -116,7 +123,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
             .Where(_scene.Document.Panels.ContainsKey)
             .Select(id => _scene.Document.Panels[id])
-            .ToList());
+            .ToList(), _scene.Characters);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }
@@ -140,17 +147,23 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         {
             var panelRect = Screen(AnchorRing.BoundingBox(selectedPanel.Shape.Anchors));
             var hasBubble = _scene.SelectedBubbleIndex >= 0 && _scene.SelectedBubbleIndex < selectedPanel.Bubbles.Count;
+            var hasCharacter = !hasBubble && _scene.SelectedCharacterIndex >= 0
+                && _scene.SelectedCharacterIndex < selectedPanel.CharacterInstances.Count && _scene.SelectedCharacterBounds is not null;
 
-            using (var outline = Stroke(Accent.WithAlpha(hasBubble ? (byte)120 : (byte)255), 2f))
+            using (var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter ? (byte)120 : (byte)255), 2f))
                 canvas.DrawRect(panelRect, outline);
-            if (!hasBubble)
+            if (hasBubble)
             {
-                foreach (var corner in Corners(panelRect))
-                    DrawSquareHandle(canvas, corner, Accent);
+                DrawBubbleSelection(canvas, selectedPanel.Bubbles[_scene.SelectedBubbleIndex]);
+            }
+            else if (hasCharacter)
+            {
+                DrawCharacterSelection(canvas, selectedPanel.CharacterInstances[_scene.SelectedCharacterIndex], _scene.SelectedCharacterBounds!.Value);
             }
             else
             {
-                DrawBubbleSelection(canvas, selectedPanel.Bubbles[_scene.SelectedBubbleIndex]);
+                foreach (var corner in Corners(panelRect))
+                    DrawSquareHandle(canvas, corner, Accent);
             }
         }
 
@@ -213,6 +226,56 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             canvas.DrawCircle(tip, 6f, fill);
             canvas.DrawCircle(tip, 6f, outline);
         }
+    }
+
+    /// <summary>A dashed box around the figure, resize handles on its two top corners (it scales about its feet) and a marker on the ground point.</summary>
+    private void DrawCharacterSelection(SKCanvas canvas, ProjectModel.Issues.CharacterInstance instance, Rect2D bounds)
+    {
+        var rect = Screen(bounds);
+        using (var box = Stroke(Accent, 1f))
+        {
+            box.PathEffect = SKPathEffect.CreateDash([4, 3], 0);
+            canvas.DrawRect(rect, box);
+        }
+        DrawSquareHandle(canvas, new SKPoint(rect.Left, rect.Top), Accent);
+        DrawSquareHandle(canvas, new SKPoint(rect.Right, rect.Top), Accent);
+
+        // Hands and feet: drag one to pose that limb.
+        using (var limbFill = new SKPaint { Color = PoseHandle, IsAntialias = true })
+        using (var limbRing = Stroke(SKColors.White, 1.5f))
+        {
+            foreach (var handle in _scene.LimbHandles ?? [])
+            {
+                var p = Screen(handle);
+                canvas.DrawCircle(p, 5.5f, limbFill);
+                canvas.DrawCircle(p, 5.5f, limbRing);
+            }
+        }
+
+        // Hips, chest, head: hollow rings, so they read apart from the hand/foot dots.
+        using (var trunkFill = new SKPaint { Color = SKColors.White, IsAntialias = true })
+        using (var trunkRing = Stroke(PoseHandle, 2.5f))
+        {
+            foreach (var handle in _scene.TrunkHandles ?? [])
+            {
+                var p = Screen(handle);
+                canvas.DrawCircle(p, 5.5f, trunkFill);
+                canvas.DrawCircle(p, 5.5f, trunkRing);
+            }
+        }
+
+        var ground = Screen(instance.Placement.Ground);
+        using var fill = new SKPaint { Color = TailHandle, IsAntialias = true };
+        using var outline = Stroke(SKColors.White, 1.5f);
+        using var diamond = new SKPathBuilder();
+        diamond.MoveTo(ground.X, ground.Y - 5);
+        diamond.LineTo(ground.X + 5, ground.Y);
+        diamond.LineTo(ground.X, ground.Y + 5);
+        diamond.LineTo(ground.X - 5, ground.Y);
+        diamond.Close();
+        using var path = diamond.Detach();
+        canvas.DrawPath(path, fill);
+        canvas.DrawPath(path, outline);
     }
 
     private void DrawGutter(SKCanvas canvas, GutterHit gutter)

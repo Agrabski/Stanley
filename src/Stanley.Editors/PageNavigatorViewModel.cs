@@ -49,10 +49,13 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
     private readonly EditorHistory _history;
     private PageItem _currentPage;
     private PageNumbering _pageNumbering;
+    private readonly ICharacterCatalog? _characters;
 
-    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null)
+    /// <param name="characters">What every page draws its placed characters from (the Characters pane); null for a comic edited without one.</param>
+    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null, ICharacterCatalog? characters = null)
     {
         _history = history;
+        _characters = characters;
         _pageNumbering = pageNumbering ?? PageNumbering.Off;
         Id = "Pages";
         Title = "Pages";
@@ -96,8 +99,19 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
         }
     }
 
-    /// <summary>Raised when a different page becomes current; the workspace shows its editor.</summary>
+    /// <summary>Raised when a different page becomes current - or the current one is asked for again (<see cref="Reveal"/>); the workspace shows its editor.</summary>
     public event Action<PageItem>? CurrentPageChanged;
+
+    /// <summary>Makes <paramref name="page"/> current and shows it even if it already was current - e.g. clicking the current page while a character is being edited brings the page back.</summary>
+    public void Reveal(PageItem page)
+    {
+        if (!Pages.Contains(page))
+            return;
+        if (ReferenceEquals(page, _currentPage))
+            CurrentPageChanged?.Invoke(page);
+        else
+            CurrentPage = page;
+    }
 
     public IRelayCommand AddPageCommand { get; }
     public IRelayCommand<PageItem?> DuplicatePageCommand { get; }
@@ -246,7 +260,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
     private void OnHistoryRestored(object? source)
     {
         if (source is PageEditorViewModel editor && Pages.FirstOrDefault(p => ReferenceEquals(p.Editor, editor)) is { } page)
-            CurrentPage = page;
+            Reveal(page);
     }
 
     private void NotifyCommands()
@@ -263,7 +277,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
             Id = $"page-{id.Value}",
             CanClose = false,
             CanFloat = false,
-            NumberingHost = this
+            NumberingHost = this,
+            Characters = _characters
         };
         if (settingsFrom != null)
         {

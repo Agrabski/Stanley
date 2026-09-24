@@ -26,7 +26,10 @@ The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
 snapping, page navigator) all exist. The GUI opens/saves real project folders (the
-pages of one issue for now — see "Documents" below). No character rendering yet.
+pages of one issue for now — see "Documents" below). Characters exist as a
+**POC** (sliders + a generated flat mannequin, front or side view, placed on
+panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
+see "Characters (POC, implemented)" below); no stickers or three-quarter view yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -425,6 +428,79 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 [`docs/character-and-project-plan.md`](docs/character-and-project-plan.md) —
 that file is the plan, not implemented yet; this section stays the short
 summary.
+
+### Characters (POC, implemented)
+
+Designed in [`docs/character-authoring-poc.md`](docs/character-authoring-poc.md);
+body and placement only.
+
+- **Body = numbers**: `BodyShape` (ProjectModel/Characters) — `Height` (relative:
+  1.0 = average adult, never cm), `Build` (shown as "Weight"), `Muscle`,
+  `HeadsTall`, `Frame` (shoulders ↔ hips); `BodyPresets` (Toddler … Chibi).
+  Stored as `CharacterDefinition.Body`; `CharacterDefinition.Skeleton` is now a
+  sparse joint *override* on the generated rest layout (empty from the UI).
+  `CharacterDefinition.Create(name)` makes a default one; `Skin` reads the `skin`
+  colour slot.
+- **`BodyRig.Build(body, angle, overrides)`**: pure math → `BodyFigure` (VRM rest
+  layout + torso outline, limb capsules, head/hand/foot ellipses) in *figure space*
+  (unit = relative height, y down, origin = ground between the feet; head top at
+  `-Height`), for `ViewAngle.Front` or `Profile` (faces +x, has a nose; the near
+  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
+  Heights depend only on `Height`/`HeadsTall`, identical in both views;
+  `ThreeQuarter` falls back to front. Skeleton overrides are per view.
+  `BodyFigure.RestLayout` is the unposed layout, `BaseLayout` the trunk-posed one
+  (limb rotations and IK are measured from it), `Layout` the fully posed one. A pose
+  is `PoseData.BoneRotations` (degrees, clockwise, relative to the parent) plus
+  `PoseData.HipsShift` (fraction of the character's height, null = standing): the
+  trunk step shifts the hips, leans everything above them (`Spine`, ±`MaxLean`) and
+  tilts the head (`Head`, ±`MaxHeadTilt`); then `ApplyPose` turns the four
+  `BodyRig.LimbChains`. Hands lie along the forearm; a lifted foot tips with its
+  shin, a planted one stays flat (`BodyEllipse.RotationDegrees`).
+- **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
+  character's handles: green hand/foot dots → `Reach` (two-bone IK, exact in reach,
+  pointing at the target out of reach; bend side held per drag via `BendSign`,
+  anatomical side on); hollow rings → `MoveHips` (feet pinned by re-solving both
+  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest), `TiltHead`.
+  `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
+  (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
+  Walk, Run, Sit) are hand/foot *goals relative to each limb's own root and length*
+  (+ lean/tilt/hips shift, optional required view), solved with the same IK, so
+  they fit any body and produce ordinary pose data; feet without a goal stay
+  planted and never go below the floor. Character tab: Pose gallery (previews on
+  the selected character), Mirror, Reset; right-click › Pose.
+- **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
+  `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
+  figure path per definition, view and pose — bounded, since a limb drag makes a new
+  pose per pointer move). `PageRenderer.Draw/DrawPanels/Export*` take an
+  optional character dictionary and draw background → characters → bubbles inside
+  the panel clip; a missing character draws a dashed placeholder.
+- **Placement**: `CharacterInstance.Placement` = `CharacterPlacement(Ground,
+  UnitHeightMm, Mirrored)` (page mm; `ToPage` maps figure space); the view is the
+  instance's `Pose.ViewAngle` (page: Character tab Front/Side, S/F keys; mirrored
+  side views face left). One scale per
+  panel by default: `CharacterPlacementEditing` (Stanley.Editing) places new ones
+  at the panel's scale/floor, resizes "together" (everyone sharing the scale) or
+  alone, keeps them reachable (may hang out of the panel — cropping is fine), and
+  `PanelLayoutEditing` carries them through panel resize/move/split.
+- **Editors**: `CharacterLibraryViewModel` (the **Characters** tool pane, tab next
+  to Pages; also the `ICharacterCatalog` page editors draw from, live incl.
+  mid-drag) owns one `CharacterEditorViewModel` per character (all in the shared
+  history; showing one swaps it into the editor area, `ReturnToPage`/Close swaps
+  back; undoing a body edit re-opens that character). Placed characters can't be
+  deleted. `CharacterEditorRibbon` = Body tab (presets, sliders — one drag = one
+  undo step via `BeginSliderDrag`/`EndSliderDrag` — skin, name, line-up, Close).
+  Page editor: `SelectedCharacterIndex`, contextual green **Character** tab,
+  Insert › Characters gallery + New character, drag from the pane onto a panel
+  (`CharacterDrag.Format`; feet land at the drop point), double-click opens the body
+  editor. The pane opens a character on click *release* (or Enter), never on press —
+  its list selection is OneWay from `Current` — so a drag starts with the page still
+  on screen to drop onto.
+  `PageEditorHost.CreateWorkspace` returns an `EditorSession(Workspace, Navigator,
+  Characters)`.
+- **Persistence**: `ProjectRepository.ListCharacters()` (scans `characters/`, no
+  index file) / `DeleteCharacter`; `ComicProject.Characters`, and
+  `Save`/`SaveAs`/`WriteCopy` take the characters (null = leave disk alone) and
+  prune deleted ones.
 
 ## Builds, versioning & releases
 
