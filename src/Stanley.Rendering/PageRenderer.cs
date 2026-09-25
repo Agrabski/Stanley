@@ -70,9 +70,13 @@ public static class PageRenderer
         canvas.DrawRect(ToSk(pageBounds), paper);
     }
 
-    /// <summary>Panels in z-order, each with its characters and then its bubbles clipped to it, and its border on top.</summary>
+    /// <summary>
+    /// Panels in z-order, each with - clipped to it - its background, its background
+    /// elements, its characters, its foreground elements and its bubbles, and its border on top.
+    /// </summary>
+    /// <param name="hideText">An element whose lettering to leave off (the editor's inline text box is showing it instead).</param>
     public static void DrawPanels(SKCanvas canvas, IEnumerable<Panel> panelsInOrder, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null,
-        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, ElementId? hideText = null)
     {
         using var border = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = PanelBorderMm, IsAntialias = true, StrokeJoin = SKStrokeJoin.Miter };
         using var panelFill = new SKPaint { Color = SKColors.White };
@@ -81,16 +85,47 @@ public static class PageRenderer
             using var path = PanelRenderer.ToSkPath(panel.Shape);
             canvas.DrawPath(path, panelFill);
 
-            // Characters and bubbles belong to their panel: clip them there, like ink that can't leave the frame.
+            // Everything in a panel belongs to it: clip it there, like ink that can't leave the frame.
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
+            DrawBackground(canvas, panel.Background, AnchorRing.BoundingBox(panel.Shape.Anchors));
+            DrawElements(canvas, panel, ElementLayer.Background, hideText);
             foreach (var instance in panel.CharacterInstances)
                 CharacterRenderers.DrawInstance(canvas, instance, characters, CharacterStrokeMm, issueLooks);
+            DrawElements(canvas, panel, ElementLayer.Foreground, hideText);
             foreach (var bubble in panel.Bubbles)
                 BubbleRenderer.Draw(canvas, bubble, SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
 
             canvas.DrawPath(path, border);
+        }
+    }
+
+    private static void DrawElements(SKCanvas canvas, Panel panel, ElementLayer layer, ElementId? hideText)
+    {
+        foreach (var element in panel.Elements)
+        {
+            if (element.Layer == layer)
+                ElementRenderer.Draw(canvas, element, drawText: element.Id != hideText);
+        }
+    }
+
+    /// <summary>Fills <paramref name="bounds"/> (the panel's box - the caller clips to its outline) with the panel's background; nothing for none, leaving the paper.</summary>
+    public static void DrawBackground(SKCanvas canvas, PanelBackground? background, Rect2D bounds)
+    {
+        var rect = ToSk(bounds);
+        switch (background)
+        {
+            case ColorBackground color:
+                using (var paint = new SKPaint { Color = FigureGeometry.ToSk(color.Color) })
+                    canvas.DrawRect(rect, paint);
+                break;
+            case GradientBackground gradient:
+                using (var shader = SKShader.CreateLinearGradient(new SKPoint(rect.MidX, rect.Top), new SKPoint(rect.MidX, rect.Bottom),
+                           [FigureGeometry.ToSk(gradient.Top), FigureGeometry.ToSk(gradient.Bottom)], SKShaderTileMode.Clamp))
+                using (var paint = new SKPaint { Shader = shader, IsAntialias = true })
+                    canvas.DrawRect(rect, paint);
+                break;
         }
     }
 

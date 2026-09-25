@@ -34,10 +34,7 @@ public static class BubbleTextRenderer
         if (maxWidth <= 0 || maxHeight <= 0)
             return;
 
-        // Linear metrics + subpixel positioning: the page editor draws at a few units per
-        // glyph (millimetres) under a zoom transform, where hinted metrics would snap
-        // widths to whole units and throw the wrapping off.
-        using var font = new SKFont(SKTypeface.Default, fontSize) { LinearMetrics = true, Subpixel = true };
+        using var font = Lettering.Font(fontSize);
         using var paint = new SKPaint { Color = color ?? SKColors.Black, IsAntialias = true };
 
         var lines = WrapLines(bubble.Text, font, paint, maxWidth);
@@ -63,34 +60,5 @@ public static class BubbleTextRenderer
         }
     }
 
-    private static List<string> WrapLines(string text, SKFont font, SKPaint paint, float maxWidth)
-    {
-        var lines = new List<string>();
-        foreach (var paragraph in text.Split('\n'))
-        {
-            var words = paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length == 0)
-            {
-                lines.Add(string.Empty);
-                continue;
-            }
-
-            var current = words[0];
-            for (var i = 1; i < words.Length; i++)
-            {
-                var candidate = current + " " + words[i];
-                if (font.MeasureText(candidate, paint) <= maxWidth)
-                {
-                    current = candidate;
-                }
-                else
-                {
-                    lines.Add(current);
-                    current = words[i];
-                }
-            }
-            lines.Add(current);
-        }
-        return lines;
-    }
+    private static List<string> WrapLines(string text, SKFont font, SKPaint paint, float maxWidth) => Lettering.Wrap(text, font, paint, maxWidth);
 }

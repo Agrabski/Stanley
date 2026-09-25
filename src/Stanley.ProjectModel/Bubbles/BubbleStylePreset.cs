@@ -53,30 +53,7 @@ public static class BubbleStylePresets
 
     public static bool UsesDashedStroke(BubbleStylePreset preset) => preset == BubbleStylePreset.Whisper;
 
-    private static List<ShapeAnchor> Oval(Rect2D b)
-    {
-        // Standard 4-point cubic-bezier ellipse approximation (kappa ~= 0.5523).
-        const double kappa = 0.5522848;
-        var rx = b.Width / 2;
-        var ry = b.Height / 2;
-        var cx = b.MidX;
-        var cy = b.MidY;
-        var ox = rx * kappa;
-        var oy = ry * kappa;
-
-        var top = new Point2D(cx, cy - ry);
-        var right = new Point2D(cx + rx, cy);
-        var bottom = new Point2D(cx, cy + ry);
-        var left = new Point2D(cx - rx, cy);
-
-        return
-        [
-            new ShapeAnchor(top, new Point2D(top.X - ox, top.Y), new Point2D(top.X + ox, top.Y), AnchorHandleKind.Smooth),
-            new ShapeAnchor(right, new Point2D(right.X, right.Y - oy), new Point2D(right.X, right.Y + oy), AnchorHandleKind.Smooth),
-            new ShapeAnchor(bottom, new Point2D(bottom.X + ox, bottom.Y), new Point2D(bottom.X - ox, bottom.Y), AnchorHandleKind.Smooth),
-            new ShapeAnchor(left, new Point2D(left.X, left.Y + oy), new Point2D(left.X, left.Y - oy), AnchorHandleKind.Smooth)
-        ];
-    }
+    private static List<ShapeAnchor> Oval(Rect2D b) => AnchorRing.Ellipse(b);
 
     private static List<ShapeAnchor> Zigzag(Rect2D b)
     {

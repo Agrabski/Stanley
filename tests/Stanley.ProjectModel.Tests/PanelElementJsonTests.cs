@@ -1,0 +1,81 @@
+using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Serialization;
+
+namespace Stanley.ProjectModel.Tests;
+
+public class PanelElementJsonTests
+{
+    private static ShapeAnchor Corner(double x, double y) => new(new Point2D(x, y), new Point2D(x, y), new Point2D(x, y), AnchorHandleKind.Corner);
+
+    private static Panel PanelWith(PanelBackground? background, params PanelElement[] elements) =>
+        new(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), background, [], [], elements);
+
+    [Fact]
+    public void Shapes_and_text_round_trip_with_their_kind_and_layer()
+    {
+        var shape = new ShapeElement(ElementId.New(), ElementLayer.Background, [Corner(20, 20), Corner(60, 30), Corner(40, 70)], Closed: true,
+            new ShapeStyle(ColorValue.FromHex("#1c1c1c"), ColorValue.FromHex("#27ae60"), 0.7));
+        var line = new ShapeElement(ElementId.New(), ElementLayer.Foreground, [Corner(20, 20), Corner(80, 20)], Closed: false,
+            new ShapeStyle(ColorValue.FromHex("#1c1c1c"), Fill: null, 1.4));
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(12, 12, 40, 10), "Meanwhile...",
+            new TextStyle(3.5, ColorValue.FromHex("#000000"), Bold: true, Align: TextAlign.Left, BoxFill: ColorValue.FromHex("#fff3b0"), BoxStroke: ColorValue.FromHex("#000000")));
+        var panel = PanelWith(new GradientBackground(ColorValue.FromHex("#5dade2"), ColorValue.FromHex("#f4f4f4")), shape, line, text);
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"kind\": \"shape\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"kind\": \"text\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"kind\": \"gradient\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"layer\": \"foreground\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        Assert.IsType<ShapeElement>(read.Elements[0]);
+        Assert.IsType<TextElement>(read.Elements[2]);
+        Assert.IsType<GradientBackground>(read.Background);
+    }
+
+    [Fact]
+    public void Unset_style_colours_are_left_out_of_the_file()
+    {
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi", new TextStyle(3.5, ColorValue.FromHex("#000000")));
+
+        var json = ProjectJson.Serialize(PanelWith(null, text));
+
+        Assert.DoesNotContain("boxFill", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("outline", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_colour_background_round_trips()
+    {
+        var panel = PanelWith(new ColorBackground(ColorValue.FromHex("#1b2a49")));
+
+        var read = ProjectJson.Deserialize<Panel>(ProjectJson.Serialize(panel));
+
+        Assert.Equal(new ColorBackground(ColorValue.FromHex("#1b2a49")), read.Background);
+    }
+
+    [Fact]
+    public void A_panel_file_from_before_elements_reads_as_having_none()
+    {
+        var old = PanelWith(null) with { Elements = [] };
+        var json = ProjectJson.Serialize(old).Replace("\"elements\": [],", "", StringComparison.Ordinal);
+        Assert.DoesNotContain("elements", json, StringComparison.Ordinal);
+
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.NotNull(read.Elements);
+        Assert.Empty(read.Elements);
+    }
+
+    [Fact]
+    public void A_panel_built_without_elements_has_an_empty_list()
+    {
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 10, 10)), null, [], []);
+
+        Assert.NotNull(panel.Elements);
+        Assert.Empty(panel.Elements);
+    }
+}
