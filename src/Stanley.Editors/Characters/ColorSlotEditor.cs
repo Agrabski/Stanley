@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.Input;
 using Stanley.ProjectModel.Characters;
@@ -46,6 +47,16 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 			else if (c != null)
 				owner.EditFabric(Slot, f => f with { Texture = c.Texture is { } kind ? new TextureFill(kind, f.Texture?.Strength, f.Texture?.Size) : null });
 		});
+		PickCustomColor = new RelayCommand<Control>(control =>
+		{
+			if (control != null)
+				ColorMenus.ShowMoreColors(control, _color, color => SetColor.Execute(new ColorSwatchChoice(Slot, "Custom", color)));
+		});
+		PickCustomPatternColor = new RelayCommand<Control>(control =>
+		{
+			if (control != null)
+				ColorMenus.ShowMoreColors(control, _fabric?.Pattern?.Colors.FirstOrDefault(), color => SetPatternColor.Execute(new ColorSwatchChoice(Slot, "Custom", color)));
+		});
 	}
 
 	public string Slot { get; }
@@ -64,6 +75,8 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	public System.Windows.Input.ICommand SetPatternColor { get; }
 	public System.Windows.Input.ICommand SetPattern { get; }
 	public System.Windows.Input.ICommand SetTexture { get; }
+	public System.Windows.Input.ICommand PickCustomColor { get; }
+	public System.Windows.Input.ICommand PickCustomPatternColor { get; }
 
 	public ColorValue Color => _color;
 

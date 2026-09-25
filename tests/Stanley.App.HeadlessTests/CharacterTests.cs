@@ -440,4 +440,27 @@ public class CharacterTests
         Assert.Equal("Pip", editor.Committed.Name);
         Assert.Equal("Pip", characters.Items.Single().Name);
     }
+
+    [Fact]
+    public void A_compared_character_can_be_clicked_to_switch_to_it()
+    {
+        var (window, characters) = Open();
+        var first = characters.CreateCharacter();
+        var second = characters.CreateCharacter();
+        characters.OpenCharacter(first.Id);
+        Dispatcher.UIThread.RunJobs();
+
+        var editor = characters.Items.Single(i => i.Id == first.Id).Editor;
+        Assert.True(editor.ShowLineUp); // line-up is shown by default
+        var figure = Single<CharacterEditorView>(window).Figure;
+        Assert.NotNull(figure.LineUp);
+        Assert.Contains(figure.LineUp, c => c.Id == second.Id);
+
+        // LineUpCharacterAt returns the clicked character for a point in its bounds
+        var bounds = figure.Bounds;
+        var clickPoint = new Point(bounds.Right - 30, bounds.Bottom - 40);
+        var lineUpChar = figure.LineUpCharacterAt(clickPoint);
+        Assert.NotNull(lineUpChar);
+        Assert.Equal(second.Id, lineUpChar.Id);
+    }
 }

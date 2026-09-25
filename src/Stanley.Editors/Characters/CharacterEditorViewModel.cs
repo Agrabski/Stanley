@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using CommunityToolkit.Mvvm.Input;
 using Stanley.Editing.Abstractions;
 using Stanley.EditorFramework;
@@ -42,6 +43,12 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 					SetSkin(swatch.Color);
 			}
 		);
+		PickCustomSkinColorCommand = new RelayCommand<Control>(control =>
+			{
+				if (control != null)
+					ColorMenus.ShowMoreColors(control, Working.Skin, color => SetSkin(color));
+			}
+		);
 		BackToPageCommand = new RelayCommand(() => Library?.ReturnToPage(), () => Library != null);
 		InitializeLook();
 		InitializeArt();
@@ -74,6 +81,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 
 	public IRelayCommand<BodyPresetChoice> ApplyPresetCommand { get; }
 	public IRelayCommand<SkinSwatch> SetSkinCommand { get; }
+	public IRelayCommand<Control> PickCustomSkinColorCommand { get; }
 
 	/// <summary>"Close" in the ribbon, like Word's "Close Header and Footer": back to the page being worked on.</summary>
 	public IRelayCommand BackToPageCommand { get; }
