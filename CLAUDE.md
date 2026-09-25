@@ -868,8 +868,13 @@ automatic back-merge) are plumbing and never appear in release notes.
   implies. Nothing is published.
 - **Linux only** (`linux-x64`) — Windows and macOS aren't supported build/release
   targets.
-- **Nightly** (daily 02:00 UTC schedule; at most once a day, and skipped when
-  `develop` hasn't moved since the last nightly; a manual run always builds):
+- **Nightly** (daily at 02:17 UTC, with a 14:17 UTC fallback slot - GitHub runs
+  scheduled workflows late when busy, worst on the hour, and can drop them; at most
+  one build a day, skipped when `develop` hasn't moved since the last nightly; a
+  manual run always builds). `nightly-gate` decides: it compares `develop` with the
+  `nightly` tag (which `velopack-release` moves to each build's commit - vpk only
+  sets it when it first creates the release) and checks the date the nightly's
+  assets were uploaded (schedules use `develop`'s copy of `ci.yml`). A build
   builds and tests `develop`, then a self-contained `dotnet publish` of
   `src/Stanley.App` for linux-x64, packed with **Velopack** (`vpk pack`,
   channel `linux-nightly`) into a `.AppImage` — the only thing uploaded, as
