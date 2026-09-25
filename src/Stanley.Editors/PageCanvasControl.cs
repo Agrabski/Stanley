@@ -30,6 +30,10 @@ public sealed class PageCanvasControl : Control
     private const double DragThresholdPx = 4;
     private const double FitPaddingPx = 28;
 
+    /// <summary>How far (screen px) a smoothed pen stroke may stray from the pointer's path, and how near its start (px) it must end to close into a shape.</summary>
+    private const double FreehandTolerancePx = 0.8;
+    private const double CloseDistancePx = 12;
+
     private PageEditorViewModel? _viewModel;
     private double _zoom = 2;
     private Vector _offset;
@@ -42,6 +46,9 @@ public sealed class PageCanvasControl : Control
     private PanelId? _dragPanelId;
     private int _dragBubbleIndex = -1;
     private int _dragCharacterIndex = -1;
+    private int _dragElementIndex = -1;
+    private readonly List<Point2D> _trail = [];
+    private bool _dragMoved;
     private double _dragStartUnit;
     private Limb _dragLimb;
     private TrunkPart _dragTrunk;
@@ -127,6 +134,21 @@ public sealed class PageCanvasControl : Control
 
     private EditingBubble? _editingBubble;
 
+    /// <summary>The text element the inline text editor is open over, if any: the canvas leaves its lettering (not its box) and handles off.</summary>
+    public ElementId? EditingText
+    {
+        get => _editingText;
+        set
+        {
+            if (_editingText == value)
+                return;
+            _editingText = value;
+            InvalidateVisual();
+        }
+    }
+
+    private ElementId? _editingText;
+
     // ---------------------------------------------------------------- view transform
 
     public double Zoom => _zoom;
@@ -205,7 +227,7 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.ActiveGuides) or nameof(PageEditorViewModel.Grid)
             or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio)
             or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
-            or nameof(PageEditorViewModel.IssueLooks))
+            or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -242,7 +264,9 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedCharacter is { } posed ? _viewModel.LimbHandles(posed).Select(h => h.Point).ToList() : null,
             _viewModel.SelectedCharacter is { } bent ? _viewModel.BendHandles(bent).Select(h => h.Point).ToList() : null,
             _viewModel.SelectedCharacter is { } trunk ? _viewModel.TrunkHandles(trunk).Select(h => h.Point).ToList() : null,
-            _editingBubble)));
+            _editingBubble,
+            _viewModel.SelectedElementIndex,
+            _editingText)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
@@ -270,9 +294,11 @@ public sealed class PageCanvasControl : Control
         BendHandle,
         TrunkHandle,
         CharacterHandle,
+        ElementHandle,
         PanelCorner,
         Gutter,
         BubbleBody,
+        ElementBody,
         CharacterBody,
         PanelEdge,
         PanelBody
@@ -284,6 +310,7 @@ public sealed class PageCanvasControl : Control
         int BubbleIndex = -1,
         int TailIndex = -1,
         int CharacterIndex = -1,
+        int ElementIndex = -1,
         Limb Limb = Limb.LeftArm,
         TrunkPart Trunk = TrunkPart.Hips,
         RectEdges Edges = RectEdges.None,
@@ -292,9 +319,11 @@ public sealed class PageCanvasControl : Control
     /// <summary>
     /// What's under a point, in priority order: the selected bubble's own handles first
     /// (they sit on top), then the selected character's pose handles (hand/foot, then
-    /// elbow/knee, then trunk) and resize handles, panel corners and gutters, then bubble
-    /// bodies (so a bubble flush against a panel edge is still grabbable), then characters
-    /// (bubbles draw over them), then panel edges and bodies.
+    /// elbow/knee, then trunk) and resize handles, the selected element's resize handles,
+    /// panel corners and gutters, then bubble bodies (so a bubble flush against a panel edge
+    /// is still grabbable), foreground elements, characters, panel edges, background
+    /// elements (scenery covering a panel mustn't stop its edges being dragged), and last
+    /// panel bodies - front to back, the way they're drawn.
     /// </summary>
     private Hit HitTest(Point2D p)
     {
@@ -343,6 +372,13 @@ public sealed class PageCanvasControl : Control
                 return new Hit(HitKind.CharacterHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Edges: RectEdges.Right | RectEdges.Top);
         }
 
+        if (vm.SelectedElement is { } element && vm.SelectedPanelId is { } elementPanel && element.Id != _editingText)
+        {
+            var handleEdges = HitHandles(ProjectModel.Issues.PanelElements.Bounds(element), p, tol, includeMidpoints: true);
+            if (handleEdges != RectEdges.None)
+                return new Hit(HitKind.ElementHandle, elementPanel, ElementIndex: vm.SelectedElementIndex, Edges: handleEdges);
+        }
+
         // A locked layout offers no panel handles, edges or gutters to grab.
         foreach (var id in doc.LayoutLocked ? [] : doc.PanelOrder)
         {
@@ -369,6 +405,9 @@ public sealed class PageCanvasControl : Control
             }
         }
 
+        if (ElementAt(p, ProjectModel.Issues.ElementLayer.Foreground) is { } front)
+            return front;
+
         for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
         {
             var id = doc.PanelOrder[i];
@@ -391,17 +430,41 @@ public sealed class PageCanvasControl : Control
             if (!Contains(bounds, p))
                 continue;
 
-            if (doc.LayoutLocked)
-                return new Hit(HitKind.PanelBody, id);
-            var edges = RectEdges.None;
-            if (p.X - bounds.Left <= band) edges |= RectEdges.Left;
-            if (bounds.Right - p.X <= band) edges |= RectEdges.Right;
-            if (p.Y - bounds.Top <= band) edges |= RectEdges.Top;
-            if (bounds.Bottom - p.Y <= band) edges |= RectEdges.Bottom;
-            return edges != RectEdges.None ? new Hit(HitKind.PanelEdge, id, Edges: edges) : new Hit(HitKind.PanelBody, id);
+            if (!doc.LayoutLocked)
+            {
+                var edges = RectEdges.None;
+                if (p.X - bounds.Left <= band) edges |= RectEdges.Left;
+                if (bounds.Right - p.X <= band) edges |= RectEdges.Right;
+                if (p.Y - bounds.Top <= band) edges |= RectEdges.Top;
+                if (bounds.Bottom - p.Y <= band) edges |= RectEdges.Bottom;
+                if (edges != RectEdges.None)
+                    return new Hit(HitKind.PanelEdge, id, Edges: edges);
+            }
+            return ElementAt(p, ProjectModel.Issues.ElementLayer.Background, id) ?? new Hit(HitKind.PanelBody, id);
         }
 
         return new Hit(HitKind.None);
+    }
+
+    /// <summary>The topmost element of <paramref name="layer"/> under <paramref name="p"/> - only where it shows, inside its panel.</summary>
+    private Hit? ElementAt(Point2D p, ProjectModel.Issues.ElementLayer layer, PanelId? only = null)
+    {
+        var doc = _viewModel!.Working;
+        var tol = HitRadiusPx / 2 / _zoom;
+        for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
+        {
+            var id = doc.PanelOrder[i];
+            if (only is { } wanted && !wanted.Equals(id))
+                continue;
+            if (!doc.Panels.TryGetValue(id, out var panel) || !Contains(AnchorRing.BoundingBox(panel.Shape.Anchors), p))
+                continue;
+            for (var e = panel.Elements.Count - 1; e >= 0; e--)
+            {
+                if (panel.Elements[e].Layer == layer && ElementRenderer.Hits(panel.Elements[e], p, tol))
+                    return new Hit(HitKind.ElementBody, id, ElementIndex: e);
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -571,6 +634,26 @@ public sealed class PageCanvasControl : Control
                     StartDrag(e, DragKind.CreateBubble);
                 }
                 return;
+
+            case PageEditorTool.Draw or PageEditorTool.Line or PageEditorTool.Rectangle or PageEditorTool.Ellipse:
+                if (PanelAt(page) is { } drawPanel)
+                {
+                    _viewModel.ClearSelection();
+                    _dragPanelId = drawPanel;
+                    _trail.Clear();
+                    _trail.Add(page);
+                    _viewModel.BeginDrawShape(drawPanel);
+                    StartDrag(e, DragKind.DrawShape);
+                }
+                return;
+
+            case PageEditorTool.Text:
+                if (PanelAt(page) is { } textPanel)
+                {
+                    _dragPanelId = textPanel;
+                    StartDrag(e, DragKind.CreateText);
+                }
+                return;
         }
 
         PressWithSelectTool(e, page);
@@ -589,6 +672,11 @@ public sealed class PageCanvasControl : Control
                     vm.Select(bubblePanel, hit.BubbleIndex);
                     _viewModel!.RequestTextEdit(bubblePanel, hit.BubbleIndex);
                     return;
+                case HitKind.ElementBody or HitKind.ElementHandle when hit.PanelId is { } textPanel
+                                                                     && vm.Working.Panels[textPanel].Elements[hit.ElementIndex] is ProjectModel.Issues.TextElement:
+                    vm.SelectElement(textPanel, hit.ElementIndex);
+                    vm.RequestElementTextEdit(textPanel, hit.ElementIndex);
+                    return;
                 case HitKind.CharacterBody when hit.PanelId is { } characterPanel:
                     vm.SelectCharacter(characterPanel, hit.CharacterIndex);
                     if (vm.EditCharacterCommand.CanExecute(null))
@@ -606,6 +694,7 @@ public sealed class PageCanvasControl : Control
         _dragBubbleIndex = hit.BubbleIndex;
         _dragTailIndex = hit.TailIndex;
         _dragCharacterIndex = hit.CharacterIndex;
+        _dragElementIndex = hit.ElementIndex;
         _dragEdges = hit.Edges;
 
         switch (hit.Kind)
@@ -642,6 +731,17 @@ public sealed class PageCanvasControl : Control
             case HitKind.BubbleBody:
                 vm.Select(hit.PanelId, hit.BubbleIndex);
                 StartDrag(e, DragKind.PendingMoveBubble);
+                break;
+
+            case HitKind.ElementHandle:
+                _dragStartBounds = ProjectModel.Issues.PanelElements.Bounds(vm.Working.Panels[hit.PanelId!.Value].Elements[hit.ElementIndex]);
+                vm.BeginResizeElement(hit.PanelId.Value, hit.ElementIndex);
+                StartDrag(e, DragKind.ResizeElement);
+                break;
+
+            case HitKind.ElementBody:
+                vm.SelectElement(hit.PanelId!.Value, hit.ElementIndex);
+                StartDrag(e, DragKind.PendingMoveElement);
                 break;
 
             case HitKind.LimbHandle:
@@ -698,6 +798,7 @@ public sealed class PageCanvasControl : Control
     private void StartDrag(PointerPressedEventArgs e, DragKind kind)
     {
         _drag = kind;
+        _dragMoved = false;
         _panStartOffset = _offset;
         e.Pointer.Capture(this);
         UpdateCursor(null);
@@ -723,6 +824,7 @@ public sealed class PageCanvasControl : Control
         var dy = page.Y - _pressPage.Y;
         var snap = e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 0 : SnapDistancePx / _zoom;
         var beyondThreshold = Math.Abs(pos.X - _pressScreen.X) > DragThresholdPx || Math.Abs(pos.Y - _pressScreen.Y) > DragThresholdPx;
+        _dragMoved |= beyondThreshold;
 
         switch (_drag)
         {
@@ -809,6 +911,36 @@ public sealed class PageCanvasControl : Control
             case DragKind.CreateBubble when beyondThreshold:
                 _rubberBand = RectFromPoints(_pressPage, page);
                 break;
+
+            case DragKind.CreateText when _dragMoved:
+                _rubberBand = RectFromPoints(_pressPage, page);
+                break;
+
+            case DragKind.PendingMoveElement when beyondThreshold:
+                _viewModel.BeginMoveElement(_dragPanelId!.Value, _dragElementIndex);
+                _drag = DragKind.MoveElement;
+                goto case DragKind.MoveElement;
+
+            case DragKind.MoveElement:
+                _viewModel.UpdateMoveElement(_dragPanelId!.Value, _dragElementIndex, dx, dy);
+                break;
+
+            case DragKind.ResizeElement:
+                _viewModel.UpdateResizeElement(_dragPanelId!.Value, _dragElementIndex, MoveEdges(_dragStartBounds, _dragEdges, dx, dy));
+                break;
+
+            case DragKind.DrawShape when _viewModel.Tool == PageEditorTool.Draw:
+                // Pointer events come faster than the pen needs; skip ones under half a pixel apart.
+                if (Dist(_trail[^1], page) * _zoom >= 0.5)
+                {
+                    _trail.Add(page);
+                    _viewModel.UpdateDrawFreehand(_trail, FreehandTolerancePx / _zoom, CloseDistancePx / _zoom);
+                }
+                break;
+
+            case DragKind.DrawShape when _dragMoved:
+                _viewModel.UpdateDrawShape(_pressPage, page, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                break;
         }
 
         InvalidateVisual();
@@ -861,8 +993,32 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
                 or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
-                or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk:
+                or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk
+                or DragKind.MoveElement or DragKind.ResizeElement:
                 vm.EndGesture(commit);
+                break;
+
+            case DragKind.DrawShape when commit:
+                // A click with the rectangle or ellipse tool places a standard-size one there.
+                if (!_dragMoved && vm.Tool is PageEditorTool.Rectangle or PageEditorTool.Ellipse)
+                    vm.UpdateDrawShape(
+                        new Point2D(_pressPage.X - PageEditorViewModel.DefaultShapeWidthMm / 2, _pressPage.Y - PageEditorViewModel.DefaultShapeHeightMm / 2),
+                        new Point2D(_pressPage.X + PageEditorViewModel.DefaultShapeWidthMm / 2, _pressPage.Y + PageEditorViewModel.DefaultShapeHeightMm / 2));
+                vm.CommitDrawShape();
+                break;
+
+            case DragKind.DrawShape:
+                vm.CancelDrawShape();
+                break;
+
+            case DragKind.CreateText when commit && _dragPanelId is { } textPanel:
+                var textIndex = vm.CreateText(textPanel, _pressPage, _dragMoved ? _rubberBand : null);
+                if (textIndex >= 0)
+                {
+                    vm.Tool = PageEditorTool.Select;
+                    vm.SelectElement(textPanel, textIndex);
+                    vm.RequestElementTextEdit(textPanel, textIndex);
+                }
                 break;
         }
 
@@ -870,6 +1026,8 @@ public sealed class PageCanvasControl : Control
         _dragBubbleIndex = -1;
         _dragTailIndex = -1;
         _dragCharacterIndex = -1;
+        _dragElementIndex = -1;
+        _trail.Clear();
         _dragEdges = RectEdges.None;
         _dragGutter = null;
         _rubberBand = null;
@@ -914,7 +1072,7 @@ public sealed class PageCanvasControl : Control
         var gutter = hit?.Gutter;
         // No "you could select this" highlight on a locked layout; the Bubble tool still
         // shows which panel a new bubble would land in.
-        var panel = vm.Tool == PageEditorTool.Bubble || vm.Tool == PageEditorTool.Select && !vm.Working.LayoutLocked ? PanelAt(page) : null;
+        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text || vm.IsShapeTool || vm.Tool == PageEditorTool.Select && !vm.Working.LayoutLocked ? PanelAt(page) : null;
         if (!Equals(gutter, _hoverGutter) || !Equals(panel, _hoverPanelId))
         {
             _hoverGutter = gutter;
@@ -952,6 +1110,9 @@ public sealed class PageCanvasControl : Control
                 break;
             case Key.Enter or Key.F2 when vm.HasSelectedBubble:
                 vm.RequestTextEdit(vm.SelectedPanelId!.Value, vm.SelectedBubbleIndex);
+                break;
+            case Key.Enter or Key.F2 when vm.HasSelectedText:
+                vm.RequestElementTextEdit(vm.SelectedPanelId!.Value, vm.SelectedElementIndex);
                 break;
             case Key.Left when _drag == DragKind.None:
                 vm.NudgeSelection(-step, 0);
@@ -992,6 +1153,21 @@ public sealed class PageCanvasControl : Control
                 break;
             case Key.H when !ctrl:
                 vm.Tool = PageEditorTool.Pan;
+                break;
+            case Key.D when !ctrl:
+                vm.Tool = PageEditorTool.Draw;
+                break;
+            case Key.L when !ctrl:
+                vm.Tool = PageEditorTool.Line;
+                break;
+            case Key.R when !ctrl:
+                vm.Tool = PageEditorTool.Rectangle;
+                break;
+            case Key.E when !ctrl:
+                vm.Tool = PageEditorTool.Ellipse;
+                break;
+            case Key.T when !ctrl:
+                vm.Tool = PageEditorTool.Text;
                 break;
             case Key.S when !ctrl && vm.HasSelectedCharacter:
                 vm.IsSelectedCharacterSide = true;
@@ -1054,6 +1230,43 @@ public sealed class PageCanvasControl : Control
             items.Add(new Separator());
             items.Add(Item("Delete bubble", () => vm.DeleteBubble(bubblePanel, index), "Del"));
         }
+        else if (hit.Kind is HitKind.ElementBody or HitKind.ElementHandle && hit.PanelId is { } elementPanel)
+        {
+            var index = hit.ElementIndex;
+            vm.SelectElement(elementPanel, index);
+            var element = vm.Working.Panels[elementPanel].Elements[index];
+            if (element is ProjectModel.Issues.TextElement)
+            {
+                items.Add(Item("Edit text", () => vm.RequestElementTextEdit(elementPanel, index), "Enter"));
+                items.Add(new MenuItem
+                {
+                    Header = "Kind",
+                    ItemsSource = vm.TextPresetChoices.Select(choice => Item(choice.Name, () => vm.ApplyTextPresetCommand.Execute(choice.Preset))).ToList()
+                });
+                items.Add(Item("Bigger letters", () => vm.BiggerTextCommand.Execute(null)));
+                items.Add(Item("Smaller letters", () => vm.SmallerTextCommand.Execute(null)));
+                items.Add(ColorMenu("Text colour", vm.SetTextColorCommand, noneLabel: null));
+                items.Add(ColorMenu("Box", vm.SetTextBoxCommand, "No box"));
+            }
+            else
+            {
+                items.Add(ColorMenu("Outline", vm.SetStrokeColorCommand, "No outline"));
+                items.Add(ColorMenu("Fill", vm.SetFillColorCommand, "No fill"));
+                items.Add(new MenuItem
+                {
+                    Header = "Thickness",
+                    ItemsSource = vm.WeightChoices.Select(weight => Item(weight.Name, () => vm.SetStrokeWeightCommand.Execute(weight))).ToList()
+                });
+            }
+            items.Add(new Separator());
+            var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
+            items.Add(Item(inFront ? "Put behind the characters" : "Put in front of the characters",
+                () => vm.SetElementLayer(elementPanel, index, inFront ? ProjectModel.Issues.ElementLayer.Background : ProjectModel.Issues.ElementLayer.Foreground)));
+            items.Add(Item("Bring to front", () => vm.ReorderElement(elementPanel, index, toFront: true)));
+            items.Add(Item("Send to back", () => vm.ReorderElement(elementPanel, index, toFront: false)));
+            items.Add(new Separator());
+            items.Add(Item(element is ProjectModel.Issues.TextElement ? "Delete text" : "Delete shape", () => vm.DeleteElement(elementPanel, index), "Del"));
+        }
         else if (hit.Kind is HitKind.CharacterBody or HitKind.CharacterHandle && hit.PanelId is { } characterPanel)
         {
             var index = hit.CharacterIndex;
@@ -1102,6 +1315,8 @@ public sealed class PageCanvasControl : Control
                 if (index >= 0)
                     _viewModel!.RequestTextEdit(lockedPanelId, index);
             }));
+            items.Add(AddTextItem(vm, lockedPanelId, at));
+            items.Add(BackgroundMenu(vm, lockedPanelId));
             items.Add(new Separator());
             items.Add(Item("Unlock layout", () => vm.IsLayoutLocked = false));
         }
@@ -1115,6 +1330,8 @@ public sealed class PageCanvasControl : Control
                 if (index >= 0)
                     _viewModel!.RequestTextEdit(panelId, index);
             }));
+            items.Add(AddTextItem(vm, panelId, at));
+            items.Add(BackgroundMenu(vm, panelId));
             items.Add(new Separator());
             items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
             items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
@@ -1131,6 +1348,38 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Actual size", ActualSize, "Ctrl+1"));
         }
         return items;
+    }
+
+    private static MenuItem AddTextItem(PageEditorViewModel vm, PanelId panelId, Point2D at) => Item("Add text here", () =>
+    {
+        var index = vm.CreateText(panelId, at);
+        if (index >= 0)
+            vm.RequestElementTextEdit(panelId, index);
+    }, "T");
+
+    /// <summary>Background ▸ every choice, for this panel - offered on a locked layout too, since a background isn't layout.</summary>
+    private static MenuItem BackgroundMenu(PageEditorViewModel vm, PanelId panelId) => new()
+    {
+        Header = "Background",
+        ItemsSource = vm.BackgroundChoices.Select(choice => Item(choice.Name, () => vm.SetPanelBackground(panelId, choice.Background))).ToList()
+    };
+
+    /// <summary>A submenu of palette colours (plus "none" when <paramref name="noneLabel"/> is given) running <paramref name="command"/>.</summary>
+    private static MenuItem ColorMenu(string header, System.Windows.Input.ICommand command, string? noneLabel)
+    {
+        var items = new List<object>();
+        if (noneLabel != null)
+        {
+            items.Add(Item(noneLabel, () => command.Execute(DrawingPalette.None)));
+            items.Add(new Separator());
+        }
+        items.AddRange(DrawingPalette.Colors.Select(color =>
+        {
+            var item = Item(color.Name, () => command.Execute(color));
+            item.Icon = new Border { Width = 14, Height = 14, Background = color.Brush, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1) };
+            return item;
+        }));
+        return new MenuItem { Header = header, ItemsSource = items };
     }
 
     private static MenuItem Item(string header, Action action, string? gesture = null)
@@ -1153,18 +1402,20 @@ public sealed class PageCanvasControl : Control
         StandardCursorType type;
         if (_drag == DragKind.Pan || _spaceHeld || vm.Tool == PageEditorTool.Pan)
             type = StandardCursorType.Hand;
-        else if (vm.Tool is PageEditorTool.Panel or PageEditorTool.Bubble)
+        else if (vm.Tool is PageEditorTool.Panel or PageEditorTool.Bubble || vm.IsShapeTool)
             type = StandardCursorType.Cross;
+        else if (vm.Tool == PageEditorTool.Text)
+            type = StandardCursorType.Ibeam;
         else if (hit == null)
-            type = _drag is DragKind.MoveBubble or DragKind.MovePanel or DragKind.MoveCharacter ? StandardCursorType.SizeAll : StandardCursorType.Arrow;
+            type = _drag is DragKind.MoveBubble or DragKind.MovePanel or DragKind.MoveCharacter or DragKind.MoveElement ? StandardCursorType.SizeAll : StandardCursorType.Arrow;
         else
             type = hit.Kind switch
             {
                 HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
-                HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle => EdgeCursor(hit.Edges),
+                HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle or HitKind.ElementHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.PanelBody when vm.Working.LayoutLocked => StandardCursorType.Arrow,
-                HitKind.BubbleBody or HitKind.PanelBody or HitKind.CharacterBody => StandardCursorType.SizeAll,
+                HitKind.BubbleBody or HitKind.PanelBody or HitKind.CharacterBody or HitKind.ElementBody => StandardCursorType.SizeAll,
                 _ => StandardCursorType.Arrow
             };
 
@@ -1248,6 +1499,11 @@ public sealed class PageCanvasControl : Control
         ResizeCharacter,
         PoseLimb,
         PoseBend,
-        PoseTrunk
+        PoseTrunk,
+        PendingMoveElement,
+        MoveElement,
+        ResizeElement,
+        DrawShape,
+        CreateText
     }
 }

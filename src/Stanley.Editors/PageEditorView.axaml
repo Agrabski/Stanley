@@ -33,7 +33,7 @@
     <!-- Page -->
     <Grid Grid.Row="0">
       <local:PageCanvasControl x:Name="PageCanvas" />
-      <!-- The text editor sits inside the bubble's text area on the (always white) paper, so it stays light in dark mode too. -->
+      <!-- The text editor sits inside the bubble's (or text box's) text area on the (always white) paper, so it stays light in dark mode too. -->
       <ThemeVariantScope RequestedThemeVariant="Light">
       <Canvas Name="Overlay">
         <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
@@ -50,7 +50,7 @@
           <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12" VerticalAlignment="Center"
                      IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
           <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-          <TextBlock Name="TextEditHintText" IsVisible="False" Text="Type the dialogue · Enter = done · Shift+Enter = new line · Esc = cancel"
+          <TextBlock Name="TextEditHintText" IsVisible="False"
                      FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </StackPanel>
         <TextBlock Name="PageInfoText" Grid.Column="1" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />

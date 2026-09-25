@@ -127,18 +127,10 @@ public sealed partial class PageEditorViewModel
                 SetCurrentTextStyle(CurrentTextStyle with { BoxFill = c.Color, BoxStroke = c.Color is null ? null : CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink });
         });
         SetTextOutlineCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentTextStyle(CurrentTextStyle with { Outline = c.Color }); });
-        ApplyTextPresetCommand = new RelayCommand<TextPresetChoice>(choice =>
-        {
-            if (choice != null)
-                SetCurrentTextStyle(TextStylePresets.Style(choice.Preset));
-        });
+        ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset)));
         BiggerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Bigger(CurrentTextStyle.FontSizeMm) }));
         SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
-        InsertTextCommand = new RelayCommand<TextPresetChoice>(choice =>
-        {
-            if (choice != null)
-                InsertText(choice.Preset);
-        }, _ => Working.PanelOrder.Count > 0);
+        InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
         SetBackgroundCommand = new RelayCommand<BackgroundChoice>(choice =>
         {
@@ -170,12 +162,12 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>An outline around each letter, like a sound effect's, or none.</summary>
     public IRelayCommand<PaletteColor> SetTextOutlineCommand { get; private set; } = null!;
-    public IRelayCommand<TextPresetChoice> ApplyTextPresetCommand { get; private set; } = null!;
+    public IRelayCommand<TextStylePreset> ApplyTextPresetCommand { get; private set; } = null!;
     public IRelayCommand BiggerTextCommand { get; private set; } = null!;
     public IRelayCommand SmallerTextCommand { get; private set; } = null!;
 
     /// <summary>Insert tab: text of that kind in the selected (or first) panel, ready to type into.</summary>
-    public IRelayCommand<TextPresetChoice> InsertTextCommand { get; private set; } = null!;
+    public IRelayCommand<TextStylePreset> InsertTextCommand { get; private set; } = null!;
 
     /// <summary>Insert tab: switches to a drawing tool.</summary>
     public IRelayCommand<PageEditorTool> UseToolCommand { get; private set; } = null!;

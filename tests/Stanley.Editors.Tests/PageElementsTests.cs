@@ -289,7 +289,7 @@ public class PageElementsTests
         (PanelId Panel, int Index)? requested = null;
         editor.ElementTextEditRequested += (p, i) => requested = (p, i);
 
-        editor.InsertTextCommand.Execute(editor.TextPresetChoices.Single(c => c.Preset == TextStylePreset.Caption));
+        editor.InsertTextCommand.Execute(TextStylePreset.Caption);
 
         var text = (TextElement)editor.Working.Panels[panel].Elements[0];
         Assert.Equal((panel, 0), requested);
@@ -308,7 +308,7 @@ public class PageElementsTests
         editor.IsTextBold = true;
         editor.IsTextAlignRight = true;
         editor.BiggerTextCommand.Execute(null);
-        editor.ApplyTextPresetCommand.Execute(editor.TextPresetChoices.Single(c => c.Preset == TextStylePreset.SoundEffect));
+        editor.ApplyTextPresetCommand.Execute(TextStylePreset.SoundEffect);
 
         var after = (TextElement)editor.Working.Panels[panel].Elements[index];
         Assert.Equal(TextStylePresets.Style(TextStylePreset.SoundEffect), after.Style);
@@ -326,7 +326,7 @@ public class PageElementsTests
     public void A_text_box_colour_adds_an_outlined_box_and_none_takes_it_away()
     {
         var (editor, _, panel) = NewEditor();
-        editor.ApplyTextPresetCommand.Execute(editor.TextPresetChoices.Single(c => c.Preset == TextStylePreset.Plain));
+        editor.ApplyTextPresetCommand.Execute(TextStylePreset.Plain);
         var index = editor.CreateText(panel, new Point2D(60, 50));
 
         editor.SetTextBoxCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "White"));
