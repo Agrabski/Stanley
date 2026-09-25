@@ -729,10 +729,11 @@ automatic back-merge) are plumbing and never appear in release notes.
   into `develop` (if that fails — protected branch, conflict — it warns; merge
   `main` into `develop` by hand). The repo is private, so only collaborators
   can download releases or nightlies. See `docs/automatic-builds.md` for the
-  end-user install/self-update steps (the AppImage goes in `~/Applications` under a
-  fixed name — updates replace it in place, and a root-owned folder would make every
-  update ask for a password — plus a `~/.local/share/applications` entry for the
-  start menu on Ubuntu/Mint).
+  end-user install/self-update steps (the AppImage goes in `~/bin` as `stanley`, so
+  the CLI is on the PATH too; Velopack's update does `mv -f <new> "$APPIMAGE"`, so any
+  path and name work, but a root-owned folder would make every update ask for a
+  password; plus a `~/.local/share/applications` entry for the start menu on
+  Ubuntu/Mint).
 - **Version numbers are never written by hand.** MinVer (`Stanley.App.csproj`)
   derives the binaries' version from git tags: a `vX.Y.Z` commit is `X.Y.Z`,
   anything after it is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag
