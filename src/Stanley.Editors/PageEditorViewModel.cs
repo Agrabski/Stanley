@@ -36,7 +36,10 @@ public enum ViewportRequest
     ZoomIn,
     ZoomOut,
     FitPage,
-    ActualSize
+    ActualSize,
+
+    /// <summary>Give the keyboard back to the page - after typing into a ribbon box, so shortcuts reach the page again.</summary>
+    FocusPage
 }
 
 public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
@@ -188,6 +191,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     /// <summary>Raised for zoom/fit requests; the pane's view owns the transform and applies them.</summary>
     public event Action<ViewportRequest>? ViewportRequested;
+
+    /// <summary>Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>).</summary>
+    public void FocusPage() => ViewportRequested?.Invoke(ViewportRequest.FocusPage);
 
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;

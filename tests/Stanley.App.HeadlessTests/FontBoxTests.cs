@@ -93,6 +93,70 @@ public class FontBoxTests
         Assert.Same(font, home.SelectedItem);
     }
 
+    /// <summary>Word's font size box: type any size and press Enter, or pick one from the arrow's list; a bad entry puts the size back.</summary>
+    [Fact]
+    public void The_size_box_takes_a_typed_size_or_a_picked_one_and_gives_the_keyboard_back_to_the_page()
+    {
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var editor = window.Editor;
+        var panelId = editor.Working.PanelOrder[0];
+        var bounds = editor.PanelBounds(panelId);
+        var index = editor.CreateText(panelId, new Point2D(bounds.MidX, bounds.MidY));
+        editor.SetElementText(panelId, index, "BOOM");
+        double Size() => ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style.FontSizeMm;
+
+        var ribbon = Ribbon(window);
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "TextTab");
+        Dispatcher.UIThread.RunJobs();
+        var box = ribbon.GetVisualDescendants().OfType<FontSizeBox>().Single(b => b.Name == "TextSizeBox");
+        var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
+        Assert.Equal(FontSizeBox.Format(Size()), box.Entry.Text);
+
+        // Click in, type, Enter: the whole entry is replaced, the size applies, the page has the keyboard again.
+        box.Entry.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyTextInput("7.5");
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(7.5, Size());
+        Assert.Equal(FontSizeBox.Format(7.5), box.Entry.Text);
+        Assert.True(view.Canvas.IsFocused);
+
+        // Nonsense is refused: the box shows the real size again and the status bar says why.
+        box.Entry.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyTextInput("huge");
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(7.5, Size());
+        Assert.Equal(FontSizeBox.Format(7.5), box.Entry.Text);
+        Assert.NotNull(editor.LastError);
+
+        // Esc cancels what's typed.
+        box.Entry.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyTextInput("40");
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(7.5, Size());
+        Assert.Equal(FontSizeBox.Format(7.5), box.Entry.Text);
+
+        // The arrow lists the usual sizes with the current one ticked once it's one of them; a click applies.
+        editor.SetTextSizeCommand.Execute("12");
+        box.Menu.ShowAt(box);
+        Dispatcher.UIThread.RunJobs();
+        var items = box.Menu.Items.OfType<MenuItem>().ToList();
+        Assert.Equal(FontSizeBox.Format(12), Assert.Single(items, i => i.IsChecked).Header);
+        LookTabTests.Snapshot(window, "font-size-menu");
+        items.Single(i => (string?)i.Header == FontSizeBox.Format(20)).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+        box.Menu.Hide();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(20, Size());
+        Assert.Equal(FontSizeBox.Format(20), box.Entry.Text);
+    }
+
     [Fact]
     public void A_font_missing_from_this_computer_is_named_in_the_box_and_drawn_in_the_default()
     {

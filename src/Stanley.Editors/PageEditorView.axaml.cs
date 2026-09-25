@@ -132,6 +132,7 @@ public partial class PageEditorView : UserControl
             case ViewportRequest.ZoomOut: PageCanvas.ZoomOut(); break;
             case ViewportRequest.FitPage: PageCanvas.FitPage(); break;
             case ViewportRequest.ActualSize: PageCanvas.ActualSize(); break;
+            case ViewportRequest.FocusPage: PageCanvas.Focus(); break;
         }
     }
 

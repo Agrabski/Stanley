@@ -109,6 +109,42 @@ public class FontsTests
     }
 
     [Fact]
+    public void A_size_picked_or_typed_resizes_the_selected_text_in_one_undo_step_and_a_bad_one_says_why()
+    {
+        var (editor, history, panel) = NewEditor();
+        var index = editor.CreateText(panel, new Point2D(40, 40));
+        editor.SelectElement(panel, index);
+        var before = editor.TextSizeMm;
+        var changes = new List<string?>();
+        editor.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        editor.SetTextSizeCommand.Execute("7,5 mm");
+
+        Assert.Equal(7.5, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizeMm);
+        Assert.Equal(7.5, editor.TextSizeMm);
+        Assert.Contains(nameof(PageEditorViewModel.TextSizeMm), changes);
+        Assert.Contains(12, editor.TextSizeChoices);
+
+        editor.SetTextSizeCommand.Execute("huge");
+        Assert.Equal(7.5, editor.TextSizeMm);
+        Assert.NotNull(editor.LastError);
+
+        history.Undo();
+        Assert.Equal(before, editor.TextSizeMm);
+    }
+
+    [Fact]
+    public void With_nothing_selected_a_typed_size_is_the_size_of_the_next_text()
+    {
+        var (editor, _, panel) = NewEditor();
+
+        editor.SetTextSizeCommand.Execute("9");
+        var index = editor.CreateText(panel, new Point2D(40, 40));
+
+        Assert.Equal(9, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizeMm);
+    }
+
+    [Fact]
     public void A_font_this_computer_lacks_is_kept_and_named_in_the_box()
     {
         var (editor, _, panel) = NewEditor();

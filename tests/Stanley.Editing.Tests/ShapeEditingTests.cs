@@ -213,6 +213,33 @@ public class TextEditingTests
         Assert.True(TextEditing.Smaller(TextEditing.SizeSteps[0]) < TextEditing.SizeSteps[0]);
     }
 
+    [Theory]
+    [InlineData("4", 4)]
+    [InlineData(" 7.5 ", 7.5)]
+    [InlineData("7,5", 7.5)]
+    [InlineData("12 mm", 12)]
+    [InlineData("12MM", 12)]
+    [InlineData("3.14159", 3.1)]
+    [InlineData("60", 60)]
+    public void A_typed_size_is_read_in_millimetres(string entry, double size) =>
+        Assert.Equal(size, TextEditing.ParseSize(entry).Value);
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("big")]
+    [InlineData("-3")]
+    [InlineData("0.5")]
+    [InlineData("61")]
+    [InlineData("1e3")]
+    [InlineData("NaN")]
+    public void A_typed_size_that_isnt_one_is_refused_with_a_reason(string entry)
+    {
+        var result = TextEditing.ParseSize(entry);
+
+        Assert.False(result.IsValid);
+        Assert.False(string.IsNullOrEmpty(result.Error));
+    }
+
     [Fact]
     public void Text_boxes_have_a_minimum_size_and_text_a_maximum_length()
     {

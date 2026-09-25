@@ -1,3 +1,4 @@
+using System.Globalization;
 using Stanley.Editing.Abstractions;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -114,6 +115,23 @@ public static class TextEditing
     /// <summary>Grows the box downwards to <paramref name="neededHeight"/> (from the renderer's measurement) so typed text never has to shrink to fit; never shrinks a box the user made bigger.</summary>
     public static TextElement GrowToFit(TextElement text, double neededHeight) =>
         neededHeight > text.Bounds.Height + 1e-6 ? text with { Bounds = text.Bounds with { Height = neededHeight } } : text;
+
+    /// <summary>
+    /// A size typed into the font size box, in millimetres: "3.5", "3,5" or "3.5 mm", rounded
+    /// to a tenth. Refused, with a reason, when it isn't a number or letters can't be that size.
+    /// </summary>
+    public static EditResult<double> ParseSize(string? entry)
+    {
+        var text = (entry ?? string.Empty).Trim();
+        if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+            text = text[..^2].TrimEnd();
+        if (!double.TryParse(text.Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var size) || !double.IsFinite(size))
+            return EditResult<double>.Failure("Type the letters' size in millimetres, like 3.5.");
+        size = Math.Round(size, 1);
+        return size < MinFontSizeMm || size > MaxFontSizeMm
+            ? EditResult<double>.Failure($"Letters must be {MinFontSizeMm}-{MaxFontSizeMm}mm tall.")
+            : EditResult<double>.Success(size);
+    }
 
     /// <summary>The next size up the <see cref="SizeSteps"/> ladder (Word's "Grow font").</summary>
     public static double Bigger(double size) => SizeSteps.FirstOrDefault(s => s > size + 1e-6, Math.Min(size * 1.25, MaxFontSizeMm));

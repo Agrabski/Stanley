@@ -231,6 +231,14 @@ public sealed partial class PageEditorViewModel
         ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset) with { FontFamily = CurrentTextStyle.FontFamily }));
         BiggerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Bigger(CurrentTextStyle.FontSizeMm) }));
         SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
+        SetTextSizeCommand = new RelayCommand<string>(entry =>
+        {
+            var size = TextEditing.ParseSize(entry);
+            if (size.IsValid)
+                SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = size.Value });
+            else
+                Apply(EditResult<PageDocument>.Failure(size.Error!));
+        });
         InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
         InitializePictureCommands();
@@ -280,6 +288,9 @@ public sealed partial class PageEditorViewModel
     public IRelayCommand<TextStylePreset> ApplyTextPresetCommand { get; private set; } = null!;
     public IRelayCommand BiggerTextCommand { get; private set; } = null!;
     public IRelayCommand SmallerTextCommand { get; private set; } = null!;
+
+    /// <summary>The font size box: a size picked from its list or typed ("7.5", "7,5 mm"), for the selected text and new text; a bad entry changes nothing and says why.</summary>
+    public IRelayCommand<string> SetTextSizeCommand { get; private set; } = null!;
 
     /// <summary>Insert tab: text of that kind in the selected (or first) panel, ready to type into.</summary>
     public IRelayCommand<TextStylePreset> InsertTextCommand { get; private set; } = null!;
@@ -382,7 +393,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(TextColorBrush));
         OnPropertyChanged(nameof(TextBoxBrush));
         OnPropertyChanged(nameof(TextOutlineBrush));
-        OnPropertyChanged(nameof(TextSizeText));
+        OnPropertyChanged(nameof(TextSizeMm));
         OnPropertyChanged(nameof(TextPresetName));
         OnPropertyChanged(nameof(IsTextBold));
         OnPropertyChanged(nameof(IsTextItalic));
@@ -673,7 +684,11 @@ public sealed partial class PageEditorViewModel
     public IBrush TextColorBrush => DrawingPalette.BrushOf(CurrentTextStyle.Color);
     public IBrush TextBoxBrush => DrawingPalette.BrushOf(CurrentTextStyle.BoxFill);
     public IBrush TextOutlineBrush => DrawingPalette.BrushOf(CurrentTextStyle.Outline);
-    public string TextSizeText => $"{CurrentTextStyle.FontSizeMm:0.#} mm";
+    /// <summary>The letters' size in mm, as the font size box shows it.</summary>
+    public double TextSizeMm => CurrentTextStyle.FontSizeMm;
+
+    /// <summary>The sizes the font size box lists (any other can be typed).</summary>
+    public IReadOnlyList<double> TextSizeChoices => TextEditing.SizeSteps;
     public string TextPresetName => TextStylePresets.Of(CurrentTextStyle) is { } preset ? TextStylePresets.Name(preset) : "Custom";
 
     public bool IsTextBold

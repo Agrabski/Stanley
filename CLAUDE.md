@@ -497,6 +497,14 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   the font of the next bubble and text. Picking the default stores null; a text
   preset (Caption, …) keeps the font. A font the computer lacks leaves the box empty
   with "<name> (missing)" as its placeholder and a tooltip saying so.
+  Beside it on the Text tab, Word's font size box (`FontSizeBox`, code-only like
+  `ColorMenuButton`): the size as editable text in mm plus an arrow listing
+  `TextEditing.SizeSteps` (the current one ticked); type any size and press Enter or
+  click away (`TextEditing.ParseSize`: "7.5", "7,5" or "7.5 mm", rounded to 0.1 mm,
+  1–60) — Esc cancels, a bad entry puts the real size back and says why in the status
+  bar. Picking or entering a size hands the keyboard back to the page
+  (`PageEditorViewModel.FocusPage` → `ViewportRequest.FocusPage`), so shortcuts work
+  again.
 - **Colour controls, as in Word** (`ColorMenus.cs`): `ColorMenuButton` is Word's
   Shape Fill / Shape Outline / Text Fill / Text Outline — a small split button, its
   icon over a bar in the last colour picked (the face applies it again), the arrow

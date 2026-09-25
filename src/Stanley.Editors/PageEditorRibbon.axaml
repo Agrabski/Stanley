@@ -748,9 +748,10 @@
             <StackPanel Orientation="Horizontal" Spacing="1">
               <ComboBox Name="TextFontBox" Classes="fontBox" Margin="0,0,3,0" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
                         PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
+              <local:FontSizeBox Name="TextSizeBox" Margin="0,0,3,0" Value="{Binding TextSizeMm}" Sizes="{Binding TextSizeChoices}" Command="{Binding SetTextSizeCommand}"
+                                 ToolTip.Tip="Font Size - the letters' height in millimetres: pick one, or type any size and press Enter" />
               <Button Name="BiggerTextButton" Classes="small" Command="{Binding BiggerTextCommand}" ToolTip.Tip="Bigger letters" FontWeight="SemiBold">A+</Button>
               <Button Name="SmallerTextButton" Classes="small" Command="{Binding SmallerTextCommand}" ToolTip.Tip="Smaller letters">A−</Button>
-              <TextBlock Name="TextSizeReadout" Text="{Binding TextSizeText}" Width="48" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="1">
               <ToggleButton Name="BoldButton" Classes="small" IsChecked="{Binding IsTextBold}" ToolTip.Tip="Bold" FontWeight="Bold" Focusable="False">B</ToggleButton>

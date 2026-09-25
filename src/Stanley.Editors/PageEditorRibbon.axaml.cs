@@ -39,6 +39,9 @@ public partial class PageEditorRibbon : UserControl
             if (ViewModel is { } vm && e.NewValue is { } value)
                 vm.GutterMm = (double)value;
         };
+        // Typing a size and pressing Enter (or picking one) hands the keyboard back to the
+        // page, as in Word, so shortcuts reach it again.
+        TextSizeBox.Committed += (_, _) => ViewModel?.FocusPage();
         PageNumberStartInput.ValueChanged += (_, e) =>
         {
             if (ViewModel is { } vm && e.NewValue is { } value)
