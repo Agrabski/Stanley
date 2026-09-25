@@ -30,11 +30,12 @@ public static class PageRenderer
     public const float FolioSideDistanceMm = 10f;
 
     /// <param name="characters">The project's characters, to draw the panels' character instances with; an instance whose character isn't in here draws as a placeholder.</param>
+    /// <param name="issueLooks">The issue's look per character (<see cref="Issue.CharacterRevisions"/>), for instances without a look of their own.</param>
     public static void Draw(SKCanvas canvas, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, PageFolio? folio = null,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         DrawPaper(canvas, pageBounds);
-        DrawPanels(canvas, panelsInOrder, characters);
+        DrawPanels(canvas, panelsInOrder, characters, issueLooks);
         if (folio != null)
             DrawFolio(canvas, pageBounds, folio);
     }
@@ -70,7 +71,8 @@ public static class PageRenderer
     }
 
     /// <summary>Panels in z-order, each with its characters and then its bubbles clipped to it, and its border on top.</summary>
-    public static void DrawPanels(SKCanvas canvas, IEnumerable<Panel> panelsInOrder, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+    public static void DrawPanels(SKCanvas canvas, IEnumerable<Panel> panelsInOrder, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null,
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         using var border = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = PanelBorderMm, IsAntialias = true, StrokeJoin = SKStrokeJoin.Miter };
         using var panelFill = new SKPaint { Color = SKColors.White };
@@ -83,7 +85,7 @@ public static class PageRenderer
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
             foreach (var instance in panel.CharacterInstances)
-                CharacterRenderers.DrawInstance(canvas, instance, characters, CharacterStrokeMm);
+                CharacterRenderers.DrawInstance(canvas, instance, characters, CharacterStrokeMm, issueLooks);
             foreach (var bubble in panel.Bubbles)
                 BubbleRenderer.Draw(canvas, bubble, SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
@@ -94,12 +96,12 @@ public static class PageRenderer
 
     /// <summary>Writes the page as a one-page vector PDF at its real trim size.</summary>
     public static void ExportPdf(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, PageFolio? folio = null,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null) =>
-        ExportPdf(output, [(pageBounds, panelsInOrder, folio)], characters);
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null) =>
+        ExportPdf(output, [(pageBounds, panelsInOrder, folio)], characters, issueLooks);
 
     /// <summary>Writes every page, in order, into one vector PDF, each at its real trim size.</summary>
     public static void ExportPdf(Stream output, IEnumerable<(Rect2D Bounds, IEnumerable<Panel> PanelsInOrder, PageFolio? Folio)> pages,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         const float pointsPerMm = 72f / 25.4f;
         using var document = SKDocument.CreatePdf(output)
@@ -109,7 +111,7 @@ public static class PageRenderer
             var canvas = document.BeginPage((float)pageBounds.Width * pointsPerMm, (float)pageBounds.Height * pointsPerMm);
             canvas.Scale(pointsPerMm);
             canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
-            Draw(canvas, pageBounds, panels, folio, characters);
+            Draw(canvas, pageBounds, panels, folio, characters, issueLooks);
             document.EndPage();
         }
         document.Close();
@@ -117,7 +119,7 @@ public static class PageRenderer
 
     /// <summary>Writes the page as a PNG at <paramref name="dpi"/> (300 = print quality).</summary>
     public static void ExportPng(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, int dpi = 300, PageFolio? folio = null,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         var pixelsPerMm = dpi / 25.4f;
         var width = (int)Math.Round(pageBounds.Width * pixelsPerMm);
@@ -128,7 +130,7 @@ public static class PageRenderer
         canvas.Clear(SKColors.White);
         canvas.Scale(pixelsPerMm);
         canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
-        Draw(canvas, pageBounds, panelsInOrder, folio, characters);
+        Draw(canvas, pageBounds, panelsInOrder, folio, characters, issueLooks);
 
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);

@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "hat": "#c0392b"
+  },
+  "id": "library",
+  "name": "Beanie",
+  "parts": [
+    {
+      "cover": {
+        "color": "hat",
+        "ease": 0.014,
+        "from": 0,
+        "to": 0.34
+      },
+      "name": "hat",
+      "region": "head"
+    }
+  ],
+  "slot": "headwear",
+  "variants": [
+    "default"
+  ]
+}

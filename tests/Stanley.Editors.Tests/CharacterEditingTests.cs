@@ -148,6 +148,59 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Expressions_are_close_ups_of_the_selected_character_and_apply_in_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+
+        var choices = page.ExpressionChoices;
+        Assert.Equal(ExpressionPresets.All.Count, choices.Count);
+        Assert.True(choices.Single(c => c.Preset.Preset == ExpressionPreset.Neutral).IsCurrent);
+        Assert.Equal("Neutral", page.SelectedExpressionName);
+
+        page.ApplyExpressionCommand.Execute(choices.Single(c => c.Preset.Preset == ExpressionPreset.Laughing));
+        var laughing = page.Working.Panels[left].CharacterInstances[0].Pose;
+        Assert.Equal("grin", laughing.Expression[StickerSlots.Mouth]);
+        Assert.Empty(laughing.BoneRotations); // the face only
+        Assert.Equal("Laughing", page.SelectedExpressionName);
+        Assert.True(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Laughing).IsCurrent);
+
+        var saved = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+        var reopened = ComicProject.Open(saved).Pages[0].Document.Panels.Values.SelectMany(p => p.CharacterInstances).Single();
+        Assert.Equal(laughing.Expression, reopened.Pose.Expression);
+
+        session.Workspace.History.Undo();
+        Assert.Equal("Neutral", page.SelectedExpressionName);
+    }
+
+    [Fact]
+    public void The_character_editor_previews_an_expression_without_an_undo_step_and_says_what_a_face_lacks()
+    {
+        var (session, _, _, _) = NewSession();
+        var item = Add(session, "A");
+        var editor = item.Editor;
+        var before = editor.Working;
+
+        editor.PreviewExpressionCommand.Execute(editor.PreviewExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Wink));
+
+        Assert.Equal("wink", editor.StagePose?.Expression[StickerSlots.Eyes]);
+        Assert.Same(before, editor.Working); // a preview, not an edit
+        Assert.All(editor.FaceGalleries.SelectMany(g => g.Choices), c => Assert.Equal("wink", c.Pose?.Expression[StickerSlots.Eyes]));
+        Assert.Null(editor.ExpressionWarning); // the default face draws every expression
+
+        // A face with no wink says so, and shows its neutral instead.
+        var sticker = new Sticker(StickerId.New(), "Plain", StickerSlots.Eyes, [new StickerPart("eyes", BodyRegion.Head, Art: new PartArt(ArtMapping.Pin))],
+            new SortedDictionary<string, ColorValue>(), ["neutral"]);
+        editor.WearCommand.Execute(new StickerChoice("Plain", StickerSlots.Eyes, editor.Working, new StickerAsset(sticker, new Dictionary<string, ArtFile>()), null, false));
+        Assert.Contains("Plain", editor.ExpressionWarning);
+        Assert.Contains("wink", editor.Hint);
+        editor.SelectSticker(sticker.Id);
+        Assert.Contains("No side view", editor.SelectedStickerWarning);
+        Assert.Contains("expressions", editor.SelectedStickerWarning);
+    }
+
+    [Fact]
     public void Pose_presets_are_previewed_on_the_selected_character_and_apply_in_one_undo_step()
     {
         var (session, page, left, _) = NewSession();

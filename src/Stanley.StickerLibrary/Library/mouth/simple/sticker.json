@@ -1,0 +1,25 @@
+{
+  "colors": {},
+  "id": "library",
+  "name": "Simple",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "mouth",
+      "region": "head"
+    }
+  ],
+  "slot": "mouth",
+  "variants": [
+    "neutral",
+    "smile",
+    "grin",
+    "open",
+    "shout",
+    "frown",
+    "o",
+    "smirk"
+  ]
+}

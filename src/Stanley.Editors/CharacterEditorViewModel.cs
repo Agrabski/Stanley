@@ -27,7 +27,7 @@ public sealed record SkinSwatch(string Name, ColorValue Color)
 /// <see cref="EndSliderDrag"/> on release, so one drag is one undo step. A value set
 /// outside a drag (keyboard, a spin box) is its own undo step.
 /// </summary>
-public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefinition>
+public sealed partial class CharacterEditorViewModel : EditorViewModel<CharacterDefinition>
 {
     private bool _showLineUp = true;
     private ViewAngle _previewAngle = ViewAngle.Front;
@@ -52,10 +52,16 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
                 SetSkin(swatch.Color);
         });
         BackToPageCommand = new RelayCommand(() => Library?.ReturnToPage(), () => Library != null);
+        InitializeLook();
+        InitializeArt();
+        InitializeLooks();
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(Working))
+            {
                 RaiseBodyChanged();
+                RaiseLookChanged();
+            }
         };
         if (library != null)
             library.CharactersChanged += () =>
@@ -208,9 +214,11 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
         get => _previewAngle;
         set
         {
-            SetProperty(ref _previewAngle, value);
+            if (!SetProperty(ref _previewAngle, value))
+                return;
             OnPropertyChanged(nameof(IsFrontPreview));
             OnPropertyChanged(nameof(IsSidePreview));
+            RaisePreviewPoseChanged();
         }
     }
 
@@ -224,9 +232,20 @@ public sealed class CharacterEditorViewModel : EditorViewModel<CharacterDefiniti
     public IReadOnlyList<CharacterDefinition> LineUp =>
         Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
-    public string Hint =>
-        "Pick a body type, then fine-tune with the sliders. Every panel this character is in updates as you go. " +
-        "Relative heights: 100% is an average adult.";
+    public string Hint => _message ?? ExpressionWarning ?? (SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
+        "Pick a body type and fine-tune it with the sliders; dress them on the Look tab, and click something they wear to adjust it. " +
+        "Every panel this character is in updates as you go.";
+
+    private string? _message;
+
+    /// <summary>Shows <paramref name="message"/> in the status bar instead of the usual hint (an import's report, say); null goes back to the hint.</summary>
+    public void ShowMessage(string? message)
+    {
+        if (_message == message)
+            return;
+        _message = message;
+        OnPropertyChanged(nameof(Hint));
+    }
 
     private static readonly IReadOnlyList<SkinSwatch> Swatches =
     [

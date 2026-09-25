@@ -60,7 +60,8 @@ public sealed class RecoveryStore : IDisposable
 
     /// <summary>Replaces this session's snapshot with the comic's current state. Written beside the old one, then swapped in, so a crash mid-write never leaves nothing.</summary>
     public void Write(ComicProject project, IReadOnlyList<(PageId Id, Editors.PageDocument Document)> pages, PageNumbering numbering,
-        IReadOnlyList<ProjectModel.Characters.CharacterDefinition>? characters = null)
+        IReadOnlyList<ProjectModel.Characters.CharacterDefinition>? characters = null,
+        IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Ids.CharacterRevisionId>? issueLooks = null)
     {
         if (SessionDirectory is not { } dir)
             return;
@@ -70,7 +71,7 @@ public sealed class RecoveryStore : IDisposable
         if (Directory.Exists(fresh))
             Directory.Delete(fresh, recursive: true);
 
-        project.WriteCopy(fresh, pages, numbering, characters);
+        project.WriteCopy(fresh, pages, numbering, characters, issueLooks);
         if (Directory.Exists(current))
             Directory.Delete(current, recursive: true);
         Directory.Move(fresh, current);

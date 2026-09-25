@@ -1,0 +1,32 @@
+{
+  "colors": {
+    "top": "#c8553d"
+  },
+  "id": "library",
+  "name": "Long sleeve",
+  "parts": [
+    {
+      "cover": {
+        "color": "top",
+        "ease": 0.014,
+        "from": 0,
+        "to": 0.86
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "top",
+        "from": 0,
+        "to": 1
+      },
+      "name": "sleeves",
+      "region": "arm"
+    }
+  ],
+  "slot": "top",
+  "variants": [
+    "default"
+  ]
+}

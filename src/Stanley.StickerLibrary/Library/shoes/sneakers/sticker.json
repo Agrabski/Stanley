@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "shoes": "#f4f4f4"
+  },
+  "id": "library",
+  "name": "Sneakers",
+  "parts": [
+    {
+      "cover": {
+        "color": "shoes",
+        "ease": 0.016,
+        "from": 0,
+        "to": 1
+      },
+      "name": "shoes",
+      "region": "foot"
+    }
+  ],
+  "slot": "shoes",
+  "variants": [
+    "default"
+  ]
+}

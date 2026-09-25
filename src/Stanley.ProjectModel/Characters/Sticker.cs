@@ -1,32 +1,120 @@
 using System.Text.Json.Serialization;
+using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Serialization;
 
 namespace Stanley.ProjectModel.Characters;
 
-/// <summary>How a sticker responds to expression state and the <c>build</c> slider.</summary>
-[JsonConverter(typeof(CamelCaseEnumConverter<StickerKind>))]
-public enum StickerKind
+/// <summary>Pulls a part out of its region's layer: to the very back (the back of the hair, a cape) or the very front.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<PartDepth>))]
+public enum PartDepth
 {
-    /// <summary>One fixed variant; renders unaffected by expression or build.</summary>
-    Static,
+    Back,
+    Front
+}
 
-    /// <summary>Face sticker (eyes, mouth, eyebrows) with a variant per expression state.</summary>
-    FaceExpressionVariant,
+/// <summary>How a part combines with the rest of its sticker. The default (absent) paints.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<PartBlend>))]
+public enum PartBlend
+{
+    /// <summary>Subtracts from the sticker's other parts in the same layer, so what's underneath shows through: a V-neck, an open jacket.</summary>
+    Cut
+}
 
-    /// <summary>Touches the body silhouette; a single variant is non-uniformly scaled to the current build value via its <see cref="StretchRegion"/>.</summary>
-    BuildStretch,
+/// <summary>What a part is clipped to. The default (absent) is nothing.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<PartClip>))]
+public enum PartClip
+{
+    /// <summary>The body's skin (tattoos, face paint).</summary>
+    Body,
 
-    /// <summary>Opts out of stretching; declares a variant per build breakpoint and the renderer snaps to the nearest one.</summary>
-    BuildBreakpoints
+    /// <summary>The sticker's own cover parts (stripes and prints that must never spill past the shirt).</summary>
+    Sticker
+}
+
+/// <summary>How drawn art is mapped from its template onto the character's region.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<ArtMapping>))]
+public enum ArtMapping
+{
+    /// <summary>Rigid: placed and scaled at the layer's centre, keeping its shape (eyes, logos, buttons).</summary>
+    Pin,
+
+    /// <summary>Every point goes through the region mapping, so the art hugs the outline (hair, hats, prints).</summary>
+    Warp
 }
 
 /// <summary>
-/// <c>characters/&lt;characterId&gt;/stickers/&lt;id&gt;-slug/</c> - one reusable piece
-/// of character art. <see cref="VariantNames"/> names the <c>variants/&lt;name&gt;/</c>
-/// subfolders, each of which holds <c>front.svg</c>/<c>three-quarter.svg</c>/<c>profile.svg</c>
-/// by convention (no path stored here - the folder layout is not optional). A
-/// <see cref="StickerKind.BuildStretch"/> sticker additionally has a <c>stretch.json</c>
-/// sibling, loaded separately as a <see cref="StretchRegion"/>.
+/// A part generated from the body itself: <paramref name="From"/> to <paramref name="To"/>
+/// of its region (0-1, e.g. the arm from the shoulder to 40% of the way to the wrist),
+/// grown by <paramref name="Ease"/> (a fraction of the character's own height; default
+/// <see cref="DefaultEase"/>), filled with the colour slot <paramref name="Color"/>.
 /// </summary>
-public sealed record Sticker(StickerId Id, string Name, string SlotName, StickerKind Kind, IReadOnlyList<string> VariantNames);
+/// <param name="Flare">Skirt only: extra width at the hem, as a fraction of the width.</param>
+public sealed record PartCover(string Color, double From, double To, double? Ease = null, double? Flare = null)
+{
+    public const double DefaultEase = 0.008;
+
+    public double EaseOrDefault => Ease ?? DefaultEase;
+}
+
+/// <summary>
+/// A part drawn as art: the SVG (or PNG) layer named after the part, in the sticker's
+/// variant and view files, mapped from its template onto the region. <paramref name="Offset"/>,
+/// <paramref name="Scale"/> and <paramref name="Rotation"/> are adjustments in template units,
+/// applied before mapping (what the on-canvas handles write).
+/// </summary>
+/// <param name="KeepReadable">Pin only: un-mirror the part about its own centre when the placement is mirrored, so text never reads backwards.</param>
+public sealed record PartArt(ArtMapping Mapping, Point2D? Offset = null, double? Scale = null, double? Rotation = null, bool? KeepReadable = null);
+
+/// <summary>
+/// One piece of a sticker, on one body region: exactly one of <paramref name="Cover"/>
+/// (generated from the body) or <paramref name="Art"/> (drawn). The rest are optional and
+/// absent by default, so files stay sparse.
+/// </summary>
+/// <param name="Side">Limb regions only: just this side; absent means both.</param>
+public sealed record StickerPart(
+    string Name,
+    BodyRegion Region,
+    PartCover? Cover = null,
+    PartArt? Art = null,
+    LimbSide? Side = null,
+    PartDepth? Depth = null,
+    PartBlend? Blend = null,
+    PartClip? Clip = null);
+
+/// <summary>
+/// <c>characters/&lt;characterId&gt;-slug/stickers/&lt;id&gt;-slug/sticker.json</c> - something a
+/// character wears in a slot: hair, eyes, a T-shirt, a watch (docs/sticker-system.md).
+/// Made of <see cref="Parts"/>; drawn parts' art lives beside it in
+/// <c>variants/&lt;variant&gt;/&lt;view&gt;.svg</c> (or <c>.png</c>).
+/// </summary>
+/// <param name="Slot">What it is (<see cref="StickerSlots"/>): decides z-order and whether several stack. Any other name behaves like <c>accessory</c>.</param>
+/// <param name="Colors">The colour slots the sticker uses, each with its default colour - a fallback under the character's own choice.</param>
+/// <param name="Variants">The variant folders; the first is the fallback. Picked per slot by the pose's expression.</param>
+/// <param name="Source">"library:&lt;key&gt;" while this is an unmodified copy of a library sticker (tidied away on save when nothing wears it); absent once it's the user's own.</param>
+/// <param name="Fabrics">Default pattern/texture per colour slot (the library's jeans come in denim).</param>
+public sealed record Sticker(
+    StickerId Id,
+    string Name,
+    string Slot,
+    IReadOnlyList<StickerPart> Parts,
+    SortedDictionary<string, ColorValue> Colors,
+    IReadOnlyList<string> Variants,
+    string? Source = null,
+    SortedDictionary<string, Fabric>? Fabrics = null)
+{
+    public const string DefaultVariant = "default";
+
+    /// <summary>A sticker read from a hand-edited file with missing lists gets empty ones instead of nulls.</summary>
+    public Sticker Normalized() =>
+        Parts is not null && Colors is not null && Variants is { Count: > 0 }
+            ? this
+            : this with
+            {
+                Parts = Parts ?? [],
+                Colors = Colors ?? new SortedDictionary<string, ColorValue>(),
+                Variants = Variants is { Count: > 0 } ? Variants : [DefaultVariant]
+            };
+
+    public bool IsFromLibrary => Source is not null;
+}

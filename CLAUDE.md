@@ -43,7 +43,9 @@ snapping, page navigator) all exist. The GUI opens/saves real project folders (t
 pages of one issue for now — see "Documents" below). Characters exist as a
 **POC** (sliders + a generated flat mannequin, front or side view, placed on
 panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
-see "Characters (POC, implemented)" below); no stickers or three-quarter view yet.
+see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
+faces, clothes, accessories — see "Stickers (implemented)" below); no
+three-quarter view yet.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -175,11 +177,9 @@ features will read and write.
   preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
   (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
   not its own preset table entry, since bleed isn't part of a paper size).
-- **Not yet designed**: `sticker.json`'s exact schema beyond what's
-  implemented here (the design doc doesn't draw one explicitly), any
-  convenience "create new project/character/issue" helpers beyond
-  `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and NativeAOT
-  publish validation (analyzer-clean under `IsAotCompatible`, not yet
+- **Not yet designed**: any convenience "create new project/character/issue"
+  helpers beyond `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and
+  NativeAOT publish validation (analyzer-clean under `IsAotCompatible`, not yet
   published via a real `PublishAot` executable).
 
 ## Editor architecture
@@ -477,6 +477,20 @@ structure, page/panel/background storage, git-friendliness rules) lives in
 that file is the plan, not implemented yet; this section stays the short
 summary.
 
+The **sticker system** (hair, faces, clothes, accessories, expressions) is
+designed in [`docs/sticker-system.md`](docs/sticker-system.md) (it wins over the
+plan where they differ; what's built so far is under "Stickers (implemented)"
+below): stickers are made
+of parts that either *cover* a body region (generated from the rig, so clothing
+follows every slider, pose and view with no art) or place SVG *art* drawn over
+a region template (Pin = rigid, Warp = hugs the outline); the figure draws in
+depth groups; colours are character-owned slots referenced by name, and each can
+carry a **fabric** (a generated or tiled pattern plus a procedural or tiled
+texture, laid out per body region so it moves with the pose); expressions are
+per-slot variants from a standard vocabulary. SVG is read with **VectSharp.SVG**
+(LGPL-3.0) behind one adapter (`StickerSvg`). Starter library art is **CC0**. Its
+§17 lists what's decided and what's still open.
+
 ### Characters (POC, implemented)
 
 Designed in [`docs/character-authoring-poc.md`](docs/character-authoring-poc.md);
@@ -493,15 +507,20 @@ body and placement only.
   layout + torso outline, limb capsules, head/hand/foot ellipses) in *figure space*
   (unit = relative height, y down, origin = ground between the feet; head top at
   `-Height`), for `ViewAngle.Front` or `Profile` (faces +x, has a nose; the near
-  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer).
+  arm/hand/foot are `NearLimbs`/`NearBlobs`, drawn as a second outlined layer, and
+  are the character's own *right* limbs - as for a real person facing right; a
+  mirrored placement is a mirror image, not the character turned around).
   Heights depend only on `Height`/`HeadsTall`, identical in both views;
   `ThreeQuarter` falls back to front. Skeleton overrides are per view.
   `BodyFigure.RestLayout` is the unposed layout, `BaseLayout` the trunk-posed one
   (limb rotations and IK are measured from it), `Layout` the fully posed one. A pose
   is `PoseData.BoneRotations` (degrees, clockwise, relative to the parent) plus
   `PoseData.HipsShift` (fraction of the character's height, null = standing): the
-  trunk step shifts the hips, leans everything above them (`Spine`, ±`MaxLean`) and
-  tilts the head (`Head`, ±`MaxHeadTilt`); then `ApplyPose` turns the four
+  trunk step shifts the hips and bends the back joint by joint (`BodyRig.SpineJoints`:
+  `Spine` about the hips ±`MaxLean`, `Chest` and `UpperChest` ±`MaxBackBend`; the upper
+  body's outline and the arm roots follow a smooth blend of the segments, `TrunkBend`,
+  so the back curves instead of pivoting like a board), then the neck (`Neck`, about its
+  base) and head (`Head`, about the chin; `NeckJoints`); then `ApplyPose` turns the four
   `BodyRig.LimbChains`. Hands lie along the forearm; a lifted foot tips with its
   shin, a planted one stays flat (`BodyEllipse.RotationDegrees`).
 - **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
@@ -509,8 +528,12 @@ body and placement only.
   pointing at the target out of reach; bend side held per drag via `BendSign`,
   anatomical side on); green elbow/knee squares → `Bend` (the upper
   bone swings about the shoulder/hip so the joint follows the pointer — one-bone IK,
-  pointing at it out of reach; the forearm/shin keeps its bend and rides along); hollow rings → `MoveHips` (feet pinned by re-solving both
-  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest), `TiltHead`.
+  pointing at it out of reach; the forearm/shin keeps its bend and rides along); hollow
+  rings → `MoveHips` (feet pinned by re-solving both legs; drop limited by
+  `MaxHipsDrop` ≈ half the leg), `Lean` (chest) and `TiltHead` - inverse kinematics
+  too (`SolveTrunkChain`: damped least squares over the spine or neck joints with a
+  smoothness term, so the bend is shared along the chain, never a rigid rotation;
+  `Lean` also keeps the arms' direction, so hanging arms keep hanging).
   `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
   (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
   Walk, Run, Sit) are hand/foot *goals relative to each limb's own root and length*
@@ -519,9 +542,14 @@ body and placement only.
   planted and never go below the floor. Character tab: Pose gallery (previews on
   the selected character), Mirror, Reset; right-click › Pose.
 - **Rendering**: `ICharacterRenderer` / `CharacterRenderers.Default` =
-  `MannequinRenderer` (unions all shapes, fills skin, inks outline; caches the
-  figure path per definition, view and pose — bounded, since a limb drag makes a new
-  pose per pointer move). `PageRenderer.Draw/DrawPanels/Export*` take an
+  `FigureRenderer`: paints `BodyFigure.Layers` back to front (front view: Back, Legs,
+  Torso, Head, Arms, Front; side view: Back, FarArm, Body, Head, NearFoot, NearArm,
+  Front), each layer's skin inked except in its *seams* (discs at hips, neck,
+  shoulders) where it lies over what's already painted, so joints read as one body
+  while an arm across the chest keeps its outline; worn stickers paint into the same
+  layers (below). Builds a `FigureDrawing` (items + union outline) cached per
+  definition, view, pose, expression and look — bounded, since a limb drag makes a
+  new pose per pointer move. `PageRenderer.Draw/DrawPanels/Export*` take an
   optional character dictionary and draw background → characters → bubbles inside
   the panel clip; a missing character draws a dashed placeholder.
 - **Placement**: `CharacterInstance.Placement` = `CharacterPlacement(Ground,
@@ -551,6 +579,123 @@ body and placement only.
   index file) / `DeleteCharacter`; `ComicProject.Characters`, and
   `Save`/`SaveAs`/`WriteCopy` take the characters (null = leave disk alone) and
   prune deleted ones.
+
+### Stickers (implemented)
+
+All slices of `docs/sticker-system.md` §15: layered figure, cover stickers,
+fabrics, drawn stickers, expressions, draw your own and import, named looks.
+
+- **Model** (ProjectModel/Characters): `Sticker` (slot, `Parts`, default `Colors`
+  and `Fabrics` per colour slot, `Variants`, `Source` = `library:<key>` while an
+  unmodified library copy). A `StickerPart` is exactly one of `Cover`
+  (`PartCover`: `From`/`To` along its `BodyRegion`, `Ease`, `Flare`, colour slot) or
+  `Art` (`PartArt`: `Pin`/`Warp`, offset/scale/rotation, `KeepReadable`), plus
+  optional `Side`, `Depth` (back/front), `Blend` (cut) and `Clip` (body/sticker).
+  `StickerSlots` = the standard slots (z-order, stacking, usual colour slot).
+  Stickers and their art files (`StickerAsset`: path → `ArtFile`, text or bytes,
+  written back byte for byte) plus pattern/texture tiles live in the character's
+  `Wardrobe` — carried on `CharacterDefinition` in memory (`[JsonIgnore]`), stored
+  under `characters/<id>/stickers/<id>-slug/` and `characters/<id>/patterns/` (tiles
+  are per character, not project-level as the design first said).
+  `CharacterDefinition.Stickers` = slot → worn ids; `ColorSlots` and `Fabrics` per
+  colour slot; `CharacterLooks.Resolve` (sticker defaults → character → revision →
+  panel overrides) gives the `CharacterLook` the renderer draws.
+- **Figure**: `BodyFigure.Regions` (`FigureRegions`: head, neck, `TorsoFrame` that
+  bends with the spine, `LimbFrame` per arm/leg, hands, feet) and
+  `BodyFigure.LayerOf(region, side)`.
+- **Covers** (`StickerCovers`): the region's own shapes grown by `Ease` and cut to
+  `From`–`To`, so garments follow every slider, pose and view with no art. A
+  sticker's covers merge per colour slot, minus its cut parts; a garment's ink is
+  only left out where it lies over *its own* earlier pieces (a sleeve joins its
+  shirt, a shirt's hem over trousers keeps its line).
+- **Fabrics** (`Fabric` = `PatternFill` + `TextureFill`, `FabricShaders`): generated
+  patterns (stripes, pinstripes, checks, plaid, dots, chevron) and procedural
+  textures (denim, knit, corduroy, wool, leather, canvas, felt; line tiles × Perlin
+  noise, multiplied), laid out in each piece's region frame so stripes turn with a
+  sleeve. Tiles: SVG (view box = one repeat; `slot-ground`/`slot-1`/`slot-2` classes
+  take the garment and pattern colours — `ArtPictures.PatternTile`) or PNG.
+- **Drawn art**: `StickerSvg` is the one place SVG is read — VectSharp.SVG behind
+  an adapter that splits top-level *named* layers (Inkscape label or id) into parts,
+  skips the template guide (`data-stanley-guide` / layer "template"), remembers
+  `slot-<name>` / `solid` classes, normalises what VectSharp reads differently
+  (ellipses → paths, clip paths → one path, Inkscape's `svg:` prefix), replays into
+  Skia paths (`ParsedArt`), and *reports* what it doesn't draw (filters, masks,
+  images, loose drawing outside named layers). `RegionMapping` maps template space
+  (the default body, 1000 units tall, origin at the ground) onto the character:
+  `Warp` region by region (head/hands/feet as ellipses, torso row by row, limbs
+  along/across each segment), `Pin` as a similarity at the layer's centre; limb art
+  is drawn once on the template's right limb (mirrored onto the left in front).
+  `StickerArtPieces` picks the variant (pose expression → "neutral" → first) and
+  view (missing views fall back: `ViewFallback`), recolours tagged elements in
+  OKLab keeping their shade offset (`ColorMath`; greys such as ink stay put), and
+  line widths are relative (a 3-unit stroke = the body's ink width). `ArtItem`s paint
+  in their part's layer after the sticker's covers; cut art opens covers; clipped
+  art is clipped. `StickerTemplates.Export(view, slot)` writes the SVG to draw on
+  (guide body, empty named layers from `PartsFor(slot)`, cropped view box,
+  `data-stanley-view`/`-slot`).
+- **Library** (`Stanley.StickerLibrary`, art CC0, embedded as
+  `library/<slot>/<name>/…`): garments are covers (23: tops, outerwear, bottoms,
+  shoes, beanie, scarf, gloves, socks); hair (6 styles: short, bob, long, ponytail,
+  curly, bun) and faces (eyes: dots/round/lashes; brows: thin/medium/thick; mouth:
+  simple/wide/lips; nose: button/pointed) are drawn SVG, front and profile, with the
+  whole expression vocabulary as variants; 5 pattern tiles (floral, stars, hearts,
+  camo, leopard). New characters wear `StickerLibrary.DefaultFace`. The art is
+  generated once by a throwaway script and then maintained as plain SVG files.
+- **Editing**: `LookEditing` (wear, take off, stacking, colours, fabrics, tidy) and
+  `StickerFitting` (Length/Sleeves/Fit sliders over a garment's covers). Saving
+  tidies unmodified library stickers nothing wears and library tiles no fabric uses.
+- **UI** (character editor): **Look** tab — Hair & face (hair gallery plus compact
+  eyes/brows/mouth/nose galleries, head close-up previews via
+  `CharacterFigure.Closeup`), Clothes, Accessories, and a colour dropdown per colour
+  slot in use (swatches, pattern and texture galleries incl. library tiles and
+  *Custom…* → `TileImportRequested` → `ImportTile`, size/angle/strength sliders, each
+  drag one undo step), plus *Preview* (an expression on the stage and in the face
+  galleries — `StagePose`, never a history entry; the status bar says which worn
+  face lacks that variant). Clicking a worn sticker on the stage opens the
+  contextual **Sticker** tab (fit sliders, take off, remove, stacking, and inline
+  notes on missing views or expressions).
+- **Draw your own / import** (`CharacterEditorViewModel.Art.cs`, `StickerImport`):
+  every slot gallery ends with *Draw your own…* and *Import…*. Draw your own wears a
+  new sticker with the slot's template parts (or takes the selected drawn sticker),
+  writes the template — or its existing art — for the stage's view through
+  `IArtEditing` (real: `SystemArtEditing`, a file under `AppPaths.ArtEditingDirectory`
+  opened via the shell and watched with a debounced `FileSystemWatcher`; tests use a
+  fake), and each save there comes back through `StickerImport.WithArt` as one undo
+  step (new layers → new parts, new `slot-` classes → colour slots, `Source`
+  cleared). Import (`ArtImportRequested` → file picker → `ImportArt`): a file with
+  `data-stanley-slot`/`-view` imports as-is (`StickerImport.FromFile`); anything
+  else, SVG or PNG, becomes one Pin part named `all` (`ParsedArt.WholeFile`: every
+  layer) centred on the slot's region and fitted (`StickerImport.RegionBox`), worn and
+  selected. PNG art is always pinned, in its own colours. Sticker tab › Art: Size and
+  Turn sliders, *Hug the shape* (Warp ↔ Pin), *Edit drawing…*; drag selected drawn art
+  on the stage to move it (`BeginArtDrag`/`UpdateArtDrag`, figure delta →
+  `RegionMapping.ToTemplate`, one undo step; a 3 px threshold keeps clicks from
+  nudging it).
+- **Named looks** (`CharacterRevision`; the UI says "look"): `LookEditing.Project`
+  flattens a character as a look (and then a panel's overrides) dress it into a plain
+  definition, every look edit runs on that, and `StoreLook` / `StorePanel` keep only
+  the differences (a look vs the default, a panel vs its look; a fabric taken off is
+  stored as a plain one). Character editor: Look tab › *Look* picker (Default, named
+  looks with previews, New look — a copy of the current one —, rename, Delete — only
+  when no panel or issue uses it, `CharacterLibraryViewModel.LookUsageCounter`); the
+  whole Look tab and the stage show and edit `CurrentLook` (`LookWorking`). Issue
+  default: `Issue.CharacterRevisions`, owned by the navigator (`IIssueLooksHost`,
+  undoable, saved by `ComicProject.Save(…, issueLooks)`), pushed to every page editor
+  (`IssueLooks`) and drawn through `PageRenderer`/`CharacterRenderers.DrawInstance`
+  (`CharacterLooks.LookOf`: the panel's `RevisionOverride`, else the issue's; the
+  reserved `CharacterLooks.DefaultLook` id means "default look for this panel").
+  Page: Character tab › *Look* dropdown when the character has named looks (this
+  panel / the whole issue), right-click › Look, and right-click › *This panel only*
+  (take off, put on, colour, pattern, back to the look — `EditPanelLook`, one undo
+  step each).
+- **Expressions** (`ExpressionPresets`, Stanley.Editing, beside `PosePresets`):
+  twelve presets (Neutral, Happy, Laughing, Sad, Angry, Surprised, Scared,
+  Skeptical, Wink, Talking, Shouting, Asleep), each a variant for eyes, brows and
+  mouth from the standard `Vocabulary`; stored per panel in `PoseData.Expression`
+  (neutral stores nothing; other slots' variants are kept). A sticker without the
+  variant shows its neutral one (`StickerArtPieces.VariantFor`). Page editor:
+  Character tab › Expression dropdown (close-ups of the selected character,
+  `ExpressionChoices`, one undo step) and right-click › Expression.
 
 ## Builds, versioning & releases
 
@@ -594,7 +739,11 @@ automatic back-merge) are plumbing and never appear in release notes.
   into `develop` (if that fails — protected branch, conflict — it warns; merge
   `main` into `develop` by hand). The repo is private, so only collaborators
   can download releases or nightlies. See `docs/automatic-builds.md` for the
-  end-user install/self-update steps.
+  end-user install/self-update steps (the AppImage goes in `~/bin` as `stanley`, so
+  the CLI is on the PATH too; Velopack's update does `mv -f <new> "$APPIMAGE"`, so any
+  path and name work, but a root-owned folder would make every update ask for a
+  password; plus a `~/.local/share/applications` entry for the start menu on
+  Ubuntu/Mint).
 - **Version numbers are never written by hand.** MinVer (`Stanley.App.csproj`)
   derives the binaries' version from git tags: a `vX.Y.Z` commit is `X.Y.Z`,
   anything after it is `X.Y.(Z+1)-alpha.0.<commits since>`, before the first tag
@@ -615,6 +764,11 @@ needed — check this first on a release/nightly `403`); branch protection on
 ## Licensing constraint
 
 The project is **AGPL-3.0**. Check the licence of every dependency before adding
-it. Some character-animation runtimes need proprietary or per-user licences (for
-example the Spine runtimes and the Live2D Cubism SDK). Prefer open formats
-(glTF, VRM, DragonBones, SVG) and libraries compatible with the AGPL.
+it — including its transitive dependencies (e.g. Svg.Skia is MIT but sits on
+MS-PL SVG.NET code, which the FSF lists as GPL-incompatible; VectSharp.SVG,
+LGPL-3.0, is the chosen SVG reader instead). The starter sticker/pattern library's
+*art* is **CC0-1.0**, not AGPL, so comics made with it carry no obligations —
+only add original or already-CC0 art to it. Some character-animation runtimes
+need proprietary or per-user licences (for example the Spine runtimes and the
+Live2D Cubism SDK). Prefer open formats (glTF, VRM, DragonBones, SVG) and
+libraries compatible with the AGPL.

@@ -1,13 +1,23 @@
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Poses;
 
 namespace Stanley.ProjectModel.Issues;
 
-/// <summary>Sparse per-panel overrides on top of a character instance's revision (e.g. sunglasses for one shot).</summary>
+/// <summary>
+/// Sparse per-panel overrides on top of a character instance's revision (e.g. sunglasses
+/// for one shot): each map replaces only the slots it names.
+/// </summary>
 public sealed record CharacterInstanceOverrides(
     SortedDictionary<string, IReadOnlyList<StickerId>>? ActiveStickerOverrides,
-    SortedDictionary<string, ColorValue>? ColorSlotOverrides);
+    SortedDictionary<string, ColorValue>? ColorSlotOverrides,
+    SortedDictionary<string, Fabric>? FabricOverrides = null)
+{
+    public bool IsEmpty => (ActiveStickerOverrides is null || ActiveStickerOverrides.Count == 0)
+        && (ColorSlotOverrides is null || ColorSlotOverrides.Count == 0)
+        && (FabricOverrides is null || FabricOverrides.Count == 0);
+}
 
 /// <summary>
 /// One character placed in a panel: a reference to a definition + revision (falling

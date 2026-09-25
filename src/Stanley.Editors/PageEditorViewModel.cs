@@ -89,6 +89,21 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             if (choice != null && HasSelectedCharacter)
                 ApplyPosePreset(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
         });
+        SetPanelLookCommand = new RelayCommand<LookChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                SetPanelLook(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Look);
+        });
+        SetIssueLookCommand = new RelayCommand<LookChoice>(choice =>
+        {
+            if (choice != null && SelectedCharacter is { } instance)
+                _looksHost?.SetIssueLook(instance.CharacterId, choice.Look);
+        });
+        ApplyExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                ApplyExpression(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
+        });
         MirrorPoseCommand = new RelayCommand(() => MirrorCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
@@ -300,6 +315,38 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     }
 
     public bool HasPageNumbering => _numberingHost != null;
+
+    // ---------------------------------------------------------------- looks
+
+    private IIssueLooksHost? _looksHost;
+    private static readonly IReadOnlyDictionary<CharacterId, CharacterRevisionId> NoLooks = new Dictionary<CharacterId, CharacterRevisionId>();
+
+    /// <summary>Where the issue's look per character lives (the navigator); null for a page edited on its own - its characters wear their default looks.</summary>
+    public IIssueLooksHost? LooksHost
+    {
+        get => _looksHost;
+        set
+        {
+            if (_looksHost != null)
+                _looksHost.IssueLooksChanged -= RaiseIssueLooksChanged;
+            _looksHost = value;
+            if (_looksHost != null)
+                _looksHost.IssueLooksChanged += RaiseIssueLooksChanged;
+            RaiseIssueLooksChanged();
+        }
+    }
+
+    /// <summary>The issue's look per character, for drawing.</summary>
+    public IReadOnlyDictionary<CharacterId, CharacterRevisionId> IssueLooks => _looksHost?.IssueLooks ?? NoLooks;
+
+    /// <summary>The look <paramref name="instance"/> is drawn in: its panel's own, else the issue's.</summary>
+    public CharacterRevisionId? LookOf(CharacterInstance instance) => CharacterLooks.LookOf(instance, IssueLooks);
+
+    private void RaiseIssueLooksChanged()
+    {
+        OnPropertyChanged(nameof(IssueLooks));
+        RaiseLookChoicesChanged();
+    }
 
     public IReadOnlyList<PageNumberOption> PageNumberOptions => PageNumberOption.All;
 
@@ -1094,6 +1141,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(HasCharacterChoices));
         OnPropertyChanged(nameof(SelectedCharacterName));
         OnPropertyChanged(nameof(PoseChoices));
+        OnPropertyChanged(nameof(ExpressionChoices));
+        RaiseLookChoicesChanged();
         NotifyCommands();
     }
 
@@ -1106,10 +1155,10 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>A placed character's bounding box on the page.</summary>
     public Rect2D CharacterBounds(CharacterInstance instance) => instance.Placement.ToPage(InstanceExtent(instance));
 
-    /// <summary>An instance's figure-space bounding box as it stands - view and pose included.</summary>
+    /// <summary>An instance's figure-space bounding box as it stands - view, pose and what it wears included.</summary>
     private Rect2D InstanceExtent(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
-            ? CharacterPosing.Figure(character, instance).Extent
+            ? Rendering.CharacterRenderers.Default.Extent(character, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, LookOf(instance))
             : BodyRig.Extent(BodyShape.Default, instance.Pose.ViewAngle);
 
     /// <summary>
@@ -1219,6 +1268,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     private int _bendSign = 1;
     private (CharacterId, ViewAngle) _poseChoicesKey;
+    private string _expressionChoicesKey = "";
 
     /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
@@ -1291,6 +1341,159 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         RaiseCharacterViewChanged();
     }
 
+    // ---------------------------------------------------------------- looks: per panel, per issue, and one panel's own changes
+
+    /// <summary>Whether the selected character has named looks to pick from.</summary>
+    public bool SelectedCharacterHasLooks => SelectedCharacterDefinition is { Revisions.Count: > 0 };
+
+    private CharacterDefinition? SelectedCharacterDefinition =>
+        SelectedCharacter is { } instance && CharacterSnapshot.TryGetValue(instance.CharacterId, out var character) ? character : null;
+
+    /// <summary>The selected character's look, for the Look button: its name, and whether it's the panel's own or the issue's.</summary>
+    public string SelectedLookName
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || SelectedCharacterDefinition is not { } character)
+                return "";
+            var name = CharacterLooks.Revision(character, LookOf(instance))?.Name ?? "Default";
+            return instance.RevisionOverride is null ? name : name + " (panel)";
+        }
+    }
+
+    /// <summary>The Look dropdown's "This panel" choices: the issue's look, the default, each named look.</summary>
+    public IReadOnlyList<LookChoice> PanelLookChoices
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || SelectedCharacterDefinition is not { } character)
+                return [];
+            var issueLook = IssueLooks.TryGetValue(character.Id, out var l) ? l : (CharacterRevisionId?)null;
+            var choices = new List<LookChoice>
+            {
+                new($"Issue: {CharacterLooks.Revision(character, issueLook)?.Name ?? "Default"}", null, instance.RevisionOverride is null,
+                    LookEditing.Project(character, CharacterLooks.Revision(character, issueLook))),
+                new("Default", CharacterLooks.DefaultLook, instance.RevisionOverride == CharacterLooks.DefaultLook, character),
+            };
+            choices.AddRange(character.Revisions.Values.OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(r => new LookChoice(r.Name, r.Id, instance.RevisionOverride == r.Id, LookEditing.Project(character, r))));
+            return choices;
+        }
+    }
+
+    /// <summary>The Look dropdown's "Whole issue" choices: the default, each named look.</summary>
+    public IReadOnlyList<LookChoice> IssueLookChoices
+    {
+        get
+        {
+            if (SelectedCharacterDefinition is not { } character)
+                return [];
+            var current = IssueLooks.TryGetValue(character.Id, out var l) ? l : (CharacterRevisionId?)null;
+            return new[] { new LookChoice("Default", null, current is null || !character.Revisions.ContainsKey(current.Value), character) }
+                .Concat(character.Revisions.Values.OrderBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .Select(r => new LookChoice(r.Name, r.Id, current == r.Id, LookEditing.Project(character, r))))
+                .ToList();
+        }
+    }
+
+    public IRelayCommand<LookChoice> SetPanelLookCommand { get; private set; } = null!;
+    public IRelayCommand<LookChoice> SetIssueLookCommand { get; private set; } = null!;
+
+    /// <summary>Shows the character in <paramref name="look"/> in this panel (null = as the issue says), in one undo step.</summary>
+    public void SetPanelLook(PanelId panelId, int index, CharacterRevisionId? look)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || panel.CharacterInstances[index].RevisionOverride == look)
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => c with { RevisionOverride = look }));
+        RaiseLookChoicesChanged();
+    }
+
+    /// <summary>
+    /// One panel's own change to what the character wears or its colours (sunglasses for
+    /// one shot): <paramref name="edit"/> works on the character as the panel shows it, and
+    /// the panel keeps only where the result differs from its look. One undo step.
+    /// </summary>
+    public void EditPanelLook(PanelId panelId, int index, Func<CharacterDefinition, CharacterDefinition> edit)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        var instance = panel.CharacterInstances[index];
+        var revision = CharacterLooks.Revision(character, LookOf(instance));
+        var edited = edit(LookEditing.Project(character, revision, instance.Overrides));
+        var updated = LookEditing.StorePanel(character, revision, instance, edited);
+        if (updated == instance || Equals(updated.Overrides, instance.Overrides))
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, _ => updated));
+        RaiseLookChoicesChanged();
+    }
+
+    /// <summary>The character as one panel shows it (its look, then the panel's own changes), flattened - what "this panel only" edits start from.</summary>
+    public CharacterDefinition? PanelView(PanelId panelId, int index) =>
+        Working.Panels.TryGetValue(panelId, out var panel) && index >= 0 && index < panel.CharacterInstances.Count
+        && CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character)
+            ? LookEditing.Project(character, CharacterLooks.Revision(character, LookOf(panel.CharacterInstances[index])), panel.CharacterInstances[index].Overrides)
+            : null;
+
+    /// <summary>Drops one panel's own changes, back to its look.</summary>
+    public void ClearPanelLook(PanelId panelId, int index)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || panel.CharacterInstances[index].Overrides is null)
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => c with { Overrides = null }));
+    }
+
+    private object? _lookChoicesKey;
+
+    private void RaiseLookChoicesChanged()
+    {
+        // Only when something the choices show changed - not on every pointer move of a drag.
+        var instance = SelectedCharacter;
+        var character = SelectedCharacterDefinition;
+        var key = (instance?.CharacterId, instance?.RevisionOverride, instance?.Overrides, character,
+            character is not null && IssueLooks.TryGetValue(character.Id, out var issueLook) ? issueLook : (CharacterRevisionId?)null);
+        if (Equals(key, _lookChoicesKey))
+            return;
+        _lookChoicesKey = key;
+        OnPropertyChanged(nameof(SelectedCharacterHasLooks));
+        OnPropertyChanged(nameof(SelectedLookName));
+        OnPropertyChanged(nameof(PanelLookChoices));
+        OnPropertyChanged(nameof(IssueLookChoices));
+    }
+
+    /// <summary>Gives the character <paramref name="preset"/>'s face, in one undo step. The pose is untouched.</summary>
+    public void ApplyExpression(PanelId panelId, int index, ExpressionPresetDefinition preset)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+        if (ExpressionPresets.Of(panel.CharacterInstances[index].Pose) == preset)
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => ExpressionPresets.Apply(c, preset)));
+        RaiseCharacterViewChanged();
+    }
+
+    /// <summary>The Character tab's expression gallery: every preset, as a close-up of the selected character.</summary>
+    public IReadOnlyList<ExpressionPresetChoice> ExpressionChoices
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+                return [];
+            var current = ExpressionPresets.Of(instance.Pose);
+            var standing = new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>());
+            return ExpressionPresets.All
+                .Select(p => new ExpressionPresetChoice(p, character, ExpressionPresets.Apply(standing, p), p == current))
+                .ToList();
+        }
+    }
+
+    /// <summary>The selected character's expression, for the gallery button: a preset's name, or "Custom" for a mix.</summary>
+    public string SelectedExpressionName => SelectedCharacter is { } instance ? ExpressionPresets.Of(instance.Pose)?.Name ?? "Custom" : "";
+
+    public IRelayCommand<ExpressionPresetChoice> ApplyExpressionCommand { get; }
+
     /// <summary>The Character tab's pose gallery: every preset, previewed on the selected character.</summary>
     public IReadOnlyList<PosePresetChoice> PoseChoices
     {
@@ -1355,6 +1558,16 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             _poseChoicesKey = key;
             OnPropertyChanged(nameof(PoseChoices));
+        }
+        var expressionKey = SelectedCharacter is { } face
+            ? $"{face.CharacterId}:{face.Pose.ViewAngle}:{string.Join(";", (face.Pose.Expression ?? []).Select(e => e.Key + "=" + e.Value))}"
+            : "";
+        RaiseLookChoicesChanged();
+        if (expressionKey != _expressionChoicesKey)
+        {
+            _expressionChoicesKey = expressionKey;
+            OnPropertyChanged(nameof(ExpressionChoices));
+            OnPropertyChanged(nameof(SelectedExpressionName));
         }
         OnPropertyChanged(nameof(SelectedCharacterView));
         OnPropertyChanged(nameof(IsSelectedCharacterFront));

@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Stanley.Editing.Abstractions\Stanley.Editing.Abstractions.csproj" />
     <ProjectReference Include="..\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
     <ProjectReference Include="..\Stanley.Rendering\Stanley.Rendering.csproj" />
+    <ProjectReference Include="..\Stanley.StickerLibrary\Stanley.StickerLibrary.csproj" />
   </ItemGroup>
 
 </Project>

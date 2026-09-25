@@ -22,7 +22,7 @@ namespace Stanley.ProjectModel.Serialization;
 [JsonSerializable(typeof(CharacterDefinition))]
 [JsonSerializable(typeof(CharacterRevision))]
 [JsonSerializable(typeof(Sticker))]
-[JsonSerializable(typeof(StretchRegion))]
+[JsonSerializable(typeof(CharacterInstanceOverrides))]
 [JsonSerializable(typeof(Pose))]
 [JsonSerializable(typeof(Prop))]
 [JsonSerializable(typeof(Background))]

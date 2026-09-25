@@ -3,6 +3,7 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Mvvm.Controls;
+using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Ids;
@@ -78,7 +79,7 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         CanClose = false;
         CanFloat = false;
 
-        NewCharacterCommand = new RelayCommand(() => Show(AddCharacter(CharacterDefinition.Create(NextName()))));
+        NewCharacterCommand = new RelayCommand(() => Show(AddCharacter(NewDefinition())));
         DuplicateCharacterCommand = new RelayCommand<CharacterItem?>(item =>
         {
             if ((item ?? Current) is { } source)
@@ -155,6 +156,12 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         }
     }
 
+    /// <summary>How many panels (and issues) show a character in a named look - set by the session, which sees the pages; a look in use can't be deleted.</summary>
+    public Func<CharacterId, CharacterRevisionId, int>? LookUsageCounter { get; set; }
+
+    /// <summary>How "Draw your own" reaches the user's SVG editor; the app points it at its data folder, tests at a fake.</summary>
+    public IArtEditing ArtEditing { get; set; } = new SystemArtEditing(Path.Combine(Path.GetTempPath(), "stanley-drawing"));
+
     // ---------------------------------------------------------------- ICharacterCatalog
 
     public IReadOnlyDictionary<CharacterId, CharacterDefinition> Characters => _snapshot;
@@ -163,7 +170,19 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
     public event Action? CharactersChanged;
 
-    public CharacterDefinition CreateCharacter() => AddCharacter(CharacterDefinition.Create(NextName())).Character;
+    public CharacterDefinition CreateCharacter() => AddCharacter(NewDefinition()).Character;
+
+    /// <summary>A new character: the default body, with the library's default face on.</summary>
+    private CharacterDefinition NewDefinition()
+    {
+        var character = CharacterDefinition.Create(NextName());
+        foreach (var key in Stanley.StickerLibrary.StickerLibrary.DefaultFace)
+        {
+            if (Stanley.StickerLibrary.StickerLibrary.Find(key) is { } sticker)
+                character = LookEditing.Wear(character, sticker.Instantiate());
+        }
+        return character;
+    }
 
     public void OpenCharacter(CharacterId id)
     {

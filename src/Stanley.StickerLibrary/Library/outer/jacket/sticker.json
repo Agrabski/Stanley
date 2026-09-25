@@ -1,0 +1,33 @@
+{
+  "colors": {
+    "outer": "#4a3b2f"
+  },
+  "id": "library",
+  "name": "Jacket",
+  "parts": [
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.022,
+        "from": 0,
+        "to": 0.95
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.022,
+        "from": 0,
+        "to": 0.96
+      },
+      "name": "sleeves",
+      "region": "arm"
+    }
+  ],
+  "slot": "outer",
+  "variants": [
+    "default"
+  ]
+}

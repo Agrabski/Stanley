@@ -1,0 +1,43 @@
+{
+  "colors": {
+    "top": "#7a8b99"
+  },
+  "id": "library",
+  "name": "Hoodie",
+  "parts": [
+    {
+      "cover": {
+        "color": "top",
+        "ease": 0.02,
+        "from": 0,
+        "to": 0.94
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "top",
+        "ease": 0.018,
+        "from": 0,
+        "to": 1
+      },
+      "name": "sleeves",
+      "region": "arm"
+    },
+    {
+      "cover": {
+        "color": "top",
+        "ease": 0.02,
+        "from": 0,
+        "to": 0.45
+      },
+      "name": "collar",
+      "region": "neck"
+    }
+  ],
+  "slot": "top",
+  "variants": [
+    "default"
+  ]
+}

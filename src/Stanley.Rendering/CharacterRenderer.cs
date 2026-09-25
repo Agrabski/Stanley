@@ -15,22 +15,40 @@ namespace Stanley.Rendering;
 /// </summary>
 public interface ICharacterRenderer
 {
-    /// <summary>The character's whole outline in page millimetres, seen from <paramref name="angle"/> - what a click hit-tests against. The caller disposes it.</summary>
-    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null);
+    /// <summary>The character's whole outline in page millimetres, seen from <paramref name="angle"/>, stickers included - what a click hit-tests against. The caller disposes it.</summary>
+    /// <param name="overrides">One panel's changes to what's worn (and its colours and fabrics).</param>
+    /// <param name="revision">The named look to draw (from <see cref="CharacterDefinition.Revisions"/>); null = the character's default look.</param>
+    SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null);
 
-    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null);
+    void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null);
+
+    /// <summary>The character's bounding box in figure space, stickers included (a flared skirt, hair) - the body's own extent when nothing sticks out.</summary>
+    Rect2D Extent(CharacterDefinition character, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null);
+
+    /// <summary>The worn sticker drawn topmost at <paramref name="pagePoint"/>, or null (bare skin, or off the character).</summary>
+    StickerId? StickerAt(CharacterDefinition character, CharacterPlacement placement, Point2D pagePoint, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null);
+
+    /// <summary>Everything <paramref name="sticker"/> draws, as one outline in page millimetres (empty if it draws nothing). The caller disposes it.</summary>
+    SKPath BuildStickerOutline(CharacterDefinition character, CharacterPlacement placement, StickerId sticker, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null);
 }
 
 public static class CharacterRenderers
 {
-    public static ICharacterRenderer Default { get; } = new MannequinRenderer();
+    public static ICharacterRenderer Default { get; } = new FigureRenderer();
 
     /// <summary>Draws one instance, or - when its character is missing from <paramref name="characters"/> (a hand-edited or half-copied project) - a dashed placeholder the size of a default body, instead of failing the whole page.</summary>
-    public static void DrawInstance(SKCanvas canvas, CharacterInstance instance, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, float strokeMm)
+    /// <param name="issueLooks">The issue's look per character, for an instance without a look of its own.</param>
+    public static void DrawInstance(SKCanvas canvas, CharacterInstance instance, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, float strokeMm,
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         if (characters != null && characters.TryGetValue(instance.CharacterId, out var character))
         {
-            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose);
+            Default.Draw(canvas, character, instance.Placement, strokeMm, instance.Pose.ViewAngle, instance.Pose, instance.Overrides, CharacterLooks.LookOf(instance, issueLooks));
             return;
         }
 
@@ -48,201 +66,422 @@ public static class CharacterRenderers
 }
 
 /// <summary>
-/// The V1 renderer: the body <see cref="BodyRig"/> generates, as one flat cartoon
-/// silhouette - every shape unioned (<see cref="SKPathOp.Union"/>, the same trick bubble
-/// tails use) so overlaps never show seams, filled with the skin colour and inked with an
-/// outline.
+/// A figure ready to paint, in figure space (see <see cref="BodyFigure"/>): its items back
+/// to front, and <see cref="Outline"/>, the union of everything, for hit-testing. Built
+/// once per character, view and pose (cached by <see cref="FigureRenderer"/>) and never
+/// changed afterwards, so it can be drawn from any thread.
 /// </summary>
-public sealed class MannequinRenderer : ICharacterRenderer
+public sealed class FigureDrawing
 {
-    // Building the union is the expensive part; definitions are immutable, so the
-    // figure-space outlines are cached per definition value (and view and pose) and
-    // only transformed per draw. A limb drag makes a new pose on every pointer move, so
-    // each definition's cache is dropped when it grows past a small bound.
-    private const int MaxPosesPerCharacter = 64;
-    private readonly ConditionalWeakTable<CharacterDefinition, Dictionary<string, FigurePaths>> _figures = new();
-    private readonly Lock _lock = new();
-
-    /// <summary>A figure's outlines in figure space: the body, the near arm and foot drawn over it (side view; empty otherwise), and the two unioned - the whole outline, for hit-testing.</summary>
-    public sealed record FigurePaths(SKPath Body, SKPath Near, SKPath Outline);
-
-    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null)
+    internal FigureDrawing(IReadOnlyList<FigureItem> items, SKPath outline)
     {
-        var matrix = ToPage(placement);
-        using var builder = new SKPathBuilder();
-        lock (_lock)
-        {
-            builder.AddPath(Figure(character, angle, pose).Outline, in matrix);
-        }
-        return builder.Detach();
+        Items = items;
+        Outline = outline;
     }
 
-    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null)
-    {
-        var matrix = ToPage(placement);
-        SKPath body, near;
-        lock (_lock)
-        {
-            var paths = Figure(character, angle, pose);
-            body = Transformed(paths.Body, matrix);
-            near = Transformed(paths.Near, matrix);
-        }
+    internal IReadOnlyList<FigureItem> Items { get; }
 
-        using (body)
-        using (near)
-        using (var fill = new SKPaint { Color = ToSk(character.Skin), Style = SKPaintStyle.Fill, IsAntialias = true })
-        using (var ink = new SKPaint
+    /// <summary>The whole figure's outline in figure space.</summary>
+    public SKPath Outline { get; }
+
+    /// <summary>Whether any sticker paints anything.</summary>
+    public bool HasStickers => Items.Any(i => i.Owner is not null);
+
+    /// <summary>The worn sticker painted topmost at <paramref name="figurePoint"/> (figure space), or null for bare skin or nothing.</summary>
+    public StickerId? StickerAt(Point2D figurePoint)
+    {
+        for (var i = Items.Count - 1; i >= 0; i--)
+        {
+            if (Items[i].Area.Contains((float)figurePoint.X, (float)figurePoint.Y))
+                return Items[i].Owner;
+        }
+        return null;
+    }
+
+    /// <summary>Everything <paramref name="sticker"/> paints, as one figure-space outline (empty if it paints nothing) - for highlighting it. The caller disposes it.</summary>
+    public SKPath OutlineOf(StickerId sticker)
+    {
+        var all = FigureGeometry.Empty();
+        foreach (var item in Items.Where(i => i.Owner == sticker))
+            all = FigureGeometry.Union(all, FigureGeometry.Copy(item.Area));
+        return all;
+    }
+
+    /// <summary>Paints every item onto <paramref name="canvas"/>, whose transform maps figure space to the page; <paramref name="strokeWidth"/> is in figure units.</summary>
+    public void Draw(SKCanvas canvas, float strokeWidth)
+    {
+        using var ink = new SKPaint
         {
             Color = SKColors.Black,
             Style = SKPaintStyle.Stroke,
-            StrokeWidth = strokeMm,
+            StrokeWidth = strokeWidth,
             StrokeJoin = SKStrokeJoin.Round,
+            StrokeCap = SKStrokeCap.Round,
             IsAntialias = true
-        })
-        {
-            canvas.DrawPath(body, fill);
-            canvas.DrawPath(body, ink);
-            if (!near.IsEmpty)
-            {
-                canvas.DrawPath(near, fill);
-                canvas.DrawPath(near, ink);
-            }
-        }
+        };
+        foreach (var item in Items)
+            item.Draw(canvas, ink);
     }
+}
 
-    private FigurePaths Figure(CharacterDefinition character, ViewAngle angle, PoseData? pose)
+/// <summary>One thing a <see cref="FigureDrawing"/> paints.</summary>
+internal abstract class FigureItem
+{
+    /// <summary>What it covers, in figure space - for hit-testing and highlighting.</summary>
+    public abstract SKPath Area { get; }
+
+    /// <summary>The sticker it belongs to, or null for skin.</summary>
+    public abstract StickerId? Owner { get; }
+
+    public abstract void Draw(SKCanvas canvas, SKPaint ink);
+}
+
+/// <summary>
+/// A filled shape (a layer's skin, a sticker cover) with an ink outline. Inside
+/// <see cref="InkMask"/> - the layer's seams where they lie over what's painted before it -
+/// the outline is left out, so joints read as one body.
+/// </summary>
+internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, StickerId? owner = null, FabricFill? fabric = null) : FigureItem
+{
+    public SKPath Path { get; } = path;
+
+    public override SKPath Area => Path;
+
+    public override StickerId? Owner { get; } = owner;
+
+    public SKPath? InkMask { get; } = inkMask;
+
+    public override void Draw(SKCanvas canvas, SKPaint ink)
     {
-        var cache = _figures.GetValue(character, _ => []);
-        var key = angle + ":" + pose?.HipsShift + ":" + string.Join(";", (pose?.BoneRotations ?? []).Select(r => $"{r.Bone}={r.Degrees:R}"));
-        if (!cache.TryGetValue(key, out var paths))
+        if (fabric is null)
         {
-            if (cache.Count >= MaxPosesPerCharacter)
-            {
-                foreach (var old in cache.Values)
-                {
-                    old.Body.Dispose();
-                    old.Near.Dispose();
-                    old.Outline.Dispose();
-                }
-                cache.Clear();
-            }
-            cache[key] = paths = BuildPaths(BodyRig.Build(character.Body, angle, character.Skeleton, pose));
+            using var paint = new SKPaint { Color = fill, Style = SKPaintStyle.Fill, IsAntialias = true };
+            canvas.DrawPath(Path, paint);
         }
-        return paths;
+        else
+        {
+            // Each piece in its own region's frame (a sleeve's stripes turn with the arm),
+            // all inside the item's outline, so its cuts stay cut.
+            canvas.Save();
+            canvas.ClipPath(Path, antialias: true);
+            fabric.Draw(canvas, fill);
+            canvas.Restore();
+        }
+        if (InkMask is { IsEmpty: false } mask)
+        {
+            canvas.Save();
+            canvas.ClipPath(mask, SKClipOperation.Difference, antialias: true);
+            canvas.DrawPath(Path, ink);
+            canvas.Restore();
+        }
+        else
+        {
+            canvas.DrawPath(Path, ink);
+        }
+    }
+}
+
+/// <summary>
+/// A fabric (pattern and/or texture) over an item's colour: the pieces it's laid out in,
+/// each with its region's frame. Shaders are made once and shared by every draw.
+/// </summary>
+internal sealed class FabricFill
+{
+    private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
+    private readonly float _strength;
+
+    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles)
+    {
+        _pieces = pieces.Select(p => (p.Path,
+            fabric.Pattern is { } pattern ? FabricShaders.Pattern(pattern, ground, p.Frame, height, tiles) : null,
+            fabric.Texture is { } texture ? FabricShaders.Texture(texture, p.Frame, height, tiles) : null)).ToList();
+        _strength = (float)Math.Clamp(fabric.Texture?.Strength ?? TextureFill.DefaultStrength, 0, 1);
     }
 
-    private static SKMatrix ToPage(CharacterPlacement placement) =>
+    public void Draw(SKCanvas canvas, SKColor ground)
+    {
+        using var paint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = true };
+        foreach (var (path, pattern, texture) in _pieces)
+        {
+            paint.Shader = null;
+            paint.BlendMode = SKBlendMode.SrcOver;
+            paint.Color = ground;
+            canvas.DrawPath(path, paint);
+            if (pattern != null)
+            {
+                paint.Color = SKColors.Black;
+                paint.Shader = pattern;
+                canvas.DrawPath(path, paint);
+            }
+            if (texture != null)
+            {
+                paint.Shader = texture;
+                paint.BlendMode = SKBlendMode.Multiply;
+                paint.Color = SKColors.White.WithAlpha((byte)(_strength * 255));
+                canvas.DrawPath(path, paint);
+            }
+        }
+    }
+}
+
+/// <summary>
+/// The V1 renderer: the body <see cref="BodyRig"/> generates, painted layer by layer
+/// (<see cref="BodyFigure.Layers"/>) - legs, torso, head, arms in a front view; far arm,
+/// body, head, near foot, near arm side on - each filled with the skin colour and inked,
+/// with the ink left out at the seams where a layer joins the ones behind it. So an arm
+/// crossing the chest keeps its outline, while shoulders and hips read as one body.
+/// </summary>
+public sealed class FigureRenderer : ICharacterRenderer
+{
+    // Building the paths (the unions especially) is the expensive part; definitions are
+    // immutable, so drawings are cached per definition value (and view and pose). A limb
+    // drag makes a new pose on every pointer move, so each definition's cache is dropped
+    // when it grows past a small bound. Dropped drawings aren't disposed here - another
+    // thread may still be painting one - their native paths are freed when collected.
+    private const int MaxPosesPerCharacter = 64;
+    private readonly ConditionalWeakTable<CharacterDefinition, Dictionary<string, FigureDrawing>> _drawings = new();
+    private readonly Lock _lock = new();
+
+    public SKPath BuildSilhouette(CharacterDefinition character, CharacterPlacement placement, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null) =>
+        FigureGeometry.Transformed(Drawing(character, angle, pose, overrides, revision).Outline, ToPage(placement));
+
+    public void Draw(SKCanvas canvas, CharacterDefinition character, CharacterPlacement placement, float strokeMm, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
+    {
+        var drawing = Drawing(character, angle, pose, overrides, revision);
+        var matrix = ToPage(placement);
+        canvas.Save();
+        canvas.Concat(in matrix);
+        drawing.Draw(canvas, strokeMm / (float)Math.Max(placement.UnitHeightMm, 1e-6));
+        canvas.Restore();
+    }
+
+    public Rect2D Extent(CharacterDefinition character, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
+    {
+        var body = BodyRig.Extent(character.Body, angle, character.Skeleton, pose);
+        if (character.Wardrobe.Stickers.Count == 0)
+            return body;
+        var drawing = Drawing(character, angle, pose, overrides, revision);
+        if (!drawing.HasStickers)
+            return body;
+        var b = drawing.Outline.TightBounds;
+        return Rect2D.FromEdges(Math.Min(body.Left, b.Left), Math.Min(body.Top, b.Top), Math.Max(body.Right, b.Right), Math.Max(body.Bottom, b.Bottom));
+    }
+
+    public StickerId? StickerAt(CharacterDefinition character, CharacterPlacement placement, Point2D pagePoint, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null) =>
+        Drawing(character, angle, pose, overrides, revision).StickerAt(placement.ToFigure(pagePoint));
+
+    public SKPath BuildStickerOutline(CharacterDefinition character, CharacterPlacement placement, StickerId sticker, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
+    {
+        using var outline = Drawing(character, angle, pose, overrides, revision).OutlineOf(sticker);
+        return FigureGeometry.Transformed(outline, ToPage(placement));
+    }
+
+    /// <summary>The character's drawing in figure space, from the cache or built now.</summary>
+    public FigureDrawing Drawing(CharacterDefinition character, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
+        CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
+    {
+        var look = revision is { } id && character.Revisions.TryGetValue(id, out var r) ? r : null;
+        var key = angle + ":" + pose?.HipsShift + ":" + string.Join(";", (pose?.BoneRotations ?? []).Select(b => $"{b.Bone}={b.Degrees:R}"))
+            + ":" + string.Join(";", (pose?.Expression ?? []).Select(e => e.Key + "=" + e.Value))
+            + ":" + CharacterLooks.CacheKey(look, overrides);
+        lock (_lock)
+        {
+            var cache = _drawings.GetValue(character, _ => []);
+            if (cache.TryGetValue(key, out var cached))
+                return cached;
+            if (cache.Count >= MaxPosesPerCharacter)
+                cache.Clear();
+            var figure = BodyRig.Build(character.Body, angle, character.Skeleton, pose);
+            return cache[key] = Build(character, figure, CharacterLooks.Resolve(character, look, overrides), pose);
+        }
+    }
+
+    /// <summary>A bare figure: the body alone, in the character's skin colour.</summary>
+    public static FigureDrawing Build(CharacterDefinition character, BodyFigure figure) =>
+        Build(character, figure, new CharacterLook([], new Dictionary<string, ColorValue>(), new Dictionary<string, Fabric>()), null);
+
+    /// <summary>
+    /// Paints the figure's layers back to front: each layer's skin, then - in the look's
+    /// order (slot z-order, then stacking) - every worn sticker's pieces that belong in
+    /// that layer: its covers merged per colour, then its drawn parts, with the sticker's
+    /// cut parts taken out and its clipped parts clipped. Skin and covers are inked on
+    /// their own outline, except in the layer's seams where they lie over the layers before
+    /// it; drawn art brings its own lines.
+    /// </summary>
+    public static FigureDrawing Build(CharacterDefinition character, BodyFigure figure, CharacterLook look, PoseData? pose)
+    {
+        var height = character.Body.Normalized().Height;
+        var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
+        var tiles = TileLookup(character);
+        var stickers = look.Stickers.Select(w => StickerGeometry.Of(figure, w, look, pose, height, tiles)).ToList();
+        var bodySkin = FigureGeometry.Empty();
+        foreach (var layer in figure.Layers.Where(l => l.HasBody))
+            bodySkin = FigureGeometry.Union(bodySkin, FigureGeometry.LayerSkin(layer));
+
+        // What's been painted in earlier layers - everything, and each sticker's own pieces.
+        // Skin at a seam merges with whatever it lies over; a garment only with itself (a
+        // sleeve with its shirt at the shoulder), so a shirt's hem over the trousers keeps its line.
+        var items = new List<FigureItem>();
+        var below = FigureGeometry.Empty();
+        var belowOwn = stickers.Select(_ => FigureGeometry.Empty()).ToList();
+        foreach (var layer in figure.Layers)
+        {
+            var painted = FigureGeometry.Empty();
+            if (layer.HasBody)
+            {
+                var path = FigureGeometry.LayerSkin(layer);
+                items.Add(new ShapeItem(path, skin, SeamMask(layer, below)));
+                painted = FigureGeometry.Union(painted, FigureGeometry.Copy(path));
+            }
+            for (var i = 0; i < stickers.Count; i++)
+            {
+                var mask = SeamMask(layer, belowOwn[i]);
+                var own = FigureGeometry.Empty();
+                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, mask, height, tiles))
+                {
+                    items.Add(item);
+                    own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Area));
+                }
+                painted = FigureGeometry.Union(painted, FigureGeometry.Copy(own));
+                belowOwn[i] = FigureGeometry.Union(belowOwn[i], own);
+            }
+            below = FigureGeometry.Union(below, painted);
+        }
+        bodySkin.Dispose();
+        foreach (var own in belowOwn)
+            own.Dispose();
+        return new FigureDrawing(items, below);
+    }
+
+    /// <summary>A worn sticker on the figure: its cover pieces, each with the part it came from, and its drawn parts mapped into figure space.</summary>
+    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art)
+    {
+        public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
+        {
+            var sticker = worn.Asset.Sticker;
+            var covers = new List<(StickerPart, PartPiece)>();
+            foreach (var part in sticker.Parts)
+            {
+                if (part.Cover is { } cover)
+                    covers.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
+            }
+
+            var art = new List<ArtPiece>();
+            var drawn = sticker.Parts.Where(p => p is { Art: not null, Cover: null }).ToList();
+            if (drawn.Count > 0 && StickerArtPieces.ArtFor(worn.Asset, StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression), figure.Angle) is { } parsed)
+            {
+                foreach (var part in drawn)
+                {
+                    foreach (var (side, elements, anchor) in StickerArtPieces.Map(figure, worn, part, part.Art!, parsed, look, height, tiles))
+                    {
+                        var layer = part.Depth switch
+                        {
+                            PartDepth.Back => FigureLayerKind.Back,
+                            PartDepth.Front => FigureLayerKind.Front,
+                            _ => figure.LayerOf(part.Region, side)
+                        };
+                        art.Add(new ArtPiece(part, layer, elements, anchor, StickerArtPieces.Area(elements, height)));
+                    }
+                }
+            }
+            return new StickerGeometry(covers, art);
+        }
+    }
+
+    /// <summary>One drawn part (one side of it, for a limb) in figure space: its elements and the area they cover.</summary>
+    private sealed record ArtPiece(StickerPart Part, FigureLayerKind Layer, IReadOnlyList<ArtStroke> Elements, SKPoint? Anchor, SKPath Area);
+
+    /// <summary>What one worn sticker paints in one layer: its covers merged per colour slot, then its drawn parts - minus its cuts, clipped as asked.</summary>
+    private static IEnumerable<FigureItem> StickerItems(WornSticker worn, StickerGeometry geometry, FigureLayerKind layer,
+        CharacterLook look, SKPath bodySkin, SKPath? mask, double height, Func<string, ArtFile?> tiles)
+    {
+        var here = geometry.Covers.Where(p => p.Piece.Layer == layer).ToList();
+        var art = geometry.Art.Where(a => a.Layer == layer).ToList();
+        if (here.Count == 0 && art.Count == 0)
+            yield break;
+        var sticker = worn.Asset.Sticker;
+        var cuts = FigureGeometry.Empty();
+        foreach (var (_, piece) in here.Where(p => p.Part.Blend == PartBlend.Cut))
+            cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Path));
+        foreach (var piece in art.Where(a => a.Part.Blend == PartBlend.Cut))
+            cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Area));
+        var own = FigureGeometry.Empty();
+        foreach (var (_, piece) in geometry.Covers.Where(p => p.Part.Blend != PartBlend.Cut && p.Part.Clip is null))
+            own = FigureGeometry.Union(own, FigureGeometry.Copy(piece.Path));
+
+        foreach (var group in here.Where(p => p.Part.Blend != PartBlend.Cut).GroupBy(p => p.Part.Cover!.Color))
+        {
+            var fallback = sticker.Colors.TryGetValue(group.Key, out var c) ? c : ColorValue.FromHex("#9a9a9a");
+            var path = FigureGeometry.Empty();
+            foreach (var (part, piece) in group)
+            {
+                var shape = part.Clip is { } clip
+                    ? FigureGeometry.Combine(piece.Path, clip == PartClip.Body ? bodySkin : own, SKPathOp.Intersect)
+                    : FigureGeometry.Copy(piece.Path);
+                path = FigureGeometry.Union(path, shape);
+            }
+            if (!cuts.IsEmpty)
+            {
+                var cut = FigureGeometry.Combine(path, cuts, SKPathOp.Difference);
+                path.Dispose();
+                path = cut;
+            }
+            if (path.IsEmpty)
+            {
+                path.Dispose();
+                continue;
+            }
+            var ground = FigureGeometry.ToSk(look.Color(group.Key, fallback));
+            var fabric = look.FabricOf(group.Key) is { } f ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles) : null;
+            yield return new ShapeItem(path, ground, mask, worn.Asset.Id, fabric);
+        }
+
+        foreach (var piece in art.Where(a => a.Part.Blend != PartBlend.Cut))
+        {
+            var keep = piece.Part.Clip switch
+            {
+                PartClip.Body => FigureGeometry.Copy(bodySkin),
+                PartClip.Sticker => FigureGeometry.Copy(own),
+                _ => null
+            };
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            if (!cuts.IsEmpty)
+            {
+                var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
+                area.Dispose();
+                area = cut;
+            }
+            if (area.IsEmpty)
+            {
+                area.Dispose();
+                keep?.Dispose();
+                continue;
+            }
+            yield return new ArtItem(piece.Elements, area, worn.Asset.Id, piece.Anchor, keep, cuts.IsEmpty ? null : FigureGeometry.Copy(cuts));
+        }
+        cuts.Dispose();
+        own.Dispose();
+    }
+
+    /// <summary>The character's pattern and texture tiles, by name.</summary>
+    private static Func<string, ArtFile?> TileLookup(CharacterDefinition character) =>
+        name => character.Wardrobe.Tiles.TryGetValue(name, out var file) ? file : null;
+
+    /// <summary>Where a layer's ink is left out: its seams, where they lie over what's already painted.</summary>
+    internal static SKPath? SeamMask(FigureLayer layer, SKPath below)
+    {
+        if (layer.Seams.Count == 0 || below.IsEmpty)
+            return null;
+        using var discs = FigureGeometry.Discs(layer.Seams);
+        return FigureGeometry.Combine(discs, below, SKPathOp.Intersect);
+    }
+
+    internal static SKMatrix ToPage(CharacterPlacement placement) =>
         SKMatrix.CreateScale((float)(placement.Mirrored ? -placement.UnitHeightMm : placement.UnitHeightMm), (float)placement.UnitHeightMm)
             .PostConcat(SKMatrix.CreateTranslation((float)placement.Ground.X, (float)placement.Ground.Y));
-
-    private static SKPath Transformed(SKPath path, SKMatrix matrix)
-    {
-        using var builder = new SKPathBuilder();
-        builder.AddPath(path, in matrix);
-        return builder.Detach();
-    }
-
-    /// <summary>The figure's outlines in figure space (see <see cref="BodyFigure"/>).</summary>
-    public static FigurePaths BuildPaths(BodyFigure figure)
-    {
-        var body = SmoothClosed(figure.Torso);
-        foreach (var limb in figure.Limbs)
-            body = Union(body, Capsule(limb));
-        foreach (var blob in figure.Blobs)
-            body = Union(body, Oval(blob));
-
-        using var empty = new SKPathBuilder();
-        var near = empty.Detach();
-        foreach (var limb in figure.NearLimbs)
-            near = Union(near, Capsule(limb));
-        foreach (var blob in figure.NearBlobs)
-            near = Union(near, Oval(blob));
-        // One real union, not two overlapping sub-paths: those would cancel out under the fill rule where the near arm crosses the body.
-        var outline = body.Op(near, SKPathOp.Union) ?? new SKPath(body);
-        return new FigurePaths(body, near, outline);
-    }
-
-    private static SKPath Union(SKPath a, SKPath b)
-    {
-        var merged = a.Op(b, SKPathOp.Union);
-        if (merged is null)
-        {
-            // Pathological input (degenerate shapes): keep both, drawn with a winding fill.
-            using var builder = new SKPathBuilder();
-            builder.AddPath(a);
-            builder.AddPath(b);
-            merged = builder.Detach();
-        }
-        a.Dispose();
-        b.Dispose();
-        return merged;
-    }
-
-    /// <summary>A closed curve through the midpoints of <paramref name="points"/>, using each point as a control point - soft corners without extra data.</summary>
-    private static SKPath SmoothClosed(IReadOnlyList<Point2D> points)
-    {
-        using var builder = new SKPathBuilder();
-        if (points.Count >= 3)
-        {
-            SKPoint P(int i) => new((float)points[i % points.Count].X, (float)points[i % points.Count].Y);
-            SKPoint Mid(SKPoint a, SKPoint b) => new((a.X + b.X) / 2, (a.Y + b.Y) / 2);
-
-            builder.MoveTo(Mid(P(0), P(1)));
-            for (var i = 1; i <= points.Count; i++)
-                builder.QuadTo(P(i), Mid(P(i), P(i + 1)));
-            builder.Close();
-        }
-        return builder.Detach();
-    }
-
-    /// <summary>Two circles joined by their outer tangents: a limb segment that tapers from one radius to the other.</summary>
-    private static SKPath Capsule(BodyCapsule c)
-    {
-        var (x1, y1, r1) = ((float)c.From.X, (float)c.From.Y, (float)c.FromRadius);
-        var (x2, y2, r2) = ((float)c.To.X, (float)c.To.Y, (float)c.ToRadius);
-        var dx = x2 - x1;
-        var dy = y2 - y1;
-        var d = MathF.Sqrt(dx * dx + dy * dy);
-        var k = d > 1e-6f ? (r1 - r2) / d : 1;
-
-        var circles = Union(Circle(x1, y1, r1), Circle(x2, y2, r2));
-        if (MathF.Abs(k) >= 1)
-            return circles; // one circle contains the other
-
-        var (ux, uy) = (dx / d, dy / d);
-        var (nx, ny) = (-uy, ux);
-        var s = MathF.Sqrt(1 - k * k);
-        var (ax, ay) = (k * ux + s * nx, k * uy + s * ny);
-        var (bx, by) = (k * ux - s * nx, k * uy - s * ny);
-        using var body = new SKPathBuilder();
-        body.MoveTo(x1 + r1 * ax, y1 + r1 * ay);
-        body.LineTo(x2 + r2 * ax, y2 + r2 * ay);
-        body.LineTo(x2 + r2 * bx, y2 + r2 * by);
-        body.LineTo(x1 + r1 * bx, y1 + r1 * by);
-        body.Close();
-        return Union(circles, body.Detach());
-    }
-
-    private static SKPath Circle(float x, float y, float r)
-    {
-        using var builder = new SKPathBuilder();
-        builder.AddCircle(x, y, r);
-        return builder.Detach();
-    }
-
-    private static SKPath Oval(BodyEllipse e)
-    {
-        using var builder = new SKPathBuilder();
-        builder.AddOval(new SKRect(
-            (float)(e.Center.X - e.RadiusX), (float)(e.Center.Y - e.RadiusY),
-            (float)(e.Center.X + e.RadiusX), (float)(e.Center.Y + e.RadiusY)));
-        var oval = builder.Detach();
-        if (e.RotationDegrees == 0)
-            return oval;
-        using (oval)
-            return Transformed(oval, SKMatrix.CreateRotationDegrees((float)e.RotationDegrees, (float)e.Center.X, (float)e.Center.Y));
-    }
-
-    private static SKColor ToSk(ColorValue color) =>
-        SKColor.TryParse(color.Hex.Length == 9 ? "#" + color.Hex[7..] + color.Hex[1..7] : color.Hex, out var parsed) ? parsed : SKColors.BurlyWood;
 }

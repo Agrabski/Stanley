@@ -7,6 +7,7 @@
     <Project Path="src/Stanley.Editors/Stanley.Editors.csproj" />
     <Project Path="src/Stanley.ProjectModel/Stanley.ProjectModel.csproj" />
     <Project Path="src/Stanley.Rendering/Stanley.Rendering.csproj" />
+    <Project Path="src/Stanley.StickerLibrary/Stanley.StickerLibrary.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj" />

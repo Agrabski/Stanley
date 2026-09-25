@@ -44,17 +44,21 @@ public sealed class PageItem : ObservableObject
 /// Ctrl+Z undoes "deleted page 3" as naturally as "moved a bubble". Undoing an edit made
 /// on another page switches to that page first, so the change is never invisible.
 /// </summary>
-public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
+public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLooksHost
 {
+    private IReadOnlyDictionary<CharacterId, CharacterRevisionId> _issueLooks;
     private readonly EditorHistory _history;
     private PageItem _currentPage;
     private PageNumbering _pageNumbering;
     private readonly ICharacterCatalog? _characters;
 
     /// <param name="characters">What every page draws its placed characters from (the Characters pane); null for a comic edited without one.</param>
-    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null, ICharacterCatalog? characters = null)
+    /// <param name="issueLooks">The issue's look per character (<see cref="ComicProject.IssueLooks"/>).</param>
+    public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null, ICharacterCatalog? characters = null,
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
     {
         _history = history;
+        _issueLooks = new Dictionary<CharacterId, CharacterRevisionId>(issueLooks ?? new Dictionary<CharacterId, CharacterRevisionId>());
         _characters = characters;
         _pageNumbering = pageNumbering ?? PageNumbering.Off;
         Id = "Pages";
@@ -118,6 +122,33 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
     public IRelayCommand<PageItem?> DeletePageCommand { get; }
     public IRelayCommand<PageItem?> MovePageUpCommand { get; }
     public IRelayCommand<PageItem?> MovePageDownCommand { get; }
+
+    /// <summary>The issue's look per character; each page draws with it.</summary>
+    public IReadOnlyDictionary<CharacterId, CharacterRevisionId> IssueLooks => _issueLooks;
+
+    public event Action? IssueLooksChanged;
+
+    public void SetIssueLook(CharacterId character, CharacterRevisionId? look)
+    {
+        var current = _issueLooks.TryGetValue(character, out var existing) ? existing : (CharacterRevisionId?)null;
+        if (current == look)
+            return;
+        var before = _issueLooks;
+        var after = new Dictionary<CharacterId, CharacterRevisionId>(_issueLooks);
+        if (look is { } id)
+            after[character] = id;
+        else
+            after.Remove(character);
+        ApplyIssueLooks(after);
+        _history.Push("Look for the issue", () => ApplyIssueLooks(before), () => ApplyIssueLooks(after), this);
+    }
+
+    private void ApplyIssueLooks(IReadOnlyDictionary<CharacterId, CharacterRevisionId> looks)
+    {
+        _issueLooks = looks;
+        OnPropertyChanged(nameof(IssueLooks));
+        IssueLooksChanged?.Invoke();
+    }
 
     /// <summary>The comic's page numbering; each page's <see cref="PageEditorViewModel.Folio"/> follows it and the page order.</summary>
     public PageNumbering PageNumbering => _pageNumbering;
@@ -279,6 +310,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost
             CanClose = false,
             CanFloat = false,
             NumberingHost = this,
+            LooksHost = this,
             Characters = _characters
         };
         if (settingsFrom != null)

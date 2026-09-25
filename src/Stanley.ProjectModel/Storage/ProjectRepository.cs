@@ -57,8 +57,8 @@ public sealed class ProjectRepository
     private string CharacterDirOrThrow(CharacterId id) =>
         ProjectPaths.FindEntityDir(CharactersDir, id) ?? throw NotFoundDir("character", id.Value);
 
-    public CharacterDefinition LoadCharacter(CharacterId id) =>
-        ReadCharacter(Path.Combine(CharacterDirOrThrow(id), ProjectPaths.CharacterFileName));
+    /// <summary>A character with everything in its folder: its stickers and pattern tiles (<see cref="CharacterDefinition.Wardrobe"/>) and its named looks.</summary>
+    public CharacterDefinition LoadCharacter(CharacterId id) => ReadCharacterFolder(CharacterDirOrThrow(id));
 
     /// <summary>
     /// Every character in the project, sorted by name. There's no index file: a character
@@ -71,9 +71,8 @@ public sealed class ProjectRepository
             return [];
 
         return Directory.EnumerateDirectories(CharactersDir)
-            .Select(dir => Path.Combine(dir, ProjectPaths.CharacterFileName))
-            .Where(File.Exists)
-            .Select(ReadCharacter)
+            .Where(dir => File.Exists(Path.Combine(dir, ProjectPaths.CharacterFileName)))
+            .Select(ReadCharacterFolder)
             .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(c => c.Id.Value, StringComparer.Ordinal)
             .ToList();
@@ -86,19 +85,131 @@ public sealed class ProjectRepository
             Directory.Delete(dir, recursive: true);
     }
 
-    // A character.json written before bodies existed has no "body"; it gets the default one.
-    private static CharacterDefinition ReadCharacter(string path)
+    // A character.json written before bodies (or stickers) existed lacks them; it gets the defaults.
+    private static CharacterDefinition ReadCharacterFolder(string dir)
     {
-        var character = ProjectJson.Read<CharacterDefinition>(path);
-        return character.Body is null ? character with { Body = BodyShape.Default } : character;
+        var character = ProjectJson.Read<CharacterDefinition>(Path.Combine(dir, ProjectPaths.CharacterFileName)).Normalized();
+        return character with { Wardrobe = ReadWardrobe(dir), Revisions = ReadRevisions(dir) };
     }
 
+    /// <summary>
+    /// Writes the character's whole folder: <c>character.json</c>, every sticker in its
+    /// wardrobe (<c>sticker.json</c> plus its art files, byte for byte), its pattern tiles
+    /// and its named looks - and removes the stickers, art files, tiles and looks it no
+    /// longer has. Files whose content is unchanged aren't rewritten.
+    /// </summary>
     public void SaveCharacter(CharacterDefinition character)
     {
         var dir = ProjectPaths.ResolveOrCreateEntityDir(CharactersDir, character.Id, character.Name);
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.RevisionsDirName));
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.StickersDirName));
         ProjectJson.Write(Path.Combine(dir, ProjectPaths.CharacterFileName), character);
+        WriteWardrobe(dir, character.Wardrobe);
+        WriteRevisions(dir, character.Id, character.Revisions);
+    }
+
+    private static Wardrobe ReadWardrobe(string characterDir)
+    {
+        var stickers = new Dictionary<StickerId, StickerAsset>();
+        var stickersDir = Path.Combine(characterDir, ProjectPaths.StickersDirName);
+        if (Directory.Exists(stickersDir))
+        {
+            foreach (var stickerDir in Directory.EnumerateDirectories(stickersDir))
+            {
+                var json = Path.Combine(stickerDir, ProjectPaths.StickerFileName);
+                if (!File.Exists(json))
+                    continue;
+                var sticker = ProjectJson.Read<Sticker>(json).Normalized();
+                var files = Directory.EnumerateFiles(stickerDir, "*", SearchOption.AllDirectories)
+                    .Where(f => !string.Equals(Path.GetFullPath(f), Path.GetFullPath(json), StringComparison.Ordinal))
+                    .ToDictionary(f => Path.GetRelativePath(stickerDir, f).Replace('\\', '/'), ReadArtFile, StringComparer.Ordinal);
+                stickers[sticker.Id] = new StickerAsset(sticker, files);
+            }
+        }
+
+        var tilesDir = Path.Combine(characterDir, ProjectPaths.PatternsDirName);
+        var tiles = Directory.Exists(tilesDir)
+            ? Directory.EnumerateFiles(tilesDir).ToDictionary(f => Path.GetFileName(f), ReadArtFile, StringComparer.Ordinal)
+            : new Dictionary<string, ArtFile>(StringComparer.Ordinal);
+        return new Wardrobe(stickers, tiles);
+    }
+
+    private static ArtFile ReadArtFile(string path) =>
+        string.Equals(Path.GetExtension(path), ".svg", StringComparison.OrdinalIgnoreCase)
+            ? ArtFile.Svg(File.ReadAllText(path))
+            : ArtFile.Png(File.ReadAllBytes(path));
+
+    private static void WriteWardrobe(string characterDir, Wardrobe wardrobe)
+    {
+        var stickersDir = Path.Combine(characterDir, ProjectPaths.StickersDirName);
+        Directory.CreateDirectory(stickersDir);
+        foreach (var asset in wardrobe.Stickers.Values)
+        {
+            var stickerDir = ProjectPaths.ResolveOrCreateEntityDir(stickersDir, asset.Id, asset.Sticker.Name);
+            var json = Path.Combine(stickerDir, ProjectPaths.StickerFileName);
+            ProjectJson.Write(json, asset.Sticker);
+            WriteFiles(stickerDir, asset.Files, keep: json);
+        }
+        foreach (var stale in Directory.EnumerateDirectories(stickersDir)
+                     .Where(d => !StickerId.TryParse(ProjectPaths.EntityIdPart(Path.GetFileName(d)), null, out var id) || !wardrobe.Stickers.ContainsKey(id))
+                     .ToList())
+            Directory.Delete(stale, recursive: true);
+
+        var tilesDir = Path.Combine(characterDir, ProjectPaths.PatternsDirName);
+        if (wardrobe.Tiles.Count > 0 || Directory.Exists(tilesDir))
+        {
+            Directory.CreateDirectory(tilesDir);
+            WriteFiles(tilesDir, wardrobe.Tiles, keep: null);
+        }
+    }
+
+    /// <summary>Writes <paramref name="files"/> (relative paths) under <paramref name="dir"/> where their content differs, and deletes every other file there except <paramref name="keep"/>.</summary>
+    private static void WriteFiles(string dir, IReadOnlyDictionary<string, ArtFile> files, string? keep)
+    {
+        var wanted = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (relative, file) in files)
+        {
+            var path = Path.GetFullPath(Path.Combine(dir, relative));
+            if (!path.StartsWith(Path.GetFullPath(dir) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                continue; // never write outside the folder, whatever a hand-edited name says
+            wanted.Add(path);
+            if (File.Exists(path) && ReadArtFile(path).SameContent(file))
+                continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, file.ToBytes());
+        }
+        foreach (var existing in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).ToList())
+        {
+            var path = Path.GetFullPath(existing);
+            if (!wanted.Contains(path) && (keep is null || path != Path.GetFullPath(keep)))
+                File.Delete(path);
+        }
+        foreach (var empty in Directory.EnumerateDirectories(dir, "*", SearchOption.AllDirectories)
+                     .OrderByDescending(d => d.Length)
+                     .Where(d => !Directory.EnumerateFileSystemEntries(d).Any())
+                     .ToList())
+            Directory.Delete(empty);
+    }
+
+    private static IReadOnlyDictionary<CharacterRevisionId, CharacterRevision> ReadRevisions(string characterDir)
+    {
+        var dir = Path.Combine(characterDir, ProjectPaths.RevisionsDirName);
+        if (!Directory.Exists(dir))
+            return new Dictionary<CharacterRevisionId, CharacterRevision>();
+        return Directory.EnumerateFiles(dir, "*." + ProjectPaths.JsonExtension)
+            .Select(ProjectJson.Read<CharacterRevision>)
+            .ToDictionary(r => r.Id);
+    }
+
+    private static void WriteRevisions(string characterDir, CharacterId characterId, IReadOnlyDictionary<CharacterRevisionId, CharacterRevision> revisions)
+    {
+        var dir = Path.Combine(characterDir, ProjectPaths.RevisionsDirName);
+        foreach (var revision in revisions.Values)
+            ProjectJson.Write(ProjectPaths.ResolveOrCreateEntityFilePath(dir, revision.Id, revision.Name, ProjectPaths.JsonExtension), revision with { CharacterId = characterId });
+        if (!Directory.Exists(dir))
+            return;
+        foreach (var stale in Directory.EnumerateFiles(dir, "*." + ProjectPaths.JsonExtension)
+                     .Where(f => !CharacterRevisionId.TryParse(ProjectPaths.EntityIdPart(Path.GetFileName(f)), null, out var id) || !revisions.ContainsKey(id))
+                     .ToList())
+            File.Delete(stale);
     }
 
     public CharacterRevision LoadCharacterRevision(CharacterId characterId, CharacterRevisionId revisionId)
@@ -115,28 +226,6 @@ public sealed class ProjectRepository
         var path = ProjectPaths.ResolveOrCreateEntityFilePath(dir, revision.Id, revision.Name, ProjectPaths.JsonExtension);
         ProjectJson.Write(path, revision);
     }
-
-    private string StickersDir(CharacterId characterId) => Path.Combine(CharacterDirOrThrow(characterId), ProjectPaths.StickersDirName);
-
-    private string StickerDirOrThrow(CharacterId characterId, StickerId stickerId) =>
-        ProjectPaths.FindEntityDir(StickersDir(characterId), stickerId) ?? throw NotFoundDir("sticker", stickerId.Value);
-
-    public Sticker LoadSticker(CharacterId characterId, StickerId stickerId) =>
-        ProjectJson.Read<Sticker>(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StickerFileName));
-
-    public void SaveSticker(CharacterId characterId, Sticker sticker)
-    {
-        var dir = ProjectPaths.ResolveOrCreateEntityDir(StickersDir(characterId), sticker.Id, sticker.Name);
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.VariantsDirName));
-        ProjectJson.Write(Path.Combine(dir, ProjectPaths.StickerFileName), sticker);
-    }
-
-    /// <summary>The <see cref="StickerKind.BuildStretch"/> region sibling of a sticker.</summary>
-    public StretchRegion LoadStretchRegion(CharacterId characterId, StickerId stickerId) =>
-        ProjectJson.Read<StretchRegion>(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StretchFileName));
-
-    public void SaveStretchRegion(CharacterId characterId, StickerId stickerId, StretchRegion region) =>
-        ProjectJson.Write(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StretchFileName), region);
 
     private string PosesDir => Path.Combine(RootDirectory, ProjectPaths.PosesDirName);
 

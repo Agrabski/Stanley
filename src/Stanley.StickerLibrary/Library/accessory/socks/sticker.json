@@ -1,0 +1,33 @@
+{
+  "colors": {
+    "accent": "#ecf0f1"
+  },
+  "id": "library",
+  "name": "Socks",
+  "parts": [
+    {
+      "cover": {
+        "color": "accent",
+        "ease": 0.004,
+        "from": 0.8,
+        "to": 1
+      },
+      "name": "socks",
+      "region": "leg"
+    },
+    {
+      "cover": {
+        "color": "accent",
+        "ease": 0.004,
+        "from": 0,
+        "to": 1
+      },
+      "name": "feet",
+      "region": "foot"
+    }
+  ],
+  "slot": "accessory",
+  "variants": [
+    "default"
+  ]
+}

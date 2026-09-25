@@ -29,6 +29,21 @@ public interface IPageNumberingHost
     event Action? PageNumberingChanged;
 }
 
+/// <summary>
+/// Where an issue's look per character lives (<see cref="ProjectModel.Issues.Issue.CharacterRevisions"/>):
+/// what its panels show each character in unless a panel picks its own. Changing it is
+/// one undoable step that every page redraws for.
+/// </summary>
+public interface IIssueLooksHost
+{
+    IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Ids.CharacterRevisionId> IssueLooks { get; }
+
+    /// <summary>Sets the issue's look for <paramref name="character"/>; null = the character's default look.</summary>
+    void SetIssueLook(ProjectModel.Ids.CharacterId character, ProjectModel.Ids.CharacterRevisionId? look);
+
+    event Action? IssueLooksChanged;
+}
+
 /// <summary>A choice in the ribbon's page-number position box.</summary>
 public sealed record PageNumberOption(PageNumberPosition Position, string Label)
 {

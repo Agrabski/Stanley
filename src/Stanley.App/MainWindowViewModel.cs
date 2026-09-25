@@ -227,7 +227,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
             AppLog.Info($"AutoSaved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
         }
@@ -256,7 +256,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
+            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
         }
         catch (Exception e) when (IsFileProblem(e))
         {
@@ -630,7 +630,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
             AppLog.Info($"Saved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
             return true;
@@ -654,7 +654,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot());
+            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             MarkSaved();
             Message = $"Saved to {saved}";
@@ -697,9 +697,9 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters());
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks);
             else
-                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters());
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(), issueLooks: _navigator.IssueLooks);
             Message = $"Exported to {path}";
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
@@ -744,6 +744,7 @@ public sealed class MainWindowViewModel : ObservableObject
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
         (_workspace, _navigator, _characters) = PageEditorHost.CreateWorkspace(project);
+        _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory);
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _titleDirty = false;

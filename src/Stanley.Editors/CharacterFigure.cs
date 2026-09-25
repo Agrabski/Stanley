@@ -37,9 +37,97 @@ public sealed class CharacterFigure : Control
     public static readonly StyledProperty<ProjectModel.Poses.PoseData?> PoseProperty =
         AvaloniaProperty.Register<CharacterFigure, ProjectModel.Poses.PoseData?>(nameof(Pose));
 
+    public static readonly StyledProperty<ProjectModel.Ids.StickerId?> HighlightProperty =
+        AvaloniaProperty.Register<CharacterFigure, ProjectModel.Ids.StickerId?>(nameof(Highlight));
+
+    public static readonly StyledProperty<bool> CloseupProperty =
+        AvaloniaProperty.Register<CharacterFigure, bool>(nameof(Closeup));
+
     static CharacterFigure()
     {
-        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty);
+        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty, HighlightProperty, CloseupProperty);
+    }
+
+    /// <summary>Head and shoulders only, filling the control - for hair, face and hat galleries.</summary>
+    public bool Closeup
+    {
+        get => GetValue(CloseupProperty);
+        set => SetValue(CloseupProperty, value);
+    }
+
+    /// <summary>A worn sticker to outline on the main character (the character editor's selection).</summary>
+    public ProjectModel.Ids.StickerId? Highlight
+    {
+        get => GetValue(HighlightProperty);
+        set => SetValue(HighlightProperty, value);
+    }
+
+    /// <summary>The worn sticker on the main character under <paramref name="point"/> (control coordinates), or null.</summary>
+    public ProjectModel.Ids.StickerId? StickerAt(Point point)
+    {
+        if (Character is not { } character)
+            return null;
+        var angle = Pose?.ViewAngle ?? Angle;
+        var main = Arrange(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
+        return main.Character is null ? null : CharacterRenderers.Default.StickerAt(character, main.Placement, new Point2D(point.X, point.Y), angle, Pose);
+    }
+
+    /// <summary>Where the main character stands in the control now (control coordinates are page millimetres to it), or null if nothing is drawn.</summary>
+    public CharacterPlacement? MainPlacement
+    {
+        get
+        {
+            if (Character is not { } character)
+                return null;
+            var main = Arrange(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, Pose?.ViewAngle ?? Angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
+            return main.Character is null ? null : main.Placement;
+        }
+    }
+
+    /// <summary>Where each figure stands in <paramref name="bounds"/>: everyone to one scale, the main character in the middle, the others alternating right and left of it.</summary>
+    private static List<(CharacterDefinition Character, CharacterPlacement Placement, bool Faded, double Unit)> Arrange(Rect bounds, CharacterDefinition main,
+        IReadOnlyList<CharacterDefinition> others, bool guides, ViewAngle angle, ProjectModel.Poses.PoseData? pose, bool closeup = false)
+    {
+        var result = new List<(CharacterDefinition, CharacterPlacement, bool, double)>();
+        if (closeup)
+        {
+            // The head, what's worn on it, and a little of the shoulders, centred.
+            var head = BodyRig.Build(main.Body, angle, main.Skeleton, pose).Regions.Head;
+            var r = head.RadiusY;
+            var worn = CharacterRenderers.Default.Extent(main, angle, pose);
+            var top = Math.Max(worn.Top, head.Center.Y - 2.4 * r) - 0.15 * r;
+            var bottom = head.Center.Y + 1.9 * r;
+            var halfWidth = 1.9 * r;
+            var scale = Math.Min((bounds.Height - 4) / (bottom - top), (bounds.Width - 4) / (2 * halfWidth));
+            if (scale <= 0)
+                return result;
+            var ground = new Point2D(bounds.Width / 2 - head.Center.X * scale, 2 + (bounds.Height - 4 - (bottom - top) * scale) / 2 - top * scale);
+            result.Add((main, new CharacterPlacement(ground, scale, Mirrored: false), false, scale));
+            return result;
+        }
+        var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: CharacterRenderers.Default.Extent(c, angle, ReferenceEquals(c, main) ? pose : null))).ToList();
+        var tallest = extents.Max(e => e.Extent.Height);
+        var padTop = guides ? 18.0 : 3.0;
+        var padBottom = guides ? 10.0 : 3.0;
+        var gap = 0.08;
+        var totalWidth = extents.Sum(e => e.Extent.Width) + gap * (extents.Count - 1);
+        var unit = Math.Min((bounds.Height - padTop - padBottom) / tallest, (bounds.Width - 6) / totalWidth);
+        if (unit <= 0)
+            return result;
+        var groundY = bounds.Height - padBottom;
+        var order = new List<(CharacterDefinition Character, Rect2D Extent, bool Faded)> { (main, extents[0].Extent, false) };
+        var right = new List<(CharacterDefinition, Rect2D, bool)>();
+        var left = new List<(CharacterDefinition, Rect2D, bool)>();
+        for (var i = 1; i < extents.Count; i++)
+            (i % 2 == 1 ? right : left).Add((extents[i].Character, extents[i].Extent, true));
+        left.Reverse();
+        var x = (bounds.Width - totalWidth * unit) / 2;
+        foreach (var (character, extent, faded) in left.Concat(order).Concat(right))
+        {
+            result.Add((character, new CharacterPlacement(new Point2D(x - extent.Left * unit, groundY), unit, Mirrored: false), faded, unit));
+            x += (extent.Width + gap) * unit;
+        }
+        return result;
     }
 
     /// <summary>The pose to show the main character in (its view wins over <see cref="Angle"/>); null stands at rest.</summary>
@@ -79,11 +167,11 @@ public sealed class CharacterFigure : Control
         if (Character is not { } character || Bounds.Width < 2 || Bounds.Height < 2)
             return;
         var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
-        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose));
+        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup));
     }
 
     private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
-        ProjectModel.Poses.PoseData? pose)
+        ProjectModel.Poses.PoseData? pose, ProjectModel.Ids.StickerId? highlight, bool closeup)
         : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
@@ -103,51 +191,37 @@ public sealed class CharacterFigure : Control
             canvas.Save();
             canvas.ClipRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
 
-            // Everyone to one scale: the tallest fills most of the height, and the widths
-            // must fit side by side.
-            var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: BodyRig.Extent(c.Body, angle, c.Skeleton, ReferenceEquals(c, main) ? pose : null))).ToList();
-            var tallest = extents.Max(e => e.Extent.Height);
-            var padTop = guides ? 18.0 : 3.0;
-            var padBottom = guides ? 10.0 : 3.0;
-            var gap = 0.08;
-            var totalWidth = extents.Sum(e => e.Extent.Width) + gap * (extents.Count - 1);
-            var unit = Math.Min((bounds.Height - padTop - padBottom) / tallest, (bounds.Width - 6) / totalWidth);
-            if (unit <= 0)
+            var figures = Arrange(bounds, main, closeup ? [] : others, guides && !closeup, angle, pose, closeup);
+            if (figures.Count == 0)
             {
                 canvas.Restore();
                 return;
             }
-            var groundY = bounds.Height - padBottom;
-
-            if (guides)
+            var unit = figures[0].Unit;
+            var groundY = figures[0].Placement.Ground.Y;
+            if (guides && !closeup)
                 DrawGuides(canvas, groundY, unit);
 
-            // Main character in the middle, the others alternating right and left of it.
-            var order = new List<(CharacterDefinition Character, Rect2D Extent, bool Faded)> { (main, extents[0].Extent, false) };
-            var right = new List<(CharacterDefinition, Rect2D, bool)>();
-            var left = new List<(CharacterDefinition, Rect2D, bool)>();
-            for (var i = 1; i < extents.Count; i++)
-                (i % 2 == 1 ? right : left).Add((extents[i].Character, extents[i].Extent, true));
-            left.Reverse();
-            var row = left.Concat(order).Concat(right).ToList();
-            var x = (bounds.Width - totalWidth * unit) / 2;
-            foreach (var (character, extent, faded) in row)
+            foreach (var (character, placement, faded, _) in figures)
             {
-                var ground = new Point2D(x - extent.Left * unit, groundY);
                 if (faded)
                 {
                     using var alpha = new SKPaint { Color = SKColors.White.WithAlpha(90) };
                     canvas.SaveLayer(alpha);
                 }
-                CharacterRenderers.Default.Draw(canvas, character, new CharacterPlacement(ground, unit, Mirrored: false),
-                    (float)Math.Clamp(unit * 0.004, 0.8, 2), angle, faded ? null : pose);
+                CharacterRenderers.Default.Draw(canvas, character, placement, (float)Math.Clamp(unit * 0.004, 0.8, closeup ? 1.6 : 2), angle, faded ? null : pose);
                 if (faded)
                 {
                     canvas.Restore();
                     if (guides)
-                        Label(canvas, character.Name, (float)ground.X, (float)(groundY - character.Body.Height * unit - 4), SKTextAlign.Center, 10, 140);
+                        Label(canvas, character.Name, (float)placement.Ground.X, (float)(groundY - character.Body.Height * unit - 4), SKTextAlign.Center, 10, 140);
                 }
-                x += (extent.Width + gap) * unit;
+                else if (highlight is { } sticker)
+                {
+                    using var outline = CharacterRenderers.Default.BuildStickerOutline(character, placement, sticker, angle, pose);
+                    using var selection = new SKPaint { Color = new SKColor(0x1E, 0x5A, 0xA8), Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
+                    canvas.DrawPath(outline, selection);
+                }
             }
             canvas.Restore();
         }

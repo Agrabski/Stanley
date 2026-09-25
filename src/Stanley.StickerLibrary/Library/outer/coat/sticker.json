@@ -1,0 +1,44 @@
+{
+  "colors": {
+    "outer": "#6b5a44"
+  },
+  "id": "library",
+  "name": "Coat",
+  "parts": [
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.026,
+        "from": 0,
+        "to": 1
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.024,
+        "from": 0,
+        "to": 0.97
+      },
+      "name": "sleeves",
+      "region": "arm"
+    },
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.026,
+        "flare": 0.12,
+        "from": 0,
+        "to": 0.62
+      },
+      "name": "tails",
+      "region": "skirt"
+    }
+  ],
+  "slot": "outer",
+  "variants": [
+    "default"
+  ]
+}

@@ -1,13 +1,78 @@
 <!--
-  The character editor's ribbon: one "Body" tab - body-type gallery, the five body
-  sliders, skin colour, name, the line-up toggle and Close (back to the page). Shown in
-  the window's ribbon bar whenever a character editor is the active pane.
+  The character editor's ribbon: the Body tab - body-type gallery, the five body
+  sliders, skin colour, name, the line-up toggle and Close (back to the page); the Look
+  tab - what the character wears (a gallery per slot - hair and face, clothes,
+  accessories - previewed on the character) and
+  the colours of the slots in use; and the contextual Sticker tab for the worn sticker
+  picked on the stage. Shown in the window's ribbon bar whenever a character editor is
+  the active pane.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.CharacterEditorRibbon"
              x:DataType="local:CharacterEditorViewModel">
+  <UserControl.Resources>
+    <!-- A slot's choices, each previewed on the character (hair, face and hats as close-ups). -->
+    <DataTemplate x:Key="StickerChoicesTemplate" x:DataType="local:SlotGallery">
+      <DockPanel MaxWidth="440">
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="1,6,1,0">
+        <Button Name="DrawYourOwnButton" Classes="small" Command="{Binding Draw}" CommandParameter="{Binding Info.Name}"
+                ToolTip.Tip="Draw one in your own SVG editor (Inkscape...), on a template of this body - every save updates it here">Draw your own...</Button>
+        <Button Name="ImportArtButton" Classes="small" Command="{Binding Import}" CommandParameter="{Binding Info.Name}"
+                ToolTip.Tip="An SVG or PNG: a file drawn on a template goes where it was drawn; anything else is placed here to move and size">Import...</Button>
+      </StackPanel>
+      <ItemsControl ItemsSource="{Binding Choices}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:StickerChoice">
+            <Button Classes="small choice sticker" Classes.worn="{Binding IsWorn}" Classes.closeup="{Binding Closeup}" Margin="1" Padding="2"
+                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Command="{Binding $parent[ItemsControl].((local:SlotGallery)DataContext).Wear}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Closeup="{Binding Closeup}" />
+              </DockPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      </DockPanel>
+    </DataTemplate>
+
+    <!-- A slot's gallery: its label and what's worn, opening the choices. -->
+    <DataTemplate x:Key="SlotGalleryTemplate" x:DataType="local:SlotGallery">
+      <DropDownButton Classes="slotGallery" ToolTip.Tip="{Binding Tip}">
+        <StackPanel Spacing="1">
+          <TextBlock Text="{Binding Label}" FontSize="12" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Current}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+        </StackPanel>
+        <DropDownButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StickerChoicesTemplate}" />
+          </Flyout>
+        </DropDownButton.Flyout>
+      </DropDownButton>
+    </DataTemplate>
+
+    <!-- The same, half height, two to a row: for the face and accessories. -->
+    <DataTemplate x:Key="CompactSlotGalleryTemplate" x:DataType="local:SlotGallery">
+      <DropDownButton Classes="slotGallery compact" ToolTip.Tip="{Binding Tip}">
+        <StackPanel Spacing="0">
+          <TextBlock Text="{Binding Label}" FontSize="11" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Current}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="56" />
+        </StackPanel>
+        <DropDownButton.Flyout>
+          <Flyout Placement="BottomEdgeAlignedLeft">
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StickerChoicesTemplate}" />
+          </Flyout>
+        </DropDownButton.Flyout>
+      </DropDownButton>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <TabControl Name="Tabs" Classes="ribbonTabs">
     <TabControl.ItemsPanel>
       <ItemsPanelTemplate>
@@ -124,6 +189,300 @@
             <StackPanel><PathIcon Data="{StaticResource CloseIcon}" /><TextBlock Text="Close" /></StackPanel>
           </Button>
           <TextBlock Classes="groupLabel" Text="Back to page" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <TabItem Name="LookTab" Classes="contextual character">
+      <TabItem.Header><TextBlock Classes="characterHeader" Text="Look" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <DropDownButton Name="LookPicker" Classes="slotGallery" ToolTip.Tip="Named looks - winter clothes, after the haircut... Everything on this tab changes the look shown here">
+            <StackPanel Spacing="1">
+              <TextBlock Text="Look" FontSize="12" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding CurrentLookName}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="6" MaxWidth="440">
+                  <ItemsControl Name="LookItems" ItemsSource="{Binding Looks}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:LookItem">
+                        <Button Classes="small choice sticker" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowLookCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Preview}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Name="NewLookButton" Classes="small" Command="{Binding NewLookCommand}"
+                            ToolTip.Tip="A new look, starting as a copy of this one">New look</Button>
+                    <TextBox Name="LookNameBox" Width="150" FontSize="12" Text="{Binding CurrentLookName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding IsNamedLook}" ToolTip.Tip="The look's name" />
+                    <Button Name="DeleteLookButton" Classes="small" Command="{Binding DeleteLookCommand}" ToolTip.Tip="{Binding DeleteLookTip}">Delete</Button>
+                  </StackPanel>
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Look" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ItemsControl Name="HairGalleries" ItemsSource="{Binding HairGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}" />
+            <ItemsControl Name="FaceGalleries" ItemsSource="{Binding FaceGalleries}" ItemTemplate="{StaticResource CompactSlotGalleryTemplate}" Width="148">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+            <DropDownButton Name="PreviewExpressionButton" Classes="slotGallery" ToolTip.Tip="See the face in another expression while you pick - a preview only; expressions are set per panel">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Preview" FontSize="12" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding PreviewExpression.Name}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                <Flyout Placement="BottomEdgeAlignedLeft">
+                  <ItemsControl ItemsSource="{Binding PreviewExpressionChoices}" MaxWidth="320">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:ExpressionPresetChoice">
+                        <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).PreviewExpressionCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" Closeup="True" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Flyout>
+              </DropDownButton.Flyout>
+            </DropDownButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Hair &amp; face" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <ItemsControl Name="ClothesGalleries" ItemsSource="{Binding ClothesGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Clothes" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <ItemsControl Name="AccessoryGalleries" ItemsSource="{Binding AccessoryGalleries}" ItemTemplate="{StaticResource CompactSlotGalleryTemplate}" Width="148">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Accessories" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
+          <ItemsControl Name="ColorEditors" ItemsSource="{Binding ColorEditors}" MaxWidth="330">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:ColorSlotEditor">
+                <DropDownButton Classes="colorSlot" Margin="1" ToolTip.Tip="{Binding Label, StringFormat='{}{0} - colour and fabric; everything this character wears in it follows'}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <local:FabricSwatch Width="18" Height="14" Color="{Binding Color}" Fabric="{Binding Fabric}" Tiles="{Binding Tiles}" />
+                    <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <DropDownButton.Flyout>
+                    <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Spacing="6" Width="340">
+                        <TextBlock Text="Colour" FontSize="11" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding Swatches}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="local:ColorSwatchChoice">
+                              <Button Classes="small" Width="38" Height="24" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                      Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetColor}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <StackPanel Spacing="6" IsVisible="{Binding CanHaveFabric}">
+                          <TextBlock Text="Pattern" FontSize="11" FontWeight="SemiBold" />
+                          <ItemsControl ItemsSource="{Binding PatternChoices}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:FabricChoice">
+                                <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="46" Height="46" Padding="2" Margin="1"
+                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPattern}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Label}">
+                                  <DockPanel>
+                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="8" HorizontalAlignment="Center" />
+                                    <Panel>
+                                      <local:FabricSwatch Color="{Binding Ground}" Fabric="{Binding Preview}" Tiles="{Binding Tiles}" IsVisible="{Binding !IsCustom}" />
+                                      <TextBlock Text="+" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsCustom}" />
+                                    </Panel>
+                                  </DockPanel>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <StackPanel Spacing="4" IsVisible="{Binding HasPattern}">
+                            <ItemsControl ItemsSource="{Binding PatternSwatches}">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:ColorSwatchChoice">
+                                  <Button Classes="small" Width="19" Height="16" Padding="2" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                          Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPatternColor}" CommandParameter="{Binding}"
+                                          ToolTip.Tip="{Binding Name, StringFormat='Pattern in {0}'}">
+                                    <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="1" />
+                                  </Button>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid ColumnDefinitions="54,*" RowDefinitions="22,22" ColumnSpacing="4">
+                              <TextBlock Text="Size" FontSize="11" VerticalAlignment="Center" />
+                              <Slider Grid.Column="1" Classes="body" Width="250" Minimum="1" Maximum="25" Value="{Binding PatternSize}" local:DragGesture.Target="{Binding}"
+                                      ToolTip.Tip="One repeat, as a share of the character's height" />
+                              <TextBlock Grid.Row="1" Text="Angle" FontSize="11" VerticalAlignment="Center" />
+                              <Slider Grid.Row="1" Grid.Column="1" Classes="body" Width="250" Minimum="0" Maximum="180" Value="{Binding PatternAngle}" local:DragGesture.Target="{Binding}" />
+                            </Grid>
+                          </StackPanel>
+
+                          <TextBlock Text="Texture" FontSize="11" FontWeight="SemiBold" />
+                          <ItemsControl ItemsSource="{Binding TextureChoices}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:FabricChoice">
+                                <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="40" Height="46" Padding="2" Margin="1"
+                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetTexture}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Label}">
+                                  <DockPanel>
+                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="8" HorizontalAlignment="Center" />
+                                    <Panel>
+                                      <local:FabricSwatch Color="{Binding Ground}" Fabric="{Binding Preview}" Tiles="{Binding Tiles}" IsVisible="{Binding !IsCustom}" />
+                                      <TextBlock Text="+" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsCustom}" />
+                                    </Panel>
+                                  </DockPanel>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Grid ColumnDefinitions="54,*" RowDefinitions="22" ColumnSpacing="4" IsVisible="{Binding HasTexture}">
+                            <TextBlock Text="Strength" FontSize="11" VerticalAlignment="Center" />
+                            <Slider Grid.Column="1" Classes="body" Width="250" Minimum="0" Maximum="100" Value="{Binding TextureStrength}" local:DragGesture.Target="{Binding}" />
+                          </Grid>
+                        </StackPanel>
+                      </StackPanel>
+                    </Flyout>
+                  </DropDownButton.Flyout>
+                </DropDownButton>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Colours" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <TabItem Name="StickerTab" Classes="contextual sticker" IsVisible="{Binding HasSelectedSticker}">
+      <TabItem.Header><TextBlock Classes="stickerHeader" Text="Sticker" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Spacing="6" Margin="0,4,0,0">
+            <ComboBox Name="WornPicker" Width="170" FontSize="12" ItemsSource="{Binding WornStickers}" SelectedItem="{Binding SelectedWorn}"
+                      ToolTip.Tip="What you're working on - or click it on the character" />
+            <Button Name="DeselectStickerButton" Classes="small" Command="{Binding DeselectStickerCommand}" HorizontalAlignment="Left">Done</Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="{Binding SelectedStickerName}" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group" IsVisible="{Binding HasArtParts}">
+          <StackPanel Spacing="2">
+            <Grid ColumnDefinitions="Auto,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="6">
+              <TextBlock Text="Size" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="ArtScaleSlider" Grid.Column="1" Classes="body" Minimum="10" Maximum="300" Value="{Binding SelectedArtScale}"
+                      ToolTip.Tip="How big it is, compared with how it was drawn" />
+              <TextBlock Grid.Column="2" Text="{Binding SelectedArtScale, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="1" Text="Turn" FontSize="12" VerticalAlignment="Center" />
+              <Slider Name="ArtTurnSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="-180" Maximum="180" Value="{Binding SelectedArtRotation}"
+                      ToolTip.Tip="Turn it" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding SelectedArtRotation, StringFormat='{}{0:0}°'}" FontSize="12" VerticalAlignment="Center" />
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <CheckBox Name="HugShapeBox" IsChecked="{Binding SelectedHugsShape}" FontSize="12"
+                        ToolTip.Tip="Bend with the body (hair, prints) instead of keeping its own shape (eyes, logos)">Hug the shape</CheckBox>
+              <Button Name="EditArtButton" Classes="small" Command="{Binding EditSelectedArtCommand}"
+                      ToolTip.Tip="Open this view of it in your SVG editor - saves come back here">Edit drawing...</Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Art" ToolTip.Tip="Drag it on the character to move it" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasArtParts}" />
+        <DockPanel Classes="group" IsVisible="{Binding HasFit}">
+          <Grid ColumnDefinitions="Auto,Auto,34" RowDefinitions="24,24,24" ColumnSpacing="6">
+            <TextBlock Text="Length" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLength}" />
+            <Slider Name="LengthSlider" Grid.Column="1" Classes="body" Minimum="0" Maximum="100" Value="{Binding SelectedLength}" IsVisible="{Binding HasLength}"
+                    ToolTip.Tip="How far down it reaches: crop top to long, shorts to trousers, mini to maxi" />
+            <TextBlock Grid.Column="2" Text="{Binding SelectedLength, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLength}" />
+            <TextBlock Grid.Row="1" Text="Sleeves" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasSleeves}" />
+            <Slider Name="SleevesSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="0" Maximum="100" Value="{Binding SelectedSleeves}" IsVisible="{Binding HasSleeves}"
+                    ToolTip.Tip="How far down the arm the sleeves reach" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding SelectedSleeves, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasSleeves}" />
+            <TextBlock Grid.Row="2" Text="Fit" FontSize="12" VerticalAlignment="Center" />
+            <Slider Name="FitSlider" Grid.Row="2" Grid.Column="1" Classes="body" Minimum="0" Maximum="50" Value="{Binding SelectedFit}"
+                    ToolTip.Tip="Skin tight to baggy" />
+            <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding SelectedFit, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Classes="groupLabel" Text="Fit" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasFit}" />
+
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="StickerUpButton" Classes="small" Command="{Binding MoveSelectedUpCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Over the next one in the same slot">Forward</Button>
+              <Button Name="StickerDownButton" Classes="small" Command="{Binding MoveSelectedDownCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Under the previous one in the same slot">Back</Button>
+            </StackPanel>
+            <StackPanel VerticalAlignment="Center" Spacing="1" Margin="6,0,0,0">
+              <Button Name="TakeOffButton" Classes="small" Command="{Binding TakeOffSelectedCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Stop wearing it - it stays in the wardrobe">Take off</Button>
+              <Button Name="RemoveStickerButton" Classes="small" Command="{Binding RemoveSelectedCommand}" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Out of the wardrobe altogether">Remove</Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Wear" />
         </DockPanel>
       </StackPanel>
     </TabItem>

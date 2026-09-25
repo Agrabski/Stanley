@@ -30,52 +30,89 @@ public class ProjectRepositoryTests : IDisposable
     }
 
     [Fact]
-    public void Character_definition_revision_sticker_and_stretch_region_round_trip_and_land_on_the_documented_layout()
+    public void A_character_with_its_stickers_art_tiles_and_looks_round_trips_and_lands_on_the_documented_layout()
     {
         var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
 
         var characterId = CharacterId.New();
-        var stickerId = StickerId.New();
+        var (jacketId, hairId) = (StickerId.New(), StickerId.New());
+        var jacket = new Sticker(jacketId, "Jacket A", StickerSlots.Outer,
+            [new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("outer", 0, 0.9)), new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover("outer", 0, 1, Ease: 0.02))],
+            new SortedDictionary<string, ColorValue> { ["outer"] = ColorValue.FromHex("#335577") }, ["default"], Source: "library:outer/jacket");
+        var hair = new Sticker(hairId, "Bob", StickerSlots.Hair,
+            [new StickerPart("back", BodyRegion.Head, Art: new PartArt(ArtMapping.Warp), Depth: PartDepth.Back), new StickerPart("front", BodyRegion.Head, Art: new PartArt(ArtMapping.Warp))],
+            new SortedDictionary<string, ColorValue> { ["hair"] = ColorValue.FromHex("#5a3a22") }, ["default"]);
+        var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- kept verbatim --></svg>\n";
+        var wardrobe = new Wardrobe(
+            new Dictionary<StickerId, StickerAsset>
+            {
+                [jacketId] = new StickerAsset(jacket, new Dictionary<string, ArtFile>()),
+                [hairId] = new StickerAsset(hair, new Dictionary<string, ArtFile> { ["variants/default/front.svg"] = ArtFile.Svg(svg), ["variants/default/profile.png"] = ArtFile.Png([1, 2, 3]) }),
+            },
+            new Dictionary<string, ArtFile> { ["tartan.svg"] = ArtFile.Svg(svg) });
+        var revisionId = CharacterRevisionId.New();
+        var revision = new CharacterRevision(revisionId, characterId, "Winter",
+            new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Outer] = [jacketId] },
+            new SortedDictionary<string, ColorValue>(), ProportionOverride: null, Build: null,
+            FabricValues: new SortedDictionary<string, Fabric> { ["outer"] = new(Texture: new TextureFill(TextureKind.Wool)) });
         var character = new CharacterDefinition(
             characterId,
             "Alice",
             BodyPresets.Shape(BodyPreset.Heroic),
             new Skeleton([new ViewAngleRestLayout(ViewAngle.Front, [new BoneRestPose(HumanoidBone.Hips, new Point2D(0, 0))])]),
-            new SortedDictionary<string, ColorValue> { ["Skin"] = ColorValue.FromHex("#f0c8a0") },
-            new SortedDictionary<string, StickerSlotDefinition> { ["torso"] = new StickerSlotDefinition(0, [stickerId]) });
+            new SortedDictionary<string, ColorValue> { ["skin"] = ColorValue.FromHex("#f0c8a0") },
+            new SortedDictionary<string, IReadOnlyList<StickerId>> { [StickerSlots.Hair] = [hairId] },
+            new SortedDictionary<string, Fabric> { ["hair"] = new(new PatternFill(PatternKind.Stripes, [ColorValue.FromHex("#ffffff")], Angle: 45)) })
+        {
+            Wardrobe = wardrobe,
+            Revisions = new Dictionary<CharacterRevisionId, CharacterRevision> { [revisionId] = revision },
+        };
         repository.SaveCharacter(character);
 
-        var sticker = new Sticker(stickerId, "Jacket A", "torso", StickerKind.BuildStretch, ["default"]);
-        repository.SaveSticker(characterId, sticker);
-
-        var stretch = new StretchRegion(4, 2, 4, 2);
-        repository.SaveStretchRegion(characterId, stickerId, stretch);
-
-        var revisionId = CharacterRevisionId.New();
-        var revision = new CharacterRevision(
-            revisionId,
-            characterId,
-            "Default",
-            new SortedDictionary<string, IReadOnlyList<StickerId>> { ["torso"] = [stickerId] },
-            new SortedDictionary<string, ColorValue>(),
-            ProportionOverride: null,
-            Build: 0.5);
-        repository.SaveCharacterRevision(revision);
-
         Assert.Equivalent(character, repository.LoadCharacter(characterId), strict: true);
-        Assert.Equivalent(sticker, repository.LoadSticker(characterId, stickerId), strict: true);
-        Assert.Equivalent(stretch, repository.LoadStretchRegion(characterId, stickerId), strict: true);
-        Assert.Equivalent(revision, repository.LoadCharacterRevision(characterId, revisionId), strict: true);
 
         var characterDir = Path.Combine(_root, "characters", $"{characterId.Value}-alice");
-        Assert.True(Directory.Exists(characterDir));
         Assert.True(File.Exists(Path.Combine(characterDir, "character.json")));
-        Assert.True(File.Exists(Path.Combine(characterDir, "revisions", $"{revisionId.Value}-default.json")));
+        Assert.DoesNotContain("wardrobe", File.ReadAllText(Path.Combine(characterDir, "character.json")), StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(Path.Combine(characterDir, "revisions", $"{revisionId.Value}-winter.json")));
+        Assert.Equal(svg, File.ReadAllText(Path.Combine(characterDir, "patterns", "tartan.svg")));
+        Assert.True(File.Exists(Path.Combine(characterDir, "stickers", $"{jacketId.Value}-jacket-a", "sticker.json")));
+        var hairDir = Path.Combine(characterDir, "stickers", $"{hairId.Value}-bob");
+        Assert.Equal(svg, File.ReadAllText(Path.Combine(hairDir, "variants", "default", "front.svg")));
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(Path.Combine(hairDir, "variants", "default", "profile.png")));
 
-        var stickerDir = Path.Combine(characterDir, "stickers", $"{stickerId.Value}-jacket-a");
-        Assert.True(File.Exists(Path.Combine(stickerDir, "sticker.json")));
-        Assert.True(File.Exists(Path.Combine(stickerDir, "stretch.json")));
-        Assert.True(Directory.Exists(Path.Combine(stickerDir, "variants")));
+        // Take the jacket, the side-view art, the tile and the look away: their files go too.
+        var trimmed = character with
+        {
+            Wardrobe = new Wardrobe(
+                new Dictionary<StickerId, StickerAsset> { [hairId] = wardrobe.Stickers[hairId] with { Files = new Dictionary<string, ArtFile> { ["variants/default/front.svg"] = ArtFile.Svg(svg) } } },
+                new Dictionary<string, ArtFile>()),
+            Revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(),
+        };
+        repository.SaveCharacter(trimmed);
+
+        Assert.False(Directory.Exists(Path.Combine(characterDir, "stickers", $"{jacketId.Value}-jacket-a")));
+        Assert.False(File.Exists(Path.Combine(hairDir, "variants", "default", "profile.png")));
+        Assert.False(File.Exists(Path.Combine(characterDir, "patterns", "tartan.svg")));
+        Assert.Empty(Directory.EnumerateFiles(Path.Combine(characterDir, "revisions")));
+        Assert.Equivalent(trimmed, repository.LoadCharacter(characterId), strict: true);
+    }
+
+    [Fact]
+    public void A_character_file_from_before_stickers_loads_with_nothing_worn()
+    {
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
+        var id = CharacterId.New();
+        var dir = Path.Combine(_root, "characters", $"{id.Value}-old");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "character.json"),
+            "{\"colorSlots\":{\"skin\":\"#f2c9a4\"},\"id\":\"" + id.Value + "\",\"name\":\"Old\",\"skeleton\":{\"restLayouts\":[]},\"stickerSlots\":{}}");
+
+        var loaded = repository.LoadCharacter(id);
+
+        Assert.Empty(loaded.Stickers);
+        Assert.Equal(BodyShape.Default, loaded.Body);
+        Assert.Empty(loaded.Wardrobe.Stickers);
     }
 
     [Fact]

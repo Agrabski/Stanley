@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "accent": "#222222"
+  },
+  "id": "library",
+  "name": "Gloves",
+  "parts": [
+    {
+      "cover": {
+        "color": "accent",
+        "ease": 0.008,
+        "from": 0,
+        "to": 1
+      },
+      "name": "gloves",
+      "region": "hand"
+    }
+  ],
+  "slot": "accessory",
+  "variants": [
+    "default"
+  ]
+}

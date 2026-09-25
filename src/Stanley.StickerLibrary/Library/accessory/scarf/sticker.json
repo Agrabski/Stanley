@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "accent": "#d35400"
+  },
+  "id": "library",
+  "name": "Scarf",
+  "parts": [
+    {
+      "cover": {
+        "color": "accent",
+        "ease": 0.022,
+        "from": 0,
+        "to": 0.8
+      },
+      "name": "scarf",
+      "region": "neck"
+    }
+  ],
+  "slot": "accessory",
+  "variants": [
+    "default"
+  ]
+}

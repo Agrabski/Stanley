@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>The starter stickers and pattern tiles Stanley ships (art under CC0 1.0 - see Library/LICENSE).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Named by their path under Library/, always with '/', so the library reads them back as a folder tree. -->
+    <EmbeddedResource Include="Library\**\*" Exclude="Library\LICENSE;Library\README.md" LogicalName="library/$([System.String]::Copy('%(RecursiveDir)').Replace('\', '/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
