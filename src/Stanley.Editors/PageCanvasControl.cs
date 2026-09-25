@@ -1196,10 +1196,12 @@ public sealed class PageCanvasControl : Control
 
     // ---------------------------------------------------------------- context menu
 
+    private ContextMenu? _contextMenu;
+
     private void ShowContextMenu(Point2D page)
     {
-        var menu = new ContextMenu { ItemsSource = ContextMenuItems(page) };
-        menu.Open(this);
+        _contextMenu = new ContextMenu { ItemsSource = ContextMenuItems(page) };
+        _contextMenu.Open(this);
     }
 
     /// <summary>The right-click menu for what's at <paramref name="page"/> (page mm) - selecting it first. Public for headless UI tests.</summary>
@@ -1247,18 +1249,20 @@ public sealed class PageCanvasControl : Control
                 });
                 items.Add(Item("Bigger letters", () => vm.BiggerTextCommand.Execute(null)));
                 items.Add(Item("Smaller letters", () => vm.SmallerTextCommand.Execute(null)));
-                items.Add(ColorMenu("Text colour", vm.SetTextColorCommand, noneLabel: null));
-                items.Add(ColorMenu("Box", vm.SetTextBoxCommand, "No box"));
+                var style = vm.CurrentTextStyle;
+                items.Add(ColorMenu("Text Fill", new ColorMenuOptions(vm.SetTextColorCommand, "No Fill", "More Fill Colors…", style.Color)));
+                items.Add(ColorMenu("Text Outline", new ColorMenuOptions(vm.SetTextOutlineCommand, "No Outline", "More Outline Colors…", style.Outline,
+                    vm.SetTextOutlineWeightCommand, style.OutlineWidthMm)));
+                items.Add(ColorMenu("Shape Fill", new ColorMenuOptions(vm.SetBoxFillCommand, "No Fill", "More Fill Colors…", style.BoxFill)));
+                items.Add(ColorMenu("Shape Outline", new ColorMenuOptions(vm.SetBoxOutlineCommand, "No Outline", "More Outline Colors…", style.BoxStroke,
+                    vm.SetBoxWeightCommand, style.BoxStrokeWidthMm, vm.SetBoxDashCommand, style.BoxDash)));
             }
             else if (element is ProjectModel.Issues.ShapeElement)
             {
-                items.Add(ColorMenu("Outline", vm.SetStrokeColorCommand, "No outline"));
-                items.Add(ColorMenu("Fill", vm.SetFillColorCommand, "No fill"));
-                items.Add(new MenuItem
-                {
-                    Header = "Thickness",
-                    ItemsSource = vm.WeightChoices.Select(weight => Item(weight.Name, () => vm.SetStrokeWeightCommand.Execute(weight))).ToList()
-                });
+                var style = vm.CurrentShapeStyle;
+                items.Add(ColorMenu("Fill", new ColorMenuOptions(vm.SetFillColorCommand, "No Fill", "More Fill Colors…", style.Fill)));
+                items.Add(ColorMenu("Outline", new ColorMenuOptions(vm.SetStrokeColorCommand, "No Outline", "More Outline Colors…", style.Stroke,
+                    vm.SetStrokeWeightCommand, style.StrokeWidthMm, vm.SetStrokeDashCommand, style.Dash)));
             }
             items.Add(new Separator());
             var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
@@ -1376,23 +1380,9 @@ public sealed class PageCanvasControl : Control
         return new MenuItem { Header = "Background", ItemsSource = items };
     }
 
-    /// <summary>A submenu of palette colours (plus "none" when <paramref name="noneLabel"/> is given) running <paramref name="command"/>.</summary>
-    private static MenuItem ColorMenu(string header, System.Windows.Input.ICommand command, string? noneLabel)
-    {
-        var items = new List<object>();
-        if (noneLabel != null)
-        {
-            items.Add(Item(noneLabel, () => command.Execute(DrawingPalette.None)));
-            items.Add(new Separator());
-        }
-        items.AddRange(DrawingPalette.Colors.Select(color =>
-        {
-            var item = Item(color.Name, () => command.Execute(color));
-            item.Icon = new Border { Width = 14, Height = 14, Background = color.Brush, BorderBrush = Brushes.Gray, BorderThickness = new Thickness(1) };
-            return item;
-        }));
-        return new MenuItem { Header = header, ItemsSource = items };
-    }
+    /// <summary>A submenu holding Word's colour menu (<see cref="ColorMenus"/>) - the same palette, None, More Colors…, Weight and Dashes as the ribbon's buttons.</summary>
+    private MenuItem ColorMenu(string header, ColorMenuOptions options) =>
+        new() { Header = header, ItemsSource = ColorMenus.Items(options, () => _contextMenu?.Close(), this, atPointer: true) };
 
     private static MenuItem Item(string header, Action action, string? gesture = null)
     {

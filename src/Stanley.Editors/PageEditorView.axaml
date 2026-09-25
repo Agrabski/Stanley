@@ -45,16 +45,17 @@
 
     <!-- Status bar -->
     <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
-      <Grid ColumnDefinitions="*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="12">
-          <TextBlock Name="ErrorText" Text="{Binding LastError}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12" VerticalAlignment="Center"
-                     IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <!-- A DockPanel rather than a StackPanel, so a long hint is cut short (…) before the page info instead of running under it. -->
+      <DockPanel>
+        <TextBlock Name="PageInfoText" DockPanel.Dock="Right" Margin="12,0,0,0" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+        <TextBlock Name="ErrorText" DockPanel.Dock="Left" Margin="0,0,12,0" Text="{Binding LastError}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12" VerticalAlignment="Center"
+                   IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Panel>
           <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
           <TextBlock Name="TextEditHintText" IsVisible="False"
                      FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        </StackPanel>
-        <TextBlock Name="PageInfoText" Grid.Column="1" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
-      </Grid>
+        </Panel>
+      </DockPanel>
     </Border>
   </Grid>
 </UserControl>

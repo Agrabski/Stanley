@@ -143,3 +143,24 @@ public class IssueArtTests : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }
+
+public class LineStyleJsonTests
+{
+    [Fact]
+    public void Dashes_weights_and_hollow_letters_round_trip_and_older_styles_read_as_solid()
+    {
+        var shape = new ShapeElement(ElementId.New(), ElementLayer.Background, [AnchorRing.Corner(new Point2D(0, 0)), AnchorRing.Corner(new Point2D(9, 9))], false,
+            new ShapeStyle(ColorValue.FromHex("#000000"), null, 1, LineDash.LongDashDot));
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 20, 5), "BAM",
+            new TextStyle(8, Color: null, Outline: ColorValue.FromHex("#000000"), OutlineWidthMm: 0.5, BoxStroke: ColorValue.FromHex("#c00000"), BoxStrokeWidthMm: 1, BoxDash: LineDash.RoundDot));
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 50, 50)), null, [], [], [shape, text]);
+
+        var json = ProjectJson.Serialize(panel);
+        Assert.Contains("\"dash\": \"longDashDot\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"boxDash\": \"roundDot\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, ProjectJson.Deserialize<Panel>(json), strict: true);
+
+        var older = ProjectJson.Deserialize<Panel>(json.Replace("\"dash\": \"longDashDot\",", "", StringComparison.Ordinal));
+        Assert.Equal(LineDash.Solid, ((ShapeElement)older.Elements[0]).Style.Dash);
+    }
+}

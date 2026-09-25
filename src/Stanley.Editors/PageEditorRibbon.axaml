@@ -74,21 +74,16 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
-          <StackPanel Spacing="1" Margin="0,2,0,0">
-            <DropDownButton Name="HomeOutlineButton" Classes="pick" ToolTip.Tip="Line colour - of the selected shape, and of what you draw next">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding StrokeBrush}" /><TextBlock Text="Outline" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetStrokeColorCommand}" NoneLabel="No outline" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="HomeFillButton" Classes="pick" ToolTip.Tip="Fill colour - of the selected shape, and of closed shapes you draw next">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding FillBrush}" /><TextBlock Text="Fill" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetFillColorCommand}" NoneLabel="No fill" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="HomeWeightButton" Classes="pick" ToolTip.Tip="Line thickness">
-              <TextBlock Text="{Binding WeightName, StringFormat='Line: {0}'}" />
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:WeightPicker Command="{Binding SetStrokeWeightCommand}" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+            <local:ColorMenuButton Name="HomeShapeFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                   Command="{Binding SetFillColorCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentShapeStyle.Fill}"
+                                   ToolTip.Tip="Shape Fill - the colour inside the selected shape, and inside closed shapes you draw next" />
+            <local:ColorMenuButton Name="HomeShapeOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                   Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentShapeStyle.Stroke}"
+                                   WeightCommand="{Binding SetStrokeWeightCommand}" CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}" DashCommand="{Binding SetStrokeDashCommand}" CurrentDash="{Binding CurrentShapeStyle.Dash}"
+                                   ToolTip.Tip="Shape Outline - the colour, weight and dashes of the selected shape's line, and of what you draw next" />
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Pen" />
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
         </DockPanel>
         <Rectangle Classes="divider" />
 
@@ -210,7 +205,7 @@
         <DockPanel Classes="group" IsVisible="{Binding HasCharacterCatalog}">
           <StackPanel Orientation="Horizontal" Spacing="2">
             <ScrollViewer MaxWidth="260" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasCharacterChoices}">
-              <ItemsControl Name="CharacterGallery" ItemsSource="{Binding CharacterChoices}">
+              <ItemsControl Name="CharacterGallery" ItemsSource="{Binding CharacterChoices}" Margin="0,0,0,6">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <StackPanel Orientation="Horizontal" Spacing="2" />
@@ -218,7 +213,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="characters:CharacterDefinition">
-                    <Button Classes="small" Width="48" Height="62" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    <Button Classes="small" MinWidth="48" MaxWidth="104" Height="62" Padding="3,2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                             Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertCharacterCommand}"
                             CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel (or drag from the Characters pane)'}">
                       <DockPanel>
@@ -235,28 +230,6 @@
             </Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Characters" />
-        </DockPanel>
-        <Rectangle Classes="divider" IsVisible="{Binding HasCharacterCatalog}" />
-
-        <DockPanel Classes="group" IsVisible="{Binding HasPageNumbering}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <PathIcon Data="{StaticResource PageNumberIcon}" Width="22" Height="22" VerticalAlignment="Top" Margin="4,6,0,0" />
-            <StackPanel Spacing="4" Margin="0,2,0,0">
-              <ComboBox Name="PageNumberPositionBox" ItemsSource="{Binding PageNumberOptions}" SelectedItem="{Binding PageNumberOption}"
-                        Width="190" Height="26" FontSize="12" Focusable="False"
-                        ToolTip.Tip="Print page numbers on every page of the comic (not just this one)" />
-              <StackPanel Orientation="Horizontal" Spacing="10" IsEnabled="{Binding PageNumbersEnabled}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <TextBlock Text="Start at" FontSize="12" VerticalAlignment="Center" />
-                  <NumericUpDown Name="PageNumberStartInput" Minimum="0" Maximum="9999" Increment="1" FormatString="0" Width="110" Height="26" FontSize="12"
-                                 ToolTip.Tip="The number the first page would carry - to continue numbering from an earlier book" />
-                </StackPanel>
-                <CheckBox Name="NumberFirstPageCheck" IsChecked="{Binding NumberFirstPage}" Focusable="False" FontSize="12" Content="On first page"
-                          ToolTip.Tip="Covers usually aren't numbered; the cover still counts as page 1" />
-              </StackPanel>
-            </StackPanel>
-          </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Page numbers" />
         </DockPanel>
       </StackPanel>
     </TabItem>
@@ -308,6 +281,45 @@
             </ToggleButton>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Protect" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasPageNumbering}" />
+
+        <!-- Word's Page Number menu: where (Top of page / Bottom of page), remove, and how the numbering runs. -->
+        <DockPanel Classes="group" IsVisible="{Binding HasPageNumbering}">
+          <DropDownButton Name="PageNumbersButton" Classes="slotGallery" Width="120" ToolTip.Tip="Print page numbers on every page of the comic (not just this one)">
+            <StackPanel Spacing="1">
+              <PathIcon Data="{StaticResource PageNumberIcon}" Width="20" Height="20" />
+              <TextBlock Text="Page numbers" FontSize="11" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding PageNumbersSummary}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuItem Name="TopOfPageMenu" Header="Top of page">
+                  <MenuItem Name="TopOuterItem" Header="Outer corner" ToggleType="Radio" GroupName="PageNumberPosition" IsChecked="{Binding IsPageNumbersTopOuter, Mode=TwoWay}" />
+                </MenuItem>
+                <MenuItem Name="BottomOfPageMenu" Header="Bottom of page">
+                  <MenuItem Name="BottomCenterItem" Header="Centre" ToggleType="Radio" GroupName="PageNumberPosition" IsChecked="{Binding IsPageNumbersBottomCenter, Mode=TwoWay}" />
+                  <MenuItem Name="BottomOuterItem" Header="Outer corner" ToggleType="Radio" GroupName="PageNumberPosition" IsChecked="{Binding IsPageNumbersBottomOuter, Mode=TwoWay}" />
+                </MenuItem>
+                <MenuItem Name="RemovePageNumbersItem" Header="Remove page numbers" Command="{Binding RemovePageNumbersCommand}" />
+                <Separator />
+                <MenuItem Name="NumberFirstPageItem" Header="Number the first page" ToggleType="CheckBox" IsChecked="{Binding NumberFirstPage, Mode=TwoWay}"
+                          IsEnabled="{Binding PageNumbersEnabled}" ToolTip.Tip="Covers usually aren't numbered; the cover still counts as page 1" />
+                <MenuItem Name="StartAtMenu" Header="Start at" IsEnabled="{Binding PageNumbersEnabled}">
+                  <MenuItem StaysOpenOnClick="True">
+                    <MenuItem.Header>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="First page is number" VerticalAlignment="Center" />
+                        <NumericUpDown Name="PageNumberStartInput" Minimum="0" Maximum="9999" Increment="1" FormatString="0" Width="110" Height="26" FontSize="12"
+                                       ToolTip.Tip="The number the first page would carry - to continue numbering from an earlier book" />
+                      </StackPanel>
+                    </MenuItem.Header>
+                  </MenuItem>
+                </MenuItem>
+              </MenuFlyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Page" />
         </DockPanel>
       </StackPanel>
     </TabItem>
@@ -417,8 +429,9 @@
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <ScrollViewer MaxWidth="480" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-              <ItemsControl Name="PoseGallery" ItemsSource="{Binding PoseChoices}">
+            <ScrollViewer MaxWidth="560" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <!-- The bottom margin keeps a scroll bar, when there is one, off the pose names. -->
+              <ItemsControl Name="PoseGallery" ItemsSource="{Binding PoseChoices}" Margin="0,0,0,6">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <StackPanel Orientation="Horizontal" Spacing="2" />
@@ -426,7 +439,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="local:PosePresetChoice">
-                    <Button Classes="small" Width="41" Height="66" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    <Button Classes="small" MinWidth="41" MaxWidth="80" Height="66" Padding="3,2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                             Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyPosePresetCommand}"
                             CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='{}{0} - then adjust by dragging the green dots'}">
                       <DockPanel>
@@ -621,21 +634,16 @@
       <TabItem.Header><TextBlock Classes="shapeHeader" Text="Shape" /></TabItem.Header>
       <StackPanel Classes="tabContent">
         <DockPanel Classes="group">
-          <StackPanel Spacing="1" Margin="0,2,0,0">
-            <DropDownButton Name="ShapeOutlineButton" Classes="pick" ToolTip.Tip="The shape's line colour">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding StrokeBrush}" /><TextBlock Text="{Binding StrokeName, StringFormat='Outline: {0}'}" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetStrokeColorCommand}" NoneLabel="No outline" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="ShapeFillButton" Classes="pick" ToolTip.Tip="The colour inside a closed shape">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding FillBrush}" /><TextBlock Text="{Binding FillName, StringFormat='Fill: {0}'}" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetFillColorCommand}" NoneLabel="No fill" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="ShapeWeightButton" Classes="pick" ToolTip.Tip="Line thickness">
-              <TextBlock Text="{Binding WeightName, StringFormat='Line: {0}'}" />
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:WeightPicker Command="{Binding SetStrokeWeightCommand}" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+            <local:ColorMenuButton Name="ShapeFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                   Command="{Binding SetFillColorCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentShapeStyle.Fill}"
+                                   ToolTip.Tip="Shape Fill - the colour inside the shape (a closed one)" />
+            <local:ColorMenuButton Name="ShapeOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                   Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentShapeStyle.Stroke}"
+                                   WeightCommand="{Binding SetStrokeWeightCommand}" CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}" DashCommand="{Binding SetStrokeDashCommand}" CurrentDash="{Binding CurrentShapeStyle.Dash}"
+                                   ToolTip.Tip="Shape Outline - the line's colour, weight and dashes" />
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Style" />
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
@@ -741,21 +749,29 @@
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
-          <StackPanel Spacing="1" Margin="0,2,0,0">
-            <DropDownButton Name="TextColorButton" Classes="pick" ToolTip.Tip="The letters' colour">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding TextColorBrush}" /><TextBlock Text="Letters" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetTextColorCommand}" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="TextBoxButton" Classes="pick" ToolTip.Tip="A box behind the text, as for a caption - or none">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding TextBoxBrush}" /><TextBlock Text="Box" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetTextBoxCommand}" NoneLabel="No box" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
-            <DropDownButton Name="TextOutlineButton" Classes="pick" ToolTip.Tip="An outline around every letter, as for a sound effect - or none">
-              <StackPanel Orientation="Horizontal" Spacing="5"><Border Classes="swatch" Background="{Binding TextOutlineBrush}" /><TextBlock Text="Letter outline" /></StackPanel>
-              <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:ColorPalettePicker Command="{Binding SetTextOutlineCommand}" NoneLabel="No outline" /></Flyout></DropDownButton.Flyout>
-            </DropDownButton>
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+            <local:ColorMenuButton Name="TextBoxFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                   Command="{Binding SetBoxFillCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentTextStyle.BoxFill}"
+                                   ToolTip.Tip="Shape Fill - a box behind the text, as for a caption, or none" />
+            <local:ColorMenuButton Name="TextBoxOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                   Command="{Binding SetBoxOutlineCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentTextStyle.BoxStroke}"
+                                   WeightCommand="{Binding SetBoxWeightCommand}" CurrentWeight="{Binding CurrentTextStyle.BoxStrokeWidthMm}" DashCommand="{Binding SetBoxDashCommand}" CurrentDash="{Binding CurrentTextStyle.BoxDash}"
+                                   ToolTip.Tip="Shape Outline - the border round the text's box: colour, weight and dashes" />
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Colours" />
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+            <local:ColorMenuButton Name="TextFillButton" Label="Text Fill" Icon="{StaticResource TextFillIcon}" DefaultColor="#ff0000"
+                                   Command="{Binding SetTextColorCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentTextStyle.Color}"
+                                   ToolTip.Tip="Text Fill - the letters' colour (No Fill leaves hollow letters, only their outline showing)" />
+            <local:ColorMenuButton Name="TextOutlineButton" Label="Text Outline" Icon="{StaticResource TextFillIcon}" IconOutlined="True" DefaultColor="#000000"
+                                   Command="{Binding SetTextOutlineCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentTextStyle.Outline}"
+                                   WeightCommand="{Binding SetTextOutlineWeightCommand}" CurrentWeight="{Binding CurrentTextStyle.OutlineWidthMm}"
+                                   ToolTip.Tip="Text Outline - an outline round every letter, as for a sound effect: colour and weight" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text Styles" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">

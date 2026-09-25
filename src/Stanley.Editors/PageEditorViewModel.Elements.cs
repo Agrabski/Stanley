@@ -51,25 +51,114 @@ public sealed record BackgroundChoice(string Name, PanelBackground? Background)
     };
 }
 
-/// <summary>The colours, thicknesses and backgrounds the page editor offers - one short, sensible list each, no colour picker to learn.</summary>
+/// <summary>
+/// The colours, thicknesses and backgrounds the page editor offers. Colours are Word's:
+/// the Office theme's ten Theme Colors with their lighter and darker shades, the ten
+/// Standard Colors, and the custom colours picked lately (Recent Colors) - the same menu
+/// Word's Shape Fill, Shape Outline, Text Fill and Text Outline buttons open.
+/// </summary>
 public static class DrawingPalette
 {
-    private static PaletteColor C(string name, string hex) => new(name, ColorValue.FromHex(hex));
-
-    public static IReadOnlyList<PaletteColor> Colors { get; } =
+    // Word's Office theme, in its column order: backgrounds and text first, then the six accents.
+    private static readonly (string Name, string Hex)[] Theme =
     [
-        C("Black", "#1c1c1c"), C("Dark grey", "#4d5656"), C("Grey", "#95a5a6"), C("Light grey", "#d5d8dc"), C("White", "#ffffff"), C("Tan", "#d8c3a5"),
-        C("Red", "#c0392b"), C("Orange", "#e67e22"), C("Yellow", "#f1c40f"), C("Pale yellow", "#fff4c2"), C("Green", "#27ae60"), C("Dark green", "#1e8449"),
-        C("Teal", "#16a085"), C("Sky", "#5dade2"), C("Blue", "#2e86c1"), C("Navy", "#1b2a49"), C("Purple", "#8e44ad"), C("Pink", "#e98fb0"),
-        C("Brown", "#6e4b2a"),
+        ("White, Background 1", "#ffffff"), ("Black, Text 1", "#000000"), ("Gray, Background 2", "#e7e6e6"), ("Blue-Gray, Text 2", "#44546a"),
+        ("Blue, Accent 1", "#4472c4"), ("Orange, Accent 2", "#ed7d31"), ("Gray, Accent 3", "#a5a5a5"), ("Gold, Accent 4", "#ffc000"),
+        ("Blue, Accent 5", "#5b9bd5"), ("Green, Accent 6", "#70ad47"),
     ];
+
+    /// <summary>Theme Colors, top row: the theme's own ten colours.</summary>
+    public static IReadOnlyList<PaletteColor> ThemeColors { get; } = Theme.Select(t => new PaletteColor(t.Name, ColorValue.FromHex(t.Hex))).ToList();
+
+    /// <summary>Theme Colors, the five rows under them: each column's lighter and darker shades, the way Word works them out (in HSL lightness).</summary>
+    public static IReadOnlyList<IReadOnlyList<PaletteColor>> ThemeShades { get; } = Enumerable.Range(0, 5)
+        .Select(row => (IReadOnlyList<PaletteColor>)Theme.Select((t, column) => Shade(t.Name, t.Hex, column, row)).ToList())
+        .ToList();
+
+    public static IReadOnlyList<PaletteColor> StandardColors { get; } =
+    [
+        C("Dark Red", "#c00000"), C("Red", "#ff0000"), C("Orange", "#ffc000"), C("Yellow", "#ffff00"), C("Light Green", "#92d050"),
+        C("Green", "#00b050"), C("Light Blue", "#00b0f0"), C("Blue", "#0070c0"), C("Dark Blue", "#002060"), C("Purple", "#7030a0"),
+    ];
+
+    /// <summary>Every named colour on offer.</summary>
+    public static IReadOnlyList<PaletteColor> Colors { get; } = [.. ThemeColors, .. ThemeShades.SelectMany(r => r), .. StandardColors];
 
     public static PaletteColor None { get; } = new("None", null);
 
+    private static readonly List<PaletteColor> RecentList = [];
+
+    /// <summary>Recent Colors: custom colours picked with "More Colors…" this session, newest first (at most ten), shared by every colour menu like Word's.</summary>
+    public static IReadOnlyList<PaletteColor> RecentColors => RecentList;
+
+    /// <summary>A custom colour just picked, remembered for Recent Colors.</summary>
+    public static PaletteColor Remember(ColorValue color)
+    {
+        var picked = new PaletteColor(color.Hex, color);
+        RecentList.RemoveAll(p => p.Color == color);
+        RecentList.Insert(0, picked);
+        if (RecentList.Count > 10)
+            RecentList.RemoveAt(RecentList.Count - 1);
+        return picked;
+    }
+
+    /// <summary>Line thicknesses for Weight ▸, in millimetres - Word's list, metric, going up to a marker's width for comic linework.</summary>
     public static IReadOnlyList<ShapeWeightChoice> Weights { get; } =
+        new[] { 0.1, 0.25, 0.35, 0.5, 0.7, 1, 1.4, 2, 3, 5 }.Select(mm => new ShapeWeightChoice($"{mm:0.##} mm", mm)).ToList();
+
+    /// <summary>Word's Dashes ▸, in its order.</summary>
+    public static IReadOnlyList<(LineDash Dash, string Name)> Dashes { get; } =
     [
-        new("Fine", 0.35), new("Medium", 0.7), new("Thick", 1.4), new("Heavy", 2.5), new("Marker", 5),
+        (LineDash.Solid, "Solid"), (LineDash.RoundDot, "Round Dot"), (LineDash.SquareDot, "Square Dot"), (LineDash.Dash, "Dash"),
+        (LineDash.DashDot, "Dash Dot"), (LineDash.LongDash, "Long Dash"), (LineDash.LongDashDot, "Long Dash Dot"),
     ];
+
+    private static PaletteColor C(string name, string hex) => new(name, ColorValue.FromHex(hex));
+
+    /// <summary>Word's shade rows: white darkens, black lightens, the light gray darkens a long way, everything else goes three steps lighter then two darker.</summary>
+    private static PaletteColor Shade(string name, string hex, int column, int row)
+    {
+        var (step, lighter) = column switch
+        {
+            0 => (new[] { 0.05, 0.15, 0.25, 0.35, 0.5 }[row], false),
+            1 => (new[] { 0.5, 0.35, 0.25, 0.15, 0.05 }[row], true),
+            2 => (new[] { 0.1, 0.25, 0.5, 0.75, 0.9 }[row], false),
+            _ => (new[] { 0.8, 0.6, 0.4, 0.25, 0.5 }[row], row < 3)
+        };
+        var color = ColorValue.FromHex(hex);
+        var (h, s, l) = ToHsl(color);
+        l = lighter ? l + (1 - l) * step : l * (1 - step);
+        return new PaletteColor($"{name}, {(lighter ? "Lighter" : "Darker")} {step * 100:0}%", FromHsl(h, s, l));
+    }
+
+    private static (double H, double S, double L) ToHsl(ColorValue color)
+    {
+        var r = Convert.ToInt32(color.Hex[1..3], 16) / 255.0;
+        var g = Convert.ToInt32(color.Hex[3..5], 16) / 255.0;
+        var b = Convert.ToInt32(color.Hex[5..7], 16) / 255.0;
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var l = (max + min) / 2;
+        if (max - min < 1e-9)
+            return (0, 0, l);
+        var d = max - min;
+        var s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        var h = max == r ? (g - b) / d + (g < b ? 6 : 0) : max == g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return (h / 6, s, l);
+    }
+
+    private static ColorValue FromHsl(double h, double s, double l)
+    {
+        double Channel(double t)
+        {
+            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            var p = 2 * l - q;
+            t = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+            return t < 1.0 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2.0 / 3 ? p + (q - p) * (2.0 / 3 - t) * 6 : p;
+        }
+        var (r, g, b) = s == 0 ? (l, l, l) : (Channel(h + 1.0 / 3), Channel(h), Channel(h - 1.0 / 3));
+        return ColorValue.FromHex($"#{(int)Math.Round(r * 255):x2}{(int)Math.Round(g * 255):x2}{(int)Math.Round(b * 255):x2}");
+    }
 
     private static BackgroundChoice Fill(string name, string hex) => new(name, new ColorBackground(ColorValue.FromHex(hex)));
 
@@ -115,18 +204,30 @@ public sealed partial class PageEditorViewModel
     {
         SetStrokeColorCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentShapeStyle(CurrentShapeStyle with { Stroke = c.Color }); });
         SetFillColorCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentShapeStyle(CurrentShapeStyle with { Fill = c.Color }); });
+        // Like Word: picking a weight or a dash for "No Outline" turns the outline on.
         SetStrokeWeightCommand = new RelayCommand<ShapeWeightChoice>(w =>
         {
             if (w != null)
                 SetCurrentShapeStyle(CurrentShapeStyle with { StrokeWidthMm = w.Mm, Stroke = CurrentShapeStyle.Stroke ?? TextStylePresets.Ink });
         });
-        SetTextColorCommand = new RelayCommand<PaletteColor>(c => { if (c?.Color is { } color) SetCurrentTextStyle(CurrentTextStyle with { Color = color }); });
-        SetTextBoxCommand = new RelayCommand<PaletteColor>(c =>
-        {
-            if (c != null)
-                SetCurrentTextStyle(CurrentTextStyle with { BoxFill = c.Color, BoxStroke = c.Color is null ? null : CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink });
-        });
+        SetStrokeDashCommand = new RelayCommand<LineDash>(dash =>
+            SetCurrentShapeStyle(CurrentShapeStyle with { Dash = dash, Stroke = CurrentShapeStyle.Stroke ?? TextStylePresets.Ink }));
+        SetTextColorCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentTextStyle(CurrentTextStyle with { Color = c.Color }); });
         SetTextOutlineCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentTextStyle(CurrentTextStyle with { Outline = c.Color }); });
+        SetTextOutlineWeightCommand = new RelayCommand<ShapeWeightChoice>(w =>
+        {
+            if (w != null)
+                SetCurrentTextStyle(CurrentTextStyle with { OutlineWidthMm = w.Mm, Outline = CurrentTextStyle.Outline ?? TextStylePresets.Ink });
+        });
+        SetBoxFillCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentTextStyle(CurrentTextStyle with { BoxFill = c.Color }); });
+        SetBoxOutlineCommand = new RelayCommand<PaletteColor>(c => { if (c != null) SetCurrentTextStyle(CurrentTextStyle with { BoxStroke = c.Color }); });
+        SetBoxWeightCommand = new RelayCommand<ShapeWeightChoice>(w =>
+        {
+            if (w != null)
+                SetCurrentTextStyle(CurrentTextStyle with { BoxStrokeWidthMm = w.Mm, BoxStroke = CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink });
+        });
+        SetBoxDashCommand = new RelayCommand<LineDash>(dash =>
+            SetCurrentTextStyle(CurrentTextStyle with { BoxDash = dash, BoxStroke = CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink }));
         ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset)));
         BiggerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Bigger(CurrentTextStyle.FontSizeMm) }));
         SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
@@ -154,16 +255,28 @@ public sealed partial class PageEditorViewModel
     public IReadOnlyList<TextPresetChoice> TextPresetChoices { get; } = TextStylePresets.All.Select(p => new TextPresetChoice(p)).ToList();
     public IReadOnlyList<BackgroundChoice> BackgroundChoices => DrawingPalette.Backgrounds;
 
+    // Word's Shape Fill / Shape Outline for shapes - and for a text's box - and Text Fill / Text
+    // Outline for its letters. Each changes the selection and becomes the default for new ones.
+
     public IRelayCommand<PaletteColor> SetStrokeColorCommand { get; private set; } = null!;
     public IRelayCommand<PaletteColor> SetFillColorCommand { get; private set; } = null!;
     public IRelayCommand<ShapeWeightChoice> SetStrokeWeightCommand { get; private set; } = null!;
+    public IRelayCommand<LineDash> SetStrokeDashCommand { get; private set; } = null!;
+
+    /// <summary>Text Fill: the letters' colour, or none - hollow letters, only their outline showing.</summary>
     public IRelayCommand<PaletteColor> SetTextColorCommand { get; private set; } = null!;
 
-    /// <summary>A box behind the text in that colour (outlined), or none.</summary>
-    public IRelayCommand<PaletteColor> SetTextBoxCommand { get; private set; } = null!;
-
-    /// <summary>An outline around each letter, like a sound effect's, or none.</summary>
+    /// <summary>Text Outline: an outline around each letter, like a sound effect's, or none.</summary>
     public IRelayCommand<PaletteColor> SetTextOutlineCommand { get; private set; } = null!;
+    public IRelayCommand<ShapeWeightChoice> SetTextOutlineWeightCommand { get; private set; } = null!;
+
+    /// <summary>Shape Fill for a text: a box behind it in that colour, or none.</summary>
+    public IRelayCommand<PaletteColor> SetBoxFillCommand { get; private set; } = null!;
+
+    /// <summary>Shape Outline for a text: a border round its box, or none.</summary>
+    public IRelayCommand<PaletteColor> SetBoxOutlineCommand { get; private set; } = null!;
+    public IRelayCommand<ShapeWeightChoice> SetBoxWeightCommand { get; private set; } = null!;
+    public IRelayCommand<LineDash> SetBoxDashCommand { get; private set; } = null!;
     public IRelayCommand<TextStylePreset> ApplyTextPresetCommand { get; private set; } = null!;
     public IRelayCommand BiggerTextCommand { get; private set; } = null!;
     public IRelayCommand SmallerTextCommand { get; private set; } = null!;

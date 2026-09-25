@@ -112,13 +112,13 @@ public class PageElementsTests
     {
         var (editor, history, panel) = NewEditor();
         DrawRectangle(editor, panel, new Rect2D(20, 20, 40, 30));
-        var yellow = DrawingPalette.Colors.Single(c => c.Name == "Yellow");
+        var yellow = DrawingPalette.StandardColors.Single(c => c.Name == "Yellow");
 
         editor.SetFillColorCommand.Execute(yellow);
-        editor.SetStrokeWeightCommand.Execute(DrawingPalette.Weights.Single(w => w.Name == "Heavy"));
+        editor.SetStrokeWeightCommand.Execute(DrawingPalette.Weights.Single(w => w.Mm == 3));
 
         Assert.Equal(yellow.Color, editor.SelectedShape!.Style.Fill);
-        Assert.Equal(2.5, editor.SelectedShape.Style.StrokeWidthMm);
+        Assert.Equal(3, editor.SelectedShape.Style.StrokeWidthMm);
         Assert.Equal("Yellow", editor.FillName);
         var next = DrawRectangle(editor, panel, new Rect2D(70, 20, 20, 20));
         Assert.Equal(yellow.Color, next.Style.Fill);
@@ -149,7 +149,7 @@ public class PageElementsTests
     {
         var (editor, _, panel) = NewEditor();
         DrawRectangle(editor, panel, new Rect2D(20, 20, 40, 30));
-        editor.SetStrokeColorCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "Red"));
+        editor.SetStrokeColorCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Red"));
 
         editor.Tool = PageEditorTool.Draw;
 
@@ -323,21 +323,74 @@ public class PageElementsTests
     }
 
     [Fact]
-    public void A_text_box_colour_adds_an_outlined_box_and_none_takes_it_away()
+    public void Shape_Fill_and_Shape_Outline_set_a_texts_box_and_its_border_separately_as_in_Word()
     {
         var (editor, _, panel) = NewEditor();
         editor.ApplyTextPresetCommand.Execute(TextStylePreset.Plain);
         var index = editor.CreateText(panel, new Point2D(60, 50));
+        TextStyle Style() => ((TextElement)editor.Working.Panels[panel].Elements[index]).Style;
 
-        editor.SetTextBoxCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "White"));
-        var boxed = ((TextElement)editor.Working.Panels[panel].Elements[index]).Style;
-        Assert.NotNull(boxed.BoxFill);
-        Assert.NotNull(boxed.BoxStroke);
+        editor.SetBoxFillCommand.Execute(DrawingPalette.ThemeColors[0]);
+        Assert.Equal(ColorValue.FromHex("#ffffff"), Style().BoxFill);
+        Assert.Null(Style().BoxStroke);
 
-        editor.SetTextBoxCommand.Execute(DrawingPalette.None);
-        var bare = ((TextElement)editor.Working.Panels[panel].Elements[index]).Style;
-        Assert.Null(bare.BoxFill);
-        Assert.Null(bare.BoxStroke);
+        editor.SetBoxDashCommand.Execute(LineDash.Dash); // picking a dash for "no outline" turns the border on
+        Assert.Equal(TextStylePresets.Ink, Style().BoxStroke);
+        editor.SetBoxWeightCommand.Execute(DrawingPalette.Weights.Single(w => w.Mm == 1));
+        editor.SetBoxOutlineCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Dark Red"));
+        Assert.Equal(new TextStyle(3.5, TextStylePresets.Ink, BoxFill: ColorValue.FromHex("#ffffff"), BoxStroke: ColorValue.FromHex("#c00000"),
+            BoxStrokeWidthMm: 1, BoxDash: LineDash.Dash), Style());
+
+        editor.SetBoxOutlineCommand.Execute(DrawingPalette.None);
+        editor.SetBoxFillCommand.Execute(DrawingPalette.None);
+        Assert.Null(Style().BoxFill);
+        Assert.Null(Style().BoxStroke);
+    }
+
+    [Fact]
+    public void Text_Fill_none_leaves_hollow_letters_and_Text_Outline_has_a_weight()
+    {
+        var (editor, _, panel) = NewEditor();
+        var index = editor.CreateText(panel, new Point2D(60, 50));
+        TextStyle Style() => ((TextElement)editor.Working.Panels[panel].Elements[index]).Style;
+
+        editor.SetTextOutlineWeightCommand.Execute(DrawingPalette.Weights.Single(w => w.Mm == 0.5));
+        editor.SetTextColorCommand.Execute(DrawingPalette.None);
+
+        Assert.Null(Style().Color);
+        Assert.Equal(TextStylePresets.Ink, Style().Outline); // a weight for "no outline" turns it on
+        Assert.Equal(0.5, Style().OutlineWidthMm);
+    }
+
+    [Fact]
+    public void Shape_Outline_dashes_restyle_the_selected_shape()
+    {
+        var (editor, history, panel) = NewEditor();
+        DrawRectangle(editor, panel, new Rect2D(20, 20, 40, 30));
+
+        editor.SetStrokeDashCommand.Execute(LineDash.RoundDot);
+
+        Assert.Equal(LineDash.RoundDot, editor.SelectedShape!.Style.Dash);
+        history.Undo();
+        Assert.Equal(LineDash.Solid, ((ShapeElement)editor.Working.Panels[panel].Elements[0]).Style.Dash);
+    }
+
+    [Fact]
+    public void The_palette_is_Words_theme_colours_with_their_shades_and_the_standard_colours()
+    {
+        Assert.Equal(10, DrawingPalette.ThemeColors.Count);
+        Assert.Equal(5, DrawingPalette.ThemeShades.Count);
+        Assert.All(DrawingPalette.ThemeShades, row => Assert.Equal(10, row.Count));
+        Assert.Equal(10, DrawingPalette.StandardColors.Count);
+        // Word's Office theme: "Blue, Accent 1, Lighter 80%" is #dae3f3, "Darker 50%" is #203864.
+        Assert.Equal(ColorValue.FromHex("#dae3f3"), DrawingPalette.ThemeShades[0][4].Color);
+        Assert.Equal(ColorValue.FromHex("#203864"), DrawingPalette.ThemeShades[4][4].Color);
+        Assert.Equal(ColorValue.FromHex("#f2f2f2"), DrawingPalette.ThemeShades[0][0].Color); // white, darker 5%
+
+        var custom = DrawingPalette.Remember(ColorValue.FromHex("#123456"));
+        Assert.Same(custom, DrawingPalette.RecentColors[0]);
+        DrawingPalette.Remember(ColorValue.FromHex("#123456"));
+        Assert.Single(DrawingPalette.RecentColors, c => c.Color == ColorValue.FromHex("#123456"));
     }
 
     [Fact]

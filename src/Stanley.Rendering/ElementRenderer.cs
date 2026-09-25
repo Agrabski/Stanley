@@ -12,9 +12,6 @@ namespace Stanley.Rendering;
 /// </summary>
 public static class ElementRenderer
 {
-    /// <summary>A text box's outline, the same weight as a bubble's.</summary>
-    public const float TextBoxStrokeMm = 0.35f;
-
     /// <summary>Space between a text box's edge and its text, as a fraction of the letter size (boxed text only - bare text runs to its bounds).</summary>
     public const double BoxPaddingFraction = 0.45;
 
@@ -70,6 +67,7 @@ public static class ElementRenderer
         {
             using var strokePaint = StrokePaint(shape, (float)shape.Style.StrokeWidthMm);
             strokePaint.Color = FigureGeometry.ToSk(stroke);
+            using var dash = LinePatterns.Apply(strokePaint, shape.Style.Dash);
             canvas.DrawPath(path, strokePaint);
         }
     }
@@ -116,9 +114,10 @@ public static class ElementRenderer
             using var fill = new SKPaint { Color = FigureGeometry.ToSk(boxFill), Style = SKPaintStyle.Fill, IsAntialias = true };
             canvas.DrawRect(bounds, fill);
         }
-        if (text.Style.BoxStroke is { } boxStroke)
+        if (text.Style.BoxStroke is { } boxStroke && text.Style.BoxStrokeWidthMm > 0)
         {
-            using var stroke = new SKPaint { Color = FigureGeometry.ToSk(boxStroke), Style = SKPaintStyle.Stroke, StrokeWidth = TextBoxStrokeMm, IsAntialias = true };
+            using var stroke = new SKPaint { Color = FigureGeometry.ToSk(boxStroke), Style = SKPaintStyle.Stroke, StrokeWidth = (float)text.Style.BoxStrokeWidthMm, IsAntialias = true };
+            using var dash = LinePatterns.Apply(stroke, text.Style.BoxDash);
             canvas.DrawRect(bounds, stroke);
         }
 
@@ -131,7 +130,8 @@ public static class ElementRenderer
 
         var fontSize = (float)text.Style.FontSizeMm;
         using var font = Lettering.Font(fontSize, text.Style.Bold, text.Style.Italic);
-        using var paint = new SKPaint { Color = FigureGeometry.ToSk(text.Style.Color), IsAntialias = true };
+        // Hollow letters (no fill) still need a paint to measure with; they just aren't filled.
+        using var paint = new SKPaint { Color = text.Style.Color is { } letters ? FigureGeometry.ToSk(letters) : SKColors.Transparent, IsAntialias = true };
         var maxWidth = (float)area.Width;
         var lines = Lettering.Wrap(text.Text, font, paint, maxWidth);
 
@@ -157,7 +157,8 @@ public static class ElementRenderer
             {
                 Color = FigureGeometry.ToSk(outlineColor),
                 Style = SKPaintStyle.Stroke,
-                StrokeWidth = font.Size * OutlineFraction,
+                // In proportion to the letters unless a weight was picked; shrunk along with them when the text shrinks to fit.
+                StrokeWidth = (float)(text.Style.OutlineWidthMm ?? fontSize * OutlineFraction) * font.Size / fontSize,
                 StrokeJoin = SKStrokeJoin.Round,
                 IsAntialias = true
             }
@@ -167,7 +168,8 @@ public static class ElementRenderer
             var y = startY + font.Spacing * i;
             if (outline != null)
                 canvas.DrawText(lines[i], x, y, align, font, outline);
-            canvas.DrawText(lines[i], x, y, align, font, paint);
+            if (text.Style.Color is not null)
+                canvas.DrawText(lines[i], x, y, align, font, paint);
         }
     }
 
@@ -204,4 +206,32 @@ public static class ElementRenderer
     }
 
     private static SKRect ToSk(Rect2D r) => new((float)r.Left, (float)r.Top, (float)r.Right, (float)r.Bottom);
+}
+
+/// <summary>Word's line "Dashes" as Skia dash patterns, scaled to the line's thickness so a thick dotted line has fat, round dots.</summary>
+public static class LinePatterns
+{
+    /// <summary>The on/off lengths of <paramref name="dash"/> for a line <paramref name="width"/> thick, or null for a solid line.</summary>
+    public static float[]? Intervals(LineDash dash, float width) => dash switch
+    {
+        // A zero-length "on" with round caps draws a dot the line's width across.
+        LineDash.RoundDot => [0.001f, 2 * width],
+        LineDash.SquareDot => [width, width],
+        LineDash.Dash => [4 * width, 3 * width],
+        LineDash.DashDot => [4 * width, 3 * width, width, 3 * width],
+        LineDash.LongDash => [8 * width, 3 * width],
+        LineDash.LongDashDot => [8 * width, 3 * width, width, 3 * width],
+        _ => null
+    };
+
+    /// <summary>Gives <paramref name="paint"/> the dash pattern - with round caps for round dots, flat ones for everything else so round ends don't eat into the gaps, as in Word; the returned effect must outlive the drawing - dispose it after.</summary>
+    public static SKPathEffect? Apply(SKPaint paint, LineDash dash)
+    {
+        if (Intervals(dash, Math.Max(paint.StrokeWidth, 0.01f)) is not { } intervals)
+            return null;
+        paint.StrokeCap = dash == LineDash.RoundDot ? SKStrokeCap.Round : SKStrokeCap.Butt;
+        var effect = SKPathEffect.CreateDash(intervals, 0);
+        paint.PathEffect = effect;
+        return effect;
+    }
 }

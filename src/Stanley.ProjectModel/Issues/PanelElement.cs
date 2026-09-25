@@ -30,9 +30,23 @@ public enum ElementLayer
 [JsonDerivedType(typeof(PictureElement), "picture")]
 public abstract record PanelElement(ElementId Id, ElementLayer Layer);
 
+/// <summary>The pattern a line is drawn in - Word's "Dashes" - each scaled to the line's thickness.</summary>
+[JsonConverter(typeof(CamelCaseEnumConverter<LineDash>))]
+public enum LineDash
+{
+    Solid,
+    RoundDot,
+    SquareDot,
+    Dash,
+    DashDot,
+    LongDash,
+    LongDashDot
+}
+
 /// <summary>How a drawn shape is painted; a null colour means "none" (no fill, no outline).</summary>
 /// <param name="StrokeWidthMm">Outline thickness in page millimetres.</param>
-public sealed record ShapeStyle(ColorValue? Stroke, ColorValue? Fill, double StrokeWidthMm);
+/// <param name="Dash">The outline's pattern; absent in files from before dashes, which read as solid.</param>
+public sealed record ShapeStyle(ColorValue? Stroke, ColorValue? Fill, double StrokeWidthMm, LineDash Dash = LineDash.Solid);
 
 /// <summary>
 /// A drawn shape: the same bezier anchor model panels and bubbles use (see
@@ -53,21 +67,32 @@ public enum TextAlign
 }
 
 /// <summary>
-/// How a piece of text is lettered. A null colour means "none": no letter
-/// <paramref name="Outline"/> (the white edge around a sound effect), no box behind the
-/// text (<paramref name="BoxFill"/>) or around it (<paramref name="BoxStroke"/>) - a
-/// caption is text with both.
+/// How a piece of text is lettered - the same fill-and-outline controls as Word's Text
+/// Fill / Text Outline for the letters and Shape Fill / Shape Outline for their box. A null
+/// colour means "none": hollow letters (no <paramref name="Color"/> - only their outline
+/// shows), no letter <paramref name="Outline"/> (the edge around a sound effect), no box
+/// behind the text (<paramref name="BoxFill"/>) or around it (<paramref name="BoxStroke"/>)
+/// - a caption is text with both.
 /// </summary>
 /// <param name="FontSizeMm">Letter size in page millimetres (3.5mm is the usual ~10pt dialogue size).</param>
+/// <param name="OutlineWidthMm">The letter outline's thickness; null keeps it in proportion to the letter size.</param>
+/// <param name="BoxStrokeWidthMm">The box outline's thickness (a bubble's, by default).</param>
+/// <param name="BoxDash">The box outline's pattern.</param>
 public sealed record TextStyle(
     double FontSizeMm,
-    ColorValue Color,
+    ColorValue? Color,
     bool Bold = false,
     bool Italic = false,
     TextAlign Align = TextAlign.Center,
     ColorValue? Outline = null,
     ColorValue? BoxFill = null,
-    ColorValue? BoxStroke = null);
+    ColorValue? BoxStroke = null,
+    double? OutlineWidthMm = null,
+    double BoxStrokeWidthMm = TextStyle.DefaultBoxStrokeWidthMm,
+    LineDash BoxDash = LineDash.Solid)
+{
+    public const double DefaultBoxStrokeWidthMm = 0.35;
+}
 
 /// <summary>
 /// Text placed freely in a panel - a caption, a sign, a sound effect: word-wrapped inside

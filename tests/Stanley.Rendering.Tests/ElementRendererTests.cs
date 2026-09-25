@@ -179,3 +179,58 @@ public class ElementRendererTests
             Assert.Equal(new SKColor(255, 255, 0), bitmap.GetPixel(x, y));
     }
 }
+
+public class LineStyleRenderingTests
+{
+    private static readonly ColorValue Black = ColorValue.FromHex("#000000");
+
+    private static SKBitmap Render(params PanelElement[] elements)
+    {
+        var bitmap = new SKBitmap(100, 100);
+        using var canvas = new SKCanvas(bitmap);
+        PageRenderer.Draw(canvas, new Rect2D(0, 0, 100, 100), [new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 100, 100)), null, [], [], elements)]);
+        return bitmap;
+    }
+
+    private static int InkAlong(SKBitmap bitmap, int y, int from, int to)
+    {
+        var ink = 0;
+        for (var x = from; x < to; x++)
+            if (bitmap.GetPixel(x, y).Red < 128)
+                ink++;
+        return ink;
+    }
+
+    private static ShapeElement Line(LineDash dash) =>
+        new(ElementId.New(), ElementLayer.Background,
+            [AnchorRing.Corner(new Point2D(10, 50)), AnchorRing.Corner(new Point2D(90, 50))], Closed: false, new ShapeStyle(Black, null, 2, dash));
+
+    [Fact]
+    public void Dashed_and_dotted_lines_leave_gaps_a_solid_one_doesnt()
+    {
+        using var solid = Render(Line(LineDash.Solid));
+        using var dashed = Render(Line(LineDash.Dash));
+        using var dotted = Render(Line(LineDash.RoundDot));
+
+        Assert.True(InkAlong(solid, 50, 12, 88) >= 75);
+        Assert.InRange(InkAlong(dashed, 50, 12, 88), 30, 55); // 4 on, 3 off
+        Assert.InRange(InkAlong(dotted, 50, 12, 88), 25, 55); // round dots, a dot's width apart
+    }
+
+    [Fact]
+    public void Hollow_letters_draw_only_their_outline_and_a_heavier_box_border_is_thicker()
+    {
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 80, 40), "O",
+            new TextStyle(30, Color: null, Bold: true, Outline: Black, OutlineWidthMm: 1));
+        using var hollow = Render(text);
+        using var filled = Render(text with { Style = text.Style with { Color = Black } });
+        int Ink(SKBitmap b) { var n = 0; for (var y = 20; y < 60; y++) n += InkAlong(b, y, 10, 90); return n; }
+        Assert.True(Ink(hollow) > 0);
+        Assert.True(Ink(hollow) < Ink(filled) * 0.7, "a hollow O should be mostly empty inside");
+
+        var thin = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 80, 40), "", new TextStyle(3.5, Black, BoxStroke: Black));
+        using var thinBox = Render(thin);
+        using var thickBox = Render(thin with { Style = thin.Style with { BoxStrokeWidthMm = 3 } });
+        Assert.True(InkAlong(thickBox, 40, 5, 15) > InkAlong(thinBox, 40, 5, 15));
+    }
+}

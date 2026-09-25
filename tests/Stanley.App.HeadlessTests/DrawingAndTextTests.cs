@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
 using Stanley.Editing;
 using Stanley.Editors;
@@ -104,7 +105,7 @@ public class DrawingAndTextTests
         editor.BeginDrawShape(panelId);
         editor.UpdateDrawShape(new Point2D(bounds.Left + 20, bounds.Top + 20), new Point2D(bounds.Left + 60, bounds.Top + 50));
         editor.CommitDrawShape();
-        editor.SetFillColorCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "Green"));
+        editor.SetFillColorCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Green"));
         editor.ClearSelection();
         Dispatcher.UIThread.RunJobs();
 
@@ -128,7 +129,7 @@ public class DrawingAndTextTests
         editor.BeginDrawShape(panelId);
         editor.UpdateDrawShape(new Point2D(bounds.Left - 5, bounds.Top - 5), new Point2D(bounds.Right + 5, bounds.Bottom + 5));
         editor.CommitDrawShape();
-        editor.SetFillColorCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "Sky"));
+        editor.SetFillColorCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Light Blue"));
         editor.ClearSelection();
         Dispatcher.UIThread.RunJobs();
 
@@ -309,6 +310,135 @@ public class DrawingAndTextTests
         Assert.Equal(new PictureImportRequest(panelId, AsBackground: true), asked);
     }
 
+    private static ShapeElement DrawRectangle(MainWindow window, PanelId panelId, Rect2D box)
+    {
+        var editor = window.Editor;
+        editor.Tool = PageEditorTool.Rectangle;
+        editor.BeginDrawShape(panelId);
+        editor.UpdateDrawShape(new Point2D(box.Left, box.Top), new Point2D(box.Right, box.Bottom));
+        return (ShapeElement)editor.Working.Panels[panelId].Elements[editor.CommitDrawShape()];
+    }
+
+    private static ColorMenuButton ColorButton(PageEditorRibbon ribbon, string tab, string name)
+    {
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == tab);
+        Dispatcher.UIThread.RunJobs();
+        return ribbon.GetVisualDescendants().OfType<ColorMenuButton>().Single(b => b.Name == name);
+    }
+
+    /// <summary>Word's Shape Fill: the arrow opens Theme/Standard colours; a swatch fills the shape and closes the menu; the button's face then applies that colour again.</summary>
+    [Fact]
+    public void Shape_Fill_picks_from_the_theme_palette_and_its_face_repeats_the_last_colour()
+    {
+        var (window, _, panelId, bounds) = Open();
+        var editor = window.Editor;
+        DrawRectangle(window, panelId, new Rect2D(bounds.Left + 10, bounds.Top + 10, 30, 20));
+        var ribbon = Ribbon(window);
+        var fill = ColorButton(ribbon, "ShapeTab", "ShapeFillButton");
+
+        fill.Menu.ShowAt(fill.Button);
+        Dispatcher.UIThread.RunJobs();
+        var palette = (Control)((MenuItem)fill.Menu.Items[0]!).Header!;
+        Assert.Contains(palette.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text == "Theme Colors");
+        Assert.Contains(palette.GetLogicalDescendants().OfType<TextBlock>(), t => t.Text == "Standard Colors");
+        var gold = palette.GetLogicalDescendants().OfType<Button>().Single(b => (b.Tag as PaletteColor)?.Name == "Gold, Accent 4, Lighter 40%");
+        gold.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(fill.Menu.IsOpen);
+        Assert.Equal(((PaletteColor)gold.Tag!).Color, editor.SelectedShape!.Style.Fill);
+        Assert.Same(gold.Tag, fill.LastColor);
+
+        DrawRectangle(window, panelId, new Rect2D(bounds.Left + 50, bounds.Top + 10, 30, 20));
+        editor.SetFillColorCommand.Execute(DrawingPalette.None);
+        fill.Button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(SplitButton.ClickEvent));
+        Assert.Equal(((PaletteColor)gold.Tag!).Color, editor.SelectedShape!.Style.Fill);
+    }
+
+    /// <summary>Word's Shape Outline: No Outline, Weight ▸ and Dashes ▸ - the current weight and dash checked.</summary>
+    [Fact]
+    public void Shape_Outline_offers_no_outline_weight_and_dashes()
+    {
+        var (window, _, panelId, bounds) = Open();
+        var editor = window.Editor;
+        DrawRectangle(window, panelId, new Rect2D(bounds.Left + 10, bounds.Top + 10, 30, 20));
+        var outline = ColorButton(Ribbon(window), "ShapeTab", "ShapeOutlineButton");
+        outline.Menu.ShowAt(outline.Button);
+        Dispatcher.UIThread.RunJobs();
+        var items = outline.Menu.Items.OfType<MenuItem>().ToList();
+        Assert.Equal(["No Outline", "More Outline Colors…", "Weight", "Dashes"], items.Skip(1).Select(i => i.Header as string));
+
+        var weight = items.Single(i => i.Header as string == "Weight");
+        weight.IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var weights = weight.Items.OfType<MenuItem>().ToList();
+        Assert.True(weights.Single(w => ((ShapeWeightChoice)w.CommandParameter!).Mm == 0.7).IsChecked); // the default pen
+        weights.Single(w => ((ShapeWeightChoice)w.CommandParameter!).Mm == 2).Command!.Execute(weights.Single(w => ((ShapeWeightChoice)w.CommandParameter!).Mm == 2).CommandParameter);
+        Assert.Equal(2, editor.SelectedShape!.Style.StrokeWidthMm);
+
+        var dashes = items.Single(i => i.Header as string == "Dashes");
+        dashes.IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var dash = dashes.Items.OfType<MenuItem>().Single(d => (LineDash)d.CommandParameter! == LineDash.LongDash);
+        dash.Command!.Execute(dash.CommandParameter);
+        Assert.Equal(LineDash.LongDash, editor.SelectedShape!.Style.Dash);
+
+        var none = items.Single(i => i.Header as string == "No Outline");
+        none.Command!.Execute(none.CommandParameter);
+        Assert.Null(editor.SelectedShape!.Style.Stroke);
+    }
+
+    /// <summary>The Text tab has Word's Shape Fill / Shape Outline for the box and Text Fill / Text Outline for the letters.</summary>
+    [Fact]
+    public void The_Text_tab_sets_box_and_letters_separately()
+    {
+        var (window, _, panelId, bounds) = Open();
+        var editor = window.Editor;
+        var index = editor.CreateText(panelId, new Point2D(bounds.MidX, bounds.MidY), style: TextStylePresets.Style(TextStylePreset.Plain));
+        editor.SetElementText(panelId, index, "BOOM");
+        var ribbon = Ribbon(window);
+        TextStyle Style() => ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style;
+
+        var textFill = ColorButton(ribbon, "TextTab", "TextFillButton");
+        textFill.Menu.ShowAt(textFill.Button);
+        Dispatcher.UIThread.RunJobs();
+        var noFill = textFill.Menu.Items.OfType<MenuItem>().Single(i => i.Header as string == "No Fill");
+        noFill.Command!.Execute(noFill.CommandParameter);
+        Assert.Null(Style().Color);
+        textFill.Menu.Hide();
+
+        var boxFill = ribbon.GetVisualDescendants().OfType<ColorMenuButton>().Single(b => b.Name == "TextBoxFillButton");
+        boxFill.Button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(SplitButton.ClickEvent)); // the face: its default colour
+        Assert.Equal(ColorValue.FromHex("#4472c4"), Style().BoxFill);
+        Assert.Null(Style().BoxStroke); // the border is Shape Outline's business
+
+        var textOutline = ribbon.GetVisualDescendants().OfType<ColorMenuButton>().Single(b => b.Name == "TextOutlineButton");
+        textOutline.Button.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(SplitButton.ClickEvent));
+        Assert.Equal(ColorValue.FromHex("#000000"), Style().Outline);
+    }
+
+    /// <summary>Right-clicking a shape offers the same colour menus as the ribbon.</summary>
+    [Fact]
+    public void The_right_click_menu_has_the_same_fill_and_outline_menus()
+    {
+        var (window, canvas, panelId, bounds) = Open();
+        var shape = DrawRectangle(window, panelId, new Rect2D(bounds.Left + 10, bounds.Top + 10, 30, 20));
+        window.Editor.SetFillColorCommand.Execute(DrawingPalette.StandardColors[0]);
+        var box = PanelElements.Bounds(shape);
+
+        var items = canvas.ContextMenuItems(new Point2D(box.MidX, box.MidY)).OfType<MenuItem>().ToList();
+        var fill = items.Single(i => i.Header as string == "Fill");
+        var fillItems = ((IEnumerable<object>)fill.ItemsSource!).ToList();
+        Assert.IsType<MenuItem>(fillItems[0]);
+        Assert.Contains(fillItems.OfType<MenuItem>(), i => i.Header as string == "No Fill");
+        var outline = items.Single(i => i.Header as string == "Outline");
+        Assert.Contains(((IEnumerable<object>)outline.ItemsSource!).OfType<MenuItem>(), i => i.Header as string == "Dashes");
+
+        var palette = (Control)((MenuItem)fillItems[0]).Header!;
+        var current = palette.GetLogicalDescendants().OfType<Border>().Single(b => b.Classes.Contains("current"));
+        Assert.Equal(DrawingPalette.StandardColors[0], current.Tag);
+    }
+
     /// <summary>
     /// A whole scene - a sky, a hill behind a character, a bush in front, a caption and a
     /// sound effect - with each contextual tab open in turn. Set STANLEY_UI_SNAPSHOTS to a
@@ -322,7 +452,7 @@ public class DrawingAndTextTests
         editor.SetPanelBackground(panelId, DrawingPalette.Backgrounds.Single(b => b.Name == "Day sky").Background);
 
         editor.Tool = PageEditorTool.Draw;
-        editor.SetFillColorCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "Green"));
+        editor.SetFillColorCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Green"));
         editor.BeginDrawShape(panelId);
         var hill = new List<Point2D> { new(bounds.Left - 5, bounds.Bottom + 5) };
         for (var x = bounds.Left - 5; x <= bounds.Right + 5; x += 2)
@@ -336,7 +466,7 @@ public class DrawingAndTextTests
         editor.InsertCharacter(character.Id, panelId, new Point2D(bounds.MidX, bounds.Bottom - 30));
 
         editor.Tool = PageEditorTool.Ellipse;
-        editor.SetFillColorCommand.Execute(DrawingPalette.Colors.Single(c => c.Name == "Dark green"));
+        editor.SetFillColorCommand.Execute(DrawingPalette.ThemeShades[4].Single(c => c.Name == "Green, Accent 6, Darker 50%"));
         editor.BeginDrawShape(panelId);
         editor.UpdateDrawShape(new Point2D(bounds.MidX - 40, bounds.Bottom - 45), new Point2D(bounds.MidX + 5, bounds.Bottom + 10));
         editor.CommitDrawShape();
@@ -364,8 +494,8 @@ public class DrawingAndTextTests
         LookTabTests.Snapshot(window, "scene-insert-tab");
 
         ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "HomeTab");
-        var fill = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "HomeFillButton");
-        fill.Flyout!.ShowAt(fill);
+        var fill = ribbon.GetVisualDescendants().OfType<ColorMenuButton>().Single(b => b.Name == "HomeShapeFillButton");
+        fill.Menu.ShowAt(fill.Button);
         Dispatcher.UIThread.RunJobs();
         LookTabTests.Snapshot(window, "scene-home-fill");
 

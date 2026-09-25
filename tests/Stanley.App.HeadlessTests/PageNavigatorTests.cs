@@ -1,3 +1,4 @@
+using Avalonia.LogicalTree;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -104,22 +105,45 @@ public class PageNavigatorTests
         Assert.True(window.History.CanUndo);
     }
 
+    /// <summary>Layout › Page numbers is a Word-style menu: Bottom of page › Outer corner numbers every page but the cover; Start at and Remove work from the same menu.</summary>
     [Fact]
     public void RibbonPageNumbers_NumberEveryPage()
     {
         var (window, _, navigator) = Open(pages: 3);
         var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
-        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "InsertTab");
+        Assert.DoesNotContain(ribbon.GetLogicalDescendants().OfType<Control>(), c => c.Name == "PageNumberPositionBox"); // no longer on Insert
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "LayoutTab");
         Dispatcher.UIThread.RunJobs();
-        var box = ribbon.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "PageNumberPositionBox");
+        var button = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "PageNumbersButton");
+        var menu = Assert.IsType<MenuFlyout>(button.Flyout);
+        MenuItem Item(IEnumerable<object?> items, string name) => items.OfType<MenuItem>().Single(i => i.Name == name);
+        var bottom = Item(menu.Items, "BottomOfPageMenu");
 
-        box.SelectedItem = PageNumberOption.All.Single(o => o.Position == Stanley.ProjectModel.Issues.PageNumberPosition.BottomOuter);
+        button.Flyout!.ShowAt(button);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(Item(menu.Items, "RemovePageNumbersItem").Command!.CanExecute(null));
+        bottom.IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        Item(bottom.Items, "BottomOuterItem").IsChecked = true;
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(Stanley.ProjectModel.Issues.PageNumberPosition.BottomOuter, navigator.PageNumbering.Position);
         Assert.Null(navigator.Pages[0].Editor.Folio); // cover unnumbered by default
         Assert.Equal("3", navigator.Pages[2].Editor.Folio!.Text);
         Assert.True(window.ViewModel.IsDirty);
+        Assert.Equal("Bottom, outer", navigator.CurrentPage.Editor.PageNumbersSummary);
+
+        var startAt = Item(menu.Items, "StartAtMenu");
+        startAt.IsSubMenuOpen = true;
+        Dispatcher.UIThread.RunJobs();
+        var start = ((Panel)((MenuItem)startAt.Items[0]!).Header!).Children.OfType<NumericUpDown>().Single();
+        start.Value = 10;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("12", navigator.Pages[2].Editor.Folio!.Text);
+
+        Item(menu.Items, "RemovePageNumbersItem").Command!.Execute(null);
+        Assert.Equal(Stanley.ProjectModel.Issues.PageNumberPosition.None, navigator.PageNumbering.Position);
+        Assert.False(Item(bottom.Items, "BottomOuterItem").IsChecked);
     }
 
     [Fact]

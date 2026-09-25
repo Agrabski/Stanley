@@ -226,7 +226,8 @@ public partial class PageEditorView : UserControl
         };
         InlineTextEditor.FontWeight = style?.Bold == true ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal;
         InlineTextEditor.FontStyle = style?.Italic == true ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
-        InlineTextEditor.Foreground = style is { } s ? DrawingPalette.BrushOf(s.Color) : Avalonia.Media.Brushes.Black;
+        // Hollow letters (no fill) are typed in their outline's colour, so they can be seen.
+        InlineTextEditor.Foreground = style is { } s && (s.Color ?? s.Outline) is { } visible ? DrawingPalette.BrushOf(visible) : Avalonia.Media.Brushes.Black;
         InlineTextEditor.MaxLength = style is null ? BubbleEditing.MaxTextLength : TextEditing.MaxTextLength;
     }
 

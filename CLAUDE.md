@@ -89,7 +89,8 @@ coverlet.collector (10.0.1). No linter is configured yet.
 
 Dependencies: **Avalonia** 12.1.3, **SkiaSharp** 4.152.1, **System.CommandLine**
 2.0.12, **CommunityToolkit.Mvvm** 8.4.2, **Dock.Avalonia** / **Dock.Model.Mvvm**
-12.1.0.6 (for dockable panes). Environment notes: on a fresh Linux container,
+12.1.0.6 (for dockable panes), **Avalonia.Controls.ColorPicker** 12.1.3 (MIT; the
+`ColorView` behind "More Colors…", its Fluent theme included from `App.axaml`). Environment notes: on a fresh Linux container,
 `apt-get install dotnet-sdk-10.0` works when `dot.net`/`builds.dotnet.microsoft.com`
 is egress-blocked (the official dotnet-install script host). SkiaSharp needs an
 explicit `SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per
@@ -220,11 +221,11 @@ Editing pipeline layers, bottom to top:
     `DataTemplate` scoped to that host maps each editor view-model type to its
     ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
     editor type adds its own tabs the same way. Page editor tabs: Home (tools incl.
-    Draw and Text, bubble style, Pen: outline/fill/line, add/edit/delete), Insert
-    (panel, speech/shout/whisper bubble, caption/text/sound effect, shapes,
-    picture, backgrounds, characters, page numbers), Layout (inline preset
-    gallery, margin/gutter, snap, split), View (fit/actual size/zoom, margin
-    guides), plus contextual **Panel** (blue), **Character** (green), **Bubble**
+    Draw and Text, bubble style, Shape Styles: Shape Fill / Shape Outline,
+    add/edit/delete), Insert (panel, speech/shout/whisper bubble,
+    caption/text/sound effect, shapes, picture, backgrounds, characters), Layout
+    (inline preset gallery, margin/gutter, snap, split, lock, Page numbers menu),
+    View (fit/actual size/zoom, margin guides), plus contextual **Panel** (blue), **Character** (green), **Bubble**
     (orange), **Shape** and **Picture** (purple) and **Text** (teal) tabs visible
     only for that selection (`IsPanelContext`, `IsBubbleContext`, `IsShapeContext`,
     ...); like Word they aren't forced open, and if the selected one disappears
@@ -254,9 +255,13 @@ Editing pipeline layers, bottom to top:
     `Issue.PageNumbering` (absent when off, so older files read unchanged). The
     navigator owns it (`IPageNumberingHost`, undoable) and sets each page
     editor's `Folio` (`PageFolios.For`: odd numbers are right-hand pages, so
-    "outer" flips sides). Changed from the Insert tab's "Page numbers" group via
-    the shown page editor's `PageNumberOption`/`PageNumberStart`/`NumberFirstPage`
-    (they write through to the host, so they apply to every page). Drawn by
+    "outer" flips sides). Changed from the Layout tab's Page numbers menu (Word's
+    Page Number menu: Top of page ▸, Bottom of page ▸, Remove page numbers, Number
+    the first page, Start at ▸ - a `MenuFlyout`; its check marks bind
+    `IsPageNumbersTopOuter`/`...BottomCenter`/`...BottomOuter` two-way, as
+    `MenuItem.IsChecked` is one-way by default) via the shown page editor's
+    `PageNumberOption`/`PageNumberStart`/`NumberFirstPage` (they write through to
+    the host, so they apply to every page). Drawn by
     `PageRenderer.DrawFolio` in the margin — on the canvas, thumbnails and
     exports alike.
   - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
@@ -410,10 +415,13 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   bubble's) and an `ElementLayer` (`Background` = behind the characters,
   `Foreground` = in front, still under the bubbles). Kinds (JSON `kind`):
   `ShapeElement` (the same anchor model as panels/bubbles, `Closed` or an open line,
-  `ShapeStyle` stroke/fill colours — null = none — and width in mm), `TextElement`
-  (`Bounds`, `Text`, `TextStyle`: size in mm, colour, bold, italic, `TextAlign`,
-  letter `Outline`, caption `BoxFill`/`BoxStroke`), `PictureElement` (`Bounds` +
-  `ArtFileName`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
+  `ShapeStyle` stroke/fill colours — null = none — width in mm and `LineDash`),
+  `TextElement` (`Bounds`, `Text`, `TextStyle`: size in mm, colour — null = hollow
+  letters — bold, italic, `TextAlign`, letter `Outline` and `OutlineWidthMm` — null
+  = in proportion to the letters — and the box: `BoxFill`, `BoxStroke`,
+  `BoxStrokeWidthMm`, `BoxDash`), `PictureElement` (`Bounds` + `ArtFileName`).
+  `LineDash` is Word's Dashes (solid, round/square dot, dash, dash dot, long dash,
+  long dash dot), drawn scaled to the line's width (`LinePatterns`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
   and `GradientBackground` (top → bottom) beside the existing `InlineBackground`
   (a picture covering the panel). `PanelElements.Bounds` / `ArtFileNames`.
 - **Pictures on disk**: `issues/<id>/art/<hash>.<ext>` — named after the content
@@ -460,9 +468,22 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   change, so a locked layout allows it. The canvas hit-tests front to back:
   foreground elements over characters, background elements under them but never
   over a panel's draggable edge; unfilled shapes are only hit along their line.
-  Empty bare text shows a faint (unprinted) outline. Pickers: `ColorPalettePicker`,
-  `WeightPicker`, `BackgroundPicker` (`DrawingPalette`: 19 colours, 5 weights,
-  paper + 13 colours + 7 gradient skies).
+  Empty bare text shows a faint (unprinted) outline.
+- **Colour controls, as in Word** (`ColorMenus.cs`): `ColorMenuButton` is Word's
+  Shape Fill / Shape Outline / Text Fill / Text Outline — a small split button, its
+  icon over a bar in the last colour picked (the face applies it again), the arrow
+  opening `ColorMenu`: Theme Colors (the Office theme's ten, then five rows of
+  lighter/darker shades worked out in HSL like Word's), Standard Colors, Recent
+  Colors (custom picks this session), No Fill / No Outline, More … Colors… (a
+  `ColorView` flyout), and for outlines Weight ▸ (0.1–5 mm) and Dashes ▸; the
+  selection's colour is highlighted, its weight/dash checked. A `MenuFlyout` keeps
+  showing the items it first opened with, so `ColorMenu` is built when the button's
+  commands are bound and only `Update`d on opening. Shapes: Shape Fill / Shape
+  Outline (Home › Shape Styles and the Shape tab); text: Shape Fill / Shape
+  Outline for its box and Text Fill / Text Outline for its letters (Text tab).
+  The canvas's right-click menu uses the same `ColorMenus.Items`. Palettes live in
+  `DrawingPalette` (also the weights, dashes and the `BackgroundPicker`'s paper +
+  13 colours + 7 gradient skies).
 
 ## Command-line interface (implemented)
 

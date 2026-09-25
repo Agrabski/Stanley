@@ -138,6 +138,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         ZoomOutCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomOut));
         FitPageCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.FitPage));
         ActualSizeCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ActualSize));
+        RemovePageNumbersCommand = new RelayCommand(() => _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = PageNumberPosition.None }),
+            () => PageNumbersEnabled);
         InitializeElementCommands();
     }
 
@@ -407,6 +409,33 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public bool PageNumbersEnabled => CurrentNumbering.Position != PageNumberPosition.None;
 
+    // The Layout tab's Page Numbers menu: one check mark per position, like Word's Page Number menu.
+    public bool IsPageNumbersTopOuter { get => IsNumbering(PageNumberPosition.TopOuter); set => SetNumbering(PageNumberPosition.TopOuter, value); }
+    public bool IsPageNumbersBottomCenter { get => IsNumbering(PageNumberPosition.BottomCenter); set => SetNumbering(PageNumberPosition.BottomCenter, value); }
+    public bool IsPageNumbersBottomOuter { get => IsNumbering(PageNumberPosition.BottomOuter); set => SetNumbering(PageNumberPosition.BottomOuter, value); }
+
+    /// <summary>What the Page Numbers button says under its name.</summary>
+    public string PageNumbersSummary => CurrentNumbering.Position switch
+    {
+        PageNumberPosition.BottomCenter => "Bottom, centred",
+        PageNumberPosition.BottomOuter => "Bottom, outer",
+        PageNumberPosition.TopOuter => "Top, outer",
+        _ => "None"
+    };
+
+    /// <summary>Page Numbers › Remove page numbers.</summary>
+    public IRelayCommand RemovePageNumbersCommand { get; private set; } = null!;
+
+    private bool IsNumbering(PageNumberPosition position) => CurrentNumbering.Position == position;
+
+    private void SetNumbering(PageNumberPosition position, bool value)
+    {
+        if (value && CurrentNumbering.Position != position)
+            _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = position });
+        else
+            RaisePageNumberingChanged(); // a check mark that flipped itself off hears "no, you're still on"
+    }
+
     private void RaisePageNumberingChanged()
     {
         OnPropertyChanged(nameof(HasPageNumbering));
@@ -414,6 +443,11 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(PageNumberStart));
         OnPropertyChanged(nameof(NumberFirstPage));
         OnPropertyChanged(nameof(PageNumbersEnabled));
+        OnPropertyChanged(nameof(IsPageNumbersTopOuter));
+        OnPropertyChanged(nameof(IsPageNumbersBottomCenter));
+        OnPropertyChanged(nameof(IsPageNumbersBottomOuter));
+        OnPropertyChanged(nameof(PageNumbersSummary));
+        RemovePageNumbersCommand?.NotifyCanExecuteChanged();
     }
 
     /// <summary>Whether the canvas draws the dashed margin (live area) guide.</summary>
