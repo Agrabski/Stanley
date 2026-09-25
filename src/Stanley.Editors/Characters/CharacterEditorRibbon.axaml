@@ -139,8 +139,8 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
-          <StackPanel DockPanel.Dock="Left" Orientation="Vertical" Spacing="4">
-            <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="84">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="90">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                   <WrapPanel />
@@ -156,9 +156,20 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Button Name="MoreSkinColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="More Colors: pick any skin colour"
-                    Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">More…</Button>
-          </StackPanel>
+            <!-- Any colour at all: Word's "More Colors…", beside the swatches so it fits the ribbon's height. -->
+            <Button Grid.Column="1" Name="MoreSkinColorsButton" Classes="small" Height="70" Padding="4,2" Margin="2,1,0,0" VerticalAlignment="Top"
+                    ToolTip.Tip="More Colors… - pick any skin colour" Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">
+              <StackPanel Spacing="4">
+                <UniformGrid Rows="2" Columns="2" Width="14" Height="14" HorizontalAlignment="Center">
+                  <Border Background="#ed7d31" />
+                  <Border Background="#ffc000" />
+                  <Border Background="#4472c4" />
+                  <Border Background="#70ad47" />
+                </UniformGrid>
+                <TextBlock Text="More…" FontSize="11" HorizontalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
           <TextBlock Classes="groupLabel" Text="Skin" />
         </DockPanel>
         <Rectangle Classes="divider" />
