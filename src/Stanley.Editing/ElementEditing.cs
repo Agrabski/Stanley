@@ -21,6 +21,7 @@ public static class ElementEditing
         ShapeElement shape => ShapeEditing.Move(shape, dx, dy),
         TextElement text => TextEditing.Move(text, dx, dy),
         PictureElement picture => PictureEditing.Move(picture, dx, dy),
+        SpeedLinesElement speedLines => SpeedLinesEditing.Move(speedLines, dx, dy),
         _ => element
     };
 
@@ -29,6 +30,7 @@ public static class ElementEditing
         ShapeElement shape => Widen(ShapeEditing.Resize(shape, bounds)),
         TextElement text => Widen(TextEditing.Resize(text, bounds)),
         PictureElement picture => Widen(PictureEditing.Resize(picture, bounds)),
+        SpeedLinesElement speedLines => Widen(SpeedLinesEditing.Resize(speedLines, bounds)),
         _ => EditResult<PanelElement>.Failure("This can't be resized.")
     };
 

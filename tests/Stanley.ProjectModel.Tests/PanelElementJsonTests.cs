@@ -100,6 +100,21 @@ public class PanelElementJsonTests
     }
 
     [Fact]
+    public void A_speed_lines_element_round_trips()
+    {
+        var speedLines = new SpeedLinesElement(ElementId.New(), ElementLayer.Background, new Rect2D(30, 40, 25, 20),
+            new SpeedLinesStyle(ColorValue.FromHex("#1c1c1c"), Count: 120, WidthMm: 1.5, Jitter: 0.6, Seed: 7));
+        var panel = PanelWith(null, speedLines);
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"kind\": \"speedLines\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        Assert.IsType<SpeedLinesElement>(read.Elements[0]);
+    }
+
+    [Fact]
     public void A_panel_file_from_before_elements_reads_as_having_none()
     {
         var old = PanelWith(null) with { Elements = [] };

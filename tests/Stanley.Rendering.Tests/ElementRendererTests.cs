@@ -234,3 +234,86 @@ public class LineStyleRenderingTests
         Assert.True(InkAlong(thickBox, 40, 5, 15) > InkAlong(thinBox, 40, 5, 15));
     }
 }
+
+public class SpeedLinesRendererTests
+{
+    private static readonly ColorValue Black = ColorValue.FromHex("#000000");
+    private static readonly Rect2D Focus = new(40, 40, 20, 20); // centred on a 100x100 panel, radius 10 each way
+
+    private static SpeedLinesElement Burst(int seed = 1, int count = 40, double widthMm = 3) =>
+        new(ElementId.New(), ElementLayer.Background, Focus, new SpeedLinesStyle(Black, count, widthMm, Jitter: 0.5, Seed: seed));
+
+    private static SKBitmap Render(SpeedLinesElement speedLines)
+    {
+        var bitmap = new SKBitmap(100, 100);
+        using var canvas = new SKCanvas(bitmap);
+        PageRenderer.Draw(canvas, new Rect2D(0, 0, 100, 100), [new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 100, 100)), null, [], [], [speedLines])]);
+        return bitmap;
+    }
+
+    private static bool HasInkOnBorder(SKBitmap bitmap)
+    {
+        for (var x = 0; x < bitmap.Width; x++)
+        {
+            if (bitmap.GetPixel(x, 0) != SKColors.White || bitmap.GetPixel(x, bitmap.Height - 1) != SKColors.White)
+                return true;
+        }
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            if (bitmap.GetPixel(0, y) != SKColors.White || bitmap.GetPixel(bitmap.Width - 1, y) != SKColors.White)
+                return true;
+        }
+        return false;
+    }
+
+    [Fact]
+    public void Lines_reach_the_panel_edge_but_leave_the_focus_ellipse_clear()
+    {
+        using var bitmap = Render(Burst());
+
+        Assert.True(HasInkOnBorder(bitmap), "a 40-line burst around the whole panel should reach its edge somewhere");
+        // The focus ellipse (centre 50,50, radius 10 each way) and a little past it: no wedge's tip ever sits inside it.
+        foreach (var (x, y) in new (int, int)[] { (50, 50), (45, 50), (55, 50), (50, 45), (50, 55) })
+            Assert.Equal(SKColors.White, bitmap.GetPixel(x, y));
+    }
+
+    [Fact]
+    public void The_same_seed_always_draws_the_same_burst()
+    {
+        var style = new SpeedLinesStyle(Black, Count: 60, WidthMm: 2, Jitter: 0.7, Seed: 42);
+        var speedLines = new SpeedLinesElement(ElementId.New(), ElementLayer.Background, Focus, style);
+
+        using var first = Render(speedLines);
+        using var second = Render(speedLines with { Id = ElementId.New() }); // a different element, same style: still pixel-identical
+
+        Assert.Equal(first.Bytes, second.Bytes);
+    }
+
+    [Fact]
+    public void Shuffling_the_seed_draws_a_different_burst()
+    {
+        using var one = Render(Burst(seed: 1));
+        using var two = Render(Burst(seed: 2));
+
+        Assert.NotEqual(one.Bytes, two.Bytes);
+    }
+
+    [Fact]
+    public void Zero_lines_draws_nothing()
+    {
+        using var bitmap = Render(Burst(count: 0));
+
+        Assert.False(HasInkOnBorder(bitmap));
+    }
+
+    [Fact]
+    public void Hit_testing_only_finds_the_focus_ellipse_not_the_lines_covering_the_panel()
+    {
+        var speedLines = Burst();
+
+        Assert.True(ElementRenderer.Hits(speedLines, new Point2D(50, 50), 1)); // dead centre
+        Assert.True(ElementRenderer.Hits(speedLines, new Point2D(49.5, 40.6), 1)); // just inside the ellipse's edge
+        Assert.False(ElementRenderer.Hits(speedLines, new Point2D(50, 32), 1)); // well outside the ellipse, but under a line
+        Assert.False(ElementRenderer.Hits(speedLines, new Point2D(5, 5), 1)); // a corner the lines reach, far from the focus
+    }
+}

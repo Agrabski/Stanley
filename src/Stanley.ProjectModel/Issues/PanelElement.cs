@@ -28,6 +28,7 @@ public enum ElementLayer
 [JsonDerivedType(typeof(ShapeElement), "shape")]
 [JsonDerivedType(typeof(TextElement), "text")]
 [JsonDerivedType(typeof(PictureElement), "picture")]
+[JsonDerivedType(typeof(SpeedLinesElement), "speedLines")]
 public abstract record PanelElement(ElementId Id, ElementLayer Layer);
 
 /// <summary>The pattern a line is drawn in - Word's "Dashes" - each scaled to the line's thickness.</summary>
@@ -115,4 +116,25 @@ public sealed record TextElement(ElementId Id, ElementLayer Layer, Rect2D Bounds
 /// <see cref="InlineBackground"/> makes.
 /// </summary>
 public sealed record PictureElement(ElementId Id, ElementLayer Layer, Rect2D Bounds, string ArtFileName)
+    : PanelElement(Id, Layer);
+
+/// <summary>
+/// How a burst of <see cref="SpeedLinesElement"/> draws: filled, tapered wedges radiating
+/// out from the focus ellipse's centre - deterministically, so the same style always draws
+/// the same lines (see <see cref="Seed"/>).
+/// </summary>
+/// <param name="Count">How many lines radiate out.</param>
+/// <param name="WidthMm">How thick each line is at its far (outer) end, in page millimetres; it tapers to nothing at its inner tip, near the focus.</param>
+/// <param name="Jitter">How irregular the lines are - their angle, gap from the focus and thickness - from dead even (0) to noticeably hand-drawn (1).</param>
+/// <param name="Seed">Which pseudo-random lines this draws; the same seed always draws the same burst, on every platform. "Shuffle" just changes this.</param>
+public sealed record SpeedLinesStyle(ColorValue Color, int Count = 80, double WidthMm = 1.2, double Jitter = 0.5, int Seed = 1);
+
+/// <summary>
+/// A comic's classic "speed lines" or "concentration lines": a burst of thin, tapered
+/// lines radiating out past the panel's edges from a clear ellipse in the middle
+/// (<see cref="Focus"/>, page millimetres) - <see cref="Focus"/>'s centre is the point they
+/// radiate from. Its move and resize handles drag <see cref="Focus"/>, the same way any
+/// other element's box moves and resizes (<see cref="PanelElements.Bounds"/>).
+/// </summary>
+public sealed record SpeedLinesElement(ElementId Id, ElementLayer Layer, Rect2D Focus, SpeedLinesStyle Style)
     : PanelElement(Id, Layer);

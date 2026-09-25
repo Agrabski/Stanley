@@ -1266,6 +1266,19 @@ public sealed class PageCanvasControl : Control
                 items.Add(ColorMenu("Outline", new ColorMenuOptions(vm.SetStrokeColorCommand, "No Outline", "More Outline Colors…", style.Stroke,
                     vm.SetStrokeWeightCommand, style.StrokeWidthMm, vm.SetStrokeDashCommand, style.Dash)));
             }
+            else if (element is ProjectModel.Issues.SpeedLinesElement)
+            {
+                var style = vm.CurrentSpeedLinesStyle;
+                items.Add(ColorMenu("Color", new ColorMenuOptions(vm.SetSpeedLinesColorCommand, null, "More Colors…", style.Color)));
+                items.Add(new MenuItem
+                {
+                    Header = "Lines",
+                    ItemsSource = new (string Name, int Count)[] { ("Few", 20), ("Some", 80), ("Many", 200) }
+                        .Select(p => Item(p.Name, () => vm.SpeedLinesCount = p.Count)).ToList()
+                });
+                items.Add(new MenuItem { Header = "Thickness", ItemsSource = vm.WeightChoices.Select(w => Item(w.Name, () => vm.SpeedLinesThickness = w.Mm)).ToList() });
+                items.Add(Item("Shuffle", () => vm.ShuffleSpeedLinesCommand.Execute(null)));
+            }
             items.Add(new Separator());
             var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
             items.Add(Item(inFront ? "Put behind the characters" : "Put in front of the characters",
@@ -1277,6 +1290,7 @@ public sealed class PageCanvasControl : Control
             {
                 ProjectModel.Issues.TextElement => "Delete text",
                 ProjectModel.Issues.PictureElement => "Delete picture",
+                ProjectModel.Issues.SpeedLinesElement => "Delete speed lines",
                 _ => "Delete shape"
             }, () => vm.DeleteElement(elementPanel, index), "Del"));
         }

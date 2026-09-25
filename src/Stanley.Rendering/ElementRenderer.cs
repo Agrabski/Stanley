@@ -32,6 +32,9 @@ public static class ElementRenderer
             case PictureElement picture:
                 PictureRenderer.Draw(canvas, pictures?.GetValueOrDefault(picture.ArtFileName), picture.Bounds, cover: false);
                 break;
+            case SpeedLinesElement speedLines:
+                DrawSpeedLines(canvas, speedLines);
+                break;
         }
     }
 
@@ -173,6 +176,101 @@ public static class ElementRenderer
         }
     }
 
+    // ---------------------------------------------------------------- speed lines
+
+    /// <summary>How far past the focus ellipse a wedge's tip sits at minimum, and how much further <see cref="SpeedLinesStyle.Jitter"/> can push it - a fraction of the ellipse's own radius in that direction.</summary>
+    private const double SpeedLinesMinGapFraction = 0.04;
+    private const double SpeedLinesJitterGapFraction = 0.5;
+
+    /// <summary>How far a wedge's wide end reaches, as a multiple of the focus ellipse's own size - the floor for when the canvas has no clip to measure against (a bare test canvas, say).</summary>
+    private const double SpeedLinesReachMultiplier = 30;
+
+    /// <summary>Slack past the clip's farthest corner, so a wedge clears the panel edge with room to spare rather than exactly grazing it.</summary>
+    private const double SpeedLinesClipSlack = 1.15;
+
+    /// <summary>
+    /// A burst of filled, tapered wedges: each one's tip sits just outside the focus ellipse
+    /// at its angle, its wide end far enough out to clear every edge of the panel (the
+    /// panel's own clip, already on <paramref name="canvas"/>, then cuts it off there). Angles,
+    /// gaps and widths are jittered, but deterministically from <see cref="SpeedLinesStyle.Seed"/> -
+    /// a hand-rolled hash, not <see cref="Random"/>, so the same seed draws the same burst on
+    /// every platform.
+    /// </summary>
+    public static void DrawSpeedLines(SKCanvas canvas, SpeedLinesElement speedLines)
+    {
+        var style = speedLines.Style;
+        var count = Math.Max(0, style.Count);
+        if (count == 0)
+            return;
+
+        var cx = speedLines.Focus.MidX;
+        var cy = speedLines.Focus.MidY;
+        var rx = Math.Max(speedLines.Focus.Width / 2, 1e-6);
+        var ry = Math.Max(speedLines.Focus.Height / 2, 1e-6);
+        var jitter = Math.Clamp(style.Jitter, 0, 1);
+        var halfWidth = Math.Max(style.WidthMm, 0) / 2;
+        var outer = SpeedLinesOuterReach(canvas, cx, cy, Math.Max(rx, ry));
+        var spacing = 2 * Math.PI / count;
+
+        using var paint = new SKPaint { Color = FigureGeometry.ToSk(style.Color), Style = SKPaintStyle.Fill, IsAntialias = true };
+        using var builder = new SKPathBuilder();
+        for (var i = 0; i < count; i++)
+        {
+            var angle = i * spacing + (SpeedLinesHash01(style.Seed, i, 0) - 0.5) * spacing * jitter;
+            var dx = Math.Cos(angle);
+            var dy = Math.Sin(angle);
+
+            // The ellipse's own radius in this direction: the wedge's tip never sits inside it.
+            var radius = rx * ry / Math.Sqrt(ry * ry * dx * dx + rx * rx * dy * dy);
+            var gap = radius * (SpeedLinesMinGapFraction + SpeedLinesJitterGapFraction * jitter * SpeedLinesHash01(style.Seed, i, 1));
+            var inner = radius + gap;
+
+            var half = Math.Max(halfWidth * (1 + jitter * (SpeedLinesHash01(style.Seed, i, 2) - 0.5)), 0);
+            var px = -dy;
+            var py = dx;
+            var baseX = cx + dx * outer;
+            var baseY = cy + dy * outer;
+
+            builder.MoveTo((float)(cx + dx * inner), (float)(cy + dy * inner));
+            builder.LineTo((float)(baseX + px * half), (float)(baseY + py * half));
+            builder.LineTo((float)(baseX - px * half), (float)(baseY - py * half));
+            builder.Close();
+        }
+        using var path = builder.Detach();
+        canvas.DrawPath(path, paint);
+    }
+
+    /// <summary>How far out a wedge needs to reach from (<paramref name="cx"/>, <paramref name="cy"/>) to clear whatever's clipping <paramref name="canvas"/> - its farthest clip corner, with slack - or a generous multiple of <paramref name="focusRadius"/> when there's no usable clip to measure.</summary>
+    private static double SpeedLinesOuterReach(SKCanvas canvas, double cx, double cy, double focusRadius)
+    {
+        var reach = focusRadius * SpeedLinesReachMultiplier;
+        var clip = canvas.LocalClipBounds;
+        if (clip is { Width: > 0, Height: > 0 })
+        {
+            SKPoint[] corners = [new(clip.Left, clip.Top), new(clip.Right, clip.Top), new(clip.Left, clip.Bottom), new(clip.Right, clip.Bottom)];
+            foreach (var corner in corners)
+            {
+                var dx = cx - corner.X;
+                var dy = cy - corner.Y;
+                reach = Math.Max(reach, Math.Sqrt(dx * dx + dy * dy) * SpeedLinesClipSlack);
+            }
+        }
+        return reach;
+    }
+
+    /// <summary>A deterministic pseudo-random number in [0, 1) - a small hash/mix, not <see cref="Random"/>, so the same (seed, index, salt) always gives the same value, identically on every platform.</summary>
+    private static double SpeedLinesHash01(int seed, int index, int salt)
+    {
+        unchecked
+        {
+            var h = (uint)(seed * 374761393 + index * 668265263 + salt * 2654435761 + 1);
+            h = (h ^ (h >> 15)) * 2246822519;
+            h = (h ^ (h >> 13)) * 3266489917;
+            h ^= h >> 16;
+            return h / 4294967296.0;
+        }
+    }
+
     // ---------------------------------------------------------------- hit testing
 
     /// <summary>
@@ -200,6 +298,16 @@ public static class ElementRenderer
             case TextElement or PictureElement:
                 var b = PanelElements.Bounds(element);
                 return point.X >= b.Left - tolerance && point.X <= b.Right + tolerance && point.Y >= b.Top - tolerance && point.Y <= b.Bottom + tolerance;
+            case SpeedLinesElement speedLines:
+                // Only the clear ellipse in the middle is clickable - the lines themselves cover
+                // the whole panel, and would otherwise swallow clicks meant for what's under them.
+                var rx = speedLines.Focus.Width / 2 + tolerance;
+                var ry = speedLines.Focus.Height / 2 + tolerance;
+                if (rx <= 0 || ry <= 0)
+                    return false;
+                var nx = (point.X - speedLines.Focus.MidX) / rx;
+                var ny = (point.Y - speedLines.Focus.MidY) / ry;
+                return nx * nx + ny * ny <= 1;
             default:
                 return false;
         }

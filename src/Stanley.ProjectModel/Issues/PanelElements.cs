@@ -11,6 +11,7 @@ public static class PanelElements
         ShapeElement shape => AnchorRing.BoundingBox(shape.Anchors),
         TextElement text => text.Bounds,
         PictureElement picture => picture.Bounds,
+        SpeedLinesElement speedLines => speedLines.Focus,
         _ => default
     };
 

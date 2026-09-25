@@ -272,14 +272,27 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         }
     }
 
-    /// <summary>A dashed box around the element with eight resize handles, like a bubble's.</summary>
+    /// <summary>
+    /// A dashed outline around the element with eight resize handles, like a bubble's - an
+    /// ellipse with a centre marker for speed lines (its focus is round, not boxy; the
+    /// marker shows exactly where the lines radiate from), a rectangle for everything else.
+    /// </summary>
     private void DrawElementSelection(SKCanvas canvas, PanelElement element)
     {
         var rect = Screen(PanelElements.Bounds(element));
         using (var box = Stroke(Accent, 1f))
         {
             box.PathEffect = SKPathEffect.CreateDash([4, 3], 0);
-            canvas.DrawRect(rect, box);
+            if (element is SpeedLinesElement)
+                canvas.DrawOval(rect, box);
+            else
+                canvas.DrawRect(rect, box);
+        }
+        if (element is SpeedLinesElement)
+        {
+            using var mark = Stroke(Accent, 1.5f);
+            canvas.DrawLine(rect.MidX - 5, rect.MidY, rect.MidX + 5, rect.MidY, mark);
+            canvas.DrawLine(rect.MidX, rect.MidY - 5, rect.MidX, rect.MidY + 5, mark);
         }
         foreach (var corner in Corners(rect))
             DrawSquareHandle(canvas, corner, Accent);

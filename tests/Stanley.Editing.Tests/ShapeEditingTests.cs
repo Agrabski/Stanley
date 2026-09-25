@@ -443,3 +443,63 @@ public class PictureEditingTests
         Assert.False(PictureEditing.Resize(Picture(new Rect2D(10, 10, 40, 20)), Rect2D.FromEdges(10, 10, 12, 30)).IsValid);
     }
 }
+
+public class SpeedLinesEditingTests
+{
+    [Fact]
+    public void A_new_burst_is_centred_in_the_panel_at_roughly_a_third_of_its_size_and_black()
+    {
+        var panel = new Rect2D(10, 10, 100, 50);
+
+        var speedLines = SpeedLinesEditing.Place(panel);
+
+        Assert.Equal(panel.MidX, speedLines.Focus.MidX, 6);
+        Assert.Equal(panel.MidY, speedLines.Focus.MidY, 6);
+        Assert.InRange(speedLines.Focus.Width / panel.Width, 0.3, 0.45);
+        Assert.InRange(speedLines.Focus.Height / panel.Height, 0.3, 0.45);
+        Assert.Equal(ElementLayer.Background, speedLines.Layer);
+        Assert.Equal(ColorValue.FromHex("#1c1c1c"), speedLines.Style.Color);
+    }
+
+    [Fact]
+    public void Moving_and_resizing_change_the_focus_like_any_other_element()
+    {
+        var speedLines = SpeedLinesEditing.Place(new Rect2D(0, 0, 100, 100));
+
+        var moved = SpeedLinesEditing.Move(speedLines, 5, -3);
+        Assert.Equal(speedLines.Focus.X + 5, moved.Focus.X, 6);
+        Assert.Equal(speedLines.Focus.Y - 3, moved.Focus.Y, 6);
+
+        var resized = SpeedLinesEditing.Resize(speedLines, new Rect2D(10, 10, 30, 20));
+        Assert.True(resized.IsValid);
+        Assert.Equal(new Rect2D(10, 10, 30, 20), resized.Value.Focus);
+
+        Assert.False(SpeedLinesEditing.Resize(speedLines, new Rect2D(10, 10, 1, 1)).IsValid);
+    }
+
+    [Fact]
+    public void Style_changes_are_validated_and_jitter_is_clamped()
+    {
+        var speedLines = SpeedLinesEditing.Place(new Rect2D(0, 0, 100, 100));
+
+        var styled = SpeedLinesEditing.SetStyle(speedLines, new SpeedLinesStyle(ColorValue.FromHex("#c00000"), Count: 150, WidthMm: 2, Jitter: 3));
+        Assert.True(styled.IsValid);
+        Assert.Equal(150, styled.Value.Style.Count);
+        Assert.Equal(1, styled.Value.Style.Jitter); // clamped to at most 1
+
+        Assert.False(SpeedLinesEditing.SetStyle(speedLines, speedLines.Style with { Count = SpeedLinesEditing.MinCount - 1 }).IsValid);
+        Assert.False(SpeedLinesEditing.SetStyle(speedLines, speedLines.Style with { WidthMm = SpeedLinesEditing.MaxWidthMm + 1 }).IsValid);
+    }
+
+    [Fact]
+    public void Shuffle_changes_only_the_seed()
+    {
+        var speedLines = SpeedLinesEditing.Place(new Rect2D(0, 0, 100, 100));
+
+        var shuffled = SpeedLinesEditing.Shuffle(speedLines);
+
+        Assert.NotEqual(speedLines.Style.Seed, shuffled.Style.Seed);
+        Assert.Equal(speedLines.Style with { Seed = shuffled.Style.Seed }, shuffled.Style);
+        Assert.Equal(speedLines.Focus, shuffled.Focus);
+    }
+}
