@@ -19,7 +19,8 @@ public static class ElementRenderer
     public const float OutlineFraction = 0.16f;
 
     /// <param name="pictures">The comic's pictures by file name (<see cref="PictureElement.ArtFileName"/>); a picture missing from them draws as a placeholder.</param>
-    public static void Draw(SKCanvas canvas, PanelElement element, bool drawText = true, IReadOnlyDictionary<string, ArtFile>? pictures = null)
+    /// <param name="panelBounds">The box of the panel the element is in: how far speed lines reach, so they're at full thickness where they leave the panel. Null measures the canvas's clip instead.</param>
+    public static void Draw(SKCanvas canvas, PanelElement element, bool drawText = true, IReadOnlyDictionary<string, ArtFile>? pictures = null, Rect2D? panelBounds = null)
     {
         switch (element)
         {
@@ -33,7 +34,7 @@ public static class ElementRenderer
                 PictureRenderer.Draw(canvas, pictures?.GetValueOrDefault(picture.ArtFileName), picture.Bounds, cover: false);
                 break;
             case SpeedLinesElement speedLines:
-                DrawSpeedLines(canvas, speedLines);
+                DrawSpeedLines(canvas, speedLines, panelBounds);
                 break;
         }
     }
@@ -196,7 +197,7 @@ public static class ElementRenderer
     /// a hand-rolled hash, not <see cref="Random"/>, so the same seed draws the same burst on
     /// every platform.
     /// </summary>
-    public static void DrawSpeedLines(SKCanvas canvas, SpeedLinesElement speedLines)
+    public static void DrawSpeedLines(SKCanvas canvas, SpeedLinesElement speedLines, Rect2D? panelBounds = null)
     {
         var style = speedLines.Style;
         var count = Math.Max(0, style.Count);
@@ -209,7 +210,9 @@ public static class ElementRenderer
         var ry = Math.Max(speedLines.Focus.Height / 2, 1e-6);
         var jitter = Math.Clamp(style.Jitter, 0, 1);
         var halfWidth = Math.Max(style.WidthMm, 0) / 2;
-        var outer = SpeedLinesOuterReach(canvas, cx, cy, Math.Max(rx, ry));
+        var outer = panelBounds is { Width: > 0, Height: > 0 } box
+            ? FarthestCorner(cx, cy, box.Left, box.Top, box.Right, box.Bottom) * SpeedLinesPanelSlack
+            : SpeedLinesOuterReach(canvas, cx, cy, Math.Max(rx, ry));
         var spacing = 2 * Math.PI / count;
 
         using var paint = new SKPaint { Color = FigureGeometry.ToSk(style.Color), Style = SKPaintStyle.Fill, IsAntialias = true };
@@ -243,19 +246,20 @@ public static class ElementRenderer
     /// <summary>How far out a wedge needs to reach from (<paramref name="cx"/>, <paramref name="cy"/>) to clear whatever's clipping <paramref name="canvas"/> - its farthest clip corner, with slack - or a generous multiple of <paramref name="focusRadius"/> when there's no usable clip to measure.</summary>
     private static double SpeedLinesOuterReach(SKCanvas canvas, double cx, double cy, double focusRadius)
     {
-        var reach = focusRadius * SpeedLinesReachMultiplier;
         var clip = canvas.LocalClipBounds;
-        if (clip is { Width: > 0, Height: > 0 })
-        {
-            SKPoint[] corners = [new(clip.Left, clip.Top), new(clip.Right, clip.Top), new(clip.Left, clip.Bottom), new(clip.Right, clip.Bottom)];
-            foreach (var corner in corners)
-            {
-                var dx = cx - corner.X;
-                var dy = cy - corner.Y;
-                reach = Math.Max(reach, Math.Sqrt(dx * dx + dy * dy) * SpeedLinesClipSlack);
-            }
-        }
-        return reach;
+        return clip is { Width: > 0, Height: > 0 } && clip.Width < 1e6 && clip.Height < 1e6
+            ? FarthestCorner(cx, cy, clip.Left, clip.Top, clip.Right, clip.Bottom) * SpeedLinesClipSlack
+            : focusRadius * SpeedLinesReachMultiplier;
+    }
+
+    /// <summary>How far (from its centre) a wedge's wide end sits past the panel's farthest corner: just outside, so each line is at full thickness where it leaves the frame.</summary>
+    private const double SpeedLinesPanelSlack = 1.02;
+
+    private static double FarthestCorner(double cx, double cy, double left, double top, double right, double bottom)
+    {
+        var dx = Math.Max(Math.Abs(cx - left), Math.Abs(cx - right));
+        var dy = Math.Max(Math.Abs(cy - top), Math.Abs(cy - bottom));
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>A deterministic pseudo-random number in [0, 1) - a small hash/mix, not <see cref="Random"/>, so the same (seed, index, salt) always gives the same value, identically on every platform.</summary>

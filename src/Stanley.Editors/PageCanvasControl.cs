@@ -380,6 +380,10 @@ public sealed class PageCanvasControl : Control
             var handleEdges = HitHandles(ProjectModel.Issues.PanelElements.Bounds(element), p, tol, includeMidpoints: true);
             if (handleEdges != RectEdges.None)
                 return new Hit(HitKind.ElementHandle, elementPanel, ElementIndex: vm.SelectedElementIndex, Edges: handleEdges);
+            // Selected speed lines keep their clear circle even where a character stands in it
+            // (the usual place for one), so dragging there always moves where the lines radiate from.
+            if (element is ProjectModel.Issues.SpeedLinesElement speedLines && InEllipse(speedLines.Focus, p))
+                return new Hit(HitKind.ElementBody, elementPanel, ElementIndex: vm.SelectedElementIndex);
         }
 
         // A locked layout offers no panel handles, edges or gutters to grab.
@@ -1515,6 +1519,15 @@ public sealed class PageCanvasControl : Control
         Rect2D.FromEdges(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
 
     private static bool Contains(Rect2D r, Point2D p) => p.X >= r.Left && p.X <= r.Right && p.Y >= r.Top && p.Y <= r.Bottom;
+
+    private static bool InEllipse(Rect2D r, Point2D p)
+    {
+        if (r.Width <= 0 || r.Height <= 0)
+            return false;
+        var dx = (p.X - r.MidX) / (r.Width / 2);
+        var dy = (p.Y - r.MidY) / (r.Height / 2);
+        return dx * dx + dy * dy <= 1;
+    }
 
     private static double Dist(Point2D a, Point2D b)
     {
