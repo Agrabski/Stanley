@@ -66,7 +66,21 @@
               <PathIcon Data="{StaticResource RedoIcon}" />
             </Button>
           </StackPanel>
-          <TextBlock Grid.Column="1" Name="CaptionText" Text="{Binding DocumentCaption}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Name="CaptionText" Text="{Binding DocumentCaption}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
+            <!-- Quick issue switcher: shows up once the comic has more than one issue; "New issue" stays reachable either way. -->
+            <ComboBox Name="IssueSwitcherBox" IsVisible="{Binding HasMultipleIssues}" ItemsSource="{Binding Issues}" SelectedItem="{Binding SelectedIssue}"
+                      MinWidth="110" MaxWidth="220" FontSize="12" ToolTip.Tip="Switch issue">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="app:IssueEntry">
+                  <TextBlock Text="{Binding Caption}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Name="NewIssueButton" Classes="qat" Command="{Binding NewIssueCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Add a new issue">
+              <PathIcon Data="{StaticResource NewIcon}" />
+            </Button>
+          </StackPanel>
           <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right"
                      Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
         </Grid>

@@ -131,8 +131,10 @@
             <TextBlock Text="Title" VerticalAlignment="Center" Opacity="0.7" />
             <TextBox Name="TitleBox" Grid.Column="1" Text="{Binding DocumentTitle}" MinWidth="320" />
             <TextBlock Grid.Row="1" Text="Issue" VerticalAlignment="Center" Opacity="0.7" />
-            <TextBox Name="IssueNumberBox" Grid.Row="1" Grid.Column="1" Text="{Binding IssueNumber}" Width="120" HorizontalAlignment="Left"
-                     ToolTip.Tip="The issue's number - 1, 0, 1.5 or whatever you print" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <TextBox Name="IssueNumberBox" Text="{Binding IssueNumber}" Width="80" ToolTip.Tip="The issue's number - 1, 0, 1.5 or whatever you print" />
+              <TextBox Name="IssueTitleBox" Text="{Binding IssueTitle}" Width="220" ToolTip.Tip="The issue's own title, if it has one - e.g. Annual" />
+            </StackPanel>
             <TextBlock Grid.Row="2" Grid.Column="1" Text="Texts on the pages show these wherever they have {title} or {issue} - a title page does, and Text › Fields adds them to any text."
                        TextWrapping="Wrap" FontSize="12" Opacity="0.7" Margin="0,-6,0,0" />
             <TextBlock Grid.Row="3" Text="Location" Opacity="0.7" />
@@ -144,6 +146,28 @@
             <TextBlock Grid.Row="6" Text="Status" Opacity="0.7" />
             <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding DocumentCaption}" />
           </Grid>
+
+          <TextBlock Classes="backstageSubheading" Text="Issues" Margin="0,24,0,8" />
+          <ItemsControl Name="IssuesList" ItemsSource="{Binding Issues}" MaxWidth="640" HorizontalAlignment="Left">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="app:IssueEntry">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Caption}" FontWeight="SemiBold" />
+                      <TextBlock Text="(current)" FontSize="12" Opacity="0.7" IsVisible="{Binding IsCurrent}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding PageCountText}" FontSize="12" Opacity="0.75" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Open" VerticalAlignment="Center" IsVisible="{Binding !IsCurrent}"
+                          Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).SwitchIssueCommand}" CommandParameter="{Binding Id}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Name="NewIssueInfoButton" Command="{Binding NewIssueCommand}" Padding="14,10" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource NewIcon}" /><TextBlock Text="New issue" /></StackPanel>
+          </Button>
         </StackPanel>
 
         <!-- Save As -->
