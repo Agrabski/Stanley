@@ -22,15 +22,15 @@ public class PageFolioTests
 
         int left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
         for (var y = 0; y < bitmap.Height; y++)
-        for (var x = 0; x < bitmap.Width; x++)
-        {
-            if (bitmap.GetPixel(x, y).Red > 128)
-                continue;
-            left = Math.Min(left, x);
-            top = Math.Min(top, y);
-            right = Math.Max(right, x);
-            bottom = Math.Max(bottom, y);
-        }
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).Red > 128)
+                    continue;
+                left = Math.Min(left, x);
+                top = Math.Min(top, y);
+                right = Math.Max(right, x);
+                bottom = Math.Max(bottom, y);
+            }
         return new SKRectI(left, top, right, bottom);
     }
 

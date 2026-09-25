@@ -98,11 +98,11 @@ public partial class CharacterEditorRibbon : UserControl
     {
         if (TopLevel.GetTopLevel(this) is not { } top)
             return null;
-        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        var files = await top.StorageProvider.OpenFilePickerAsync(new()
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
+            FileTypeFilter = [new("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
         });
         if (files is not [var picked])
             return null;

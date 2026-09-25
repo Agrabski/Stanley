@@ -9,16 +9,6 @@ using Stanley.Rendering;
 
 namespace Stanley.Editors;
 
-/// <summary>Asks the view for an SVG or PNG to import as a sticker for <paramref name="Slot"/>.</summary>
-public sealed record ArtImportRequest(string Slot);
-
-/// <summary>
-/// Asks the view to set up an SVG editor (none is configured yet) before drawing for
-/// <paramref name="Slot"/> can go ahead; the view answers with <see cref="SvgEditorPicker"/>
-/// and then calls <see cref="CharacterEditorViewModel.DrawYourOwn"/> again.
-/// </summary>
-public sealed record SvgEditorConfigurationRequest(string Slot);
-
 /// <summary>
 /// Drawing your own stickers and importing art (docs/sticker-system.md §13.2), and placing
 /// drawn art on the character: the Sticker tab's size, turn and "hug the shape", and
@@ -49,7 +39,7 @@ public sealed partial class CharacterEditorViewModel
         ImportArtCommand = new RelayCommand<string>(slot =>
         {
             if (slot != null)
-                ArtImportRequested?.Invoke(this, new ArtImportRequest(slot));
+                ArtImportRequested?.Invoke(this, new(slot));
         });
         EditSelectedArtCommand = new RelayCommand(() =>
         {
@@ -79,7 +69,7 @@ public sealed partial class CharacterEditorViewModel
     {
         if (ArtEditing.EditorPath is not { Length: > 0 })
         {
-            SvgEditorConfigurationRequested?.Invoke(this, new SvgEditorConfigurationRequest(slot));
+            SvgEditorConfigurationRequested?.Invoke(this, new(slot));
             return;
         }
 

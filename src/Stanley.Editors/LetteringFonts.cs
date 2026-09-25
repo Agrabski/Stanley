@@ -89,7 +89,6 @@ public static class LetteringFonts
 /// <summary>One entry in the font box: a family name, shown in its own face.</summary>
 public sealed class FontChoice(string name, bool isBundled)
 {
-    private FontFamily? _preview;
 
     public string Name { get; } = name;
 
@@ -101,7 +100,7 @@ public sealed class FontChoice(string name, bool isBundled)
     /// <summary>The small note beside the name: the default, or built in.</summary>
     public string Note => IsDefault ? "default" : IsBundled ? "built in" : "";
 
-    public FontFamily Preview => _preview ??= LetteringFonts.AvaloniaFamily(Name);
+    public FontFamily Preview => field ??= LetteringFonts.AvaloniaFamily(Name);
 
     public override string ToString() => Name;
 }

@@ -68,8 +68,8 @@ public sealed class CharacterFigure : Control
         if (Character is not { } character)
             return null;
         var angle = Pose?.ViewAngle ?? Angle;
-        var main = Arrange(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
-        return main.Character is null ? null : CharacterRenderers.Default.StickerAt(character, main.Placement, new Point2D(point.X, point.Y), angle, Pose);
+        var main = Arrange(new(Bounds.Size), character, LineUp ?? [], ShowGuides, angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
+        return main.Character is null ? null : CharacterRenderers.Default.StickerAt(character, main.Placement, new(point.X, point.Y), angle, Pose);
     }
 
     /// <summary>Where the main character stands in the control now (control coordinates are page millimetres to it), or null if nothing is drawn.</summary>
@@ -79,7 +79,7 @@ public sealed class CharacterFigure : Control
         {
             if (Character is not { } character)
                 return null;
-            var main = Arrange(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, Pose?.ViewAngle ?? Angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
+            var main = Arrange(new(Bounds.Size), character, LineUp ?? [], ShowGuides, Pose?.ViewAngle ?? Angle, Pose, Closeup).FirstOrDefault(f => !f.Faded);
             return main.Character is null ? null : main.Placement;
         }
     }
@@ -102,7 +102,7 @@ public sealed class CharacterFigure : Control
             if (scale <= 0)
                 return result;
             var ground = new Point2D(bounds.Width / 2 - head.Center.X * scale, 2 + (bounds.Height - 4 - (bottom - top) * scale) / 2 - top * scale);
-            result.Add((main, new CharacterPlacement(ground, scale, Mirrored: false), false, scale));
+            result.Add((main, new(ground, scale, Mirrored: false), false, scale));
             return result;
         }
         var extents = new[] { main }.Concat(others).Select(c => (Character: c, Extent: CharacterRenderers.Default.Extent(c, angle, ReferenceEquals(c, main) ? pose : null))).ToList();
@@ -124,7 +124,7 @@ public sealed class CharacterFigure : Control
         var x = (bounds.Width - totalWidth * unit) / 2;
         foreach (var (character, extent, faded) in left.Concat(order).Concat(right))
         {
-            result.Add((character, new CharacterPlacement(new Point2D(x - extent.Left * unit, groundY), unit, Mirrored: false), faded, unit));
+            result.Add((character, new(new(x - extent.Left * unit, groundY), unit, Mirrored: false), faded, unit));
             x += (extent.Width + gap) * unit;
         }
         return result;
@@ -167,7 +167,7 @@ public sealed class CharacterFigure : Control
         if (Character is not { } character || Bounds.Width < 2 || Bounds.Height < 2)
             return;
         var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
-        context.Custom(new FigureDrawOperation(new Rect(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup));
+        context.Custom(new FigureDrawOperation(new(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup));
     }
 
     private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
@@ -189,7 +189,7 @@ public sealed class CharacterFigure : Control
             using var lease = feature.Lease();
             var canvas = lease.SkCanvas;
             canvas.Save();
-            canvas.ClipRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+            canvas.ClipRect(new(0, 0, (float)bounds.Width, (float)bounds.Height));
 
             var figures = Arrange(bounds, main, closeup ? [] : others, guides && !closeup, angle, pose, closeup);
             if (figures.Count == 0)
@@ -219,7 +219,7 @@ public sealed class CharacterFigure : Control
                 else if (highlight is { } sticker)
                 {
                     using var outline = CharacterRenderers.Default.BuildStickerOutline(character, placement, sticker, angle, pose);
-                    using var selection = new SKPaint { Color = new SKColor(0x1E, 0x5A, 0xA8), Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
+                    using var selection = new SKPaint { Color = new(0x1E, 0x5A, 0xA8), Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
                     canvas.DrawPath(outline, selection);
                 }
             }

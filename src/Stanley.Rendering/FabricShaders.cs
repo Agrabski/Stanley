@@ -198,7 +198,7 @@ public static class FabricShaders
                 canvas.DrawLine(0, 0.5f, 1, 0.5f, line);
                 canvas.DrawLine(0.5f, 0, 0.5f, 1, line);
                 break;
-            // Wool, leather and felt are the noise alone.
+                // Wool, leather and felt are the noise alone.
         }
     }
 

@@ -274,7 +274,8 @@ public sealed class ComicProject
 
         var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
         var record = (previous?.Record ?? new Page(id, "Title page", TrimOverride: null, []))
-            with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = true };
+            with
+        { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = true };
         repository.SaveTitlePage(record);
         foreach (var panelId in panelIds)
             repository.SaveTitlePagePanel(document.Panels[panelId]);
@@ -398,7 +399,8 @@ public sealed class ComicProject
             var (id, document) = pages[i];
             var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
             var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, document.IsTitlePage ? "Title page" : $"Page {i + 1}", TrimOverride: null, []))
-                with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = document.IsTitlePage };
+                with
+            { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = document.IsTitlePage };
             repository.SavePage(issue.Id, record);
             foreach (var panelId in panelIds)
                 repository.SavePanel(issue.Id, id, document.Panels[panelId]);

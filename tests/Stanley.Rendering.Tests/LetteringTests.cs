@@ -122,9 +122,9 @@ public class LetteringTests
         canvas.Clear(SKColors.White);
         BubbleTextRenderer.Draw(canvas, bubble, 8);
         for (var y = 0; y < 30; y++)
-        for (var x = 0; x < 60; x++)
-            if (bitmap.GetPixel(x, y).Red < 128)
-                yield return x;
+            for (var x = 0; x < 60; x++)
+                if (bitmap.GetPixel(x, y).Red < 128)
+                    yield return x;
     }
 
     private static byte[] Pixels(Bubble bubble)

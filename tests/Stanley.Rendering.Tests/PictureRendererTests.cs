@@ -14,8 +14,8 @@ public class PictureRendererTests
     {
         using var bitmap = new SKBitmap(width, height);
         for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++)
-            bitmap.SetPixel(x, y, x < width / 2 ? SKColors.Red : SKColors.Blue);
+            for (var x = 0; x < width; x++)
+                bitmap.SetPixel(x, y, x < width / 2 ? SKColors.Red : SKColors.Blue);
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return ArtFile.Png(data.ToArray());

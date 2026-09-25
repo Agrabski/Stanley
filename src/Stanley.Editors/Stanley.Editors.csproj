@@ -27,4 +27,19 @@
     <ProjectReference Include="..\Stanley.StickerLibrary\Stanley.StickerLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Characters\CharacterEditorRibbon.axaml.cs">
+      <DependentUpon>CharacterEditorRibbon.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Characters\CharacterEditorView.axaml.cs">
+      <DependentUpon>CharacterEditorView.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Characters\CharacterLibraryView.axaml.cs">
+      <DependentUpon>CharacterLibraryView.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+
 </Project>

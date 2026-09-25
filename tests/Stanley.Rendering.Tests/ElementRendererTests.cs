@@ -143,9 +143,9 @@ public class ElementRendererTests
         Assert.Equal(new SKColor(255, 255, 0), bitmap.GetPixel(53, 33)); // box corner, clear of the text
         var ink = 0;
         for (var y = 16; y < 35; y++)
-        for (var x = 16; x < 55; x++)
-            if (bitmap.GetPixel(x, y) is { Red: < 100, Green: < 100 })
-                ink++;
+            for (var x = 16; x < 55; x++)
+                if (bitmap.GetPixel(x, y) is { Red: < 100, Green: < 100 })
+                    ink++;
         Assert.True(ink > 10, "some letters should be drawn");
         for (var y = 0; y < 100; y++)
             Assert.NotEqual(new SKColor(0, 0, 0), bitmap.GetPixel(70, y)); // nothing ran past the box's right edge
@@ -175,8 +175,8 @@ public class ElementRendererTests
             PageRenderer.DrawPanels(canvas, [panel], hideText: caption.Id);
 
         for (var y = 16; y < 35; y++)
-        for (var x = 16; x < 55; x++)
-            Assert.Equal(new SKColor(255, 255, 0), bitmap.GetPixel(x, y));
+            for (var x = 16; x < 55; x++)
+                Assert.Equal(new SKColor(255, 255, 0), bitmap.GetPixel(x, y));
     }
 }
 

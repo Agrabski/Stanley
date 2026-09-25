@@ -15,7 +15,6 @@ namespace Stanley.Editors;
 /// </summary>
 public sealed partial class PageEditorViewModel
 {
-    private string _newFaceName = "";
     private string? _notice;
 
     public IRelayCommand<ExpressionVariantChoice> SetExpressionVariantCommand { get; private set; } = null!;
@@ -131,13 +130,13 @@ public sealed partial class PageEditorViewModel
     /// <summary>The name "Save this face" saves under (the Face dropdown's box); a name already saved is replaced.</summary>
     public string NewFaceName
     {
-        get => _newFaceName;
+        get;
         set
         {
-            if (SetProperty(ref _newFaceName, value ?? ""))
+            if (SetProperty(ref field, value ?? ""))
                 SaveFaceCommand.NotifyCanExecuteChanged();
         }
-    }
+    } = "";
 
     /// <summary>The faces saved on the selected character, as close-ups dressed as this panel shows it.</summary>
     public IReadOnlyList<SavedFaceChoice> SavedFaceChoices

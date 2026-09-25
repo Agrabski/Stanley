@@ -48,19 +48,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     public const double DefaultBubbleWidthMm = 42;
     public const double DefaultBubbleHeightMm = 26;
 
-    private PageEditorTool _tool = PageEditorTool.Select;
     private PanelId? _selectedPanelId;
     private int _selectedBubbleIndex = -1;
     private int _selectedCharacterIndex = -1;
     private ICharacterCatalog? _catalog;
     private BubbleStylePreset _newBubbleStyle = BubbleStylePreset.Speech;
-    private PanelGrid _grid = PanelGrid.Default;
-    private bool _snapEnabled = true;
-    private IReadOnlyList<SnapGuide> _activeGuides = [];
     private PanelId _pendingPanelId;
-    private double _zoomPercent = 100;
-    private bool _showMarginGuides = true;
-    private PageFolio? _folio;
     private IPageNumberingHost? _numberingHost;
 
     public Rect2D PageBounds { get; }
@@ -230,13 +223,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>The zoom the view is currently showing, reported back by it, for the ribbon's readout.</summary>
     public double ZoomPercent
     {
-        get => _zoomPercent;
+        get;
         set
         {
-            if (SetProperty(ref _zoomPercent, value))
+            if (SetProperty(ref field, value))
                 OnPropertyChanged(nameof(ZoomText));
         }
-    }
+    } = 100;
 
     public string ZoomText => $"{ZoomPercent:0}%";
 
@@ -291,10 +284,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public PageEditorTool Tool
     {
-        get => _tool;
+        get;
         set
         {
-            SetProperty(ref _tool, value);
+            SetProperty(ref field, value);
             // A drawing or text tool shows (and changes) the style of what it makes next, not
             // of a selected element, so let go of the element.
             if ((IsShapeTool || value == PageEditorTool.Text) && HasSelectedElement)
@@ -310,7 +303,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             _notice = null;
             OnPropertyChanged(nameof(Hint));
         }
-    }
+    } = PageEditorTool.Select;
 
     public bool IsSelectTool { get => Tool == PageEditorTool.Select; set => SetToolFlag(PageEditorTool.Select, value); }
     public bool IsPanelTool { get => Tool == PageEditorTool.Panel; set => SetToolFlag(PageEditorTool.Panel, value); }
@@ -322,15 +315,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Margin and gutter used for snapping, splitting and layout presets - the comic's, set by its <see cref="SpacingHost"/>.</summary>
     public PanelGrid Grid
     {
-        get => _grid;
+        get;
         set
         {
-            if (!SetProperty(ref _grid, value))
+            if (!SetProperty(ref field, value))
                 return;
             OnPropertyChanged(nameof(MarginMm));
             OnPropertyChanged(nameof(GutterMm));
         }
-    }
+    } = PanelGrid.Default;
 
     /// <summary>Where the comic's margin and gutter live (the navigator), so the Layout tab sets them for every page; null for a page edited on its own, which keeps its own.</summary>
     public IPageSpacingHost? SpacingHost { get; set; }
@@ -378,8 +371,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>The number printed on this page (set by whoever knows the page's position - the navigator), or null for none.</summary>
     public PageFolio? Folio
     {
-        get => _folio;
-        set => SetProperty(ref _folio, value);
+        get;
+        set => SetProperty(ref field, value);
     }
 
     /// <summary>Where the comic's page-numbering setting lives; null for a page edited on its own, which then has no page-number controls.</summary>
@@ -512,15 +505,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Whether the canvas draws the dashed margin (live area) guide.</summary>
     public bool ShowMarginGuides
     {
-        get => _showMarginGuides;
-        set => SetProperty(ref _showMarginGuides, value);
-    }
+        get;
+        set => SetProperty(ref field, value);
+    } = true;
 
     public bool SnapEnabled
     {
-        get => _snapEnabled;
-        set => SetProperty(ref _snapEnabled, value);
-    }
+        get;
+        set => SetProperty(ref field, value);
+    } = true;
 
     /// <summary>
     /// A Word-style "protect this layout" switch: while true, panels on this page can't be
@@ -543,9 +536,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>The lines the current drag snapped to, for the canvas to draw. Empty outside a snapping drag.</summary>
     public IReadOnlyList<SnapGuide> ActiveGuides
     {
-        get => _activeGuides;
-        private set => SetProperty(ref _activeGuides, value);
-    }
+        get;
+        private set => SetProperty(ref field, value);
+    } =
+        [];
 
     // ---------------------------------------------------------------- selection
 
