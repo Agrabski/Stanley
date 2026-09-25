@@ -2,6 +2,7 @@ using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel;
 using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Storage;
 
 namespace Stanley.Editors.Tests;
@@ -173,4 +174,110 @@ public sealed class ComicProjectTests : IDisposable
 
         Assert.Equal(numbering, ComicProject.Open(folder).PageNumbering);
     }
+
+    [Fact]
+    public void CreateNew_HasJustItsOwnIssueInTheIssuesList()
+    {
+        var project = ComicProject.CreateNew();
+
+        var issue = Assert.Single(project.Issues);
+        Assert.Equal(project.IssueId, issue.Id);
+        Assert.Equal("1", issue.Number);
+        Assert.Equal(1, issue.PageCount);
+    }
+
+    [Fact]
+    public void NewIssue_OnAnUnsavedComic_Throws()
+    {
+        var project = ComicProject.CreateNew();
+
+        Assert.Throws<InvalidOperationException>(() => project.NewIssue());
+    }
+
+    [Fact]
+    public void NewIssue_IsAddedToTheManifestWithOneBlankPage_NumberedOnePastTheFirst()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "series");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+
+        var newId = project.NewIssue();
+
+        var repository = new ProjectRepository(folder);
+        Assert.Equal(["1", "2"], repository.LoadManifest().IssueIds.Select(id => repository.LoadIssue(id).Number));
+        var opened = ComicProject.Open(folder, newId);
+        Assert.Equal("2", opened.IssueNumber);
+        Assert.Single(opened.Pages);
+        Assert.Single(opened.Pages[0].Document.PanelOrder);
+    }
+
+    [Fact]
+    public void NewIssue_ANumberAndTitleCanBeGivenExplicitly()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "annual");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+
+        var newId = project.NewIssue("1.5", "Annual");
+
+        var opened = ComicProject.Open(folder, newId);
+        Assert.Equal("1.5", opened.IssueNumber);
+        Assert.Equal("Annual", opened.IssueTitle);
+    }
+
+    [Fact]
+    public void Open_ASpecificIssueId_OpensThatIssuesOwnPages()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "multi");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        var firstId = project.IssueId;
+        var secondId = project.NewIssue();
+
+        var second = ComicProject.Open(folder, secondId);
+        var first = ComicProject.Open(folder, firstId);
+
+        Assert.Equal(secondId, second.IssueId);
+        Assert.Equal(firstId, first.IssueId);
+        Assert.NotEqual(first.Pages[0].Id, second.Pages[0].Id);
+    }
+
+    [Fact]
+    public void Save_OfOneIssue_NeverTouchesAnotherIssuesFiles()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "untouched");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        var secondId = project.NewIssue();
+        var secondIssueDir = IssueDir(folder, secondId);
+        var before = Directory.EnumerateFiles(secondIssueDir, "*", SearchOption.AllDirectories)
+            .ToDictionary(f => f, File.ReadAllBytes);
+
+        var reopenedFirst = ComicProject.Open(folder, project.IssueId);
+        var navigator = NavigatorFor(reopenedFirst);
+        navigator.CurrentPage.Editor.SplitPanel(navigator.CurrentPage.Editor.Working.PanelOrder[0], BoundaryOrientation.Vertical, 0.5);
+        reopenedFirst.Save(navigator.Snapshot());
+
+        var after = Directory.EnumerateFiles(secondIssueDir, "*", SearchOption.AllDirectories)
+            .ToDictionary(f => f, File.ReadAllBytes);
+        Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
+        foreach (var (path, bytes) in before)
+            Assert.Equal(bytes, after[path]);
+    }
+
+    [Fact]
+    public void IssueTitle_RoundTripsThroughSaveAndOpen()
+    {
+        var project = ComicProject.CreateNew();
+        project.IssueTitle = "The Long Way Home";
+        var folder = Path.Combine(_root, "titled-issue");
+
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+
+        Assert.Equal("The Long Way Home", ComicProject.Open(folder).IssueTitle);
+    }
+
+    /// <summary>The folder an issue lives in - for asserting a save never touches another issue's files.</summary>
+    private static string IssueDir(string folder, IssueId id) =>
+        Directory.EnumerateDirectories(Path.Combine(folder, "issues")).Single(d => Path.GetFileName(d).StartsWith(id.Value + "-", StringComparison.Ordinal));
 }

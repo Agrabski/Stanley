@@ -10,6 +10,7 @@ using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.Editors;
 using Stanley.ProjectModel;
+using Stanley.ProjectModel.Ids;
 
 namespace Stanley.App;
 
@@ -25,6 +26,13 @@ public enum BackstagePage
 }
 
 public sealed record RecentProjectEntry(string Name, string Path);
+
+/// <summary>One of the comic's issues, as shown in File &gt; Info's Issues section and the quick switcher.</summary>
+public sealed record IssueEntry(IssueId Id, string Number, string Title, int PageCount, bool IsCurrent)
+{
+    public string Caption => string.IsNullOrEmpty(Title) ? $"#{Number}" : $"#{Number} - {Title}";
+    public string PageCountText => PageCount == 1 ? "1 page" : $"{PageCount} pages";
+}
 
 /// <summary>
 /// The window's document lifecycle, the way Word runs it: one open comic at a time, New /
@@ -95,6 +103,8 @@ public sealed class MainWindowViewModel : ObservableObject
         SaveCommand = new AsyncRelayCommand(async () => await SaveAsync(), () => HasDocument);
         SaveAsCommand = new AsyncRelayCommand(async () => await SaveAsAsync(), () => HasDocument);
         CloseDocumentCommand = new AsyncRelayCommand(CloseDocumentAsync, () => HasDocument);
+        SwitchIssueCommand = new AsyncRelayCommand<IssueId>(SwitchIssueAsync, _ => HasDocument);
+        NewIssueCommand = new AsyncRelayCommand(NewIssueAsync, () => HasDocument);
         ExportPdfCommand = new AsyncRelayCommand(() => ExportAsync("pdf"), () => HasDocument);
         ExportPngCommand = new AsyncRelayCommand(() => ExportAsync("png"), () => HasDocument);
         UndoCommand = new RelayCommand(() => _workspace?.History.Undo(), () => _workspace?.History.CanUndo ?? false);
@@ -455,13 +465,16 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string WindowTitle => HasDocument ? $"{DocumentTitle}{(IsDirty ? " •" : "")} - Stanley" : "Stanley";
+    public string WindowTitle => HasDocument ? $"{DocumentTitle}{IssueSuffix}{(IsDirty ? " •" : "")} - Stanley" : "Stanley";
 
     /// <summary>The title bar caption, Word-style: the name, and whether it's saved.</summary>
     public string DocumentCaption => !HasDocument ? "Stanley"
-        : _project!.IsUntitled ? $"{DocumentTitle} - not saved yet"
-        : IsDirty ? $"{DocumentTitle} - unsaved changes"
-        : $"{DocumentTitle} - saved";
+        : _project!.IsUntitled ? $"{DocumentTitle}{IssueSuffix} - not saved yet"
+        : IsDirty ? $"{DocumentTitle}{IssueSuffix} - unsaved changes"
+        : $"{DocumentTitle}{IssueSuffix} - saved";
+
+    /// <summary>" - Issue N" once the comic has more than one issue, so the title bar and File &gt; Info's caption always say which one's open.</summary>
+    private string IssueSuffix => HasMultipleIssues ? $" - Issue {IssueNumber}" : "";
 
     /// <summary>The comic's title, editable from File &gt; Info. Saved with the project; texts show it wherever they have <c>{title}</c>.</summary>
     public string DocumentTitle
@@ -486,6 +499,113 @@ public sealed class MainWindowViewModel : ObservableObject
                 return;
             _project.IssueNumber = value.Trim();
             InfoChanged();
+        }
+    }
+
+    /// <summary>The issue's title, editable from File &gt; Info next to its number - e.g. "Annual" or "The Long Way Home". Saved with the issue, separately from the comic's own <see cref="DocumentTitle"/>.</summary>
+    public string IssueTitle
+    {
+        get => _project?.IssueTitle ?? "";
+        set
+        {
+            if (_project is null || value.Trim() == _project.IssueTitle)
+                return;
+            _project.IssueTitle = value.Trim();
+            InfoChanged();
+        }
+    }
+
+    // ---------------------------------------------------------------- issues
+
+    /// <summary>
+    /// The comic's issues in storage order (File &gt; Info's Issues section, and the quick
+    /// switcher), current one marked - just the one issue for a comic that's never been saved.
+    /// </summary>
+    public IReadOnlyList<IssueEntry> Issues =>
+        _project is null ? [] : _project.Issues.Select(i => new IssueEntry(i.Id, i.Number, i.Title, i.PageCount, i.Id == _project.IssueId)).ToList();
+
+    public bool HasMultipleIssues => Issues.Count > 1;
+
+    /// <summary>
+    /// The quick switcher's selection. Picking another issue kicks off <see cref="SwitchIssueAsync"/>
+    /// in the background (like a menu command); the getter always reflects which issue is
+    /// actually open, so the switcher snaps back if a switch is cancelled.
+    /// </summary>
+    public IssueEntry? SelectedIssue
+    {
+        get => Issues.FirstOrDefault(i => i.IsCurrent);
+        set
+        {
+            if (value is null || value.IsCurrent)
+                return;
+            _ = SwitchIssueAsync(value.Id);
+        }
+    }
+
+    public IAsyncRelayCommand<IssueId> SwitchIssueCommand { get; }
+    public IAsyncRelayCommand NewIssueCommand { get; }
+
+    /// <summary>
+    /// Switches to another of the comic's issues: the same Save / Don't Save / Cancel gate as
+    /// opening a different comic, then loads it, staying on the editor. Opening the current
+    /// issue again is a no-op.
+    /// </summary>
+    public async Task SwitchIssueAsync(IssueId issueId)
+    {
+        if (_project is null || issueId == _project.IssueId)
+        {
+            IsBackstageOpen = false; // already open - Word just switches to it
+            return;
+        }
+
+        if (_project.Location is { } folder && await ConfirmDiscardAsync())
+        {
+            try
+            {
+                var project = ComicProject.Open(folder, issueId);
+                Load(project);
+                AppLog.Info($"Switched to issue #{project.IssueNumber} of \"{project.Title}\".");
+            }
+            catch (Exception e) when (IsFileProblem(e))
+            {
+                AppLog.Error($"Couldn't switch to issue {issueId} of \"{DocumentTitle}\".", e);
+                ShowError($"Couldn't switch issues: {e.Message}");
+            }
+        }
+        OnPropertyChanged(nameof(SelectedIssue)); // snaps the switcher back to the issue that's actually open
+    }
+
+    /// <summary>
+    /// File &gt; Info's "New issue": an untitled comic is saved first (like Word's first
+    /// Save), then the current issue is saved (the same gate as switching), a new issue -
+    /// one blank page, numbered one past the highest so far - is added on disk and opened.
+    /// </summary>
+    public async Task NewIssueAsync()
+    {
+        if (_project is null)
+            return;
+
+        if (_project.IsUntitled && !await SaveAsAsync())
+        {
+            Message = "Save the comic before adding an issue to it.";
+            return;
+        }
+        if (!await ConfirmDiscardAsync())
+            return;
+
+        var folder = _project.Location!;
+        try
+        {
+            var newIssueId = _project.NewIssue();
+            var project = ComicProject.Open(folder, newIssueId);
+            Load(project);
+            Message = $"Issue #{project.IssueNumber} added";
+            AppLog.Info($"Added issue #{project.IssueNumber} to \"{project.Title}\".");
+        }
+        catch (Exception e) when (IsFileProblem(e))
+        {
+            AppLog.Error($"Couldn't add a new issue to \"{DocumentTitle}\".", e);
+            ShowError($"Couldn't add a new issue: {e.Message}");
         }
     }
 
@@ -926,6 +1046,10 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DocumentCaption));
         OnPropertyChanged(nameof(DocumentTitle));
         OnPropertyChanged(nameof(IssueNumber));
+        OnPropertyChanged(nameof(IssueTitle));
+        OnPropertyChanged(nameof(Issues));
+        OnPropertyChanged(nameof(HasMultipleIssues));
+        OnPropertyChanged(nameof(SelectedIssue));
         OnPropertyChanged(nameof(LocationText));
         OnPropertyChanged(nameof(PageSizeText));
         OnPropertyChanged(nameof(PngExportText));
@@ -936,6 +1060,8 @@ public sealed class MainWindowViewModel : ObservableObject
         SaveCommand.NotifyCanExecuteChanged();
         SaveAsCommand.NotifyCanExecuteChanged();
         CloseDocumentCommand.NotifyCanExecuteChanged();
+        SwitchIssueCommand.NotifyCanExecuteChanged();
+        NewIssueCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
         ExportPngCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();
