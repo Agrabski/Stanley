@@ -19,7 +19,7 @@ public sealed record ArtImportRequest(string Slot);
 /// </summary>
 public sealed partial class CharacterEditorViewModel
 {
-    private readonly Dictionary<(StickerId, ViewAngle), ArtEditSession> _artEdits = [];
+    private readonly Dictionary<(StickerId, string Variant, ViewAngle), ArtEditSession> _artEdits = [];
     private StickerAsset? _dragBaseline;
 
     public IRelayCommand<string> DrawYourOwnCommand { get; private set; } = null!;
@@ -53,9 +53,9 @@ public sealed partial class CharacterEditorViewModel
 
     /// <summary>
     /// Draws a sticker for <paramref name="slot"/> in the user's SVG editor: the selected
-    /// sticker if it's a drawn one in that slot (its art for the view on the stage, or a
-    /// template if that view isn't drawn yet), else a new sticker, worn at once. Each save
-    /// there comes back as one undo step.
+    /// sticker if it's a drawn one in that slot (its art for the view and expression on the
+    /// stage, or a template if that view isn't drawn yet), else a new sticker, worn at once.
+    /// Each save there comes back as one undo step.
     /// </summary>
     public void DrawYourOwn(string slot)
     {
@@ -69,29 +69,47 @@ public sealed partial class CharacterEditorViewModel
             ApplyLook(c => LookEditing.Wear(c, drawn));
             SelectSticker(asset.Id);
         }
-        var id = asset.Id;
-        if (_artEdits.Remove((id, view), out var previous))
-            previous.Dispose();
-        var fileName = $"{Slug(asset.Sticker.Name)}-{id.Value}-{StickerAsset.ViewFileStem(view)}.svg";
-        var session = ArtEditing.Edit(fileName, StickerImport.ArtToEdit(asset, view), text => ReimportArt(id, view, text), out var error);
-        if (session is null)
-        {
-            ShowMessage($"Couldn't write the drawing: {error}");
-            return;
-        }
-        _artEdits[(id, view)] = session;
-        ShowMessage(error is not null
-            ? $"Drawing {asset.Sticker.Name}: {error}."
-            : $"Drawing {asset.Sticker.Name} in your SVG editor ({session.Path}) - every save there updates it here." +
-              (view == ViewAngle.Front ? " Switch to Side and draw again for the side view." : ""));
+        ShowMessage(OpenArt(asset, asset.Sticker.VariantFor(asset.Sticker.Slot, StagePose?.Expression), view, historySource: null));
     }
 
-    /// <summary>A new version of a drawing, saved in the user's editor: one undo step. Anything it doesn't draw is said in the status bar.</summary>
-    public void ReimportArt(StickerId id, ViewAngle view, string text)
+    /// <summary>
+    /// Opens one of the character's stickers - its <paramref name="variant"/> seen from
+    /// <paramref name="view"/> - in the user's SVG editor. Each save there comes back as one
+    /// undo step, <paramref name="historySource"/>'s when given (a face drawn from a page:
+    /// undoing it goes back to that page, not to this editor). Returns what to tell the user.
+    /// </summary>
+    public string DrawVariant(StickerId id, string variant, ViewAngle view, object? historySource = null) =>
+        Committed.Wardrobe.Find(id) is { } asset ? OpenArt(asset, variant, view, historySource) : "That sticker isn't there any more.";
+
+    private string OpenArt(StickerAsset asset, string variant, ViewAngle view, object? historySource)
+    {
+        var id = asset.Id;
+        if (_artEdits.Remove((id, variant, view), out var previous))
+            previous.Dispose();
+        // A sticker's first variant is the sticker; any other is named after its expression too.
+        var first = asset.Sticker.Variants.Count == 0 || asset.Sticker.Variants[0] == variant;
+        var name = first ? asset.Sticker.Name : $"{asset.Sticker.Name} ({ExpressionPresets.VariantName(asset.Sticker.Slot, variant).ToLowerInvariant()})";
+        var fileName = $"{Slug(asset.Sticker.Name)}-{id.Value}-{(first ? "" : Slug(variant) + "-")}{StickerAsset.ViewFileStem(view)}.svg";
+        var session = ArtEditing.Edit(fileName, StickerImport.ArtToEdit(asset, view, variant), text =>
+        {
+            using (historySource is null ? null : History.Group($"Draw {name}", historySource))
+                ReimportArt(id, view, text, variant);
+        }, out var error);
+        if (session is null)
+            return $"Couldn't write the drawing: {error}";
+        _artEdits[(id, variant, view)] = session;
+        return error is not null
+            ? $"Drawing {name}: {error}."
+            : $"Drawing {name} in your SVG editor ({session.Path}) - every save there updates it here." +
+              (view == ViewAngle.Front ? " Switch to Side and draw again for the side view." : "");
+    }
+
+    /// <summary>A new version of a drawing (of <paramref name="variant"/>, else the sticker's first), saved in the user's editor: one undo step. Anything it doesn't draw is said in the status bar.</summary>
+    public void ReimportArt(StickerId id, ViewAngle view, string text, string? variant = null)
     {
         if (Committed.Wardrobe.Find(id) is not { } asset)
             return;
-        var result = StickerImport.WithArt(asset, view, text);
+        var result = StickerImport.WithArt(asset, view, text, variant);
         if (result.Asset is not { } updated)
         {
             ShowMessage($"{asset.Sticker.Name}: {result.Error}.");

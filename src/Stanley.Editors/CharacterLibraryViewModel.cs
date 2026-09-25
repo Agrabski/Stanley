@@ -4,8 +4,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Mvvm.Controls;
 using Stanley.Editing;
+using Stanley.Editing.Abstractions;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Characters;
+using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 
 namespace Stanley.Editors;
@@ -189,6 +191,17 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         if (Items.FirstOrDefault(i => i.Id == id) is { } item)
             Show(item);
     }
+
+    public void EditCharacter(CharacterId id, string description, Func<CharacterDefinition, CharacterDefinition> edit, object? source)
+    {
+        if (Items.FirstOrDefault(i => i.Id == id) is not { } item)
+            return;
+        using (_history.Group(description, source))
+            item.Editor.Apply(EditResult<CharacterDefinition>.Success(edit(item.Editor.Committed)));
+    }
+
+    public string DrawVariant(CharacterId id, StickerId sticker, string variant, ViewAngle view, object? source) =>
+        Items.FirstOrDefault(i => i.Id == id) is { } item ? item.Editor.DrawVariant(sticker, variant, view, source) : "That character isn't there any more.";
 
     // ---------------------------------------------------------------- operations
 

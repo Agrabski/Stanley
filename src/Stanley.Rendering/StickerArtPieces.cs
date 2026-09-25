@@ -304,12 +304,8 @@ internal static class StickerArtPieces
     /// The variant a sticker shows: the pose's expression for its slot if it has that one,
     /// else "neutral" if it has one, else its first.
     /// </summary>
-    public static string VariantFor(Sticker sticker, string slot, IReadOnlyDictionary<string, string>? expression)
-    {
-        if (expression is not null && expression.TryGetValue(slot, out var wanted) && sticker.Variants.Contains(wanted))
-            return wanted;
-        return sticker.Variants.Contains("neutral") ? "neutral" : sticker.Variants.Count > 0 ? sticker.Variants[0] : Sticker.DefaultVariant;
-    }
+    public static string VariantFor(Sticker sticker, string slot, IReadOnlyDictionary<string, string>? expression) =>
+        sticker.VariantFor(slot, expression);
 
     /// <summary>The views to try, nearest first (§6.3): a missing view falls back to the nearest drawn one.</summary>
     public static IEnumerable<ViewAngle> ViewFallback(ViewAngle view) => view switch

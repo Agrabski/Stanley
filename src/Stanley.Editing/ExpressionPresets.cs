@@ -113,16 +113,27 @@ public static class ExpressionPresets
         return pose with { Expression = expression };
     }
 
-    /// <summary>A variant's name for people: "halfClosed" is "Half closed", "o" an "Oh" mouth.</summary>
+    /// <summary>A variant's name for people: "halfClosed" is "Half closed", "myMouth2" "My mouth 2", "o" an "Oh" mouth.</summary>
     public static string VariantName(string slot, string variant) => (slot, variant) switch
     {
-        (_, "halfClosed") => "Half closed",
         (StickerSlots.Eyes, "wide") => "Wide open",
         (StickerSlots.Mouth, "o") => "Oh",
-        _ => Capitalized(variant),
+        _ => Words(variant),
     };
 
-    private static string Capitalized(string word) => word.Length == 0 ? word : char.ToUpperInvariant(word[0]) + word[1..];
+    /// <summary>A camel-case key as words: capitalised, a space before each capital or number.</summary>
+    private static string Words(string key)
+    {
+        var words = new System.Text.StringBuilder();
+        for (var i = 0; i < key.Length; i++)
+        {
+            var c = key[i];
+            if (i > 0 && (char.IsUpper(c) || char.IsDigit(c) && !char.IsDigit(key[i - 1])))
+                words.Append(' ');
+            words.Append(i == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
+        }
+        return words.ToString();
+    }
 
     /// <summary>The preset <paramref name="pose"/>'s face matches (a slot left out counts as neutral), or null for a mix of its own.</summary>
     public static ExpressionPresetDefinition? Of(PoseData pose) =>

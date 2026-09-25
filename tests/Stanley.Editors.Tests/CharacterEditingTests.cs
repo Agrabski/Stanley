@@ -201,6 +201,90 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void A_face_saved_on_the_page_is_the_characters_to_use_in_any_panel_and_undoes_as_a_page_step()
+    {
+        var (session, page, left, right) = NewSession();
+        var item = Add(session, "Pip");
+        page.InsertCharacter(item.Id, right);
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+        page.SetExpressionVariantCommand.Execute(page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).Choices.Single(c => c.Variant == "open"));
+        Assert.False(page.HasSavedFaces);
+        Assert.False(page.SaveFaceCommand.CanExecute(null)); // nothing to call it yet
+
+        page.NewFaceName = "Grinning";
+        page.SaveFaceCommand.Execute(null);
+
+        Assert.Equal("", page.NewFaceName);
+        var face = Assert.Single(item.Editor.Committed.Expressions!);
+        Assert.Equal(("happy", "open"), (face.Variants[StickerSlots.Eyes], face.Variants[StickerSlots.Mouth]));
+        Assert.Equal("Grinning", page.SelectedExpressionName);
+        Assert.Equal("Pip's faces", page.SavedFacesTitle);
+        Assert.True(Assert.Single(page.SavedFaceChoices).IsCurrent);
+
+        // Another panel: one click.
+        page.SelectCharacter(right, 0);
+        Assert.Equal("Neutral", page.SelectedExpressionName);
+        page.SavedFaceChoices.Single().Apply.Execute(null);
+        Assert.Equal("open", page.Working.Panels[right].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Equal("Grinning", page.SelectedExpressionName);
+
+        var saved = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+        Assert.Equal("Grinning", Assert.Single(ComicProject.Open(saved).Characters.Single().Expressions!).Name);
+
+        // Deleting it leaves the panels their faces.
+        page.SavedFaceChoices.Single().Delete.Execute(null);
+        Assert.Null(item.Editor.Committed.Expressions);
+        Assert.Equal("Custom", page.SelectedExpressionName);
+
+        session.Workspace.History.Undo(); // the delete
+        session.Workspace.History.Undo(); // the face on the right
+        session.Workspace.History.Undo(); // saving it
+        Assert.Null(item.Editor.Committed.Expressions);
+        Assert.Same(page, session.Workspace.ActiveEditor); // undone on the page, not in the character's editor
+    }
+
+    [Fact]
+    public void A_new_expression_drawn_from_the_page_starts_as_the_one_shown_is_worn_and_each_save_comes_back()
+    {
+        var (session, page, left, _) = NewSession();
+        var art = new FakeArtEditing();
+        session.Characters.ArtEditing = art;
+        var item = Add(session, "Pip");
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+        var mouthRow = page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth);
+        Assert.True(mouthRow.CanDraw);
+
+        mouthRow.DrawNew.Execute(null);
+
+        var mouth = item.Editor.Committed.Wardrobe.Stickers.Values.Single(a => a.Sticker.Slot == StickerSlots.Mouth);
+        Assert.Equal("myMouth", mouth.Sticker.Variants[^1]);
+        Assert.Equal(mouth.Files["variants/smile/front.svg"].Text, mouth.Files["variants/myMouth/front.svg"].Text);
+        Assert.Equal("myMouth", page.Working.Panels[left].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Equal("My mouth", page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).Choices.Single(c => c.IsCurrent).Name);
+        var (_, text, save) = Assert.Single(art.Opened);
+        Assert.Equal(mouth.Files["variants/myMouth/front.svg"].Text, text);
+        Assert.Contains("/drawing/", page.Hint);
+
+        var redrawn = text.Replace("</svg>", "<!-- mine --></svg>");
+        save(redrawn);
+        Assert.Equal(redrawn, item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Files["variants/myMouth/front.svg"].Text);
+        Assert.Same(page, session.Workspace.ActiveEditor);
+
+        session.Workspace.History.Undo(); // the save
+        Assert.Equal(text, item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Files["variants/myMouth/front.svg"].Text);
+        session.Workspace.History.Undo(); // the new mouth and wearing it: one step
+        Assert.DoesNotContain("myMouth", item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Sticker.Variants);
+        Assert.Equal("smile", page.Working.Panels[left].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Same(page, session.Workspace.ActiveEditor);
+
+        // The pen redraws the one shown.
+        page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).EditDrawing.Execute(null);
+        Assert.Equal(mouth.Files["variants/smile/front.svg"].Text, art.Opened[^1].Text);
+    }
+
+    [Fact]
     public void Placing_a_character_from_the_pane_puts_it_on_the_page_and_closes_the_tab_the_first_click_opened()
     {
         var (session, page, _, _) = NewSession();

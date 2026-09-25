@@ -58,33 +58,53 @@ public static class StickerImport
     }
 
     /// <summary>
-    /// <paramref name="asset"/> with <paramref name="text"/> as its SVG for its first variant
-    /// seen from <paramref name="view"/> (a template if it had none): a new layer becomes a
-    /// new part, a new colour class a new colour slot, and it's the user's own from now on.
-    /// Null, with the reason, if the text can't be read.
+    /// <paramref name="asset"/> with <paramref name="text"/> as its SVG for <paramref name="variant"/>
+    /// (its first if null; added if it hasn't that one) seen from <paramref name="view"/>: a new layer becomes a new part,
+    /// a new colour class a new colour slot, and it's the user's own from now on. Null, with
+    /// the reason, if the text can't be read.
     /// </summary>
-    public static Result WithArt(StickerAsset asset, ViewAngle view, string text)
+    public static Result WithArt(StickerAsset asset, ViewAngle view, string text, string? variant = null)
     {
         var file = ArtFile.Svg(text);
         if (StickerSvg.Parse(file) is not { } art)
             return new Result(null, [], "not an SVG file Stanley can read");
         var sticker = asset.Sticker;
-        var variant = sticker.Variants.Count > 0 ? sticker.Variants[0] : Sticker.DefaultVariant;
+        variant ??= FirstVariant(sticker);
         var files = new Dictionary<string, ArtFile>(asset.Files) { [FilePath(variant, view, svg: true)] = file };
         files.Remove(FilePath(variant, view, svg: false));
         var parts = sticker.Parts.Any(p => p.Name == ParsedArt.WholeFile) ? sticker.Parts : PartsFrom(sticker.Slot, art, sticker.Parts);
-        var edited = sticker with { Parts = parts, Colors = ColorsOf(art, sticker.Colors), Source = null };
+        // A drawing saved for a variant makes it one of the sticker's, even if it wasn't (any more - an undone "new expression").
+        var variants = sticker.Variants.Contains(variant) ? sticker.Variants : [.. sticker.Variants, variant];
+        var edited = sticker with { Parts = parts, Colors = ColorsOf(art, sticker.Colors), Variants = variants, Source = null };
         return new Result(new StickerAsset(edited, files), art.Report, null);
     }
 
-    /// <summary>A template for <paramref name="asset"/>'s slot seen from <paramref name="view"/>, or its art for that view if it has some - what "Draw your own" opens.</summary>
-    public static string ArtToEdit(StickerAsset asset, ViewAngle view)
-    {
-        var variant = asset.Sticker.Variants.Count > 0 ? asset.Sticker.Variants[0] : Sticker.DefaultVariant;
-        return asset.Files.TryGetValue(FilePath(variant, view, svg: true), out var file) && file.Text is { } text
+    /// <summary>
+    /// <paramref name="asset"/>'s art for <paramref name="variant"/> (its first if null) seen
+    /// from <paramref name="view"/>, or a template for its slot if that isn't drawn yet - what
+    /// "Draw your own" opens.
+    /// </summary>
+    public static string ArtToEdit(StickerAsset asset, ViewAngle view, string? variant = null) =>
+        asset.Files.TryGetValue(FilePath(variant ?? FirstVariant(asset.Sticker), view, svg: true), out var file) && file.Text is { } text
             ? text
             : StickerTemplates.Export(view, asset.Sticker.Slot);
+
+    /// <summary>
+    /// <paramref name="asset"/> with a new variant <paramref name="variant"/>, drawn for now
+    /// as a copy of <paramref name="copyOf"/> in every view that has - a new expression to
+    /// draw from there. It's the user's own sticker from now on.
+    /// </summary>
+    public static StickerAsset WithVariant(StickerAsset asset, string variant, string copyOf)
+    {
+        var from = $"variants/{copyOf}/";
+        var files = new Dictionary<string, ArtFile>(asset.Files);
+        foreach (var (path, file) in asset.Files.Where(f => f.Key.StartsWith(from, StringComparison.Ordinal)))
+            files[$"variants/{variant}/{path[from.Length..]}"] = file;
+        var sticker = asset.Sticker with { Variants = [.. asset.Sticker.Variants.Where(v => v != variant), variant], Source = null };
+        return new StickerAsset(sticker, files);
     }
+
+    private static string FirstVariant(Sticker sticker) => sticker.Variants.Count > 0 ? sticker.Variants[0] : Sticker.DefaultVariant;
 
     public static string FilePath(string variant, ViewAngle view, bool svg) => $"variants/{variant}/{StickerAsset.ViewFileStem(view)}.{(svg ? "svg" : "png")}";
 

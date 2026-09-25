@@ -914,7 +914,8 @@ fabrics, drawn stickers, expressions, draw your own and import, named looks.
 - **Draw your own / import** (`CharacterEditorViewModel.Art.cs`, `StickerImport`):
   every slot gallery ends with *Draw your own…* and *Import…*. Draw your own wears a
   new sticker with the slot's template parts (or takes the selected drawn sticker),
-  writes the template — or its existing art — for the stage's view through
+  writes the template — or its existing art — for the stage's view (and the variant
+  the stage's expression shows, `Sticker.VariantFor`) through
   `IArtEditing` (real: `SystemArtEditing`, a file under `AppPaths.ArtEditingDirectory`
   opened via the shell and watched with a debounced `FileSystemWatcher`; tests use a
   fake), and each save there comes back through `StickerImport.WithArt` as one undo
@@ -950,14 +951,32 @@ fabrics, drawn stickers, expressions, draw your own and import, named looks.
   Skeptical, Wink, Talking, Shouting, Asleep), each a variant for eyes, brows and
   mouth from the standard `Vocabulary`; stored per panel in `PoseData.Expression`
   (neutral stores nothing; other slots' variants are kept). A sticker without the
-  variant shows its neutral one (`StickerArtPieces.VariantFor`). Page editor:
-  Character tab › Expression dropdown (close-ups of the selected character,
-  `ExpressionChoices`, one undo step) and right-click › Expression. **Mix your own**
-  (for a face no preset has - happy eyes over an open mouth): the same dropdown has a
-  row per face slot, Eyes / Brows / Mouth (`ExpressionMixer`, `ExpressionPresets.FaceSlots`,
-  `VariantName`), each choice a close-up with the rest of the face as it is; a pick sets
-  that slot only (`ExpressionPresets.SetVariant`, one undo step) and the button then
-  reads "Custom". Right-click › Expression › Eyes ▸ / Brows ▸ / Mouth ▸ does the same.
+  variant shows its neutral one (`Sticker.VariantFor`). Page editor:
+  Character tab › Expression dropdown (close-ups of the selected character as its panel
+  shows it, `ExpressionChoices`, one undo step) and right-click › Expression.
+  Beyond the presets (`PageEditorViewModel.Faces.cs`, `SavedFaces` in Stanley.Editing):
+  - **Mix your own** (for a face no preset has - happy eyes over an open mouth): a row per
+    face slot (`SavedFaces.Slots`: eyes, brows, mouth, then nose and facial hair) offering
+    the variants the face worn there draws, its own ones too (`SavedFaces.VariantsFor`:
+    the vocabulary's first, in order; a slot with fewer than two has no row;
+    `ExpressionMixer`, `VariantName` - "myMouth2" reads "My mouth 2"), each choice a
+    close-up with the rest of the face as it is; a pick sets that slot only
+    (`ExpressionPresets.SetVariant`, one undo step) and the button then reads "Custom".
+  - **Draw a new one** (+ under a row's name, for a drawn face): a new variant of the worn
+    sticker, a copy of the one shown in every view (`StickerImport.WithVariant`, named
+    "My mouth", "My mouth 2"... by `SavedFaces.NewVariantKey` - letters and digits, as it
+    names a folder), shown in the panel at once (one undo step), and opened in the user's
+    SVG editor; the pen redraws the one shown. Saves come back through
+    `ICharacterCatalog.DrawVariant` → `CharacterEditorViewModel.DrawVariant` as undo steps
+    of the page's (`EditorHistory.Group` with the page as source), and the page's status
+    bar says where the file is (`ShowNotice`, until the selection or tool changes).
+  - **Saved faces**: "Save this face" (a name box; Enter works; a name already saved is
+    replaced) keeps the face on the character (`CharacterDefinition.Expressions`, a list of
+    `SavedExpression` name + slot → variant, neutral left out; absent from the file when
+    there are none) through `ICharacterCatalog.EditCharacter`, again a page undo step;
+    "<name>'s faces" then lists them as close-ups in every panel (right-click › Delete this
+    face; panels keep their faces), and the button shows a saved face's name.
+  Right-click › Expression has the saved faces and a submenu per mix-your-own row too.
 
 ## Builds, versioning & releases
 

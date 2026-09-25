@@ -312,6 +312,46 @@ public class CharacterTests
     }
 
     [Fact]
+    public void A_face_saved_from_the_expression_gallery_is_one_click_there_afterwards()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        var panelId = page.Working.PanelOrder[0];
+        page.InsertCharacter(created.Id, panelId);
+        page.SetExpressionVariant(panelId, 0, "eyes", "happy");
+        page.SetExpressionVariant(panelId, 0, "mouth", "open");
+        var ribbon = Single<PageEditorRibbon>(window.RibbonBarControl);
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "CharacterTab");
+        Dispatcher.UIThread.RunJobs();
+        var gallery = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "ExpressionGallery");
+        gallery.Flyout!.ShowAt(gallery);
+        Dispatcher.UIThread.RunJobs();
+        var content = (Control)((Flyout)gallery.Flyout!).Content!;
+
+        var name = content.GetLogicalDescendants().OfType<TextBox>().Single(b => b.Name == "FaceNameBox");
+        name.Text = "Cheeky";
+        var save = content.GetLogicalDescendants().OfType<Button>().Single(b => b.Name == "SaveFaceButton");
+        Assert.True(save.Command!.CanExecute(null));
+        save.Command.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        LookTabTests.Snapshot(window, "page-saved-face");
+
+        Assert.Equal("Cheeky", page.SelectedExpressionName);
+        Assert.Equal("", name.Text);
+        Assert.Contains(content.GetLogicalDescendants().OfType<Button>(), b => b.Name == "DrawNewExpressionButton" && b.IsEffectivelyVisible);
+
+        page.ApplyExpression(panelId, 0, Editing.ExpressionPresets.Get(Editing.ExpressionPreset.Neutral));
+        Dispatcher.UIThread.RunJobs();
+        var cheeky = content.GetLogicalDescendants().OfType<Button>().Single(b => b.DataContext is SavedFaceChoice { Name: "Cheeky" });
+        cheeky.Command!.Execute(cheeky.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+
+        var face = page.Working.Panels[panelId].CharacterInstances[0].Pose.Expression;
+        Assert.Equal(("happy", "open"), (face["eyes"], face["mouth"]));
+    }
+
+    [Fact]
     public void The_character_editors_Front_and_Side_switch_is_in_its_status_bar_whichever_tab_is_open()
     {
         var (window, characters) = Open();
