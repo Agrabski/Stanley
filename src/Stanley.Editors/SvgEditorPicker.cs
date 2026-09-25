@@ -61,6 +61,28 @@ public static class SvgEditorPicker
                 content.Children.Add(button);
             }
         }
+        else
+        {
+            content.Children.Add(new TextBlock
+            {
+                Text = "Nothing was found on this computer. Inkscape is a good free one to start with.",
+                Opacity = 0.7,
+                TextWrapping = TextWrapping.Wrap
+            });
+            var getInkscape = new Button { Content = "Get Inkscape (inkscape.org)" };
+            getInkscape.Click += (_, _) =>
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://inkscape.org/release/") { UseShellExecute = true });
+                }
+                catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+                {
+                    // Nothing opens URLs here either; the address is right there in the button for the user to copy by hand.
+                }
+            };
+            content.Children.Add(getInkscape);
+        }
 
         content.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { pathBox, browseButton } });
 

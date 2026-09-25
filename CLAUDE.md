@@ -911,7 +911,8 @@ fabrics, drawn stickers, expressions, draw your own and import, named looks.
   nothing yet and raises `SvgEditorConfigurationRequested` instead, which the ribbon
   answers with `SvgEditorPicker` (a small code-built modal, like
   `AvaloniaFileDialogs.AskSaveChangesAsync`: programs `SvgEditorCandidates.Detect()`
-  finds on `PATH` — Inkscape, Karbon, Boxy SVG, sK1 — or *Browse…* to any executable)
+  finds on `PATH` — Inkscape, Karbon, Boxy SVG, sK1 — or *Browse…* to any executable;
+  finding none, a *Get Inkscape (inkscape.org)* button opens its release page instead)
   and then calls `DrawYourOwn` again, so nothing is created until there's somewhere to
   draw it. Once set, Draw your own wears a new sticker with the slot's template parts
   (or takes the selected drawn sticker) and each save there comes back through
