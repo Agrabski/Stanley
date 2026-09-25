@@ -81,5 +81,39 @@ public class InitCommandTests : IDisposable
         Assert.Equal("Overwritten", new ProjectRepository(path).LoadManifest().Title);
     }
 
+    [Fact]
+    public void A_template_sets_the_page_and_the_comics_format()
+    {
+        var path = Path.Combine(_root, "strip");
+
+        Assert.Equal(0, Run(path, "--template", "daily-strip"));
+
+        var manifest = new ProjectRepository(path).LoadManifest();
+        Assert.Equal(new PageTrim(new PageSize(330, 105), 0), manifest.DefaultPageTrim);
+        Assert.Equal([4], manifest.Format!.PanelsPerRow!);
+        Assert.Null(manifest.Format.ExportWidthPx);
+    }
+
+    [Fact]
+    public void Page_options_typed_alongside_a_template_still_win()
+    {
+        var path = Path.Combine(_root, "wide-scroll");
+
+        Assert.Equal(0, Run(path, "--template", "vertical-scroll", "--page-width-mm", "250"));
+
+        var manifest = new ProjectRepository(path).LoadManifest();
+        Assert.Equal(new PageSize(250, 320), manifest.DefaultPageTrim.Size);
+        Assert.Equal(800, manifest.Format!.ExportWidthPx);
+    }
+
+    [Fact]
+    public void An_unknown_template_is_refused()
+    {
+        var path = Path.Combine(_root, "nope");
+
+        Assert.NotEqual(0, Run(path, "--template", "broadsheet"));
+        Assert.False(ProjectRepository.IsInitialized(path));
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

@@ -110,6 +110,54 @@
     <!-- ============================== INSERT ============================== -->
     <TabItem Name="InsertTab" Header="Insert">
       <StackPanel Classes="tabContent">
+        <!-- Word's Cover Page gallery: a title page at the front of the comic; picking again redoes it, keeping its words. -->
+        <DockPanel Classes="group" IsVisible="{Binding HasTitlePageHost}">
+          <DropDownButton Name="TitlePageButton" Classes="slotGallery"
+                          ToolTip.Tip="Start every issue with the comic's title page: pick a design, then double-click its words to retype them. Picking another design redoes it and keeps its words.">
+            <StackPanel Spacing="2">
+              <PathIcon Data="{StaticResource TitlePageIcon}" Width="20" Height="20" />
+              <TextBlock Text="Title page" FontSize="11" HorizontalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Title page" FontWeight="SemiBold" />
+                  <ItemsControl Name="TitlePageGallery" ItemsSource="{Binding TitlePageChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:TitlePageChoice">
+                        <Button Classes="small" Width="112" Height="156" Padding="6" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertTitlePageCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Description}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            <local:TitlePagePreview Design="{Binding Design}" Page="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext)}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="The comic's title page opens every issue, each showing its own issue number. Everything on it stays editable - words, colours, the background."
+                             FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350" HorizontalAlignment="Left" />
+                  <CheckBox Name="OwnTitlePageBox" IsChecked="{Binding IsOwnTitlePage, Mode=TwoWay}" IsEnabled="{Binding HasTitlePage}" Focusable="False"
+                            ToolTip.Tip="This issue gets a title page of its own - a copy of the comic's to change freely. Untick to go back to the comic's.">
+                    <TextBlock Text="Only this issue - the other issues keep the comic's title page" TextWrapping="Wrap" MaxWidth="320" />
+                  </CheckBox>
+                  <Button Name="RemoveTitlePageButton" Classes="small" Command="{Binding RemoveTitlePageCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="{Binding RemoveTitlePageText}" /></StackPanel>
+                  </Button>
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Pages" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasTitlePageHost}" />
+
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}" ToolTip.Tip="Drag on the page to draw a new panel (P)">
@@ -251,10 +299,10 @@
             <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="6" VerticalAlignment="Center">
               <TextBlock Text="Margin" FontSize="12" VerticalAlignment="Center" />
               <NumericUpDown Name="MarginInput" Grid.Column="1" Minimum="0" Maximum="40" Increment="1" FormatString="0.# mm" Width="130" Height="26" FontSize="12"
-                             ToolTip.Tip="Distance from the page edge to the panel area" />
+                             ToolTip.Tip="Distance from the page edge to the panels, for every page - panel edges on the margin move with it, and panels snap to it" />
               <TextBlock Grid.Row="1" Text="Gutter" FontSize="12" VerticalAlignment="Center" />
               <NumericUpDown Name="GutterInput" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="20" Increment="0.5" FormatString="0.# mm" Width="130" Height="26" FontSize="12"
-                             ToolTip.Tip="Space between neighbouring panels" />
+                             ToolTip.Tip="Space between neighbouring panels, for every page - new layouts and snapping use it" />
             </Grid>
             <ToggleButton Name="SnapButton" Classes="tool" IsChecked="{Binding SnapEnabled}" ToolTip.Tip="Snap panel edges to the page margin and a gutter's width from other panels (hold Alt while dragging to place freely)">
               <StackPanel><PathIcon Data="M4,3 H9 V12 A3,3 0 0 0 15,12 V3 H20 V12 A8,8 0 0 1 4,12 Z M4,5 H9 V7 H4 Z M15,5 H20 V7 H15 Z" /><TextBlock Text="Snap" /></StackPanel>
@@ -384,6 +432,14 @@
             <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" PictureCommand="{Binding BackgroundPictureCommand}" /></Flyout></DropDownButton.Flyout>
           </DropDownButton>
           <TextBlock Classes="groupLabel" Text="Background" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <ToggleButton Name="PanelBorderButton" Classes="tool" IsChecked="{Binding SelectedPanelHasBorder}"
+                        ToolTip.Tip="Draw this panel's border - switch it off for an open panel, or a background that runs to the page edge">
+            <StackPanel><PathIcon Data="{StaticResource PanelBorderIcon}" /><TextBlock Text="Border" /></StackPanel>
+          </ToggleButton>
+          <TextBlock Classes="groupLabel" Text="Border" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
@@ -778,6 +834,24 @@
             </RadioButton>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Text" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <!-- Fields, like Word's: Stanley fills them in from File › Info. The buttons don't take the keyboard, so while typing they go in at the caret. -->
+        <DockPanel Classes="group">
+          <ItemsControl Name="FieldButtons" ItemsSource="{Binding TextFieldChoices}" VerticalAlignment="Center">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:TextFieldChoice">
+                <Button Classes="small" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" ToolTip.Tip="{Binding Description}"
+                        Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertFieldCommand}" CommandParameter="{Binding}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding Token}" FontFamily="monospace" Opacity="0.6" />
+                    <TextBlock Text="{Binding Name}" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Fields" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">

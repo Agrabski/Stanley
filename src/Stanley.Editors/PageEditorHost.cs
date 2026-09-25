@@ -22,7 +22,11 @@ public static class PageEditorHost
         var history = new EditorHistory();
         var characters = new CharacterLibraryViewModel(history, project.Characters);
         var pictures = new PictureLibrary(project.Pictures);
-        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures);
+        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures,
+            project.Grid, project.NewPageLayout, project.TitlePage)
+        {
+            Fields = project.Fields
+        };
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;
@@ -41,10 +45,10 @@ public static class PageEditorHost
             navigator.CurrentPage.Editor.InsertCharacter(id);
         };
 
-        // "In 3 panels" and whether Delete is allowed follow every page edit.
-        characters.UsageCounter = id => navigator.Pages.Sum(p => p.Editor.CountPanelsShowing(id));
+        // "In 3 panels" and whether Delete is allowed follow every page edit - the comic's title page's too, even while this issue shows its own.
+        characters.UsageCounter = id => navigator.AllPages.Sum(p => p.Editor.CountPanelsShowing(id));
         characters.LookUsageCounter = (id, look) =>
-            navigator.Pages.Sum(p => p.Editor.Working.Panels.Values.Count(panel => panel.CharacterInstances.Any(i => i.CharacterId == id && i.RevisionOverride == look)))
+            navigator.AllPages.Sum(p => p.Editor.Working.Panels.Values.Count(panel => panel.CharacterInstances.Any(i => i.CharacterId == id && i.RevisionOverride == look)))
             + (navigator.IssueLooks.TryGetValue(id, out var issueLook) && issueLook == look ? 1 : 0);
         void OnPageChanged(object? sender, PropertyChangedEventArgs e)
         {

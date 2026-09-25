@@ -40,7 +40,8 @@ public sealed record PageCanvasScene(
     EditingBubble? EditingBubble = null,
     int SelectedElementIndex = -1,
     ElementId? EditingText = null,
-    IReadOnlyDictionary<string, ArtFile>? Pictures = null);
+    IReadOnlyDictionary<string, ArtFile>? Pictures = null,
+    TextFields? Fields = null);
 
 /// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
 public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
@@ -133,7 +134,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
             .Where(_scene.Document.Panels.ContainsKey)
             .Select(id => WithoutEditedText(_scene.Document.Panels[id]))
-            .ToList(), _scene.Characters, _scene.IssueLooks, _scene.EditingText, _scene.Pictures);
+            .ToList(), _scene.Characters, _scene.IssueLooks, _scene.EditingText, _scene.Pictures, _scene.Fields);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }
@@ -164,6 +165,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         if (_scene.HighlightGutter is { } gutter)
             DrawGutter(canvas, gutter);
 
+        DrawBorderlessPanelOutlines(canvas);
         DrawEmptyTextOutlines(canvas);
 
         if (_scene.SelectedPanelId is { } selectedId && doc.Panels.TryGetValue(selectedId, out var selectedPanel))
@@ -283,6 +285,18 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             DrawSquareHandle(canvas, corner, Accent);
         foreach (var mid in new[] { new SKPoint(rect.MidX, rect.Top), new SKPoint(rect.Right, rect.MidY), new SKPoint(rect.MidX, rect.Bottom), new SKPoint(rect.Left, rect.MidY) })
             DrawSquareHandle(canvas, mid, Accent, 3.5f);
+    }
+
+    /// <summary>A panel without a border only shows through what's in it; a faint outline shows where it is, so it can still be found, filled or selected. Not printed.</summary>
+    private void DrawBorderlessPanelOutlines(SKCanvas canvas)
+    {
+        using var faint = Stroke(Accent.WithAlpha(70), 1f);
+        faint.PathEffect = SKPathEffect.CreateDash([2, 4], 0);
+        foreach (var panel in _scene.Document.Panels.Values)
+        {
+            if (panel.Borderless)
+                canvas.DrawRect(Screen(AnchorRing.BoundingBox(panel.Shape.Anchors)), faint);
+        }
     }
 
     /// <summary>Bare text with nothing typed in it draws nothing on the page; a faint outline shows where it is, so it can still be found, filled in or deleted. Not printed.</summary>

@@ -7,7 +7,7 @@
 #   changed since the last nightly, build + test + publish it. Publishing packs
 #   the Linux build with Velopack (vpk) and uploads it to the rolling "nightly"
 #   release/tag on the Nightly channel - see velopack-release below. A manual
-#   run always builds.
+#   run always builds. See "Scheduling" below for why there are two slots.
 # - push to main: build + test, and keep the draft release "vX.Y.Z" up to date
 #   (version and notes from the issues closed by the PRs main now contains, see
 #   .github/scripts/release-notes.js).
@@ -16,6 +16,16 @@
 #   channel, merge the tag back into develop (so develop's nightlies version
 #   after it).
 # The binaries' version comes from MinVer (git tags), see Stanley.App.csproj.
+#
+# Scheduling: GitHub runs `schedule` workflows from the default branch's copy of
+# this file (develop), late when Actions is busy - worst at the top of the hour
+# (the first 02:00 nightly started at 07:34) - and under enough load it drops
+# them altogether. So the cron avoids :00, and a second slot later in the day
+# catches a dropped or failed first one. nightly-gate keeps it to one build a
+# day: a scheduled run skips if develop is still the commit the "nightly" tag
+# points at, or if a nightly was already uploaded today (UTC). velopack-release
+# moves the tag to each build's commit, since vpk only sets it when it first
+# creates the release.
 #
 # Linux (linux-x64) is the only build/release target - Windows and macOS
 # aren't supported.
@@ -38,7 +48,8 @@ on:
   release:
     types: [published]
   schedule:
-    - cron: "0 2 * * *" # 02:00 UTC daily
+    - cron: "17 2 * * *" # 02:17 UTC daily - the nightly
+    - cron: "17 14 * * *" # 14:17 UTC - only builds if the first slot didn't (see "Scheduling")
   workflow_dispatch:
 
 permissions:
@@ -75,13 +86,24 @@ jobs:
           set -euo pipefail
           sha=$(gh api "repos/$GH_REPO/commits/develop" --jq .sha)
           last=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || echo none)
+          # When the current nightly was uploaded: its assets are replaced by every build.
+          uploaded=$(gh api "repos/$GH_REPO/releases/tags/nightly" --jq '[.assets[].created_at] | max // ""' 2>/dev/null || true)
+          today=$(date -u +%F)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ "$sha" != "$last" ]; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-            echo "Building develop at $sha (last nightly: $last)."
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            build=true; why="manual run"
+          elif [ "$sha" = "$last" ]; then
+            build=false; why="develop hasn't changed since the last nightly ($sha)"
+          elif [ "${uploaded:0:10}" = "$today" ]; then
+            build=false; why="a nightly was already built today ($uploaded); tomorrow's picks up $sha"
           else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::develop hasn't changed since the last nightly ($sha); skipping."
+            build=true; why="develop moved to $sha (last nightly: $last, uploaded ${uploaded:-never})"
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          if [ "$build" = true ]; then
+            echo "Building develop: $why."
+          else
+            echo "::notice::Skipping the nightly: $why."
           fi
 
   # Keeps one draft release up to date; publishing it (by hand) makes the release.
@@ -343,6 +365,16 @@ jobs:
           vpk upload github --outputDir Releases --channel "${{ steps.release.outputs.channel }}" \
             --repoUrl "$GITHUB_SERVER_URL/$GH_REPO" --token "$GH_TOKEN" \
             --tag "${{ steps.release.outputs.tag }}" --merge --publish ${{ steps.release.outputs.pre }}
+
+      # vpk creates the tag only with the release (pointing at develop's head at
+      # the time) and never moves it after, so without this nightly-gate would
+      # compare develop against that first commit forever and never skip.
+      - name: Point the nightly tag at this build's commit
+        if: steps.release.outputs.nightly == 'true'
+        shell: bash
+        run: |
+          gh api -X PATCH "repos/$GH_REPO/git/refs/tags/nightly" -f sha="$SHA" -F force=true > /dev/null \
+            || echo "::warning::Couldn't move the nightly tag to $SHA; the next scheduled run will rebuild even if develop hasn't changed."
 
       - name: Update the nightly release notes
         if: steps.release.outputs.nightly == 'true'

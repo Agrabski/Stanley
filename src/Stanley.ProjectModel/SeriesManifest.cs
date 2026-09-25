@@ -8,4 +8,5 @@ namespace Stanley.ProjectModel;
 /// issues; number/title live on each <see cref="Issues.Issue"/> instead, so a #0 preview
 /// or a #1.5 annual doesn't force renumbering.
 /// </summary>
-public sealed record SeriesManifest(string Title, PageTrim DefaultPageTrim, IReadOnlyList<IssueId> IssueIds);
+/// <param name="Format">What the comic was set up as (a newspaper strip, a webcomic...); absent for a printed comic book, and in projects from before formats existed.</param>
+public sealed record SeriesManifest(string Title, PageTrim DefaultPageTrim, IReadOnlyList<IssueId> IssueIds, ComicFormat? Format = null);

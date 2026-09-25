@@ -357,13 +357,13 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>
     /// Everything the ribbon shows about the selected element (or the next new one) and the
-    /// selected panel's background - raised only when one of them changed, not on every
+    /// selected panel's background and border - raised only when one of them changed, not on every
     /// pointer move of a drag.
     /// </summary>
     private void RaiseElementDerivedChanged()
     {
         RaiseFontChanged();
-        var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedElement?.Layer, SelectedPanel?.Background,
+        var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedElement?.Layer, SelectedPanel?.Background, SelectedPanel?.Borderless,
             _newShapeStyle, _newTextStyle, _newShapeLayer, _newTextLayer, Tool);
         if (Equals(key, _elementDerivedKey))
             return;
@@ -385,6 +385,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(SelectedPanelBackground));
         OnPropertyChanged(nameof(BackgroundPreview));
         OnPropertyChanged(nameof(BackgroundName));
+        OnPropertyChanged(nameof(SelectedPanelHasBorder));
     }
 
     // ---------------------------------------------------------------- drawing shapes

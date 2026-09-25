@@ -50,15 +50,24 @@
         <TextBlock Name="MessageText" Text="{Binding Message}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
                    Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
 
-        <!-- New -->
+        <!-- New: comic book pages (paper + layout), then strip and webcomic templates. -->
         <StackPanel IsVisible="{Binding IsNewPage}">
           <TextBlock Classes="backstageHeading" Text="New" />
+          <TextBlock Classes="backstageSubheading" Text="Comic book" Margin="0,0,0,8" />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
             <TextBlock Text="Paper" VerticalAlignment="Center" />
             <ComboBox Name="PaperSizeBox" ItemsSource="{Binding PaperSizes}" SelectedItem="{Binding NewPaperSize}" MinWidth="90" />
             <TextBlock Text="Pick a starting layout - you can change it any time from the Layout tab." Opacity="0.7" VerticalAlignment="Center" Margin="12,0,0,0" />
           </StackPanel>
           <WrapPanel Name="NewTiles" />
+
+          <TextBlock Classes="backstageSubheading" Text="Comic strips" />
+          <TextBlock Text="Each page is one strip, and every new page starts with the same panels." Opacity="0.7" Margin="0,0,0,12" />
+          <WrapPanel Name="StripTiles" />
+
+          <TextBlock Classes="backstageSubheading" Text="Webcomics" />
+          <TextBlock Text="Made to read on screen: File › Export › PNG gives each page at the size shown, ready to post." Opacity="0.7" Margin="0,0,0,12" TextWrapping="Wrap" />
+          <WrapPanel Name="WebcomicTiles" />
         </StackPanel>
 
         <!-- Open -->
@@ -118,17 +127,22 @@
         <!-- Info -->
         <StackPanel IsVisible="{Binding IsInfoPage}">
           <TextBlock Classes="backstageHeading" Text="Info" />
-          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="12" MaxWidth="640" HorizontalAlignment="Left">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="12" MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Text="Title" VerticalAlignment="Center" Opacity="0.7" />
             <TextBox Name="TitleBox" Grid.Column="1" Text="{Binding DocumentTitle}" MinWidth="320" />
-            <TextBlock Grid.Row="1" Text="Location" Opacity="0.7" />
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LocationText}" TextWrapping="Wrap" />
-            <TextBlock Grid.Row="2" Text="Page size" Opacity="0.7" />
-            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PageSizeText}" />
-            <TextBlock Grid.Row="3" Text="Contents" Opacity="0.7" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PanelCountText}" />
-            <TextBlock Grid.Row="4" Text="Status" Opacity="0.7" />
-            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DocumentCaption}" />
+            <TextBlock Grid.Row="1" Text="Issue" VerticalAlignment="Center" Opacity="0.7" />
+            <TextBox Name="IssueNumberBox" Grid.Row="1" Grid.Column="1" Text="{Binding IssueNumber}" Width="120" HorizontalAlignment="Left"
+                     ToolTip.Tip="The issue's number - 1, 0, 1.5 or whatever you print" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="Texts on the pages show these wherever they have {title} or {issue} - a title page does, and Text › Fields adds them to any text."
+                       TextWrapping="Wrap" FontSize="12" Opacity="0.7" Margin="0,-6,0,0" />
+            <TextBlock Grid.Row="3" Text="Location" Opacity="0.7" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LocationText}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4" Text="Page size" Opacity="0.7" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding PageSizeText}" />
+            <TextBlock Grid.Row="5" Text="Contents" Opacity="0.7" />
+            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PanelCountText}" />
+            <TextBlock Grid.Row="6" Text="Status" Opacity="0.7" />
+            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding DocumentCaption}" />
           </Grid>
         </StackPanel>
 
@@ -157,7 +171,7 @@
             <Button Name="ExportPngButton" Classes="tile" Command="{Binding ExportPngCommand}" Width="180" Height="110">
               <StackPanel Spacing="6">
                 <TextBlock Text="PNG" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                <TextBlock Text="The current page at 300 dpi. For the web and social media." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+                <TextBlock Text="{Binding PngExportText}" TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
               </StackPanel>
             </Button>
           </StackPanel>

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Threading;
 
 namespace Stanley.Editors;
 
@@ -28,6 +29,13 @@ public partial class PageEditorRibbon : UserControl
             button.Click += (_, _) => ViewModel?.ApplyLayoutCommand.Execute(preset);
             LayoutGallery.Children.Add(button);
         }
+
+        // A title page design is picked with one click, like Word's cover pages - the gallery
+        // closes behind it. Posted: a button runs its command after its Click event, and a
+        // closed flyout's buttons have lost the DataContext their commands are bound through.
+        void CloseTitlePageGallery() => Dispatcher.UIThread.Post(() => TitlePageButton.Flyout?.Hide());
+        TitlePageGallery.AddHandler(Button.ClickEvent, (_, _) => CloseTitlePageGallery());
+        RemoveTitlePageButton.Click += (_, _) => CloseTitlePageGallery();
 
         MarginInput.ValueChanged += (_, e) =>
         {
@@ -71,9 +79,13 @@ public partial class PageEditorRibbon : UserControl
     /// <summary>Like Word: a contextual tab appears with its selection but isn't forced open; if the one you're on goes away (selection cleared), fall back to Home.</summary>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // Undo/redo can change the start number underneath the box.
+        // Undo/redo can change the start number, margin or gutter underneath their boxes.
         if (e.PropertyName == nameof(PageEditorViewModel.PageNumberStart) && ViewModel is { } current && PageNumberStartInput.Value != current.PageNumberStart)
             PageNumberStartInput.Value = current.PageNumberStart;
+        if (e.PropertyName == nameof(PageEditorViewModel.MarginMm) && ViewModel is { } margins && MarginInput.Value != (decimal)margins.MarginMm)
+            MarginInput.Value = (decimal)margins.MarginMm;
+        if (e.PropertyName == nameof(PageEditorViewModel.GutterMm) && ViewModel is { } gutters && GutterInput.Value != (decimal)gutters.GutterMm)
+            GutterInput.Value = (decimal)gutters.GutterMm;
 
         if (e.PropertyName is not (nameof(PageEditorViewModel.IsPanelContext) or nameof(PageEditorViewModel.IsBubbleContext)
                 or nameof(PageEditorViewModel.IsCharacterContext) or nameof(PageEditorViewModel.IsShapeContext)
