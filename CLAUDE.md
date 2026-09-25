@@ -901,14 +901,26 @@ fabrics, drawn stickers, expressions, draw your own and import, named looks.
   contextual **Sticker** tab (fit sliders, take off, remove, stacking, and inline
   notes on missing views or expressions).
 - **Draw your own / import** (`CharacterEditorViewModel.Art.cs`, `StickerImport`):
-  every slot gallery ends with *Draw your own…* and *Import…*. Draw your own wears a
-  new sticker with the slot's template parts (or takes the selected drawn sticker),
-  writes the template — or its existing art — for the stage's view through
-  `IArtEditing` (real: `SystemArtEditing`, a file under `AppPaths.ArtEditingDirectory`
-  opened via the shell and watched with a debounced `FileSystemWatcher`; tests use a
-  fake), and each save there comes back through `StickerImport.WithArt` as one undo
-  step (new layers → new parts, new `slot-` classes → colour slots, `Source`
-  cleared). Import (`ArtImportRequested` → file picker → `ImportArt`): a file with
+  every slot gallery ends with *Draw your own…* and *Import…*. Draw your own opens the
+  selected view's art (a template, or the selected drawn sticker's existing art) in a
+  **configured** SVG editor — never the OS's file association for `.svg`, which is
+  often just a viewer, not an editor. The editor is `IArtEditing.EditorPath` (real:
+  `SystemArtEditing`, launched directly — no shell — with the file as its only
+  argument, a file under `AppPaths.ArtEditingDirectory` watched with a debounced
+  `FileSystemWatcher`; tests use a fake). Null the first time: `DrawYourOwn` wears
+  nothing yet and raises `SvgEditorConfigurationRequested` instead, which the ribbon
+  answers with `SvgEditorPicker` (a small code-built modal, like
+  `AvaloniaFileDialogs.AskSaveChangesAsync`: programs `SvgEditorCandidates.Detect()`
+  finds on `PATH` — Inkscape, Karbon, Boxy SVG, sK1 — or *Browse…* to any executable)
+  and then calls `DrawYourOwn` again, so nothing is created until there's somewhere to
+  draw it. Once set, Draw your own wears a new sticker with the slot's template parts
+  (or takes the selected drawn sticker) and each save there comes back through
+  `StickerImport.WithArt` as one undo step (new layers → new parts, new `slot-`
+  classes → colour slots, `Source` cleared). The same picker is File › Options › SVG
+  editor's *Change…* (`MainWindowViewModel.ChooseSvgEditorCommand`,
+  `IFileDialogs.PickSvgEditorAsync`), backed by `AppSettings.SvgEditorPath` (plain
+  text — a program path isn't a secret) so it's remembered across projects and runs.
+  Import (`ArtImportRequested` → file picker → `ImportArt`): a file with
   `data-stanley-slot`/`-view` imports as-is (`StickerImport.FromFile`); anything
   else, SVG or PNG, becomes one Pin part named `all` (`ParsedArt.WholeFile`: every
   layer) centred on the slot's region and fitted (`StickerImport.RegionBox`), worn and

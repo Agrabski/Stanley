@@ -13,6 +13,13 @@ namespace Stanley.Editors;
 public sealed record ArtImportRequest(string Slot);
 
 /// <summary>
+/// Asks the view to set up an SVG editor (none is configured yet) before drawing for
+/// <paramref name="Slot"/> can go ahead; the view answers with <see cref="SvgEditorPicker"/>
+/// and then calls <see cref="CharacterEditorViewModel.DrawYourOwn"/> again.
+/// </summary>
+public sealed record SvgEditorConfigurationRequest(string Slot);
+
+/// <summary>
 /// Drawing your own stickers and importing art (docs/sticker-system.md §13.2), and placing
 /// drawn art on the character: the Sticker tab's size, turn and "hug the shape", and
 /// dragging it on the stage.
@@ -28,6 +35,9 @@ public sealed partial class CharacterEditorViewModel
 
     /// <summary>Raised to ask the view for a file to import ("Import..." in a gallery); the view answers with <see cref="ImportArt"/>.</summary>
     public event EventHandler<ArtImportRequest>? ArtImportRequested;
+
+    /// <summary>Raised when <see cref="DrawYourOwn"/> is asked to draw but no SVG editor is set up yet.</summary>
+    public event EventHandler<SvgEditorConfigurationRequest>? SvgEditorConfigurationRequested;
 
     private void InitializeArt()
     {
@@ -51,14 +61,28 @@ public sealed partial class CharacterEditorViewModel
     private IArtEditing ArtEditing => Library?.ArtEditing ?? _fallbackArtEditing;
     private static readonly IArtEditing _fallbackArtEditing = new SystemArtEditing(Path.Combine(Path.GetTempPath(), "stanley-drawing"));
 
+    /// <summary>The configured SVG editor, for the picker to pre-fill with the current choice.</summary>
+    public string? SvgEditorPath => ArtEditing.EditorPath;
+
+    /// <summary>Sets the SVG editor to open drawings in, chosen through <see cref="SvgEditorConfigurationRequested"/>.</summary>
+    public void SetSvgEditorPath(string path) => ArtEditing.EditorPath = path;
+
     /// <summary>
-    /// Draws a sticker for <paramref name="slot"/> in the user's SVG editor: the selected
+    /// Draws a sticker for <paramref name="slot"/> in the configured SVG editor: the selected
     /// sticker if it's a drawn one in that slot (its art for the view on the stage, or a
     /// template if that view isn't drawn yet), else a new sticker, worn at once. Each save
-    /// there comes back as one undo step.
+    /// there comes back as one undo step. Nothing is created yet if no editor is set up -
+    /// <see cref="SvgEditorConfigurationRequested"/> asks for one first, and calling this
+    /// again afterwards picks up where it left off.
     /// </summary>
     public void DrawYourOwn(string slot)
     {
+        if (ArtEditing.EditorPath is not { Length: > 0 })
+        {
+            SvgEditorConfigurationRequested?.Invoke(this, new SvgEditorConfigurationRequest(slot));
+            return;
+        }
+
         var view = PreviewAngle;
         var asset = SelectedSticker is { HasArt: true } selected && selected.Sticker.Slot == slot ? selected : null;
         if (asset is null)
@@ -81,9 +105,8 @@ public sealed partial class CharacterEditorViewModel
         }
         _artEdits[(id, view)] = session;
         ShowMessage(error is not null
-            ? $"Drawing {asset.Sticker.Name}: {error}. Ctrl+Z undoes adding {asset.Sticker.Name}."
-            : $"Drawing {asset.Sticker.Name}: {session.Path} opened in your system's app for SVG files - every save there updates it here. " +
-              $"If that's not an SVG editor (Inkscape is a free one), install one and try again, or Ctrl+Z to undo adding {asset.Sticker.Name}." +
+            ? $"Drawing {asset.Sticker.Name}: {error}."
+            : $"Drawing {asset.Sticker.Name} in {session.Path} - every save there updates it here." +
               (view == ViewAngle.Front ? " Switch to Side and draw again for the side view." : ""));
     }
 

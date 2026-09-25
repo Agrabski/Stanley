@@ -11,10 +11,20 @@ namespace Stanley.Editors;
 public interface IArtEditing
 {
     /// <summary>
-    /// Writes <paramref name="text"/> to a file named <paramref name="fileName"/>, opens it
-    /// in the system's editor for SVG files, and calls <paramref name="saved"/> (on the UI
-    /// thread) with the file's new text each time it's saved, until the result is disposed.
-    /// Returns the file's path, or null (with the reason) if it couldn't be written.
+    /// The SVG editor to open drawings in - an executable's path, or null until the user has
+    /// chosen one (File &gt; Options &gt; SVG editor, or the first-run picker). Stanley never
+    /// guesses at the operating system's default app for <c>.svg</c> files, which is often
+    /// just a viewer.
+    /// </summary>
+    string? EditorPath { get; set; }
+
+    /// <summary>
+    /// Writes <paramref name="text"/> to a file named <paramref name="fileName"/>, opens it in
+    /// <see cref="EditorPath"/>, and calls <paramref name="saved"/> (on the UI thread) with the
+    /// file's new text each time it's saved, until the result is disposed. Returns the file's
+    /// path, or null (with the reason) if it couldn't be written or opened. Callers should check
+    /// <see cref="EditorPath"/> first and ask the user to set one rather than relying on the
+    /// error this gives when it's still unset.
     /// </summary>
     ArtEditSession? Edit(string fileName, string text, Action<string> saved, out string? error);
 }
@@ -29,21 +39,49 @@ public sealed class ArtEditSession(string path, IDisposable? watch) : IDisposabl
 
 /// <summary>
 /// The real thing: files go in a folder of their own (under the app's data folder), open
-/// with whatever the desktop uses for SVG (<c>xdg-open</c> and friends, through the
-/// shell), and a <see cref="FileSystemWatcher"/> brings saves back - debounced, since
-/// editors often write a file in several steps or replace it by renaming.
+/// directly in <see cref="EditorPath"/> (never a shell/file-association guess - see
+/// <see cref="IArtEditing.EditorPath"/>), and a <see cref="FileSystemWatcher"/> brings saves
+/// back - debounced, since editors often write a file in several steps or replace it by
+/// renaming.
 /// </summary>
-public sealed class SystemArtEditing(string folder) : IArtEditing
+public sealed class SystemArtEditing : IArtEditing
 {
     private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(400);
 
+    private readonly string _folder;
+    private readonly Func<string?> _getEditorPath;
+    private readonly Action<string?> _setEditorPath;
+
+    /// <param name="folder">Where drawing files are written and watched.</param>
+    /// <param name="getEditorPath">Reads the persisted editor path (<see cref="Documents.AppSettings.SvgEditorPath"/> in the real app); omit to keep it in memory only (tests, or a character editor opened without a project).</param>
+    /// <param name="setEditorPath">Persists a newly chosen editor path.</param>
+    public SystemArtEditing(string folder, Func<string?>? getEditorPath = null, Action<string?>? setEditorPath = null)
+    {
+        _folder = folder;
+        string? memory = null;
+        _getEditorPath = getEditorPath ?? (() => memory);
+        _setEditorPath = setEditorPath ?? (v => memory = v);
+    }
+
+    public string? EditorPath
+    {
+        get => _getEditorPath();
+        set => _setEditorPath(value);
+    }
+
     public ArtEditSession? Edit(string fileName, string text, Action<string> saved, out string? error)
     {
+        if (EditorPath is not { Length: > 0 } editorPath)
+        {
+            error = "no SVG editor is set up (File › Options › SVG editor)";
+            return null;
+        }
+
         string path;
         try
         {
-            Directory.CreateDirectory(folder);
-            path = Path.Combine(folder, fileName);
+            Directory.CreateDirectory(_folder);
+            path = Path.Combine(_folder, fileName);
             File.WriteAllText(path, text);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -53,7 +91,7 @@ public sealed class SystemArtEditing(string folder) : IArtEditing
         }
 
         var last = text;
-        var watcher = new FileSystemWatcher(folder, fileName) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size };
+        var watcher = new FileSystemWatcher(_folder, fileName) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size };
         Timer? pending = null;
         void Changed()
         {
@@ -86,13 +124,15 @@ public sealed class SystemArtEditing(string folder) : IArtEditing
 
         try
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            var start = new ProcessStartInfo(editorPath) { UseShellExecute = false };
+            start.ArgumentList.Add(path);
+            Process.Start(start);
             error = null;
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException)
         {
-            // Nothing opens SVG files here: the file is still watched, so opening it by hand works.
-            error = $"couldn't open an SVG editor ({e.Message}) - open {path} yourself; saves still come back";
+            // The configured editor didn't start: the file is still watched, so opening it by hand works.
+            error = $"couldn't start {editorPath} ({e.Message}) - open {path} yourself; saves still come back";
         }
         return new ArtEditSession(path, new Disposables(watcher, () => pending?.Dispose()));
     }
