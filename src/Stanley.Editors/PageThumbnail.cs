@@ -83,7 +83,7 @@ public sealed class PageThumbnail : Control
         context.Custom(new ThumbnailDrawOperation(new Rect(Bounds.Size), page.PageBounds, page.Working, page.Folio, page.CharacterSnapshot, page.IssueLooks, page.PictureSnapshot));
     }
 
-    private sealed class ThumbnailDrawOperation(Rect bounds, Rect2D pageBounds, PageDocument document, PageFolio? folio,
+    internal sealed class ThumbnailDrawOperation(Rect bounds, Rect2D pageBounds, PageDocument document, PageFolio? folio,
         IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Characters.CharacterDefinition> characters,
         IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Ids.CharacterRevisionId> issueLooks,
         IReadOnlyDictionary<string, ProjectModel.Characters.ArtFile> pictures) : ICustomDrawOperation
@@ -105,7 +105,8 @@ public sealed class PageThumbnail : Control
             var canvas = lease.SkCanvas;
             var scale = (float)Math.Min(bounds.Width / pageBounds.Width, bounds.Height / pageBounds.Height);
             canvas.Save();
-            canvas.ClipRect(new SKRect(0, 0, (float)bounds.Width, (float)bounds.Height));
+            canvas.ClipRect(new SKRect((float)bounds.Left, (float)bounds.Top, (float)bounds.Right, (float)bounds.Bottom));
+            canvas.Translate((float)bounds.X, (float)bounds.Y);
             canvas.Scale(scale);
             canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
             PageRenderer.Draw(canvas, pageBounds, document.PanelOrder

@@ -74,7 +74,8 @@ public static class PageRenderer
 
     /// <summary>
     /// Panels in z-order, each with - clipped to it - its background, its background
-    /// elements, its characters, its foreground elements and its bubbles, and its border on top.
+    /// elements, its characters, its foreground elements and its bubbles, and its border on
+    /// top (unless it's <see cref="Panel.Borderless"/>).
     /// </summary>
     /// <param name="hideText">An element whose lettering to leave off (the editor's inline text box is showing it instead).</param>
     public static void DrawPanels(SKCanvas canvas, IEnumerable<Panel> panelsInOrder, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null,
@@ -99,7 +100,8 @@ public static class PageRenderer
                 BubbleRenderer.Draw(canvas, bubble, SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
 
-            canvas.DrawPath(path, border);
+            if (!panel.Borderless)
+                canvas.DrawPath(path, border);
         }
     }
 
@@ -162,11 +164,22 @@ public static class PageRenderer
     /// <summary>Writes the page as a PNG at <paramref name="dpi"/> (300 = print quality).</summary>
     public static void ExportPng(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, int dpi = 300, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null) =>
+        RenderPng(output, pageBounds, panelsInOrder, dpi / 25.4, folio, characters, issueLooks, pictures);
+
+    /// <summary>Writes the page as a PNG exactly <paramref name="widthPx"/> pixels wide, its height in proportion - a webcomic's picture size.</summary>
+    public static void ExportPngAtWidth(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, int widthPx, PageFolio? folio = null,
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null) =>
+        RenderPng(output, pageBounds, panelsInOrder, widthPx / pageBounds.Width, folio, characters, issueLooks, pictures);
+
+    private static void RenderPng(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, double pixelsPerMillimetre, PageFolio? folio,
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks,
+        IReadOnlyDictionary<string, ArtFile>? pictures)
     {
-        var pixelsPerMm = dpi / 25.4f;
-        var width = (int)Math.Round(pageBounds.Width * pixelsPerMm);
-        var height = (int)Math.Round(pageBounds.Height * pixelsPerMm);
+        var pixelsPerMm = (float)pixelsPerMillimetre;
+        var width = (int)Math.Round(pageBounds.Width * pixelsPerMillimetre);
+        var height = (int)Math.Round(pageBounds.Height * pixelsPerMillimetre);
         using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul))
             ?? throw new InvalidOperationException("Couldn't allocate an image that large.");
         var canvas = surface.Canvas;

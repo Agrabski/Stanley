@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Stanley.Editing;
 using Stanley.ProjectModel;
 using Stanley.ProjectModel.Storage;
 
@@ -38,6 +39,12 @@ internal static class InitCommand
             Description = "Default page bleed, in millimetres.",
             DefaultValueFactory = _ => DefaultBleedMm
         };
+        var templateOption = new Option<string?>("--template")
+        {
+            Description = "Start from a comic strip or webcomic template (its page size, panels and spacing) instead of a comic book page. "
+                + "--page-*-mm still override its size."
+        };
+        templateOption.AcceptOnlyFromAmong([.. ComicTemplates.All.Select(t => t.Key)]);
         var forceOption = new Option<bool>("--force")
         {
             Description = "Overwrite the project at the target directory if one already exists there."
@@ -49,15 +56,20 @@ internal static class InitCommand
         command.Add(widthOption);
         command.Add(heightOption);
         command.Add(bleedOption);
+        command.Add(templateOption);
         command.Add(forceOption);
 
         command.SetAction(parseResult =>
         {
             var path = parseResult.GetRequiredValue(pathArgument);
             var title = parseResult.GetValue(titleOption) ?? DefaultTitle(path);
+            var template = ComicTemplates.All.SingleOrDefault(t => t.Key == parseResult.GetValue(templateOption));
+            // A template supplies the page unless a --page-* option was actually typed.
+            double Mm(Option<double> option, double fromTemplate) =>
+                template is null || parseResult.GetResult(option) is { Implicit: false } ? parseResult.GetRequiredValue(option) : fromTemplate;
             var trim = new PageTrim(
-                new PageSize(parseResult.GetRequiredValue(widthOption), parseResult.GetRequiredValue(heightOption)),
-                parseResult.GetRequiredValue(bleedOption));
+                new PageSize(Mm(widthOption, template?.Trim.Size.WidthMm ?? 0), Mm(heightOption, template?.Trim.Size.HeightMm ?? 0)),
+                Mm(bleedOption, template?.Trim.BleedMm ?? 0));
 
             if (!parseResult.GetRequiredValue(forceOption) && ProjectRepository.IsInitialized(path))
             {
@@ -65,7 +77,7 @@ internal static class InitCommand
                 return 1;
             }
 
-            ProjectRepository.Initialize(path, title, trim);
+            ProjectRepository.Initialize(path, title, trim, template?.Format);
             Console.WriteLine($"Created '{title}' at {Path.GetFullPath(path)}");
             return 0;
         });

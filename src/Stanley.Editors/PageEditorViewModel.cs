@@ -144,6 +144,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         RemovePageNumbersCommand = new RelayCommand(() => _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = PageNumberPosition.None }),
             () => PageNumbersEnabled);
         InitializeElementCommands();
+        InitializeTitlePageCommands();
     }
 
     // ---------------------------------------------------------------- ribbon commands

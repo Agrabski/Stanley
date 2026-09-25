@@ -41,11 +41,12 @@ public sealed class ComicProject
     // can delete the ones no page uses any more (and never touches other files there).
     private HashSet<string> _savedPictures;
 
-    private ComicProject(string? location, string title, PageTrim trim, Issue issue, IReadOnlyList<ComicPage> pages,
+    private ComicProject(string? location, string title, PageTrim trim, ComicFormat? format, Issue issue, IReadOnlyList<ComicPage> pages,
         Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels,
         IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
         IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures)
     {
+        Format = format;
         Characters = characters;
         _savedCharacters = savedCharacters;
         Pictures = pictures;
@@ -70,6 +71,21 @@ public sealed class ComicProject
     /// <summary>The project's default page size - what new pages get.</summary>
     public PageTrim Trim { get; }
 
+    /// <summary>What the comic was set up as (<see cref="SeriesManifest.Format"/>) - a strip, a webcomic; null for a comic book.</summary>
+    public ComicFormat? Format { get; }
+
+    /// <summary>The margin and gutter the comic's pages are laid out with: its format's, else the comic book default.</summary>
+    public PanelGrid Grid => GridOf(Format);
+
+    /// <summary>The panels a new page starts with (a strip's row of four); null for one panel filling the page.</summary>
+    public PanelLayoutPreset? NewPageLayout => LayoutOf(Format);
+
+    /// <summary>For a comic read on screen, the width in pixels a page is exported at as a PNG; null for print resolution.</summary>
+    public int? ExportWidthPx => Format?.ExportWidthPx;
+
+    /// <summary>The issue's number as displayed ("1", "0", "1.5"), for a title page.</summary>
+    public string IssueNumber => _issue.Number;
+
     public Rect2D PageBounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 
     /// <summary>The pages as they were opened, in reading order - the editor's starting point.</summary>
@@ -88,15 +104,22 @@ public sealed class ComicProject
     public IReadOnlyDictionary<CharacterId, CharacterRevisionId> IssueLooks => _issue.CharacterRevisions;
 
     /// <summary>A brand-new, unsaved comic with one page: either one panel filling the live area or tiled with <paramref name="layout"/>.</summary>
-    public static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout = null, PanelGrid? grid = null)
-    {
-        var issue = NewIssue();
-        var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
-        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], [], [], [], NoPictures, []);
-    }
+    public static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout = null, PanelGrid? grid = null) =>
+        CreateNew(trim, layout, grid, format: null);
 
     public static ComicProject CreateNew(MetricPaperSize paper = MetricPaperSize.A4, PanelLayoutPreset? layout = null) =>
         CreateNew(new PageTrim(MetricPaperSizes.Size(paper), DefaultBleedMm), layout);
+
+    /// <summary>A brand-new, unsaved comic from a strip or webcomic template: its page size and first page, and its format - spacing, new pages' panels, export width - kept with the comic.</summary>
+    public static ComicProject CreateNew(ComicTemplate template) =>
+        CreateNew(template.Trim, template.Layout, template.Grid, template.Format);
+
+    private static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout, PanelGrid? grid, ComicFormat? format)
+    {
+        var issue = NewIssue();
+        var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
+        return new ComicProject(null, UntitledTitle, trim, format, issue, [page], [], [], [], [], NoPictures, []);
+    }
 
     /// <summary>Opens the project in <paramref name="folder"/>. Throws <see cref="InvalidDataException"/> if the folder isn't a Stanley project.</summary>
     public static ComicProject Open(string folder)
@@ -115,13 +138,13 @@ public sealed class ComicProject
         {
             var page = repository.LoadPage(issue.Id, pageId);
             var panels = page.PanelIds.ToDictionary(id => id, id => repository.LoadPanel(issue.Id, page.Id, id));
-            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels, page.LayoutLocked)));
+            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels, page.LayoutLocked, page.TitlePage)));
             records[page.Id] = page;
             saved[page.Id] = [.. page.PanelIds];
         }
 
         if (pages.Count == 0)
-            pages.Add(NewPage(manifest.DefaultPageTrim));
+            pages.Add(NewPage(manifest.DefaultPageTrim, manifest.Format));
 
         var characters = repository.ListCharacters();
         var pictures = new Dictionary<string, ArtFile>(StringComparer.Ordinal);
@@ -133,12 +156,12 @@ public sealed class ComicProject
                     pictures[name] = file;
             }
         }
-        return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, pages, records, saved,
+        return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, manifest.Format, issue, pages, records, saved,
             characters, [.. characters.Select(c => c.Id)], pictures, [.. pictures.Keys]);
     }
 
-    /// <summary>A blank page at the project's size: one panel filling the live area.</summary>
-    public ComicPage CreateBlankPage(PanelGrid? grid = null) => NewPage(Trim, grid);
+    /// <summary>A new page at the project's size: one panel filling the live area, or the format's panels.</summary>
+    public ComicPage CreateBlankPage() => NewPage(Trim, Format);
 
     /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
@@ -158,7 +181,7 @@ public sealed class ComicProject
 
         var repository = ProjectRepository.IsInitialized(Location)
             ? new ProjectRepository(Location)
-            : ProjectRepository.Initialize(Location, Title, Trim);
+            : ProjectRepository.Initialize(Location, Title, Trim, Format);
 
         (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: true);
         if (pictures != null)
@@ -209,7 +232,7 @@ public sealed class ComicProject
         IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
         IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
-        var repository = ProjectRepository.Initialize(folder, Title, Trim);
+        var repository = ProjectRepository.Initialize(folder, Title, Trim, Format);
         WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: false);
         WritePictures(repository, pages, pictures ?? Pictures, prune: false);
         WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
@@ -227,10 +250,10 @@ public sealed class ComicProject
         if (originalLocation != null && ProjectRepository.IsInitialized(originalLocation))
         {
             var original = Open(originalLocation);
-            return new ComicProject(original.Location, copy.Title, original.Trim, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
+            return new ComicProject(original.Location, copy.Title, original.Trim, copy.Format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
                 copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
+        return new ComicProject(null, copy.Title, copy.Trim, copy.Format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
@@ -242,7 +265,7 @@ public sealed class ComicProject
     {
         var manifest = repository.LoadManifest();
         var issueIds = manifest.IssueIds.Contains(_issue.Id) ? manifest.IssueIds : [.. manifest.IssueIds, _issue.Id];
-        repository.SaveManifest(manifest with { Title = Title, IssueIds = issueIds });
+        repository.SaveManifest(manifest with { Title = Title, IssueIds = issueIds, Format = Format });
 
         var issue = _issue with
         {
@@ -259,8 +282,8 @@ public sealed class ComicProject
         {
             var (id, document) = pages[i];
             var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
-            var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, $"Page {i + 1}", TrimOverride: null, []))
-                with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked };
+            var record = (_pageRecords.TryGetValue(id, out var existing) ? existing : new Page(id, document.IsTitlePage ? "Title page" : $"Page {i + 1}", TrimOverride: null, []))
+                with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = document.IsTitlePage };
             repository.SavePage(issue.Id, record);
             foreach (var panelId in panelIds)
                 repository.SavePanel(issue.Id, id, document.Panels[panelId]);
@@ -341,13 +364,16 @@ public sealed class ComicProject
         PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks, pictures);
     }
 
-    /// <summary>One page as a PNG.</summary>
+    /// <summary>One page as a PNG: at <paramref name="dpi"/>, or exactly <paramref name="widthPx"/> pixels wide when given (a webcomic's <see cref="ExportWidthPx"/>).</summary>
     public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, int? widthPx = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks, pictures);
+        if (widthPx is { } width)
+            PageRenderer.ExportPngAtWidth(stream, bounds, InOrder(document), width, folio, characters, issueLooks, pictures);
+        else
+            PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks, pictures);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>
@@ -357,8 +383,13 @@ public sealed class ComicProject
 
     private static Issue NewIssue() => new(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
 
-    private static ComicPage NewPage(PageTrim trim, PanelGrid? grid = null) =>
-        new(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, null));
+    private static ComicPage NewPage(PageTrim trim, ComicFormat? format) =>
+        new(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), GridOf(format), LayoutOf(format)));
+
+    private static PanelGrid GridOf(ComicFormat? format) => format is null ? PanelGrid.Default : new PanelGrid(format.MarginMm, format.GutterMm);
+
+    private static PanelLayoutPreset? LayoutOf(ComicFormat? format) =>
+        format?.PanelsPerRow is { Count: > 0 } rows ? new PanelLayoutPreset("New page", rows) : null;
 
     private string ChooseTargetFolder(string folder)
     {

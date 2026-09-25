@@ -198,4 +198,38 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         Assert.True(File.Exists(_dialogs.ExportPath));
     }
+
+    [Fact]
+    public async Task NewFromATemplate_OpensThatKindOfComic_AndInfoNamesIt()
+    {
+        var vm = NewViewModel();
+        var daily = Stanley.Editing.ComicTemplates.All.Single(t => t.Name == "Daily strip");
+
+        await vm.NewFromTemplateAsync(daily);
+
+        Assert.Equal(new Rect2D(0, 0, 330, 105), vm.Editor!.PageBounds);
+        Assert.Equal(4, vm.Editor.Working.PanelOrder.Count);
+        Assert.False(vm.IsDirty);
+        Assert.Equal("Daily strip · 330 × 105 mm, no bleed", vm.PageSizeText);
+        Assert.Equal("The current page at 300 dpi. For the web and social media.", vm.PngExportText);
+    }
+
+    [Fact]
+    public async Task AWebcomicsPng_IsExportedAtItsPixelSize()
+    {
+        var vm = NewViewModel();
+        await vm.NewFromTemplateAsync(Stanley.Editing.ComicTemplates.All.Single(t => t.Name == "Vertical scroll"));
+        _dialogs.ExportPath = Path.Combine(_root, "episode.png");
+
+        await vm.ExportAsync("png");
+
+        Assert.Equal("Vertical scroll · 200 × 320 mm, no bleed, exported at 800 × 1280 px", vm.PageSizeText);
+        Assert.Contains("800 × 1280 px", vm.PngExportText, StringComparison.Ordinal);
+        using var image = SkiaSharp.SKBitmap.Decode(_dialogs.ExportPath);
+        Assert.Equal((800, 1280), (image.Width, image.Height));
+    }
+
+    [Fact]
+    public void AComicBooksInfo_StillNamesItsPaper() =>
+        Assert.Equal("A4 · 210 × 297 mm, 3 mm bleed", NewViewModel().PageSizeText);
 }

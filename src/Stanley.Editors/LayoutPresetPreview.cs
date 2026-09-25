@@ -2,22 +2,35 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Stanley.Editing;
+using Stanley.ProjectModel;
 using Stanley.ProjectModel.Geometry;
 
 namespace Stanley.Editors;
 
-/// <summary>A thumbnail of a <see cref="PanelLayoutPreset"/> on an A-series page, so the layout picker shows each grid instead of just naming it.</summary>
+/// <summary>
+/// A thumbnail of a <see cref="PanelLayoutPreset"/> on a page, so a layout or template
+/// picker shows each grid instead of just naming it: an A-series page with exaggerated
+/// spacing unless <see cref="PageSize"/> and <see cref="Grid"/> give the real ones (a
+/// strip, a webcomic page). The page is centred in the control, whatever its shape.
+/// </summary>
 public sealed class LayoutPresetPreview : Control
 {
-    private static readonly Rect2D ThumbnailPage = new(0, 0, 210, 297);
+    private static readonly PageSize ThumbnailPage = new(210, 297);
     private static readonly PanelGrid ThumbnailGrid = new(14, 8);
 
     public static readonly StyledProperty<PanelLayoutPreset?> PresetProperty =
         AvaloniaProperty.Register<LayoutPresetPreview, PanelLayoutPreset?>(nameof(Preset));
 
+    public static readonly StyledProperty<PageSize?> PageSizeProperty =
+        AvaloniaProperty.Register<LayoutPresetPreview, PageSize?>(nameof(PageSize));
+
+    public static readonly StyledProperty<PanelGrid?> GridProperty =
+        AvaloniaProperty.Register<LayoutPresetPreview, PanelGrid?>(nameof(Grid));
+
     static LayoutPresetPreview()
     {
-        AffectsRender<LayoutPresetPreview>(PresetProperty);
+        AffectsRender<LayoutPresetPreview>(PresetProperty, PageSizeProperty, GridProperty);
+        AffectsMeasure<LayoutPresetPreview>(PageSizeProperty);
     }
 
     public PanelLayoutPreset? Preset
@@ -26,18 +39,37 @@ public sealed class LayoutPresetPreview : Control
         set => SetValue(PresetProperty, value);
     }
 
-    protected override Size MeasureOverride(Size availableSize) => new(42, 42 * ThumbnailPage.Height / ThumbnailPage.Width);
+    /// <summary>The page the layout is shown on; an A4 page if null.</summary>
+    public PageSize? PageSize
+    {
+        get => GetValue(PageSizeProperty);
+        set => SetValue(PageSizeProperty, value);
+    }
+
+    /// <summary>The margin and gutter to show; wider than real ones (so they read at thumbnail size) if null.</summary>
+    public PanelGrid? Grid
+    {
+        get => GetValue(GridProperty);
+        set => SetValue(GridProperty, value);
+    }
+
+    private Rect2D Page => PageSize is { } size ? new Rect2D(0, 0, size.WidthMm, size.HeightMm) : new Rect2D(0, 0, ThumbnailPage.WidthMm, ThumbnailPage.HeightMm);
+
+    protected override Size MeasureOverride(Size availableSize) => new(42, 42 * Page.Height / Page.Width);
 
     public override void Render(DrawingContext context)
     {
-        var scale = Math.Min(Bounds.Width / ThumbnailPage.Width, Bounds.Height / ThumbnailPage.Height);
-        Rect ToRect(Rect2D r) => new(r.X * scale, r.Y * scale, r.Width * scale, r.Height * scale);
+        var page = Page;
+        var scale = Math.Min(Bounds.Width / page.Width, Bounds.Height / page.Height);
+        var left = (Bounds.Width - page.Width * scale) / 2;
+        var top = (Bounds.Height - page.Height * scale) / 2;
+        Rect ToRect(Rect2D r) => new(left + r.X * scale, top + r.Y * scale, r.Width * scale, r.Height * scale);
 
-        context.DrawRectangle(Brushes.White, new Pen(Brushes.Gray, 1), ToRect(ThumbnailPage));
+        context.DrawRectangle(Brushes.White, new Pen(Brushes.Gray, 1), ToRect(page));
         if (Preset is null)
             return;
 
-        var layout = PanelLayoutEditing.GridLayout(ThumbnailPage, ThumbnailGrid, Preset.ColumnsPerRow);
+        var layout = PanelLayoutEditing.GridLayout(page, Grid ?? ThumbnailGrid, Preset.ColumnsPerRow);
         if (!layout.IsValid)
             return;
 

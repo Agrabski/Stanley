@@ -2,7 +2,10 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Mvvm.Controls;
+using Stanley.Editing;
+using Stanley.Editing.Abstractions;
 using Stanley.EditorFramework;
+using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
 
@@ -29,9 +32,15 @@ public sealed class PageItem : ObservableObject
         set
         {
             if (SetProperty(ref _number, value))
+            {
                 Editor.Title = $"Page {value}";
+                OnPropertyChanged(nameof(Caption));
+            }
         }
     }
+
+    /// <summary>What the navigator shows under the thumbnail: the page's number, or "Title" for the title page.</summary>
+    public string Caption => Editor.Committed.IsTitlePage ? "Title" : Number.ToString(System.Globalization.CultureInfo.CurrentCulture);
 }
 
 /// <summary>
@@ -44,7 +53,7 @@ public sealed class PageItem : ObservableObject
 /// Ctrl+Z undoes "deleted page 3" as naturally as "moved a bubble". Undoing an edit made
 /// on another page switches to that page first, so the change is never invisible.
 /// </summary>
-public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLooksHost
+public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLooksHost, ITitlePageHost
 {
     private IReadOnlyDictionary<CharacterId, CharacterRevisionId> _issueLooks;
     private readonly EditorHistory _history;
@@ -52,15 +61,22 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     private PageNumbering _pageNumbering;
     private readonly ICharacterCatalog? _characters;
     private readonly PictureLibrary? _pictures;
+    private readonly PanelGrid _grid;
+    private readonly PanelLayoutPreset? _newPageLayout;
 
     /// <param name="characters">What every page draws its placed characters from (the Characters pane); null for a comic edited without one.</param>
     /// <param name="issueLooks">The issue's look per character (<see cref="ComicProject.IssueLooks"/>).</param>
     /// <param name="pictures">The comic's pictures, shared by every page; null for a comic edited without them.</param>
+    /// <param name="grid">The margin and gutter the pages start with (<see cref="ComicProject.Grid"/>); the comic book default if null.</param>
+    /// <param name="newPageLayout">The panels a new page starts with (<see cref="ComicProject.NewPageLayout"/>); one panel if null.</param>
     public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null, ICharacterCatalog? characters = null,
-        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, PictureLibrary? pictures = null)
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, PictureLibrary? pictures = null, PanelGrid? grid = null,
+        PanelLayoutPreset? newPageLayout = null)
     {
         _history = history;
         _pictures = pictures;
+        _grid = grid ?? PanelGrid.Default;
+        _newPageLayout = newPageLayout;
         _issueLooks = new Dictionary<CharacterId, CharacterRevisionId>(issueLooks ?? new Dictionary<CharacterId, CharacterRevisionId>());
         _characters = characters;
         _pageNumbering = pageNumbering ?? PageNumbering.Off;
@@ -181,19 +197,23 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     public IReadOnlyList<(PageId Id, PageDocument Document)> Snapshot() =>
         Pages.Select(p => (p.Id, p.Editor.Committed)).ToList();
 
-    /// <summary>Adds a blank page (one panel filling the live area, same size and spacing as <paramref name="after"/>) right after it, and shows it.</summary>
+    /// <summary>
+    /// Adds a new page (same size and spacing as <paramref name="after"/>, with one panel
+    /// filling the live area - or, for a strip or webcomic, its format's panels) right after
+    /// it, and shows it.
+    /// </summary>
     public PageItem AddPageAfter(PageItem after)
     {
         var bounds = after.Editor.PageBounds;
         var id = PageId.New();
-        var item = new PageItem(id, CreateEditor(id, bounds, ComicProject.BlankDocument(bounds, after.Editor.Grid, null), after.Editor));
+        var item = new PageItem(id, CreateEditor(id, bounds, ComicProject.BlankDocument(bounds, after.Editor.Grid, _newPageLayout), after.Editor));
         var order = Pages.ToList();
         order.Insert(order.IndexOf(after) + 1, item);
         ChangePages("Add page", order, item);
         return item;
     }
 
-    /// <summary>A copy of <paramref name="source"/> (fresh panel ids, same content) right after it.</summary>
+    /// <summary>A copy of <paramref name="source"/> (fresh panel ids, same content) right after it. A copy of the title page is an ordinary page.</summary>
     public PageItem DuplicatePage(PageItem source)
     {
         var document = source.Editor.Committed;
@@ -201,7 +221,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         var copy = new PageDocument(
             newIds.Values.ToList(),
             newIds.ToDictionary(kvp => kvp.Value, kvp => document.Panels[kvp.Key] with { Id = kvp.Value }),
-            document.LayoutLocked);
+            document.LayoutLocked,
+            IsTitlePage: false);
 
         var id = PageId.New();
         var item = new PageItem(id, CreateEditor(id, source.Editor.PageBounds, copy, source.Editor));
@@ -238,6 +259,60 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         order.RemoveAt(from);
         order.Insert(to, item);
         ChangePages("Move page", order, CurrentPage);
+    }
+
+    // ---------------------------------------------------------------- title page
+
+    /// <summary>The comic's title page (Insert › Title page), if it has one.</summary>
+    public PageItem? TitlePage => Pages.FirstOrDefault(p => p.Editor.Committed.IsTitlePage);
+
+    public bool HasTitlePage => TitlePage is not null;
+
+    /// <summary>Whether the title page can go: it can't if it's the comic's only page.</summary>
+    public bool CanRemoveTitlePage => HasTitlePage && Pages.Count > 1;
+
+    /// <summary>The words a new title page starts with; the session hands in the comic's own title and issue.</summary>
+    public Func<TitlePageWords> NewTitlePageWords { get; set; } = () => TitlePages.DefaultWords(null, null);
+
+    public event Action? TitlePageChanged;
+
+    /// <summary>
+    /// Insert › Title page: a title page in <paramref name="design"/> at the front of the
+    /// comic, shown. If the comic has one already, that page is redone in the new design
+    /// instead, keeping the words typed into it - like Word's cover pages. One undo step.
+    /// </summary>
+    public PageItem InsertTitlePage(TitlePageDesign design)
+    {
+        if (TitlePage is { } existing)
+        {
+            var editor = existing.Editor;
+            var words = TitlePages.WordsOn(editor.Committed.Panels.Values, NewTitlePageWords());
+            var redone = TitlePageDocument(design, editor.PageBounds, editor.Grid, words) with { LayoutLocked = editor.Committed.LayoutLocked };
+            editor.Apply(EditResult<PageDocument>.Success(redone));
+            Reveal(existing);
+            return existing;
+        }
+
+        var bounds = Pages[0].Editor.PageBounds;
+        var id = PageId.New();
+        var item = new PageItem(id, CreateEditor(id, bounds, TitlePageDocument(design, bounds, CurrentPage.Editor.Grid, NewTitlePageWords()), CurrentPage.Editor));
+        var order = Pages.ToList();
+        order.Insert(0, item);
+        ChangePages("Insert title page", order, item);
+        return item;
+    }
+
+    /// <summary>Deletes the title page (never the comic's only page).</summary>
+    public void RemoveTitlePage()
+    {
+        if (TitlePage is { } page)
+            DeletePage(page);
+    }
+
+    private static PageDocument TitlePageDocument(TitlePageDesign design, Rect2D bounds, PanelGrid grid, TitlePageWords words)
+    {
+        var panels = TitlePages.Compose(design, bounds, grid, words);
+        return new PageDocument(panels.Select(p => p.Id).ToList(), panels.ToDictionary(p => p.Id), IsTitlePage: true);
     }
 
     private void MoveBy(PageItem item, int delta)
@@ -281,6 +356,9 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         {
             CurrentPage = current;
         }
+        OnPropertyChanged(nameof(HasTitlePage));
+        OnPropertyChanged(nameof(CanRemoveTitlePage));
+        TitlePageChanged?.Invoke();
     }
 
     private void Renumber()
@@ -305,7 +383,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         MovePageDownCommand.NotifyCanExecuteChanged();
     }
 
-    private PageEditorViewModel CreateEditor(PageId id, ProjectModel.Geometry.Rect2D bounds, PageDocument document, PageEditorViewModel? settingsFrom)
+    private PageEditorViewModel CreateEditor(PageId id, Rect2D bounds, PageDocument document, PageEditorViewModel? settingsFrom)
     {
         var editor = new PageEditorViewModel(_history, bounds, document)
         {
@@ -314,8 +392,10 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             CanFloat = false,
             NumberingHost = this,
             LooksHost = this,
+            TitlePageHost = this,
             Characters = _characters,
-            Pictures = _pictures
+            Pictures = _pictures,
+            Grid = _grid
         };
         if (settingsFrom != null)
         {

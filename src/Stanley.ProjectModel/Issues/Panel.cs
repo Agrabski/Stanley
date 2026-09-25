@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -19,13 +20,16 @@ namespace Stanley.ProjectModel.Issues;
 /// characters (<see cref="PanelElement.Layer"/>). Absent in panel files written before
 /// elements existed, which read as none.
 /// </param>
+/// <param name="Borderless">No border drawn around the panel - an open panel, or a title page's
+/// background. Written only when set, so older panel files read unchanged.</param>
 public sealed record Panel(
     PanelId Id,
     PanelShape Shape,
     PanelBackground? Background,
     IReadOnlyList<CharacterInstance> CharacterInstances,
     IReadOnlyList<Bubble> Bubbles,
-    IReadOnlyList<PanelElement> Elements = null!)
+    IReadOnlyList<PanelElement> Elements = null!,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Borderless = false)
 {
     public IReadOnlyList<PanelElement> Elements { get; init; } = Elements ?? [];
 }

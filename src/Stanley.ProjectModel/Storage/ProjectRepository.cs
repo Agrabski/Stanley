@@ -25,7 +25,8 @@ public sealed class ProjectRepository
         File.Exists(Path.Combine(Path.GetFullPath(rootDirectory), ProjectPaths.ManifestFileName));
 
     /// <summary>Creates a brand-new, empty project on disk: the manifest, top-level folders, and the LFS <c>.gitattributes</c> rule.</summary>
-    public static ProjectRepository Initialize(string rootDirectory, string title, PageTrim defaultPageTrim)
+    /// <param name="format">What the comic is set up as (a strip, a webcomic...); null for a printed comic book.</param>
+    public static ProjectRepository Initialize(string rootDirectory, string title, PageTrim defaultPageTrim, ComicFormat? format = null)
     {
         var repository = new ProjectRepository(rootDirectory);
         Directory.CreateDirectory(repository.RootDirectory);
@@ -42,7 +43,7 @@ public sealed class ProjectRepository
             "*.jpg filter=lfs diff=lfs merge=lfs -text\n" +
             "*.psd filter=lfs diff=lfs merge=lfs -text\n");
 
-        repository.SaveManifest(new SeriesManifest(title, defaultPageTrim, []));
+        repository.SaveManifest(new SeriesManifest(title, defaultPageTrim, [], format));
         return repository;
     }
 

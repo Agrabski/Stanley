@@ -92,6 +92,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OpenBackstageCommand = new RelayCommand<BackstagePage?>(page => ShowBackstage(page ?? (HasDocument ? BackstagePage.Info : BackstagePage.New)));
         CloseBackstageCommand = new RelayCommand(() => IsBackstageOpen = false, () => HasDocument);
         NewCommand = new AsyncRelayCommand<PanelLayoutPreset?>(NewAsync);
+        NewFromTemplateCommand = new AsyncRelayCommand<ComicTemplate?>(NewFromTemplateAsync);
         OpenCommand = new AsyncRelayCommand(BrowseAndOpenAsync);
         OpenRecentCommand = new AsyncRelayCommand<string>(path => path is null ? Task.CompletedTask : OpenAsync(path));
         SaveCommand = new AsyncRelayCommand(async () => await SaveAsync(), () => HasDocument);
@@ -458,6 +459,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public string LocationText => _project?.Location ?? "Not saved yet - Save picks a folder for it.";
 
+    /// <summary>File › Info's page size: the paper or template it matches, the size, the bleed and - for a webcomic - the size its pictures export at.</summary>
     public string PageSizeText
     {
         get
@@ -467,9 +469,18 @@ public sealed class MainWindowViewModel : ObservableObject
             var size = _project.Trim.Size;
             var paper = Enum.GetValues<MetricPaperSize>().Cast<MetricPaperSize?>()
                 .FirstOrDefault(p => MetricPaperSizes.Size(p!.Value) == size);
-            return $"{(paper is { } p ? p + " · " : "")}{size.WidthMm:0.#} × {size.HeightMm:0.#} mm, {_project.Trim.BleedMm:0.#} mm bleed";
+            var name = paper?.ToString() ?? ComicTemplates.Matching(size)?.Name;
+            var bleed = _project.Trim.BleedMm > 0 ? $"{_project.Trim.BleedMm:0.#} mm bleed" : "no bleed";
+            var pixels = _project.ExportWidthPx is { } width ? $", exported at {width} × {ComicTemplates.ExportHeightPx(width, size)} px" : "";
+            return $"{(name is null ? "" : name + " · ")}{size.WidthMm:0.#} × {size.HeightMm:0.#} mm, {bleed}{pixels}";
         }
     }
+
+    /// <summary>File › Export's PNG tile: print resolution, or a webcomic's own picture size.</summary>
+    public string PngExportText =>
+        _project?.ExportWidthPx is { } width
+            ? $"The current page at {width} × {ComicTemplates.ExportHeightPx(width, _project.Trim.Size)} px, ready to post online."
+            : "The current page at 300 dpi. For the web and social media.";
 
     public string PanelCountText
     {
@@ -560,6 +571,9 @@ public sealed class MainWindowViewModel : ObservableObject
     public IRelayCommand<BackstagePage?> OpenBackstageCommand { get; }
     public IRelayCommand CloseBackstageCommand { get; }
     public IAsyncRelayCommand<PanelLayoutPreset?> NewCommand { get; }
+
+    /// <summary>File › New › a comic strip or webcomic template.</summary>
+    public IAsyncRelayCommand<ComicTemplate?> NewFromTemplateCommand { get; }
     public IAsyncRelayCommand OpenCommand { get; }
     public IAsyncRelayCommand<string> OpenRecentCommand { get; }
     public IAsyncRelayCommand SaveCommand { get; }
@@ -578,6 +592,14 @@ public sealed class MainWindowViewModel : ObservableObject
         if (!await ConfirmDiscardAsync())
             return;
         Load(ComicProject.CreateNew(NewPaperSize, layout));
+    }
+
+    /// <summary>File &gt; New from a strip or webcomic template: its page size, panels and spacing, and for a webcomic its export size.</summary>
+    public async Task NewFromTemplateAsync(ComicTemplate? template)
+    {
+        if (template is null || !await ConfirmDiscardAsync())
+            return;
+        Load(ComicProject.CreateNew(template));
     }
 
     public async Task BrowseAndOpenAsync()
@@ -700,7 +722,8 @@ public sealed class MainWindowViewModel : ObservableObject
             if (isPdf)
                 ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks, _pictures?.Files);
             else
-                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(), issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files);
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(),
+                    issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files, widthPx: _project.ExportWidthPx);
             Message = $"Exported to {path}";
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
@@ -826,6 +849,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DocumentTitle));
         OnPropertyChanged(nameof(LocationText));
         OnPropertyChanged(nameof(PageSizeText));
+        OnPropertyChanged(nameof(PngExportText));
         OnPropertyChanged(nameof(PanelCountText));
         OnPropertyChanged(nameof(AutoSaveEnabled));
         OnPropertyChanged(nameof(AutoSaveTip));

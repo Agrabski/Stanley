@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Threading;
 
 namespace Stanley.Editors;
 
@@ -28,6 +29,13 @@ public partial class PageEditorRibbon : UserControl
             button.Click += (_, _) => ViewModel?.ApplyLayoutCommand.Execute(preset);
             LayoutGallery.Children.Add(button);
         }
+
+        // A title page design is picked with one click, like Word's cover pages - the gallery
+        // closes behind it. Posted: a button runs its command after its Click event, and a
+        // closed flyout's buttons have lost the DataContext their commands are bound through.
+        void CloseTitlePageGallery() => Dispatcher.UIThread.Post(() => TitlePageButton.Flyout?.Hide());
+        TitlePageGallery.AddHandler(Button.ClickEvent, (_, _) => CloseTitlePageGallery());
+        RemoveTitlePageButton.Click += (_, _) => CloseTitlePageGallery();
 
         MarginInput.ValueChanged += (_, e) =>
         {

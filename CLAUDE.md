@@ -47,7 +47,10 @@ see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
 faces, clothes, accessories — see "Stickers (implemented)" below); no
 three-quarter view yet. Panels also hold **drawn shapes, free text and pictures**
 behind or in front of the characters, over a colour, gradient or picture
-**background** — see "Panel elements and backgrounds (implemented)" below.
+**background** — see "Panel elements and backgrounds (implemented)" below. A comic
+can start with a **title page** (Insert › Title page) and be a **comic strip or
+webcomic** rather than a comic book page (File › New templates) — see "Title pages
+and comic formats (implemented)" below.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -235,7 +238,7 @@ Editing pipeline layers, bottom to top:
     ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
     editor type adds its own tabs the same way. Page editor tabs: Home (tools incl.
     Draw and Text, bubble style, Font, Shape Styles: Shape Fill / Shape Outline,
-    add/edit/delete), Insert (panel, speech/shout/whisper bubble,
+    add/edit/delete), Insert (title page, panel, speech/shout/whisper bubble,
     caption/text/sound effect, shapes, picture, backgrounds, characters), Layout
     (inline preset gallery, margin/gutter, snap, split, lock, Page numbers menu),
     View (fit/actual size/zoom, margin guides), plus contextual **Panel** (blue), **Character** (green), **Bubble**
@@ -252,8 +255,8 @@ Editing pipeline layers, bottom to top:
   - **Page navigator** (`PageNavigatorViewModel` + `PageNavigatorView`): a dock
     *tool* pane on the left (`EditorWorkspace(history, panes, leftTools)`), not an
     editor, so focusing it never changes `ActiveEditor` and the ribbon stays put.
-    Live thumbnails, three to a row with the page's position underneath
-    (`PageThumbnail`, drawing through `PageRenderer` and redrawing on the page's
+    Live thumbnails, three to a row with the page's position underneath ("Title"
+    for the title page, `PageItem.Caption`) (`PageThumbnail`, drawing through `PageRenderer` and redrawing on the page's
     `Working`/`Folio` changes), click to show a page, drag to reorder (drop
     position is the gap nearest the pointer in reading order), right-click /
     Delete / Ctrl+D / Ctrl+Left/Right for page actions, "New page" at the bottom. Each page has its own `PageEditorViewModel`, all sharing
@@ -339,14 +342,17 @@ save. Multi-issue navigation isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
 and never writes into a non-empty folder — it uses a subfolder named after the title
 instead. An untitled comic takes its folder's name as title on first save. Export
-(all pages as one PDF at trim size; the current page as a 300 dpi PNG) goes through
+(all pages as one PDF at trim size; the current page as a 300 dpi PNG, or a
+webcomic's at its format's pixel width — `ComicProject.ExportWidthPx`,
+`PageRenderer.ExportPngAtWidth`) goes through
 `PageRenderer` (Stanley.Rendering), the same code the canvas and thumbnails draw
 with.
 
 `MainWindowViewModel` (Stanley.App) runs New / Open / Save / Save As / Close /
 Export and the File ("backstage") view, `Backstage.axaml`: full-window, blue command
-rail, pages New (paper size + layout tiles), Open (Browse + Recent), Info (editable
-title, location, size), Save As, Export. With no comic open the window *is* the File
+rail, pages New (comic book: paper size + layout tiles; then comic strip and webcomic
+template tiles), Open (Browse + Recent), Info (editable title, location, size — named
+after its paper or template, with a webcomic's export size), Save As, Export. With no comic open the window *is* the File
 view. Dirty state is `EditorHistory.IsDirty` (undo-stack top vs. the top at
 `MarkSaved()`, so undoing back to the saved state is clean again) or an unsaved title
 edit; New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
@@ -438,6 +444,10 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   long dash dot), drawn scaled to the line's width (`LinePatterns`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
   and `GradientBackground` (top → bottom) beside the existing `InlineBackground`
   (a picture covering the panel). `PanelElements.Bounds` / `ArtFileNames`.
+  `Panel.Borderless` (written only when set) leaves the panel's border off — an open
+  panel, or a title page's background running to the page edge; Panel tab › Border
+  and right-click › Border switch it (not layout, so a locked layout allows it), and
+  the canvas draws an unprinted faint outline where a borderless panel is.
 - **Pictures on disk**: `issues/<id>/art/<hash>.<ext>` — named after the content
   (`IssueArt.NameFor`: SHA-256 prefix, so the same picture is one file and names
   never collide), PNG/JPEG/WebP/GIF/BMP bytes or SVG text as `ArtFile`;
@@ -537,6 +547,47 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   `DrawingPalette` (also the weights, dashes and the `BackgroundPicker`'s paper +
   13 colours + 7 gradient skies).
 
+## Title pages and comic formats (implemented)
+
+- **Title page** (Insert › Pages › Title page, like Word's Insert › Cover Page): a
+  gallery of `TitlePageDesign`s (Stanley.Editing `TitlePages`: Cover — a sky over the
+  whole page, the title in big outlined letters; Title band — the title in a navy band,
+  a bordered art panel, credits at the foot; Book title page — centred on plain paper
+  over a rule), previewed by `TitlePagePreview` on the comic's own page size.
+  `TitlePages.Compose(design, page, grid, words)` lays out ordinary panels (borderless
+  grounds), text and shapes, sized from the page's shorter side so a design fits an A4
+  cover, a daily strip or a 4-koma; everything on it edits like any other page. The
+  three texts have fixed element ids (`TitleId`/`SubtitleId`/`CreditsId`), so picking
+  another design redoes the title page *in place* keeping its words
+  (`TitlePages.WordsOn`), one undo step. Words start as the comic's title, "Issue #n"
+  and "Story and art by Your Name" (`PageEditorHost` sets
+  `PageNavigatorViewModel.NewTitlePageWords`; read when the page is made, not bound
+  to the title afterwards). The navigator owns it (`ITitlePageHost`:
+  `InsertTitlePage` — a new first page, or the existing one redone and shown —
+  `RemoveTitlePage`, never the only page); it's marked `PageDocument.IsTitlePage` /
+  `Page.TitlePage` (written only when set; a new one's folder slug is `title-page`),
+  and a copy of it (Duplicate) is an ordinary page. The gallery closes *posted* after
+  a pick: a button runs its command after its Click event, and a closed flyout's
+  buttons have lost the DataContext their commands bind through.
+- **Comic formats / templates** (File › New › Comic strips / Webcomics): `ComicTemplate`s
+  (Stanley.Editing `ComicTemplates`) — Daily strip (330×105, 4 in a row), Sunday strip
+  (330×225, 2/3/3), Four-panel strip (90×262, 4-koma); Vertical scroll (200×320 →
+  800×1280 px, WEBTOON Canvas's size), Web strip (300×100 → 1200×400 px), Square post
+  (200×200 → 1080 px), Portrait post (200×250 → 1080×1350 px). Always metric: page sizes
+  are round millimetres picked so the pixel size comes out exact; no bleed (nothing is
+  trimmed). A template gives the page size, the first page's panels
+  (`PanelsPerRow`), the spacing (`PanelGrid`) and a webcomic's export width.
+  `ComicProject.CreateNew(template)`; the comic keeps it as `SeriesManifest.Format`
+  (`ComicFormat`: margin, gutter, `PanelsPerRow`, `ExportWidthPx`; absent for a comic
+  book), so after reopening pages still start with the template's spacing
+  (`ComicProject.Grid`) and every *new* page with its panels
+  (`ComicProject.NewPageLayout` → `PageNavigatorViewModel(..., grid, newPageLayout)`;
+  a comic book's new pages stay one panel), and PNG export keeps the pixel size.
+  Changing margin/gutter on the Layout tab is still session-only, as for comic books.
+  `ComicTemplates.Matching(size)` names the format in File › Info and the status bar.
+  `LayoutPresetPreview` takes an optional `PageSize`/`Grid` to draw a template's page
+  to shape.
+
 ## Command-line interface (implemented)
 
 `stanley` is **one executable** with both a GUI and a CLI, not two separate
@@ -565,7 +616,10 @@ it's Microsoft's own, AOT/trim-clean (0 analyzer warnings under this repo's
   `ProjectRepository.Initialize`. Defaults the title to the target
   directory's name and the page trim to A4 (`MetricPaperSizes.Size(A4)`)
   with a 3mm bleed so it works with zero flags, per the project's "ease of
-  use" priority; `--title`/`--page-*-mm` override. Always metric, no
+  use" priority; `--title`/`--page-*-mm` override. `--template <key>`
+  (`ComicTemplate.Key`: `daily-strip`, `vertical-scroll`, ...) starts from a
+  strip or webcomic template instead — its page and `SeriesManifest.Format`;
+  `--page-*-mm` typed alongside it still win. Always metric, no
   inch-derived defaults anywhere. `--force` is required to overwrite a
   directory that already has a `stanley.json` (checked via
   `ProjectRepository.IsInitialized`).

@@ -1328,6 +1328,7 @@ public sealed class PageCanvasControl : Control
             }));
             items.Add(AddTextItem(vm, lockedPanelId, at));
             items.Add(BackgroundMenu(vm, lockedPanelId));
+            items.Add(BorderItem(vm, lockedPanelId));
             items.Add(new Separator());
             items.Add(Item("Unlock layout", () => vm.IsLayoutLocked = false));
         }
@@ -1343,6 +1344,7 @@ public sealed class PageCanvasControl : Control
             }));
             items.Add(AddTextItem(vm, panelId, at));
             items.Add(BackgroundMenu(vm, panelId));
+            items.Add(BorderItem(vm, panelId));
             items.Add(new Separator());
             items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
             items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
@@ -1378,6 +1380,16 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Picture…", () => vm.RequestPictureImport(panelId, asBackground: true)));
         }
         return new MenuItem { Header = "Background", ItemsSource = items };
+    }
+
+    /// <summary>Border, ticked while the panel has one - offered on a locked layout too, since a border isn't layout.</summary>
+    private static MenuItem BorderItem(PageEditorViewModel vm, PanelId panelId)
+    {
+        var hasBorder = vm.Working.Panels.TryGetValue(panelId, out var panel) && !panel.Borderless;
+        var item = Item("Border", () => vm.SetPanelBorder(panelId, !hasBorder));
+        item.ToggleType = MenuItemToggleType.CheckBox;
+        item.IsChecked = hasBorder;
+        return item;
     }
 
     /// <summary>A submenu holding Word's colour menu (<see cref="ColorMenus"/>) - the same palette, None, More Colors…, Weight and Dashes as the ribbon's buttons.</summary>

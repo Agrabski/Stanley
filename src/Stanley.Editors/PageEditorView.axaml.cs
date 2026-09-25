@@ -105,7 +105,7 @@ public partial class PageEditorView : UserControl
             if (Math.Abs(paper.HeightMm - page.Width) < 0.5 && Math.Abs(paper.WidthMm - page.Height) < 0.5)
                 return $"{size} landscape";
         }
-        return "Custom";
+        return Editing.ComicTemplates.Matching(new ProjectModel.PageSize(page.Width, page.Height))?.Name ?? "Custom";
     }
 
     // ---------------------------------------------------------------- view

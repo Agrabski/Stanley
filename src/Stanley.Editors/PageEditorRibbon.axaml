@@ -110,6 +110,49 @@
     <!-- ============================== INSERT ============================== -->
     <TabItem Name="InsertTab" Header="Insert">
       <StackPanel Classes="tabContent">
+        <!-- Word's Cover Page gallery: a title page at the front of the comic; picking again redoes it, keeping its words. -->
+        <DockPanel Classes="group" IsVisible="{Binding HasTitlePageHost}">
+          <DropDownButton Name="TitlePageButton" Classes="slotGallery"
+                          ToolTip.Tip="Start the comic with a title page: pick a design, then double-click its words to retype them. Picking another design redoes the title page and keeps its words.">
+            <StackPanel Spacing="2">
+              <PathIcon Data="{StaticResource TitlePageIcon}" Width="20" Height="20" />
+              <TextBlock Text="Title page" FontSize="11" HorizontalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Title page" FontWeight="SemiBold" />
+                  <ItemsControl Name="TitlePageGallery" ItemsSource="{Binding TitlePageChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:TitlePageChoice">
+                        <Button Classes="small" Width="112" Height="156" Padding="6" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertTitlePageCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Description}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            <local:TitlePagePreview Design="{Binding Design}" Page="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext)}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="Goes at the front of the comic. Everything on it stays editable - words, colours, the background." FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350" HorizontalAlignment="Left" />
+                  <Button Name="RemoveTitlePageButton" Classes="small" Command="{Binding RemoveTitlePageCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove title page" /></StackPanel>
+                  </Button>
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Pages" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasTitlePageHost}" />
+
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}" ToolTip.Tip="Drag on the page to draw a new panel (P)">
@@ -384,6 +427,14 @@
             <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" PictureCommand="{Binding BackgroundPictureCommand}" /></Flyout></DropDownButton.Flyout>
           </DropDownButton>
           <TextBlock Classes="groupLabel" Text="Background" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <ToggleButton Name="PanelBorderButton" Classes="tool" IsChecked="{Binding SelectedPanelHasBorder}"
+                        ToolTip.Tip="Draw this panel's border - switch it off for an open panel, or a background that runs to the page edge">
+            <StackPanel><PathIcon Data="{StaticResource PanelBorderIcon}" /><TextBlock Text="Border" /></StackPanel>
+          </ToggleButton>
+          <TextBlock Classes="groupLabel" Text="Border" />
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">

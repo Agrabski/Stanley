@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Stanley.Editing;
 using Stanley.EditorFramework;
 
 namespace Stanley.Editors;
@@ -22,7 +23,12 @@ public static class PageEditorHost
         var history = new EditorHistory();
         var characters = new CharacterLibraryViewModel(history, project.Characters);
         var pictures = new PictureLibrary(project.Pictures);
-        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures);
+        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures,
+            project.Grid, project.NewPageLayout)
+        {
+            // Read when the title page is made, so a title changed in File › Info since is the one used.
+            NewTitlePageWords = () => TitlePages.DefaultWords(project.Title == ComicProject.UntitledTitle ? null : project.Title, project.IssueNumber)
+        };
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;
