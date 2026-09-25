@@ -156,7 +156,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Button Name="MoreSkinColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
+            <Button Name="MoreSkinColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="More Colors: pick any skin colour"
                     Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">More…</Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Skin" />
@@ -334,7 +334,7 @@
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <Button Name="MoreSlotColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
-                                  Command="{Binding PickCustomColor}" CommandParameter="{Binding $self}">More…</Button>
+                                  Command="{Binding PickCustomColor}" CommandParameter="{Binding $self}">More Colors…</Button>
                         </StackPanel>
 
                         <StackPanel Spacing="6" IsVisible="{Binding CanHaveFabric}">
@@ -376,7 +376,7 @@
                                 </ItemsControl.ItemTemplate>
                               </ItemsControl>
                               <Button Name="MorePatternColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
-                                      Command="{Binding PickCustomPatternColor}" CommandParameter="{Binding $self}">More…</Button>
+                                      Command="{Binding PickCustomPatternColor}" CommandParameter="{Binding $self}">More Colors…</Button>
                             </StackPanel>
                             <Grid ColumnDefinitions="54,*" RowDefinitions="22,22" ColumnSpacing="4">
                               <TextBlock Text="Size" FontSize="11" VerticalAlignment="Center" />

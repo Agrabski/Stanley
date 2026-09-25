@@ -13,6 +13,11 @@ public partial class CharacterEditorView : UserControl
     private (Point2D Start, CharacterPlacement Placement, Avalonia.Point Pressed)? _artDrag;
     private bool _artMoving;
 
+    // The "Click to edit ..." hint shown while the pointer is over a compared character -
+    // kept so leaving it clears only that hint, never a message something else put up.
+    private string? _lineUpHint;
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
     /// <summary>How far (pixels) the pointer goes before a press on drawn art becomes a move - so a click to select never nudges it.</summary>
     private const double DragThreshold = 3;
 
@@ -29,6 +34,7 @@ public partial class CharacterEditorView : UserControl
             var p = e.GetPosition(Stage);
             if (Stage.LineUpCharacterAt(p) is { } lineUpCharacter)
             {
+                ClearLineUpHint(vm);
                 vm.Library?.OpenCharacter(lineUpCharacter.Id);
                 e.Handled = true;
                 return;
@@ -57,17 +63,30 @@ public partial class CharacterEditorView : UserControl
             }
             else if (Stage.LineUpCharacterAt(p) is { } hovered)
             {
-                Stage.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
-                vm.ShowMessage($"Click to edit {hovered.Name}");
+                Stage.Cursor = HandCursor;
+                _lineUpHint = $"Click to edit {hovered.Name}";
+                vm.ShowMessage(_lineUpHint);
             }
             else
-            {
-                Stage.Cursor = Avalonia.Input.Cursor.Default;
-                vm.ShowMessage(null);
-            }
+                ClearLineUpHint(vm);
+        };
+        Stage.PointerExited += (_, _) =>
+        {
+            if (DataContext is CharacterEditorViewModel vm)
+                ClearLineUpHint(vm);
         };
         Stage.PointerReleased += (_, e) => EndDrag(e.Pointer);
         Stage.PointerCaptureLost += (_, _) => EndDrag(null);
+    }
+
+    private void ClearLineUpHint(CharacterEditorViewModel vm)
+    {
+        if (_lineUpHint is null)
+            return;
+        Stage.Cursor = Cursor.Default;
+        if (vm.Hint == _lineUpHint)
+            vm.ShowMessage(null);
+        _lineUpHint = null;
     }
 
     private void EndDrag(IPointer? pointer)
