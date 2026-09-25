@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
+using Stanley.Editors;
 
 namespace Stanley.App.Documents;
 
@@ -70,4 +71,6 @@ public sealed class AvaloniaFileDialogs(Window owner) : IFileDialogs
 
         return await dialog.ShowDialog<SaveChangesChoice?>(owner) ?? SaveChangesChoice.Cancel;
     }
+
+    public Task<string?> PickSvgEditorAsync(string? currentPath) => SvgEditorPicker.PickAsync(owner, currentPath);
 }

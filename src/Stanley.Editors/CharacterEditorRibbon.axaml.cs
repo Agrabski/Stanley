@@ -49,6 +49,7 @@ public partial class CharacterEditorRibbon : UserControl
             _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
             _subscribed.TileImportRequested -= OnTileImportRequested;
             _subscribed.ArtImportRequested -= OnArtImportRequested;
+            _subscribed.SvgEditorConfigurationRequested -= OnSvgEditorConfigurationRequested;
         }
         _subscribed = ViewModel;
         if (_subscribed != null)
@@ -56,6 +57,7 @@ public partial class CharacterEditorRibbon : UserControl
             _subscribed.PropertyChanged += OnViewModelPropertyChanged;
             _subscribed.TileImportRequested += OnTileImportRequested;
             _subscribed.ArtImportRequested += OnArtImportRequested;
+            _subscribed.SvgEditorConfigurationRequested += OnSvgEditorConfigurationRequested;
         }
     }
 
@@ -78,6 +80,18 @@ public partial class CharacterEditorRibbon : UserControl
     {
         if (sender is CharacterEditorViewModel editor && await PickArt(editor, "Import a picture to wear (SVG or PNG)") is { } picked)
             editor.ImportArt(request.Slot, picked.Name, picked.File);
+    }
+
+    /// <summary>No SVG editor is set up yet: ask, and pick up drawing again if one was chosen.</summary>
+    private async void OnSvgEditorConfigurationRequested(object? sender, SvgEditorConfigurationRequest request)
+    {
+        if (sender is not CharacterEditorViewModel editor || TopLevel.GetTopLevel(this) is not Window owner)
+            return;
+        if (await SvgEditorPicker.PickAsync(owner, editor.SvgEditorPath) is { Length: > 0 } chosen)
+        {
+            editor.SetSvgEditorPath(chosen);
+            editor.DrawYourOwn(request.Slot);
+        }
     }
 
     private async Task<(string Name, ArtFile File)?> PickArt(CharacterEditorViewModel editor, string title)
