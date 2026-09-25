@@ -48,7 +48,7 @@ on:
   release:
     types: [published]
   schedule:
-    - cron: "17 2 * * *" # 02:17 UTC daily - the nightly
+    - cron: "30 20 * * *" # 20:30 UTC daily - the nightly
     - cron: "17 14 * * *" # 14:17 UTC - only builds if the first slot didn't (see "Scheduling")
   workflow_dispatch:
 
