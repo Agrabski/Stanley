@@ -7,16 +7,23 @@ using Stanley.ProjectModel.Issues;
 namespace Stanley.Editors;
 
 /// <summary>
-/// Where the comic's title page is kept track of (the page navigator): Insert › Title page
-/// on any page puts one at the front of the comic, or redoes the one it has.
+/// Where the title page is kept track of (the page navigator): the comic's, which every
+/// issue opens with, or the issue's own instead. Insert › Title page on any page gives the
+/// comic one, or redoes the one the issue shows.
 /// </summary>
 public interface ITitlePageHost
 {
     bool HasTitlePage { get; }
 
+    /// <summary>Whether this issue has its own title page rather than the comic's.</summary>
+    bool HasOwnTitlePage { get; }
+
     bool CanRemoveTitlePage { get; }
 
     PageItem InsertTitlePage(TitlePageDesign design);
+
+    /// <summary>Gives this issue its own title page (a copy of the comic's), or goes back to the comic's.</summary>
+    void SetOwnTitlePage(bool own);
 
     void RemoveTitlePage();
 
@@ -54,6 +61,28 @@ public sealed partial class PageEditorViewModel
 
     public bool HasTitlePage => _titlePageHost?.HasTitlePage ?? false;
 
+    /// <summary>
+    /// Insert › Title page › Only this issue: on, this issue has a title page of its own -
+    /// a copy of the comic's, changed without touching the other issues'; off, it opens with
+    /// the comic's, which every issue shares. One undo step.
+    /// </summary>
+    public bool IsOwnTitlePage
+    {
+        get => _titlePageHost?.HasOwnTitlePage ?? false;
+        set
+        {
+            if (_titlePageHost is { } host && value != host.HasOwnTitlePage)
+                host.SetOwnTitlePage(value);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>What Remove title page takes away, said on the button.</summary>
+    public string RemoveTitlePageText => IsOwnTitlePage ? "Remove this issue's title page" : "Remove the title page from every issue";
+
+    /// <summary>What the page shown is, for the status bar: the comic's title page is shared, so editing it changes every issue's.</summary>
+    public bool IsComicTitlePage => Working.TitlePage == TitlePageScope.Comic;
+
     public IReadOnlyList<TitlePageChoice> TitlePageChoices { get; } = TitlePages.All.Select(d => new TitlePageChoice(d)).ToList();
 
     /// <summary>Insert › Title page: a title page in the chosen design at the front of the comic - or the comic's title page redone in it.</summary>
@@ -75,6 +104,8 @@ public sealed partial class PageEditorViewModel
     {
         OnPropertyChanged(nameof(HasTitlePageHost));
         OnPropertyChanged(nameof(HasTitlePage));
+        OnPropertyChanged(nameof(IsOwnTitlePage));
+        OnPropertyChanged(nameof(RemoveTitlePageText));
         InsertTitlePageCommand?.NotifyCanExecuteChanged();
         RemoveTitlePageCommand?.NotifyCanExecuteChanged();
     }

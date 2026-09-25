@@ -89,6 +89,43 @@ public class TitlePageAndTemplateTests
     }
 
     [Fact]
+    public void Only_this_issue_gives_the_issue_its_own_title_page_and_unticking_brings_the_comics_back()
+    {
+        var window = Open();
+        var navigator = window.ViewModel.Navigator!;
+        var comic = navigator.InsertTitlePage(TitlePageDesign.Banner);
+        Dispatcher.UIThread.RunJobs();
+        ShowTab(window, "InsertTab");
+        var dropDown = Ribbon(window).GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "TitlePageButton");
+        dropDown.Flyout!.ShowAt(dropDown);
+        Dispatcher.UIThread.RunJobs();
+        var content = (Control)((Flyout)dropDown.Flyout).Content!;
+        var box = content.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Name == "OwnTitlePageBox");
+        var remove = content.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "RemoveTitlePageButton");
+        string RemoveText() => string.Concat(remove.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        Assert.True(box.IsEnabled);
+        Assert.False(box.IsChecked);
+        Assert.Equal("Remove the title page from every issue", RemoveText());
+
+        var at = box.TranslatePoint(new Point(10, box.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var own = Assert.IsType<PageItem>(navigator.OwnTitlePage);
+        Assert.Same(own, navigator.Pages[0]);
+        Assert.Same(own.Editor, window.Editor);
+        Assert.True(box.IsChecked);
+        Assert.Equal("Remove this issue's title page", RemoveText());
+        Snapshot(content, window, "title-page-only-this-issue");
+
+        box.IsChecked = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(comic, navigator.Pages[0]);
+        Assert.Null(navigator.OwnTitlePage);
+    }
+
+    [Fact]
     public void A_field_clicked_on_the_Text_tab_while_typing_goes_in_at_the_caret_and_shows_the_issue_number()
     {
         var window = Open();

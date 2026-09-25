@@ -113,7 +113,7 @@
         <!-- Word's Cover Page gallery: a title page at the front of the comic; picking again redoes it, keeping its words. -->
         <DockPanel Classes="group" IsVisible="{Binding HasTitlePageHost}">
           <DropDownButton Name="TitlePageButton" Classes="slotGallery"
-                          ToolTip.Tip="Start the comic with a title page: pick a design, then double-click its words to retype them. Picking another design redoes the title page and keeps its words.">
+                          ToolTip.Tip="Start every issue with the comic's title page: pick a design, then double-click its words to retype them. Picking another design redoes it and keeps its words.">
             <StackPanel Spacing="2">
               <PathIcon Data="{StaticResource TitlePageIcon}" Width="20" Height="20" />
               <TextBlock Text="Title page" FontSize="11" HorizontalAlignment="Center" />
@@ -141,9 +141,14 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Text="Goes at the front of the comic. Everything on it stays editable - words, colours, the background." FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350" HorizontalAlignment="Left" />
+                  <TextBlock Text="The comic's title page opens every issue, each showing its own issue number. Everything on it stays editable - words, colours, the background."
+                             FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350" HorizontalAlignment="Left" />
+                  <CheckBox Name="OwnTitlePageBox" IsChecked="{Binding IsOwnTitlePage, Mode=TwoWay}" IsEnabled="{Binding HasTitlePage}" Focusable="False"
+                            ToolTip.Tip="This issue gets a title page of its own - a copy of the comic's to change freely. Untick to go back to the comic's.">
+                    <TextBlock Text="Only this issue - the other issues keep the comic's title page" TextWrapping="Wrap" MaxWidth="320" />
+                  </CheckBox>
                   <Button Name="RemoveTitlePageButton" Classes="small" Command="{Binding RemoveTitlePageCommand}" HorizontalAlignment="Left">
-                    <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove title page" /></StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="{Binding RemoveTitlePageText}" /></StackPanel>
                   </Button>
                 </StackPanel>
               </Flyout>

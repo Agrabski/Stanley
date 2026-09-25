@@ -19,10 +19,10 @@ public sealed record ComicPage(PageId Id, PageTrim Trim, PageDocument Document)
 /// <summary>
 /// An open comic - the thing File &gt; New/Open/Save act on, the way Word acts on a
 /// document. On disk it's a Stanley project folder (see <see cref="ProjectRepository"/>);
-/// the editor works on the pages of its first issue (created on the fly for a project
-/// that has none yet, e.g. one fresh from <c>stanley init</c>), plus the project's
-/// characters. Everything else in the folder is left untouched by a save, and carried
-/// along by Save As.
+/// the editor works on the pages of one issue - the first unless told otherwise (created
+/// on the fly for a project that has none yet, e.g. one fresh from <c>stanley init</c>) -
+/// plus the project's characters and its title page, which every issue shares.
+/// Everything else in the folder is left untouched by a save, and carried along by Save As.
 /// </summary>
 public sealed class ComicProject
 {
@@ -42,12 +42,20 @@ public sealed class ComicProject
     // Pictures in the issue's art folder the pages used as of the last open/save, so a save
     // can delete the ones no page uses any more (and never touches other files there).
     private HashSet<string> _savedPictures;
+    // The comic's title page on disk as of the last open/save, so a save can prune it.
+    private SavedTitlePage? _savedTitlePage;
+
+    /// <summary>The comic's title page as last written: its record (the label survives), panels and the pictures in its art folder.</summary>
+    private sealed record SavedTitlePage(Page Record, HashSet<PanelId> Panels, HashSet<string> Pictures);
 
     private ComicProject(string? location, string title, PageTrim trim, ComicFormat? format, Issue issue, IReadOnlyList<ComicPage> pages,
         Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels,
         IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
-        IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures)
+        IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures,
+        ComicPage? titlePage = null, SavedTitlePage? savedTitlePage = null)
     {
+        TitlePage = titlePage;
+        _savedTitlePage = savedTitlePage;
         _format = format;
         Grid = GridOf(format);
         Characters = characters;
@@ -105,8 +113,11 @@ public sealed class ComicProject
 
     public Rect2D PageBounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 
-    /// <summary>The pages as they were opened, in reading order - the editor's starting point.</summary>
+    /// <summary>The issue's pages as they were opened, in reading order - the editor's starting point. The comic's title page isn't among them (<see cref="TitlePage"/>); an issue's own title page is.</summary>
     public IReadOnlyList<ComicPage> Pages { get; }
+
+    /// <summary>The comic's title page as opened (<see cref="TitlePageScope.Comic"/>), which every issue without one of its own opens with - or null if it has none.</summary>
+    public ComicPage? TitlePage { get; }
 
     /// <summary>The project's characters as they were opened, sorted by name.</summary>
     public IReadOnlyList<CharacterDefinition> Characters { get; }
@@ -138,15 +149,17 @@ public sealed class ComicProject
         return new ComicProject(null, UntitledTitle, trim, format, issue, [page], [], [], [], [], NoPictures, []);
     }
 
-    /// <summary>Opens the project in <paramref name="folder"/>. Throws <see cref="InvalidDataException"/> if the folder isn't a Stanley project.</summary>
-    public static ComicProject Open(string folder)
+    /// <summary>Opens the project in <paramref name="folder"/> at <paramref name="issueId"/> - its first issue if null. Throws <see cref="InvalidDataException"/> if the folder isn't a Stanley project.</summary>
+    public static ComicProject Open(string folder, IssueId? issueId = null)
     {
         if (!ProjectRepository.IsInitialized(folder))
             throw new InvalidDataException($"'{folder}' isn't a Stanley project (it has no stanley.json).");
 
         var repository = new ProjectRepository(folder);
         var manifest = repository.LoadManifest();
-        var issue = manifest.IssueIds.Count > 0 ? repository.LoadIssue(manifest.IssueIds[0]) : NewIssue();
+        var issue = issueId is { } id ? repository.LoadIssue(id)
+            : manifest.IssueIds.Count > 0 ? repository.LoadIssue(manifest.IssueIds[0])
+            : NewIssue();
 
         var pages = new List<ComicPage>();
         var records = new Dictionary<PageId, Page>();
@@ -155,7 +168,8 @@ public sealed class ComicProject
         {
             var page = repository.LoadPage(issue.Id, pageId);
             var panels = page.PanelIds.ToDictionary(id => id, id => repository.LoadPanel(issue.Id, page.Id, id));
-            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim, new PageDocument(page.PanelIds, panels, page.LayoutLocked, page.TitlePage)));
+            pages.Add(new ComicPage(page.Id, page.TrimOverride ?? manifest.DefaultPageTrim,
+                new PageDocument(page.PanelIds, panels, page.LayoutLocked, page.TitlePage ? TitlePageScope.Issue : TitlePageScope.None)));
             records[page.Id] = page;
             saved[page.Id] = [.. page.PanelIds];
         }
@@ -173,8 +187,29 @@ public sealed class ComicProject
                     pictures[name] = file;
             }
         }
+        var issuePictures = pictures.Keys.ToHashSet(StringComparer.Ordinal);
+
+        ComicPage? titlePage = null;
+        SavedTitlePage? savedTitlePage = null;
+        if (repository.LoadTitlePage() is { } titleRecord)
+        {
+            var panels = titleRecord.PanelIds.ToDictionary(id => id, repository.LoadTitlePagePanel);
+            titlePage = new ComicPage(titleRecord.Id, titleRecord.TrimOverride ?? manifest.DefaultPageTrim,
+                new PageDocument(titleRecord.PanelIds, panels, titleRecord.LayoutLocked, TitlePageScope.Comic));
+            var titlePictures = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var name in panels.Values.SelectMany(PanelElements.ArtFileNames).Distinct())
+            {
+                if (repository.LoadTitlePageArt(name) is { } file)
+                {
+                    pictures.TryAdd(name, file);
+                    titlePictures.Add(name);
+                }
+            }
+            savedTitlePage = new SavedTitlePage(titleRecord, [.. titleRecord.PanelIds], titlePictures);
+        }
+
         return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, manifest.Format, issue, pages, records, saved,
-            characters, [.. characters.Select(c => c.Id)], pictures, [.. pictures.Keys]);
+            characters, [.. characters.Select(c => c.Id)], pictures, issuePictures, titlePage, savedTitlePage);
     }
 
     /// <summary>A new page at the project's size: one panel filling the live area, or the format's panels.</summary>
@@ -183,9 +218,11 @@ public sealed class ComicProject
     /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
     /// manifest title, the issue's page list, every page and panel - and deletes the
-    /// folders/files of pages and panels removed since the last save. With
-    /// <paramref name="characters"/>, writes every character too and deletes the ones
-    /// removed since; without, leaves the characters on disk alone.
+    /// folders/files of pages and panels removed since the last save. A page that's the
+    /// comic's title page (<see cref="TitlePageScope.Comic"/>) goes to the project's
+    /// <c>title-page/</c> folder instead of the issue; with none among the pages, the comic's
+    /// title page is deleted. With <paramref name="characters"/>, writes every character too
+    /// and deletes the ones removed since; without, leaves the characters on disk alone.
     /// </summary>
     /// <param name="issueLooks">The issue's look per character; null leaves the issue's as it was.</param>
     /// <param name="pictures">The comic's pictures by art file name: the ones the pages use are written to the issue's art folder, and ones a page used at the last save but none uses now are deleted. Null leaves the art folder alone.</param>
@@ -200,11 +237,68 @@ public sealed class ComicProject
             ? new ProjectRepository(Location)
             : ProjectRepository.Initialize(Location, Title, Trim, Format);
 
-        (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: true);
+        var (issuePages, titlePage) = Split(pages);
+        (_issue, _pageRecords, _savedPanels) = WritePages(repository, issuePages, pageNumbering ?? PageNumbering, issueLooks, prune: true);
+        _savedTitlePage = WriteTitlePage(repository, titlePage, pictures, prune: true);
         if (pictures != null)
-            _savedPictures = WritePictures(repository, pages, pictures, prune: true);
+            _savedPictures = WritePictures(repository, issuePages, pictures, prune: true);
         if (characters != null)
             _savedCharacters = WriteCharacters(repository, Tidied(characters, pages), prune: true);
+    }
+
+    /// <summary>The issue's own pages, and the comic's title page if it's among them.</summary>
+    private static (List<(PageId Id, PageDocument Document)> Issue, (PageId Id, PageDocument Document)? Title) Split(IReadOnlyList<(PageId Id, PageDocument Document)> pages) =>
+        (pages.Where(p => p.Document.TitlePage != TitlePageScope.Comic).ToList(),
+         pages.Where(p => p.Document.TitlePage == TitlePageScope.Comic).Cast<(PageId, PageDocument)?>().FirstOrDefault());
+
+    /// <summary>
+    /// Writes the comic's title page into the project's <c>title-page/</c> folder - its
+    /// panels, and with <paramref name="pictures"/> the pictures it uses - and, with
+    /// <paramref name="prune"/>, deletes what it no longer has; with no title page, the whole
+    /// folder goes. Returns what's on disk now.
+    /// </summary>
+    private SavedTitlePage? WriteTitlePage(ProjectRepository repository, (PageId Id, PageDocument Document)? page,
+        IReadOnlyDictionary<string, ArtFile>? pictures, bool prune)
+    {
+        if (page is not { } titlePage)
+        {
+            if (prune && _savedTitlePage != null)
+                repository.DeleteTitlePage();
+            return null;
+        }
+
+        var (id, document) = titlePage;
+        var previous = _savedTitlePage is { } saved && saved.Record.Id == id ? saved : null;
+        if (prune && _savedTitlePage != null && previous is null)
+            repository.DeleteTitlePage(); // a different page took its place
+
+        var panelIds = document.PanelOrder.Where(document.Panels.ContainsKey).ToList();
+        var record = (previous?.Record ?? new Page(id, "Title page", TrimOverride: null, []))
+            with { PanelIds = panelIds, LayoutLocked = document.LayoutLocked, TitlePage = true };
+        repository.SaveTitlePage(record);
+        foreach (var panelId in panelIds)
+            repository.SaveTitlePagePanel(document.Panels[panelId]);
+        if (prune && previous != null)
+        {
+            foreach (var removed in previous.Panels.Except(panelIds))
+                repository.DeleteTitlePagePanel(removed);
+        }
+
+        var used = document.Panels.Values.SelectMany(PanelElements.ArtFileNames).Where(IssueArt.IsValidName).ToHashSet(StringComparer.Ordinal);
+        if (pictures != null)
+        {
+            foreach (var name in used)
+            {
+                if (pictures.TryGetValue(name, out var file))
+                    repository.SaveTitlePageArt(name, file);
+            }
+            if (prune && previous != null)
+            {
+                foreach (var removed in previous.Pictures.Except(used))
+                    repository.DeleteTitlePageArt(removed);
+            }
+        }
+        return new SavedTitlePage(record, [.. panelIds], used);
     }
 
     /// <summary>
@@ -250,8 +344,10 @@ public sealed class ComicProject
         IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim, Format);
-        WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: false);
-        WritePictures(repository, pages, pictures ?? Pictures, prune: false);
+        var (issuePages, titlePage) = Split(pages);
+        WritePages(repository, issuePages, pageNumbering ?? PageNumbering, issueLooks, prune: false);
+        WriteTitlePage(repository, titlePage, pictures ?? Pictures, prune: false);
+        WritePictures(repository, issuePages, pictures ?? Pictures, prune: false);
         WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
     }
 
@@ -266,11 +362,13 @@ public sealed class ComicProject
         var copy = Open(snapshotFolder);
         if (originalLocation != null && ProjectRepository.IsInitialized(originalLocation))
         {
-            var original = Open(originalLocation);
+            // The same issue the snapshot is of, if it's there already (a comic's first issue is written on its first save).
+            var issueId = new ProjectRepository(originalLocation).LoadManifest().IssueIds.Contains(copy._issue.Id) ? copy._issue.Id : (IssueId?)null;
+            var original = Open(originalLocation, issueId);
             return new ComicProject(original.Location, copy.Title, original.Trim, copy._format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
-                copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures);
+                copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures, copy.TitlePage, original._savedTitlePage);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
+        return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, [], copy.TitlePage);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(

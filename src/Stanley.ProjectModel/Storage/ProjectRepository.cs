@@ -383,6 +383,86 @@ public sealed class ProjectRepository
             File.Delete(path);
     }
 
+    // ---------------------------------------------------------------- the comic's title page
+
+    private string TitlePageDir => Path.Combine(RootDirectory, ProjectPaths.TitlePageDirName);
+
+    private string TitlePagePanelsDir => Path.Combine(TitlePageDir, ProjectPaths.PanelsDirName);
+
+    private string TitlePageArtDir => Path.Combine(TitlePageDir, ProjectPaths.ArtDirName);
+
+    /// <summary>The comic's title page (<c>title-page/page.json</c>) - shared by every issue that has none of its own - or null if the comic has none.</summary>
+    public Page? LoadTitlePage()
+    {
+        var path = Path.Combine(TitlePageDir, ProjectPaths.PageFileName);
+        return File.Exists(path) ? ProjectJson.Read<Page>(path) : null;
+    }
+
+    public void SaveTitlePage(Page page)
+    {
+        Directory.CreateDirectory(TitlePagePanelsDir);
+        ProjectJson.Write(Path.Combine(TitlePageDir, ProjectPaths.PageFileName), page);
+    }
+
+    public Panel LoadTitlePagePanel(PanelId panelId)
+    {
+        var path = ProjectPaths.PanelFilePath(TitlePagePanelsDir, panelId);
+        if (!File.Exists(path))
+            throw NotFoundFile("panel", panelId.Value);
+        return ProjectJson.Read<Panel>(path);
+    }
+
+    public void SaveTitlePagePanel(Panel panel)
+    {
+        Directory.CreateDirectory(TitlePagePanelsDir);
+        ProjectJson.Write(ProjectPaths.PanelFilePath(TitlePagePanelsDir, panel.Id), panel);
+    }
+
+    /// <summary>Removes one of the title page's panel files; a no-op if it isn't there.</summary>
+    public void DeleteTitlePagePanel(PanelId panelId)
+    {
+        var path = ProjectPaths.PanelFilePath(TitlePagePanelsDir, panelId);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    /// <summary>Removes the comic's title page - page, panels and pictures; a no-op if it has none.</summary>
+    public void DeleteTitlePage()
+    {
+        if (Directory.Exists(TitlePageDir))
+            Directory.Delete(TitlePageDir, recursive: true);
+    }
+
+    /// <summary>A picture from the title page's own <c>art/</c> folder (named like an issue's, see <see cref="IssueArt"/>), or null if it isn't there.</summary>
+    public ArtFile? LoadTitlePageArt(string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return null;
+        var path = Path.Combine(TitlePageArtDir, name);
+        return File.Exists(path) ? ReadArtFile(path) : null;
+    }
+
+    /// <summary>Writes a picture the title page uses - unless the same content is already there.</summary>
+    public void SaveTitlePageArt(string name, ArtFile file)
+    {
+        if (!IssueArt.IsValidName(name))
+            throw new ArgumentException($"'{name}' isn't a picture file name.", nameof(name));
+        var path = Path.Combine(TitlePageArtDir, name);
+        if (File.Exists(path) && ReadArtFile(path).SameContent(file))
+            return;
+        Directory.CreateDirectory(TitlePageArtDir);
+        File.WriteAllBytes(path, file.ToBytes());
+    }
+
+    public void DeleteTitlePageArt(string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return;
+        var path = Path.Combine(TitlePageArtDir, name);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
     private static string DisplayName(string number, string title) => string.IsNullOrWhiteSpace(title) ? number : $"{number} {title}";
 
     private static DirectoryNotFoundException NotFoundDir(string kind, string id) =>

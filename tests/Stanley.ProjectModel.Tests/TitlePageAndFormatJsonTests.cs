@@ -5,9 +5,17 @@ using Stanley.ProjectModel.Serialization;
 
 namespace Stanley.ProjectModel.Tests;
 
-/// <summary>The fields title pages and comic formats added: written only when set, so files from before read - and write back - unchanged.</summary>
-public class TitlePageAndFormatJsonTests
+/// <summary>The fields title pages and comic formats added: written only when set, so files from before read - and write back - unchanged. And where the comic's title page is kept.</summary>
+public sealed class TitlePageAndFormatJsonTests : IDisposable
 {
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "stanley-title-page-json-tests-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
+    }
+
     private static Panel APanel(bool borderless = false) =>
         new(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [], [], Borderless: borderless);
 
@@ -56,5 +64,34 @@ public class TitlePageAndFormatJsonTests
         Assert.Equal([1, 1], readWeb.PanelsPerRow!);
         Assert.Equal(800, readWeb.ExportWidthPx);
         Assert.Null(ProjectJson.Deserialize<SeriesManifest>(ProjectJson.Serialize(book)).Format);
+    }
+
+    [Fact]
+    public void The_comics_title_page_lives_in_the_project_folder_beside_the_issues()
+    {
+        var repository = Storage.ProjectRepository.Initialize(_root, "Comic", new PageTrim(new PageSize(210, 297), 3));
+        Assert.Null(repository.LoadTitlePage());
+        var panel = APanel(borderless: true);
+        var page = new Page(PageId.New(), "Title page", null, [panel.Id], TitlePage: true);
+        var art = Characters.ArtFile.Png([1, 2, 3]);
+        var name = Storage.IssueArt.NameFor(art, "png");
+
+        repository.SaveTitlePage(page);
+        repository.SaveTitlePagePanel(panel);
+        repository.SaveTitlePageArt(name, art);
+
+        Assert.True(File.Exists(Path.Combine(_root, "title-page", "page.json")));
+        Assert.True(File.Exists(Path.Combine(_root, "title-page", "art", name)));
+        Assert.Equal(page.Id, repository.LoadTitlePage()!.Id);
+        Assert.True(repository.LoadTitlePagePanel(panel.Id).Borderless);
+        Assert.True(repository.LoadTitlePageArt(name)!.SameContent(art));
+        Assert.Null(repository.LoadTitlePageArt("../stanley.json"));
+
+        repository.DeleteTitlePagePanel(panel.Id);
+        Assert.Throws<FileNotFoundException>(() => repository.LoadTitlePagePanel(panel.Id));
+        repository.DeleteTitlePage();
+        Assert.Null(repository.LoadTitlePage());
+        Assert.False(Directory.Exists(Path.Combine(_root, "title-page")));
+        Assert.True(Storage.ProjectRepository.IsInitialized(_root));
     }
 }

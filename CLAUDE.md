@@ -333,15 +333,17 @@ Editing pipeline layers, bottom to top:
 
 Modelled on Word. `ComicProject` (Stanley.Editors) is "the document": a project
 folder on disk (or untitled, `Location == null`) plus the pages the editor edits —
-all pages of the first issue, with a blank one created on the fly for a project with
-none (e.g. straight from `stanley init`). `Save(pages)` (from
+all pages of one issue (the first; `ComicProject.Open(folder, issueId)` opens another),
+with a blank one created on the fly for a project with none (e.g. straight from
+`stanley init`), and the comic's title page (`ComicProject.TitlePage`, kept in the
+project folder, not the issue — see "Title pages" below). `Save(pages)` (from
 `PageNavigatorViewModel.Snapshot()`) writes the manifest title, the issue's page
 order, every page and panel, and deletes the folders/files of pages and panels
 removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`); with
 the session's pictures it also writes the ones pages use into the issue's `art/`
 folder and deletes the ones a page used at the last save but none uses now;
 nothing else in the folder is touched. A page's label and trim override survive a
-save. Multi-issue navigation isn't implemented yet.
+save. Multi-issue navigation (an issue switcher in the UI) isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
 and never writes into a non-empty folder — it uses a subfolder named after the title
 instead. An untitled comic takes its folder's name as title on first save. Export
@@ -566,12 +568,23 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   (`TitlePages.WordsOn`), one undo step. Words start as `{title}`, `Issue #{issue}`
   and "Story and art by Your Name" (`TitlePages.DefaultWords`): the title and issue
   number are *fields* Stanley fills in (below), so they follow File › Info, and the
-  words around them are the user's ("Wydanie #{issue}"). The navigator owns it (`ITitlePageHost`:
-  `InsertTitlePage` — a new first page, or the existing one redone and shown —
-  `RemoveTitlePage`, never the only page); it's marked `PageDocument.IsTitlePage` /
-  `Page.TitlePage` (written only when set; a new one's folder slug is `title-page`),
-  and a copy of it (Duplicate) is an ordinary page. The gallery closes *posted* after
-  a pick: a button runs its command after its Click event, and a closed flyout's
+  words around them are the user's ("Wydanie #{issue}").
+  **The title page is the comic's, overridable per issue** (`PageDocument.TitlePage`, a
+  `TitlePageScope`: None / Comic / Issue). The comic's is stored once in the project
+  folder — `title-page/page.json`, `panels/`, `art/` (`ProjectRepository.LoadTitlePage` /
+  `SaveTitlePage` / `…Panel` / `…Art` / `DeleteTitlePage`) — and every issue opens with it,
+  showing its own `{issue}`. Insert › Title page › *Only this issue* (`IsOwnTitlePage` →
+  `SetOwnTitlePage`) gives the issue its own, a copy of the comic's stored among the
+  issue's pages (`Page.TitlePage`, written only when set, folder slug `title-page`);
+  unticking or deleting it brings the comic's back (with no comic's, unticking makes the
+  issue's the comic's). The navigator owns it (`ITitlePageHost`): `ComicTitlePage` is held
+  even while the issue shows its own, so `Snapshot()` always lists it first and `Save`
+  writes it to `title-page/` (the rest to the issue; none left → the folder is deleted);
+  `InsertTitlePage` redoes the title page shown (own or comic's — the latter for every
+  issue) or adds the comic's; `RemoveTitlePage` takes away the one shown. A title page
+  stays first; an issue always keeps a page of its own besides the comic's
+  (`CanDeletePage`); a copy (Duplicate) is an ordinary page. The gallery closes *posted*
+  after a pick: a button runs its command after its Click event, and a closed flyout's
   buttons have lost the DataContext their commands bind through.
 - **Comic formats / templates** (File › New › Comic strips / Webcomics): `ComicTemplate`s
   (Stanley.Editing `ComicTemplates`) — Daily strip (330×105, 4 in a row), Sunday strip

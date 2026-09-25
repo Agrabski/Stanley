@@ -71,7 +71,7 @@ public sealed class TitlePagePreview : Control
         {
             _pageBounds = Page?.PageBounds ?? _pageBounds;
             var panels = TitlePages.Compose(Design, _pageBounds, Page?.Grid ?? PanelGrid.Default, TitlePages.DefaultWords);
-            _document = new PageDocument(panels.Select(p => p.Id).ToList(), panels.ToDictionary(p => p.Id), IsTitlePage: true);
+            _document = new PageDocument(panels.Select(p => p.Id).ToList(), panels.ToDictionary(p => p.Id), TitlePage: TitlePageScope.Comic);
         }
 
         // Centred, whatever the page's shape, with a hairline edge so white paper shows on a white menu.

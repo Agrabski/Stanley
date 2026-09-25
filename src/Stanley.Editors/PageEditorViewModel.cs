@@ -712,6 +712,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
+        _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
         _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; D draws, T adds text; Insert › Character adds a character."
     };
