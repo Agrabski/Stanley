@@ -139,6 +139,41 @@ public class BubbleEditingTests
     }
 
     [Fact]
+    public void Move_WithTails_CarriesTheTipsAlong()
+    {
+        var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(0, 0, 60, 40)), new Point2D(30, 100)).Value;
+
+        var moved = BubbleEditing.Move(bubble, 10, 5, withTails: true).Value;
+
+        Assert.Equal(10, AnchorRing.BoundingBox(moved.Shape.Anchors).Left, 6);
+        Assert.Equal(new Point2D(40, 105), moved.Tails[0].Target);
+        Assert.Equal(bubble.Tails[0].AttachmentT, moved.Tails[0].AttachmentT);
+    }
+
+    [Fact]
+    public void OutOfTheWay_StepsANewBubbleAsideFromOneInTheSameSpot()
+    {
+        var panel = new Rect2D(0, 0, 200, 150);
+        var spot = new Rect2D(50, 30, 42, 26);
+
+        Assert.Equal(spot, BubbleEditing.OutOfTheWay(spot, [new Rect2D(120, 30, 42, 26)], panel)); // clear already
+        var second = BubbleEditing.OutOfTheWay(spot, [spot], panel);
+        Assert.Equal(spot with { X = 56, Y = 36 }, second);
+        var third = BubbleEditing.OutOfTheWay(spot, [spot, second], panel);
+        Assert.Equal(spot with { X = 62, Y = 42 }, third);
+    }
+
+    [Fact]
+    public void OutOfTheWay_StepsBackUpWhenThereIsNoRoomBelow()
+    {
+        var panel = new Rect2D(0, 0, 100, 60);
+        var corner = new Rect2D(58, 34, 42, 26); // in the bottom right corner
+
+        Assert.Equal(corner with { X = 52, Y = 28 }, BubbleEditing.OutOfTheWay(corner, [corner], panel));
+        Assert.Equal(panel, BubbleEditing.OutOfTheWay(panel, [panel], panel)); // no room anywhere
+    }
+
+    [Fact]
     public void KeepInside_SlidesTheBubbleAndClampsTailTargetsIntoTheContainer()
     {
         var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(90, -10, 60, 40)), new Point2D(300, 300)).Value;

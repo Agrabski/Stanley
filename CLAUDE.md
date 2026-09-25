@@ -299,7 +299,11 @@ Editing pipeline layers, bottom to top:
     bubbles along (`BubbleEditing.Refit`, split sends each bubble to the half its
     centre is in). Double-click in a panel (or the Bubble tool, or "Add bubble")
     creates a bubble with a tail already aimed into free space, and opens an inline
-    text editor in it (Enter = done, Shift+Enter = newline, Esc = cancel). Nothing
+    text editor in it (Enter = done, Shift+Enter = newline, Esc = cancel). A new bubble
+    placed without a drag never lands on one already there: it steps 6mm down and right
+    (else up and left) until clear (`BubbleEditing.OutOfTheWay`, like Office's cascade).
+    Dragging a bubble leaves its tail tips on the speaker; Ctrl-drag takes them along
+    (`BubbleEditing.Move(..., withTails)`). Nothing
     may cover the bubble while typing: the text box is transparent and borderless,
     sits in `BubbleTextRenderer.TextArea`, and the canvas (`PageCanvasControl.EditingBubble`)
     leaves that bubble's lettering and handles off; key hints go in the status bar.

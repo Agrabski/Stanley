@@ -837,7 +837,8 @@ public sealed class PageCanvasControl : Control
                 goto case DragKind.MoveBubble;
 
             case DragKind.MoveBubble:
-                _viewModel.UpdateMoveBubble(_dragPanelId!.Value, _dragBubbleIndex, dx, dy);
+                _viewModel.UpdateMoveBubble(_dragPanelId!.Value, _dragBubbleIndex, dx, dy,
+                    withTails: e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta));
                 break;
 
             case DragKind.PendingMoveCharacter when beyondThreshold:

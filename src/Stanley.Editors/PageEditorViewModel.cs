@@ -710,7 +710,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
         _ when HasSelectedText => "Drag to move the text · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
-        _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
+        _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
         _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
@@ -1029,6 +1029,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         }
 
         var bubble = BubbleEditing.KeepInside(_newBubbleLettering.ApplyTo(created.Value), panelBounds);
+        if (bounds is null)
+        {
+            // Not on top of one already there: adding two in a row would hide the first.
+            var at = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+            var free = BubbleEditing.OutOfTheWay(at, panel.Bubbles.Select(b => AnchorRing.BoundingBox(b.Shape.Anchors)).ToList(), panelBounds);
+            bubble = BubbleEditing.Move(bubble, free.Left - at.Left, free.Top - at.Top).Value;
+        }
         bubble = WithDefaultTail(bubble, panelBounds);
         var index = panel.Bubbles.Count;
         Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Bubbles = [.. p.Bubbles, bubble] })));
@@ -1056,9 +1063,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public void BeginMoveBubble(PanelId panelId, int bubbleIndex) => BeginGesture();
 
-    /// <summary>Moves by (<paramref name="dx"/>, <paramref name="dy"/>) from where the bubble was when the drag began; it stops at its panel's edge.</summary>
-    public void UpdateMoveBubble(PanelId panelId, int bubbleIndex, double dx, double dy) =>
-        UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy)));
+    /// <summary>
+    /// Moves by (<paramref name="dx"/>, <paramref name="dy"/>) from where the bubble was when
+    /// the drag began; it stops at its panel's edge. Its tails keep pointing where they did -
+    /// at the speaker - unless <paramref name="withTails"/> (Ctrl held), which moves the whole bubble, tails and all.
+    /// </summary>
+    public void UpdateMoveBubble(PanelId panelId, int bubbleIndex, double dx, double dy, bool withTails = false) =>
+        UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy, withTails)));
 
     /// <summary>Nudges the selected bubble (or, with none, the selected panel) by a fixed amount - the arrow-key path.</summary>
     public void NudgeSelection(double dx, double dy)
