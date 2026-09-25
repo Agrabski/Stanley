@@ -4,8 +4,8 @@ using Stanley.EditorFramework;
 
 namespace Stanley.Editors;
 
-/// <summary>Everything one open comic is edited through: the workspace (history + panes), the page navigator and the Characters pane.</summary>
-public sealed record EditorSession(EditorWorkspace Workspace, PageNavigatorViewModel Navigator, CharacterLibraryViewModel Characters);
+/// <summary>Everything one open comic is edited through: the workspace (history + panes), the page navigator, the Characters pane and the comic's pictures.</summary>
+public sealed record EditorSession(EditorWorkspace Workspace, PageNavigatorViewModel Navigator, CharacterLibraryViewModel Characters, PictureLibrary Pictures);
 
 public static class PageEditorHost
 {
@@ -21,7 +21,8 @@ public static class PageEditorHost
     {
         var history = new EditorHistory();
         var characters = new CharacterLibraryViewModel(history, project.Characters);
-        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks);
+        var pictures = new PictureLibrary(project.Pictures);
+        var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures);
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;
@@ -62,6 +63,6 @@ public static class PageEditorHost
             characters.RefreshUsage();
         };
 
-        return new EditorSession(workspace, navigator, characters);
+        return new EditorSession(workspace, navigator, characters, pictures);
     }
 }

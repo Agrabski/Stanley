@@ -186,13 +186,22 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
+          <Button Name="InsertPictureButton" Classes="tool" Command="{Binding InsertPictureCommand}"
+                  ToolTip.Tip="Place a picture from a file (PNG, JPEG, SVG...) in the selected panel - behind or in front of the characters">
+            <StackPanel><PathIcon Data="{StaticResource BackgroundIcon}" /><TextBlock Text="Picture" /></StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Pictures" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <DropDownButton Name="InsertBackgroundButton" Classes="slotGallery" Width="100" IsEnabled="{Binding HasSelectedPanel}"
                           ToolTip.Tip="Fill the selected panel behind everything in it: a colour or a sky (select a panel, or anything in one, first)">
             <StackPanel Spacing="2">
               <PathIcon Data="{StaticResource BackgroundIcon}" Width="20" Height="20" />
               <TextBlock Text="Background" FontSize="11" HorizontalAlignment="Center" />
             </StackPanel>
-            <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" /></Flyout></DropDownButton.Flyout>
+            <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" PictureCommand="{Binding BackgroundPictureCommand}" /></Flyout></DropDownButton.Flyout>
           </DropDownButton>
           <TextBlock Classes="groupLabel" Text="Backgrounds" />
         </DockPanel>
@@ -357,7 +366,7 @@
               <Border Width="34" Height="22" Background="{Binding BackgroundPreview}" BorderBrush="#80808080" BorderThickness="1" CornerRadius="2" HorizontalAlignment="Center" />
               <TextBlock Text="{Binding BackgroundName}" FontSize="10" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="76" />
             </StackPanel>
-            <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" /></Flyout></DropDownButton.Flyout>
+            <DropDownButton.Flyout><Flyout Placement="BottomEdgeAlignedLeft"><local:BackgroundPicker Command="{Binding SetBackgroundCommand}" PictureCommand="{Binding BackgroundPictureCommand}" /></Flyout></DropDownButton.Flyout>
           </DropDownButton>
           <TextBlock Classes="groupLabel" Text="Background" />
         </DockPanel>
@@ -650,6 +659,39 @@
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
             <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this shape (Delete)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <!-- ============================== PICTURE (contextual) ============================== -->
+    <TabItem Name="PictureTab" Classes="contextual shape" IsVisible="{Binding IsPictureContext}">
+      <TabItem.Header><TextBlock Classes="shapeHeader" Text="Picture" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Name="PictureBehindButton" Classes="tool" GroupName="PictureLayer" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsElementBehind}"
+                         ToolTip.Tip="Scenery: drawn behind the panel's characters">
+              <StackPanel><PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="PictureInFrontButton" Classes="tool" GroupName="PictureLayer" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsElementInFront}"
+                         ToolTip.Tip="Foreground: drawn in front of the panel's characters (bubbles stay on top)">
+              <StackPanel><PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" /></StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Layer" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
+              <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
+            </StackPanel>
+            <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture (Delete)">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>

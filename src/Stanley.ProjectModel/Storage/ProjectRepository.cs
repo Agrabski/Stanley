@@ -348,6 +348,40 @@ public sealed class ProjectRepository
             File.Delete(path);
     }
 
+    private string IssueArtDir(IssueId issueId) => Path.Combine(IssueDirOrThrow(issueId), ProjectPaths.ArtDirName);
+
+    /// <summary>A picture from the issue's <c>art/</c> folder (see <see cref="IssueArt"/>), or null if there's no such file (or the name isn't a plain picture file name).</summary>
+    public ArtFile? LoadIssueArt(IssueId issueId, string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return null;
+        var path = Path.Combine(IssueArtDir(issueId), name);
+        return File.Exists(path) ? ReadArtFile(path) : null;
+    }
+
+    /// <summary>Writes a picture into the issue's <c>art/</c> folder - unless the same content is already there, so an unchanged save touches nothing.</summary>
+    public void SaveIssueArt(IssueId issueId, string name, ArtFile file)
+    {
+        if (!IssueArt.IsValidName(name))
+            throw new ArgumentException($"'{name}' isn't a picture file name.", nameof(name));
+        var dir = IssueArtDir(issueId);
+        var path = Path.Combine(dir, name);
+        if (File.Exists(path) && ReadArtFile(path).SameContent(file))
+            return;
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(path, file.ToBytes());
+    }
+
+    /// <summary>Removes a picture from the issue's <c>art/</c> folder; a no-op if it isn't there.</summary>
+    public void DeleteIssueArt(IssueId issueId, string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return;
+        var path = Path.Combine(IssueArtDir(issueId), name);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
     private static string DisplayName(string number, string title) => string.IsNullOrWhiteSpace(title) ? number : $"{number} {title}";
 
     private static DirectoryNotFoundException NotFoundDir(string kind, string id) =>

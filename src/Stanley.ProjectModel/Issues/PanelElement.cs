@@ -27,6 +27,7 @@ public enum ElementLayer
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ShapeElement), "shape")]
 [JsonDerivedType(typeof(TextElement), "text")]
+[JsonDerivedType(typeof(PictureElement), "picture")]
 public abstract record PanelElement(ElementId Id, ElementLayer Layer);
 
 /// <summary>How a drawn shape is painted; a null colour means "none" (no fill, no outline).</summary>
@@ -73,4 +74,14 @@ public sealed record TextStyle(
 /// <see cref="Bounds"/> (page millimetres), shrunk to fit if it doesn't.
 /// </summary>
 public sealed record TextElement(ElementId Id, ElementLayer Layer, Rect2D Bounds, string Text, TextStyle Style)
+    : PanelElement(Id, Layer);
+
+/// <summary>
+/// An imported picture (PNG, JPEG, SVG...) placed in a panel - a painted backdrop, a tree
+/// in the foreground - drawn into <see cref="Bounds"/> (page millimetres).
+/// <paramref name="ArtFileName"/> is a file in the issue's <c>art/</c> folder, named after
+/// its content (<see cref="Storage.IssueArt"/>), the same kind of reference
+/// <see cref="InlineBackground"/> makes.
+/// </summary>
+public sealed record PictureElement(ElementId Id, ElementLayer Layer, Rect2D Bounds, string ArtFileName)
     : PanelElement(Id, Layer);

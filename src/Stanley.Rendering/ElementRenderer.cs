@@ -1,12 +1,14 @@
 using SkiaSharp;
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Issues;
 
 namespace Stanley.Rendering;
 
 /// <summary>
-/// Draws a panel's free elements - shapes and text - in page space (millimetres), and
-/// answers "is this point on it" for the editor. No data ownership, no mutable state.
+/// Draws a panel's free elements - shapes, text and pictures - in page space
+/// (millimetres), and answers "is this point on it" for the editor. No data ownership, no
+/// mutable state.
 /// </summary>
 public static class ElementRenderer
 {
@@ -19,7 +21,8 @@ public static class ElementRenderer
     /// <summary>A sound effect's letter outline, as a fraction of the letter size.</summary>
     public const float OutlineFraction = 0.16f;
 
-    public static void Draw(SKCanvas canvas, PanelElement element, bool drawText = true)
+    /// <param name="pictures">The comic's pictures by file name (<see cref="PictureElement.ArtFileName"/>); a picture missing from them draws as a placeholder.</param>
+    public static void Draw(SKCanvas canvas, PanelElement element, bool drawText = true, IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         switch (element)
         {
@@ -28,6 +31,9 @@ public static class ElementRenderer
                 break;
             case TextElement text:
                 DrawText(canvas, text, drawText);
+                break;
+            case PictureElement picture:
+                PictureRenderer.Draw(canvas, pictures?.GetValueOrDefault(picture.ArtFileName), picture.Bounds, cover: false);
                 break;
         }
     }
@@ -171,7 +177,7 @@ public static class ElementRenderer
     /// Whether <paramref name="point"/> (page mm) is on the element, within
     /// <paramref name="tolerance"/> (mm) of its outline: a filled shape anywhere inside, an
     /// unfilled one or a line only along its stroke (you can see - and click - through it),
-    /// text anywhere in its box.
+    /// text and pictures anywhere in their box.
     /// </summary>
     public static bool Hits(PanelElement element, Point2D point, double tolerance)
     {
@@ -189,8 +195,8 @@ public static class ElementRenderer
                     using var band = paint.GetFillPath(path);
                     return band.Contains((float)point.X, (float)point.Y);
                 }
-            case TextElement text:
-                var b = text.Bounds;
+            case TextElement or PictureElement:
+                var b = PanelElements.Bounds(element);
                 return point.X >= b.Left - tolerance && point.X <= b.Right + tolerance && point.Y >= b.Top - tolerance && point.Y <= b.Bottom + tolerance;
             default:
                 return false;

@@ -131,13 +131,18 @@ public sealed class WeightPicker : UserControl
     }
 }
 
-/// <summary>Every panel background (paper, colours, gradients) as a named tile, running <see cref="Command"/> with its <see cref="BackgroundChoice"/>.</summary>
+/// <summary>Every panel background (paper, colours, gradients) as a named tile, running <see cref="Command"/> with its <see cref="BackgroundChoice"/> - plus "Picture…", running <see cref="PictureCommand"/>.</summary>
 public sealed class BackgroundPicker : UserControl
 {
     public static readonly StyledProperty<ICommand?> CommandProperty =
         AvaloniaProperty.Register<BackgroundPicker, ICommand?>(nameof(Command));
 
+    /// <summary>Asks for a picture file to fill the panel with; the "Picture…" button shows only with one.</summary>
+    public static readonly StyledProperty<ICommand?> PictureCommandProperty =
+        AvaloniaProperty.Register<BackgroundPicker, ICommand?>(nameof(PictureCommand));
+
     private readonly List<Button> _buttons = [];
+    private readonly Button _picture;
 
     public BackgroundPicker()
     {
@@ -168,13 +173,21 @@ public sealed class BackgroundPicker : UserControl
             _buttons.Add(button);
             grid.Children.Add(button);
         }
-        Content = grid;
+        _picture = new Button { Name = "BackgroundPicture", Classes = { "small" }, Content = "Picture…", HorizontalAlignment = HorizontalAlignment.Stretch, IsVisible = false };
+        ToolTip.SetTip(_picture, "Fill the panel with a picture from a file (PNG, JPEG, SVG...) - it's scaled to cover the panel");
+        Content = new StackPanel { Spacing = 4, Children = { grid, _picture } };
     }
 
     public ICommand? Command
     {
         get => GetValue(CommandProperty);
         set => SetValue(CommandProperty, value);
+    }
+
+    public ICommand? PictureCommand
+    {
+        get => GetValue(PictureCommandProperty);
+        set => SetValue(PictureCommandProperty, value);
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -184,6 +197,11 @@ public sealed class BackgroundPicker : UserControl
         {
             foreach (var button in _buttons)
                 button.Command = Command;
+        }
+        else if (change.Property == PictureCommandProperty)
+        {
+            _picture.Command = PictureCommand;
+            _picture.IsVisible = PictureCommand != null;
         }
     }
 }

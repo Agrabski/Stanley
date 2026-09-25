@@ -26,7 +26,11 @@ public sealed record ColorBackground(ColorValue Color) : PanelBackground;
 /// <summary>Blends from <paramref name="Top"/> at the panel's top edge to <paramref name="Bottom"/> at its bottom edge.</summary>
 public sealed record GradientBackground(ColorValue Top, ColorValue Bottom) : PanelBackground;
 
-/// <summary><paramref name="ArtFileName"/> is a one-off image under the issue's <c>art/</c> folder (LFS), not a cross-referenced id.</summary>
+/// <summary>
+/// A picture filling the panel (scaled to cover it, centred, the overflow cropped).
+/// <paramref name="ArtFileName"/> is a one-off image under the issue's <c>art/</c> folder
+/// (LFS), not a cross-referenced id - named after its content (<see cref="Storage.IssueArt"/>).
+/// </summary>
 public sealed record InlineBackground(string ArtFileName) : PanelBackground;
 
 public sealed record LibraryBackground(BackgroundId BackgroundId, BackgroundRevisionId RevisionId, BackgroundCrop Crop) : PanelBackground;

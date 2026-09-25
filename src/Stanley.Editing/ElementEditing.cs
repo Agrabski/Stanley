@@ -5,7 +5,7 @@ using Stanley.ProjectModel.Issues;
 namespace Stanley.Editing;
 
 /// <summary>
-/// What every panel element - shape or text - can do the same way: move, resize, change
+/// What every panel element - shape, text or picture - can do the same way: move, resize, change
 /// layer and stacking, and stay with its panel. Elements belong to their panel like
 /// characters do: clipped to it and carried along when it moves, allowed to hang out of it
 /// (a hillside drawn past the frame), but never dragged so far out they can't be clicked
@@ -20,6 +20,7 @@ public static class ElementEditing
     {
         ShapeElement shape => ShapeEditing.Move(shape, dx, dy),
         TextElement text => TextEditing.Move(text, dx, dy),
+        PictureElement picture => PictureEditing.Move(picture, dx, dy),
         _ => element
     };
 
@@ -27,6 +28,7 @@ public static class ElementEditing
     {
         ShapeElement shape => Widen(ShapeEditing.Resize(shape, bounds)),
         TextElement text => Widen(TextEditing.Resize(text, bounds)),
+        PictureElement picture => Widen(PictureEditing.Resize(picture, bounds)),
         _ => EditResult<PanelElement>.Failure("This can't be resized.")
     };
 

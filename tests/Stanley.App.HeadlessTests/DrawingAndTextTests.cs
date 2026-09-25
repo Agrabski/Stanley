@@ -279,6 +279,36 @@ public class DrawingAndTextTests
         Assert.Equal("Day sky", window.Editor.BackgroundName);
     }
 
+    [Fact]
+    public void An_imported_picture_shows_the_Picture_tab_and_panels_offer_a_background_picture()
+    {
+        var (window, canvas, panelId, bounds) = Open();
+        var editor = window.Editor;
+        using var bitmap = new SkiaSharp.SKBitmap(20, 10);
+        bitmap.Erase(SkiaSharp.SKColors.Purple);
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+
+        Assert.True(editor.ImportPicture(new PictureImportRequest(panelId, AsBackground: false), "p.png", Stanley.ProjectModel.Characters.ArtFile.Png(data.ToArray())));
+        Dispatcher.UIThread.RunJobs();
+        var tab = Ribbon(window).TabControl.Items.OfType<TabItem>().Single(t => t.Name == "PictureTab");
+        Assert.True(tab.IsVisible);
+        Ribbon(window).TabControl.SelectedItem = tab;
+        Dispatcher.UIThread.RunJobs();
+        LookTabTests.Snapshot(window, "picture-tab");
+        Assert.False(Ribbon(window).TabControl.Items.OfType<TabItem>().Single(t => t.Name == "ShapeTab").IsVisible);
+
+        editor.ClearSelection();
+        PictureImportRequest? asked = null;
+        editor.PictureImportRequested += r => asked = r;
+        var corner = new Point2D(bounds.Left + 3, bounds.Bottom - 3);
+        var background = canvas.ContextMenuItems(corner).OfType<MenuItem>().Single(i => i.Header as string == "Background");
+        var picture = ((IEnumerable<object>)background.ItemsSource!).OfType<MenuItem>().Single(i => i.Header as string == "Picture…");
+        picture.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+
+        Assert.Equal(new PictureImportRequest(panelId, AsBackground: true), asked);
+    }
+
     /// <summary>
     /// A whole scene - a sky, a hill behind a character, a bush in front, a caption and a
     /// sound effect - with each contextual tab open in turn. Set STANLEY_UI_SNAPSHOTS to a

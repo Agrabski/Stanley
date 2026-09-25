@@ -39,7 +39,8 @@ public sealed record PageCanvasScene(
     IReadOnlyList<Point2D>? TrunkHandles = null,
     EditingBubble? EditingBubble = null,
     int SelectedElementIndex = -1,
-    ElementId? EditingText = null);
+    ElementId? EditingText = null,
+    IReadOnlyDictionary<string, ArtFile>? Pictures = null);
 
 /// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
 public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
@@ -132,7 +133,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         PageRenderer.DrawPanels(canvas, _scene.Document.PanelOrder
             .Where(_scene.Document.Panels.ContainsKey)
             .Select(id => WithoutEditedText(_scene.Document.Panels[id]))
-            .ToList(), _scene.Characters, _scene.IssueLooks, _scene.EditingText);
+            .ToList(), _scene.Characters, _scene.IssueLooks, _scene.EditingText, _scene.Pictures);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }

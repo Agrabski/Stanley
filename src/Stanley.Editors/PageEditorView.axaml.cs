@@ -5,7 +5,10 @@ using Avalonia.Interactivity;
 using Stanley.Editing;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Avalonia.Platform.Storage;
+using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Storage;
 using Stanley.Rendering;
 
 namespace Stanley.Editors;
@@ -57,6 +60,7 @@ public partial class PageEditorView : UserControl
             _subscribed.TextEditRequested -= BeginTextEdit;
             _subscribed.ElementTextEditRequested -= BeginElementTextEdit;
             _subscribed.ViewportRequested -= OnViewportRequested;
+            _subscribed.PictureImportRequested -= OnPictureImportRequested;
         }
         _subscribed = ViewModel;
         if (_subscribed != null)
@@ -65,6 +69,7 @@ public partial class PageEditorView : UserControl
             _subscribed.TextEditRequested += BeginTextEdit;
             _subscribed.ElementTextEditRequested += BeginElementTextEdit;
             _subscribed.ViewportRequested += OnViewportRequested;
+            _subscribed.PictureImportRequested += OnPictureImportRequested;
         }
 
         PageCanvas.ViewModel = ViewModel;
@@ -128,6 +133,38 @@ public partial class PageEditorView : UserControl
             case ViewportRequest.FitPage: PageCanvas.FitPage(); break;
             case ViewportRequest.ActualSize: PageCanvas.ActualSize(); break;
         }
+    }
+
+    // ---------------------------------------------------------------- pictures
+
+    /// <summary>Picks a picture file for the view model (Insert › Picture, Background › Picture…) and hands it over.</summary>
+    private async void OnPictureImportRequested(PictureImportRequest request)
+    {
+        if (ViewModel is not { } vm || TopLevel.GetTopLevel(this) is not { } top)
+            return;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = request.AsBackground ? "Choose a picture to fill the panel" : "Choose a picture to place in the panel",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = IssueArt.Extensions.Select(e => "*." + e).ToList() }],
+        });
+        if (files is not [var picked])
+            return;
+        try
+        {
+            await using var stream = await picked.OpenReadAsync();
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var bytes = memory.ToArray();
+            var file = IssueArt.IsSvg(picked.Name) ? ArtFile.Svg(System.Text.Encoding.UTF8.GetString(bytes)) : ArtFile.Png(bytes);
+            vm.ImportPicture(request, picked.Name, file);
+        }
+        catch (IOException e)
+        {
+            ErrorText.Text = $"Couldn't read {picked.Name}: {e.Message}";
+            ErrorText.IsVisible = true;
+        }
+        PageCanvas.Focus();
     }
 
     // ---------------------------------------------------------------- inline text editing

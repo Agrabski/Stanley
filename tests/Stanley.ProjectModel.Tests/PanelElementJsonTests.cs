@@ -79,3 +79,67 @@ public class PanelElementJsonTests
         Assert.Empty(panel.Elements);
     }
 }
+
+public class IssueArtTests : IDisposable
+{
+    private readonly string _root = Directory.CreateTempSubdirectory("stanley-art-tests").FullName;
+
+    [Fact]
+    public void A_picture_is_named_after_its_content()
+    {
+        var a = Stanley.ProjectModel.Characters.ArtFile.Png([1, 2, 3]);
+        var same = Stanley.ProjectModel.Characters.ArtFile.Png([1, 2, 3]);
+        var other = Stanley.ProjectModel.Characters.ArtFile.Png([1, 2, 4]);
+
+        Assert.Equal(Storage.IssueArt.NameFor(a, ".PNG"), Storage.IssueArt.NameFor(same, "png"));
+        Assert.NotEqual(Storage.IssueArt.NameFor(a, "png"), Storage.IssueArt.NameFor(other, "png"));
+        Assert.Matches("^[0-9a-f]{16}\\.png$", Storage.IssueArt.NameFor(a, "png"));
+        Assert.Throws<ArgumentException>(() => Storage.IssueArt.NameFor(a, "exe"));
+    }
+
+    [Theory]
+    [InlineData("0123abcd.png", true)]
+    [InlineData("sky.svg", true)]
+    [InlineData("../escape.png", false)]
+    [InlineData("sub/dir.png", false)]
+    [InlineData("notes.txt", false)]
+    [InlineData("", false)]
+    public void Only_plain_picture_file_names_are_valid(string name, bool valid) =>
+        Assert.Equal(valid, Storage.IssueArt.IsValidName(name));
+
+    [Fact]
+    public void Issue_art_is_saved_loaded_and_deleted_in_the_issues_art_folder()
+    {
+        var repository = Storage.ProjectRepository.Initialize(_root, "Comic", new PageTrim(new PageSize(210, 297), 3));
+        var issue = new Issue(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
+        repository.SaveIssue(issue);
+        var file = Stanley.ProjectModel.Characters.ArtFile.Png([9, 8, 7]);
+        var name = Storage.IssueArt.NameFor(file, "png");
+
+        repository.SaveIssueArt(issue.Id, name, file);
+        var written = Directory.GetFiles(_root, name, SearchOption.AllDirectories).Single();
+        Assert.Equal("art", Path.GetFileName(Path.GetDirectoryName(written)));
+        Assert.True(repository.LoadIssueArt(issue.Id, name)!.SameContent(file));
+
+        repository.DeleteIssueArt(issue.Id, name);
+        Assert.Null(repository.LoadIssueArt(issue.Id, name));
+        Assert.Null(repository.LoadIssueArt(issue.Id, "../stanley.json"));
+        Assert.Throws<ArgumentException>(() => repository.SaveIssueArt(issue.Id, "../x.png", file));
+    }
+
+    [Fact]
+    public void A_picture_element_round_trips()
+    {
+        var picture = new PictureElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 30, 15), "0123456789abcdef.png");
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 100, 80)), new InlineBackground("fedcba9876543210.jpg"), [], [], [picture]);
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"kind\": \"picture\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        Assert.Equal(["fedcba9876543210.jpg", "0123456789abcdef.png"], PanelElements.ArtFileNames(read));
+    }
+
+    public void Dispose() => Directory.Delete(_root, recursive: true);
+}

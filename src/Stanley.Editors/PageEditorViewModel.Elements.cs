@@ -132,6 +132,7 @@ public sealed partial class PageEditorViewModel
         SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
         InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
+        InitializePictureCommands();
         SetBackgroundCommand = new RelayCommand<BackgroundChoice>(choice =>
         {
             if (choice != null && _selectedPanelId is { } panelId)
@@ -143,6 +144,7 @@ public sealed partial class PageEditorViewModel
     {
         InsertTextCommand.NotifyCanExecuteChanged();
         SetBackgroundCommand.NotifyCanExecuteChanged();
+        NotifyPictureCommands();
     }
 
     // ---------------------------------------------------------------- ribbon
@@ -238,12 +240,24 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(HasSelectedText));
         OnPropertyChanged(nameof(IsShapeContext));
         OnPropertyChanged(nameof(IsTextContext));
+        OnPropertyChanged(nameof(IsPictureContext));
         RaiseElementDerivedChanged();
     }
 
-    /// <summary>Everything the ribbon shows about the selected element (or the next new one) and the selected panel's background.</summary>
+    private object? _elementDerivedKey;
+
+    /// <summary>
+    /// Everything the ribbon shows about the selected element (or the next new one) and the
+    /// selected panel's background - raised only when one of them changed, not on every
+    /// pointer move of a drag.
+    /// </summary>
     private void RaiseElementDerivedChanged()
     {
+        var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedElement?.Layer, SelectedPanel?.Background,
+            _newShapeStyle, _newTextStyle, _newShapeLayer, _newTextLayer, Tool);
+        if (Equals(key, _elementDerivedKey))
+            return;
+        _elementDerivedKey = key;
         OnPropertyChanged(nameof(CurrentShapeStyle));
         OnPropertyChanged(nameof(StrokeBrush));
         OnPropertyChanged(nameof(FillBrush));
@@ -569,7 +583,17 @@ public sealed partial class PageEditorViewModel
         if (value)
             SetCurrentTextStyle(CurrentTextStyle with { Align = align });
         else
-            RaiseElementDerivedChanged(); // a toggle that flipped itself off hears "no, you're still on"
+            RaiseToggles(); // a toggle that flipped itself off hears "no, you're still on"
+    }
+
+    /// <summary>Re-raises the ribbon's toggle states even though nothing changed: a toggle button that flipped itself off locally needs to hear it's still on.</summary>
+    private void RaiseToggles()
+    {
+        OnPropertyChanged(nameof(IsTextAlignLeft));
+        OnPropertyChanged(nameof(IsTextAlignCenter));
+        OnPropertyChanged(nameof(IsTextAlignRight));
+        OnPropertyChanged(nameof(IsElementBehind));
+        OnPropertyChanged(nameof(IsElementInFront));
     }
 
     // ---------------------------------------------------------------- layer
@@ -603,6 +627,7 @@ public sealed partial class PageEditorViewModel
             }
         }
         RaiseElementDerivedChanged();
+        RaiseToggles();
     }
 
     // ---------------------------------------------------------------- panel background
@@ -613,7 +638,9 @@ public sealed partial class PageEditorViewModel
     public IBrush BackgroundPreview => DrawingPalette.Backgrounds.FirstOrDefault(b => Equals(b.Background, SelectedPanelBackground))?.Preview
         ?? new BackgroundChoice("", SelectedPanelBackground).Preview;
 
-    public string BackgroundName => SelectedPanel is null ? "" : DrawingPalette.Backgrounds.FirstOrDefault(b => Equals(b.Background, SelectedPanelBackground))?.Name ?? "Custom";
+    public string BackgroundName => SelectedPanel is null ? ""
+        : SelectedPanelBackground is InlineBackground ? "Picture"
+        : DrawingPalette.Backgrounds.FirstOrDefault(b => Equals(b.Background, SelectedPanelBackground))?.Name ?? "Custom";
 
     /// <summary>Fills a panel with a background (null = back to plain paper), in one undo step. Not a layout change, so a locked layout allows it.</summary>
     public void SetPanelBackground(PanelId panelId, PanelBackground? background) =>

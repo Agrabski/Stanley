@@ -227,7 +227,8 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.ActiveGuides) or nameof(PageEditorViewModel.Grid)
             or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio)
             or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
-            or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex))
+            or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex)
+            or nameof(PageEditorViewModel.PictureSnapshot))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -266,7 +267,8 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedCharacter is { } trunk ? _viewModel.TrunkHandles(trunk).Select(h => h.Point).ToList() : null,
             _editingBubble,
             _viewModel.SelectedElementIndex,
-            _editingText)));
+            _editingText,
+            _viewModel.PictureSnapshot)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
@@ -1248,7 +1250,7 @@ public sealed class PageCanvasControl : Control
                 items.Add(ColorMenu("Text colour", vm.SetTextColorCommand, noneLabel: null));
                 items.Add(ColorMenu("Box", vm.SetTextBoxCommand, "No box"));
             }
-            else
+            else if (element is ProjectModel.Issues.ShapeElement)
             {
                 items.Add(ColorMenu("Outline", vm.SetStrokeColorCommand, "No outline"));
                 items.Add(ColorMenu("Fill", vm.SetFillColorCommand, "No fill"));
@@ -1265,7 +1267,12 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Bring to front", () => vm.ReorderElement(elementPanel, index, toFront: true)));
             items.Add(Item("Send to back", () => vm.ReorderElement(elementPanel, index, toFront: false)));
             items.Add(new Separator());
-            items.Add(Item(element is ProjectModel.Issues.TextElement ? "Delete text" : "Delete shape", () => vm.DeleteElement(elementPanel, index), "Del"));
+            items.Add(Item(element switch
+            {
+                ProjectModel.Issues.TextElement => "Delete text",
+                ProjectModel.Issues.PictureElement => "Delete picture",
+                _ => "Delete shape"
+            }, () => vm.DeleteElement(elementPanel, index), "Del"));
         }
         else if (hit.Kind is HitKind.CharacterBody or HitKind.CharacterHandle && hit.PanelId is { } characterPanel)
         {
@@ -1358,11 +1365,16 @@ public sealed class PageCanvasControl : Control
     }, "T");
 
     /// <summary>Background ▸ every choice, for this panel - offered on a locked layout too, since a background isn't layout.</summary>
-    private static MenuItem BackgroundMenu(PageEditorViewModel vm, PanelId panelId) => new()
+    private static MenuItem BackgroundMenu(PageEditorViewModel vm, PanelId panelId)
     {
-        Header = "Background",
-        ItemsSource = vm.BackgroundChoices.Select(choice => Item(choice.Name, () => vm.SetPanelBackground(panelId, choice.Background))).ToList()
-    };
+        var items = vm.BackgroundChoices.Select(choice => (object)Item(choice.Name, () => vm.SetPanelBackground(panelId, choice.Background))).ToList();
+        if (vm.CanImportPictures)
+        {
+            items.Add(new Separator());
+            items.Add(Item("Picture…", () => vm.RequestPictureImport(panelId, asBackground: true)));
+        }
+        return new MenuItem { Header = "Background", ItemsSource = items };
+    }
 
     /// <summary>A submenu of palette colours (plus "none" when <paramref name="noneLabel"/> is given) running <paramref name="command"/>.</summary>
     private static MenuItem ColorMenu(string header, System.Windows.Input.ICommand command, string? noneLabel)

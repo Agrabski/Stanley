@@ -77,13 +77,13 @@ public partial class PageEditorRibbon : UserControl
 
         if (e.PropertyName is not (nameof(PageEditorViewModel.IsPanelContext) or nameof(PageEditorViewModel.IsBubbleContext)
                 or nameof(PageEditorViewModel.IsCharacterContext) or nameof(PageEditorViewModel.IsShapeContext)
-                or nameof(PageEditorViewModel.IsTextContext)) || ViewModel is not { } vm)
+                or nameof(PageEditorViewModel.IsTextContext) or nameof(PageEditorViewModel.IsPictureContext)) || ViewModel is not { } vm)
             return;
         // Read the view model rather than the tabs' IsVisible: those bindings may not have
         // caught up with this same change notification yet.
         if ((Tabs.SelectedItem == PanelTab && !vm.IsPanelContext) || (Tabs.SelectedItem == BubbleTab && !vm.IsBubbleContext)
             || (Tabs.SelectedItem == CharacterTab && !vm.IsCharacterContext) || (Tabs.SelectedItem == ShapeTab && !vm.IsShapeContext)
-            || (Tabs.SelectedItem == TextTab && !vm.IsTextContext))
+            || (Tabs.SelectedItem == TextTab && !vm.IsTextContext) || (Tabs.SelectedItem == PictureTab && !vm.IsPictureContext))
             Tabs.SelectedItem = HomeTab;
     }
 }

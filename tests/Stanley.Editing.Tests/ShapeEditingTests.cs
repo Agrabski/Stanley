@@ -298,3 +298,51 @@ public class ElementEditingTests
         Assert.Equal(new Rect2D(25, 15, 20, 20), PanelElements.Bounds(moved.Elements[0]));
     }
 }
+
+public class PictureEditingTests
+{
+    private static PictureElement Picture(Rect2D box) => new(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, box, "p.png");
+
+    [Fact]
+    public void A_placed_picture_fits_in_the_middle_of_the_panel_at_its_own_shape()
+    {
+        var panel = new Rect2D(10, 10, 100, 50);
+
+        var placed = PictureEditing.Place(panel, (400, 100), "p.png", ElementLayer.Foreground).Value;
+
+        Assert.Equal(80, placed.Bounds.Width, 6); // 80% of the panel's width limits a wide picture
+        Assert.Equal(20, placed.Bounds.Height, 6);
+        Assert.Equal(panel.MidX, placed.Bounds.MidX, 6);
+        Assert.Equal(panel.MidY, placed.Bounds.MidY, 6);
+        Assert.False(PictureEditing.Place(panel, (0, 10), "p.png", ElementLayer.Foreground).IsValid);
+    }
+
+    [Fact]
+    public void Dragging_a_corner_keeps_the_shape_and_the_opposite_corner_in_place()
+    {
+        var picture = Picture(new Rect2D(10, 10, 40, 20));
+
+        var resized = PictureEditing.Resize(picture, Rect2D.FromEdges(10, 10, 90, 35)).Value; // bottom-right corner
+
+        Assert.Equal(new Rect2D(10, 10, 80, 40), resized.Bounds);
+    }
+
+    [Fact]
+    public void Dragging_an_edge_grows_the_picture_both_ways_across_it()
+    {
+        var picture = Picture(new Rect2D(10, 10, 40, 20));
+
+        var resized = PictureEditing.Resize(picture, Rect2D.FromEdges(10, 10, 90, 30)).Value; // right edge only
+
+        Assert.Equal(10, resized.Bounds.Left, 6);
+        Assert.Equal(80, resized.Bounds.Width, 6);
+        Assert.Equal(40, resized.Bounds.Height, 6);
+        Assert.Equal(20, resized.Bounds.MidY, 6);
+    }
+
+    [Fact]
+    public void A_picture_cant_be_shrunk_to_nothing()
+    {
+        Assert.False(PictureEditing.Resize(Picture(new Rect2D(10, 10, 40, 20)), Rect2D.FromEdges(10, 10, 12, 30)).IsValid);
+    }
+}
