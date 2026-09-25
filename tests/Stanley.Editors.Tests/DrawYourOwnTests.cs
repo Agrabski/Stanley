@@ -9,6 +9,7 @@ namespace Stanley.Editors.Tests;
 internal sealed class FakeArtEditing : IArtEditing
 {
     public List<(string FileName, string Text, Action<string> Saved)> Opened { get; } = [];
+    public string? EditorPath { get; set; } = "/usr/bin/inkscape";
 
     public ArtEditSession? Edit(string fileName, string text, Action<string> saved, out string? error)
     {
@@ -27,6 +28,30 @@ public sealed class DrawYourOwnTests
         session.Characters.ArtEditing = art;
         var created = session.Characters.CreateCharacter();
         return (session, session.Characters.Items.Single(i => i.Id == created.Id).Editor, art);
+    }
+
+    [Fact]
+    public void Draw_your_own_asks_for_an_SVG_editor_first_and_wears_nothing_until_one_is_set()
+    {
+        var (_, editor, art) = NewCharacter();
+        art.EditorPath = null;
+        var stickersBefore = editor.Working.Wardrobe.Stickers.Count;
+        SvgEditorConfigurationRequest? request = null;
+        editor.SvgEditorConfigurationRequested += (_, r) => request = r;
+
+        editor.Gallery(StickerSlots.Hair).Draw!.Execute(StickerSlots.Hair);
+
+        Assert.Equal(StickerSlots.Hair, request?.Slot);
+        Assert.Empty(art.Opened);
+        Assert.Equal(stickersBefore, editor.Working.Wardrobe.Stickers.Count);
+        Assert.Null(editor.SelectedSticker);
+
+        editor.SetSvgEditorPath("/usr/bin/inkscape");
+        editor.DrawYourOwn(StickerSlots.Hair);
+
+        Assert.Equal("/usr/bin/inkscape", art.EditorPath);
+        Assert.Single(art.Opened);
+        Assert.NotNull(editor.SelectedSticker);
     }
 
     [Fact]

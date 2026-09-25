@@ -29,4 +29,7 @@ public interface IFileDialogs
 
     /// <summary>Word's "Want to save your changes to …?" prompt.</summary>
     Task<SaveChangesChoice> AskSaveChangesAsync(string documentTitle);
+
+    /// <summary>File &gt; Options &gt; SVG editor's picker (detected programs, or Browse... to any executable); null if cancelled.</summary>
+    Task<string?> PickSvgEditorAsync(string? currentPath);
 }

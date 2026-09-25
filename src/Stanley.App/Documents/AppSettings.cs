@@ -77,6 +77,15 @@ public sealed class AppSettings
         set => Set(nameof(UpdateChannel), value.ToString());
     }
 
+    /// <summary>File &gt; Options &gt; SVG editor: the program "Draw your own..."/"Edit drawing..." opens sticker art in.
+    /// Null until the user sets one up - Stanley never guesses at the OS's default app for SVG files. Not a secret, so
+    /// this plain preferences file (rather than <see cref="Updates.GithubTokenStore"/>'s owner-only one) is fine for it.</summary>
+    public string? SvgEditorPath
+    {
+        get => _values.TryGetValue(nameof(SvgEditorPath), out var value) && value.Length > 0 ? value : null;
+        set => Set(nameof(SvgEditorPath), value?.Trim() ?? "");
+    }
+
     private void Set(string key, string value)
     {
         _values[key] = value;

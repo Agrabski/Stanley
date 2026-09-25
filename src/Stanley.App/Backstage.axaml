@@ -206,6 +206,14 @@
             <Button Name="InstallUpdateButton" Content="Install and restart" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding HasUpdateAvailable}" />
             <TextBlock Name="UpdateStatusText" Text="{Binding UpdateStatus}" VerticalAlignment="Center" Opacity="0.8" />
           </StackPanel>
+
+          <TextBlock Classes="backstageSubheading" Text="SVG editor" Margin="0,24,0,8" />
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,8"
+                      Text="What Character &gt; Look &gt; Draw your own... and Edit drawing... open sticker art in - a vector editor, such as Inkscape. Stanley never guesses at the operating system's default app for SVG files, which is often just a viewer." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Name="SvgEditorPathText" Text="{Binding SvgEditorPath, TargetNullValue='Not set up yet', FallbackValue='Not set up yet'}" VerticalAlignment="Center" />
+            <Button Name="ChooseSvgEditorButton" Content="Change..." Command="{Binding ChooseSvgEditorCommand}" />
+          </StackPanel>
         </StackPanel>
       </StackPanel>
     </ScrollViewer>

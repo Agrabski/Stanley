@@ -105,6 +105,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OpenRecoveredCommand = new AsyncRelayCommand<RecoveredComic>(comic => comic is null ? Task.CompletedTask : OpenRecoveredAsync(comic));
         CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
         InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, () => HasUpdateAvailable);
+        ChooseSvgEditorCommand = new AsyncRelayCommand(ChooseSvgEditorAsync);
         DiscardRecoveredCommand = new RelayCommand<RecoveredComic>(comic =>
         {
             if (comic is null)
@@ -389,6 +390,25 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public IAsyncRelayCommand CheckForUpdatesCommand { get; }
     public IAsyncRelayCommand InstallUpdateCommand { get; }
+
+    /// <summary>
+    /// File &gt; Options &gt; SVG editor: what "Draw your own..."/"Edit drawing..." opens sticker
+    /// art in - never guessed from the OS's file association, which is often just a viewer
+    /// (see <see cref="Editors.IArtEditing"/>). Null until set; the character editor asks for
+    /// one itself the first time it's needed, through the same picker.
+    /// </summary>
+    public string? SvgEditorPath => _settings.SvgEditorPath;
+
+    public IAsyncRelayCommand ChooseSvgEditorCommand { get; }
+
+    private async Task ChooseSvgEditorAsync()
+    {
+        if (await _dialogs.PickSvgEditorAsync(_settings.SvgEditorPath) is not { Length: > 0 } chosen)
+            return;
+        _settings.SvgEditorPath = chosen;
+        AppLog.Info($"SVG editor set to {chosen}.");
+        OnPropertyChanged(nameof(SvgEditorPath));
+    }
 
     private async Task CheckForUpdatesAsync()
     {
@@ -810,7 +830,11 @@ public sealed class MainWindowViewModel : ObservableObject
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
         (_workspace, _navigator, _characters, _pictures) = PageEditorHost.CreateWorkspace(project);
-        _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory);
+        _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory, () => _settings.SvgEditorPath, path =>
+        {
+            _settings.SvgEditorPath = path;
+            OnPropertyChanged(nameof(SvgEditorPath));
+        });
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _navigator.SpacingChanged += OnSpacingChanged;

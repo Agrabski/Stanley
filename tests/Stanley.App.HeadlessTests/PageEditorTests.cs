@@ -508,6 +508,7 @@ public class PageEditorTests
         public Task<string?> PickSaveLocationAsync(string title, string suggestedName) => Task.FromResult<string?>(folder);
         public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) => Task.FromResult<string?>(null);
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
+        public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
     }
 
     /// <summary>Clicking a panel on a locked layout selects nothing - no Panel tab, nothing to drag - while double-click still adds a bubble.</summary>

@@ -10,6 +10,7 @@ public sealed class FakeFileDialogs : IFileDialogs
     public Queue<SaveChangesChoice> SaveChangesAnswers { get; } = new();
     public string? ExportPath { get; set; }
     public int SaveChangesPrompts { get; private set; }
+    public string? SvgEditorAnswer { get; set; }
 
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(Folders.Count > 0 ? Folders.Dequeue() : null);
 
@@ -31,6 +32,8 @@ public sealed class FakeFileDialogs : IFileDialogs
         SaveChangesPrompts++;
         return Task.FromResult(SaveChangesAnswers.Count > 0 ? SaveChangesAnswers.Dequeue() : SaveChangesChoice.Cancel);
     }
+
+    public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult(SvgEditorAnswer);
 }
 
 public sealed class MainWindowViewModelTests : IDisposable
