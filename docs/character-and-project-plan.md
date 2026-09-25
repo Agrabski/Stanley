@@ -300,8 +300,10 @@ MyComic/
   character to editable layers.
 
 ### Open questions (ask the user before deciding)
-- Lettering beyond the built-in default font (bubble text and free text/captions/sound
-  effects are rendered; choosing lettering fonts isn't).
+- Lettering fonts beyond what's built: bubble and free text can use any installed font
+  or the bundled default (Inter); a comic-style lettering font to bundle (OFL, none is
+  on NuGet), and carrying fonts with a project so it looks the same on a computer that
+  lacks them, are still open.
 - Export/print output pipeline.
 - Whether an "extract inline background to a reusable library entry" action
   is worth building, or manual promotion (copy the file, add

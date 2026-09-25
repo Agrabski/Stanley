@@ -599,6 +599,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(IsSpeechStyle));
         OnPropertyChanged(nameof(IsShoutStyle));
         OnPropertyChanged(nameof(IsWhisperStyle));
+        RaiseFontChanged();
     }
 
     /// <summary>Undo/redo or a delete can remove what's selected out from under us; drop whatever no longer exists instead of pointing at a stale index.</summary>
@@ -990,7 +991,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             return -1;
         }
 
-        var bubble = BubbleEditing.KeepInside(created.Value, panelBounds);
+        var bubble = BubbleEditing.KeepInside(created.Value with { FontFamily = _newBubbleFont }, panelBounds);
         bubble = WithDefaultTail(bubble, panelBounds);
         var index = panel.Bubbles.Count;
         Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Bubbles = [.. p.Bubbles, bubble] })));

@@ -214,10 +214,11 @@ public partial class PageEditorView : UserControl
         InlineTextEditor.SelectAll();
     }
 
-    /// <summary>Bubble lettering is always plain black and centred; a text element's editor takes on its style, so what's typed looks like what it'll be.</summary>
+    /// <summary>Bubble lettering is plain black and centred in the bubble's font; a text element's editor takes on its style, so what's typed looks like what it'll be.</summary>
     private void StyleTextEditor()
     {
         var style = EditedText()?.Style;
+        InlineTextEditor.FontFamily = LetteringFonts.AvaloniaFamily(style is not null ? style.FontFamily : EditedBubble()?.FontFamily);
         InlineTextEditor.TextAlignment = style?.Align switch
         {
             TextAlign.Left => Avalonia.Media.TextAlignment.Left,
@@ -230,6 +231,11 @@ public partial class PageEditorView : UserControl
         InlineTextEditor.Foreground = style is { } s && (s.Color ?? s.Outline) is { } visible ? DrawingPalette.BrushOf(visible) : Avalonia.Media.Brushes.Black;
         InlineTextEditor.MaxLength = style is null ? BubbleEditing.MaxTextLength : TextEditing.MaxTextLength;
     }
+
+    private ProjectModel.Bubbles.Bubble? EditedBubble() =>
+        _editing is { Bubble: not null } editing && ViewModel is { } vm && FindIndex(editing) is var index and >= 0
+            ? vm.Working.Panels[editing.Panel].Bubbles[index]
+            : null;
 
     private TextElement? EditedText() =>
         _editing is { Element: not null } editing && ViewModel is { } vm && FindIndex(editing) is var index and >= 0

@@ -90,7 +90,9 @@ coverlet.collector (10.0.1). No linter is configured yet.
 Dependencies: **Avalonia** 12.1.3, **SkiaSharp** 4.152.1, **System.CommandLine**
 2.0.12, **CommunityToolkit.Mvvm** 8.4.2, **Dock.Avalonia** / **Dock.Model.Mvvm**
 12.1.0.6 (for dockable panes), **Avalonia.Controls.ColorPicker** 12.1.3 (MIT; the
-`ColorView` behind "More Colors…", its Fluent theme included from `App.axaml`). Environment notes: on a fresh Linux container,
+`ColorView` behind "More Colors…", its Fluent theme included from `App.axaml`),
+**Avalonia.Fonts.Inter** 12.1.3 (MIT package; the Inter font in it is SIL OFL 1.1 —
+Stanley's bundled default lettering font, see "Fonts" below). Environment notes: on a fresh Linux container,
 `apt-get install dotnet-sdk-10.0` works when `dot.net`/`builds.dotnet.microsoft.com`
 is egress-blocked (the official dotnet-install script host). SkiaSharp needs an
 explicit `SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per
@@ -125,6 +127,8 @@ the page editor via `PageEditorViewModel`.
   regenerates the shape from current bounds under the new preset while
   preserving tail attachment/target so they don't jump. The anchor model
   itself is the escape hatch for arbitrary hand-edited shapes later.
+- **Lettering font**: `Bubble.FontFamily` (null = the default font; see "Fonts" under
+  panel elements) — the font box on the Bubble and Home tabs.
 - Deferred: thought-bubble style (disjoint circle chain — breaks
   the single-polygon-per-tail union model), colour slots, character-bound tail
   targets, NativeAOT publish validation. See the design discussion in this
@@ -419,7 +423,8 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   `TextElement` (`Bounds`, `Text`, `TextStyle`: size in mm, colour — null = hollow
   letters — bold, italic, `TextAlign`, letter `Outline` and `OutlineWidthMm` — null
   = in proportion to the letters — and the box: `BoxFill`, `BoxStroke`,
-  `BoxStrokeWidthMm`, `BoxDash`), `PictureElement` (`Bounds` + `ArtFileName`).
+  `BoxStrokeWidthMm`, `BoxDash` — plus `FontFamily`), `PictureElement` (`Bounds` +
+  `ArtFileName`).
   `LineDash` is Word's Dashes (solid, round/square dot, dash, dash dot, long dash,
   long dash dot), drawn scaled to the line's width (`LinePatterns`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
   and `GradientBackground` (top → bottom) beside the existing `InlineBackground`
@@ -436,7 +441,7 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
 - **Rendering** (`ElementRenderer`, `PictureRenderer`, `Lettering`): shapes (round
   caps/joins on open lines), text (greedy wrap shared with bubbles through
   `Lettering.Wrap`, shrink to fit, box padding, letter outline; bold/italic use the
-  default family's real faces or fake them), pictures (decoded once per file value;
+  font's real faces or fake them), pictures (decoded once per file value;
   SVG replayed as vectors; a missing file draws a grey placeholder).
   `PageRenderer.Draw/DrawPanels/Export*` take `pictures`; `DrawPanels` takes
   `hideText` for the element the inline editor is showing.
@@ -469,6 +474,29 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   foreground elements over characters, background elements under them but never
   over a panel's draggable edge; unfilled shapes are only hit along their line.
   Empty bare text shows a faint (unprinted) outline.
+- **Fonts**: `TextStyle.FontFamily` and `Bubble.FontFamily` name a family (null =
+  the default lettering font; absent from the file then, so older files read
+  unchanged). `Lettering` (Stanley.Rendering, Skia only) resolves it: fonts Stanley
+  ships with (`AddBundledFace`, one of them the default), then any family installed
+  on the computer (`SystemFamilies`: each font once — aliases fontconfig lists under
+  a second name, e.g. a Japanese font's Latin and Japanese names, still count as
+  installed but aren't listed twice), else the default — a comic made on another
+  computer keeps the name and comes back when the font is installed.
+  `LetteringFonts` (Stanley.Editors) installs the bundled ones: **Inter**, from the
+  Avalonia.Fonts.Inter package (every weight, read from its `avares://` assets with
+  `StandardAssetLoader`, registered as the default), for both Skia and Avalonia
+  (`AppBuilder.WithLetteringFonts()` in `Program` and the headless `TestAppBuilder`;
+  the Editors tests install it in a module initializer so the default never changes
+  mid-run), and maps a family to the Avalonia `FontFamily` the inline editor types in.
+  No comic lettering font is on NuGet, so Inter (a clean sans) is the one bundled;
+  more would be OFL/Apache fonts, in a package or embedded, never proprietary ones.
+  UI: Word's font box (`ComboBox.fontBox`, each name in its own face, Stanley's own
+  fonts first) on the Home, Bubble and Text tabs, all bound to
+  `PageEditorViewModel.SelectedFont` (`PageEditorViewModel.Fonts.cs`): the selected
+  bubble's or text's font, one undo step to change; with nothing selected it sets
+  the font of the next bubble and text. Picking the default stores null; a text
+  preset (Caption, …) keeps the font. A font the computer lacks leaves the box empty
+  with "<name> (missing)" as its placeholder and a tooltip saying so.
 - **Colour controls, as in Word** (`ColorMenus.cs`): `ColorMenuButton` is Word's
   Shape Fill / Shape Outline / Text Fill / Text Outline — a small split button, its
   icon over a bar in the last colour picked (the face applies it again), the arrow
@@ -862,7 +890,9 @@ needed — check this first on a release/nightly `403`); branch protection on
 The project is **AGPL-3.0**. Check the licence of every dependency before adding
 it — including its transitive dependencies (e.g. Svg.Skia is MIT but sits on
 MS-PL SVG.NET code, which the FSF lists as GPL-incompatible; VectSharp.SVG,
-LGPL-3.0, is the chosen SVG reader instead). The starter sticker/pattern library's
+LGPL-3.0, is the chosen SVG reader instead) — and of every bundled *font*: SIL OFL
+1.1 or Apache-2.0 fonts may ship alongside AGPL code, as Inter does; fonts free
+only for personal use, like many comic lettering fonts, may not. The starter sticker/pattern library's
 *art* is **CC0-1.0**, not AGPL, so comics made with it carry no obligations —
 only add original or already-CC0 art to it. Some character-animation runtimes
 need proprietary or per-user licences (for example the Spine runtimes and the

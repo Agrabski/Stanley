@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Headless;
 using Stanley.App;
+using Stanley.Editors;
 
 namespace Stanley.App.HeadlessTests;
 
@@ -16,6 +17,7 @@ public static class TestAppBuilder
             Path.Combine(Path.GetTempPath(), "stanley-headless-data-" + Guid.NewGuid().ToString("N")));
         return AppBuilder.Configure<App>()
             .UseSkia()
+            .WithLetteringFonts()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
     }
 }

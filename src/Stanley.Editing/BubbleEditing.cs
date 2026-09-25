@@ -156,6 +156,12 @@ public static class BubbleEditing
         return EditResult<Bubble>.Success(bubble with { Text = text });
     }
 
+    /// <summary>Letters the bubble in <paramref name="family"/> (null or blank: the default lettering font).</summary>
+    public static EditResult<Bubble> SetFont(Bubble bubble, string? family) =>
+        TextEditing.CleanFontName(family) is { IsValid: true } name
+            ? EditResult<Bubble>.Success(bubble with { FontFamily = name.Value })
+            : EditResult<Bubble>.Failure(TextEditing.CleanFontName(family).Error!);
+
     private static double NextAttachmentT(IReadOnlyList<BubbleTail> tails)
     {
         const double goldenStep = 0.61803398875;

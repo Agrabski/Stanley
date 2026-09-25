@@ -5,7 +5,7 @@ using Stanley.ProjectModel.Geometry;
 namespace Stanley.Rendering;
 
 /// <summary>
-/// Draws a bubble's text, word-wrapped and centered within its shape's bounding box.
+/// Draws a bubble's text in its font, word-wrapped and centered within its shape's bounding box.
 /// SkiaSharp-only measurement/layout (no Avalonia text stack available here) - a plain
 /// greedy word wrap, not full text shaping; good enough for short dialogue lines.
 /// </summary>
@@ -34,7 +34,7 @@ public static class BubbleTextRenderer
         if (maxWidth <= 0 || maxHeight <= 0)
             return;
 
-        using var font = Lettering.Font(fontSize);
+        using var font = Lettering.Font(fontSize, family: bubble.FontFamily);
         using var paint = new SKPaint { Color = color ?? SKColors.Black, IsAntialias = true };
 
         var lines = WrapLines(bubble.Text, font, paint, maxWidth);

@@ -228,7 +228,7 @@ public sealed partial class PageEditorViewModel
         });
         SetBoxDashCommand = new RelayCommand<LineDash>(dash =>
             SetCurrentTextStyle(CurrentTextStyle with { BoxDash = dash, BoxStroke = CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink }));
-        ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset)));
+        ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset) with { FontFamily = CurrentTextStyle.FontFamily }));
         BiggerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Bigger(CurrentTextStyle.FontSizeMm) }));
         SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
         InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
@@ -366,6 +366,7 @@ public sealed partial class PageEditorViewModel
     /// </summary>
     private void RaiseElementDerivedChanged()
     {
+        RaiseFontChanged();
         var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedElement?.Layer, SelectedPanel?.Background,
             _newShapeStyle, _newTextStyle, _newShapeLayer, _newTextLayer, Tool);
         if (Equals(key, _elementDerivedKey))
@@ -565,7 +566,7 @@ public sealed partial class PageEditorViewModel
             panelId = Working.PanelOrder[0];
         }
 
-        var style = TextStylePresets.Style(preset);
+        var style = TextStylePresets.Style(preset) with { FontFamily = _newTextStyle.FontFamily };
         _newTextStyle = style;
         var bounds = PanelBounds(panelId);
         var width = Math.Min(TextStylePresets.DefaultWidthMm(preset), bounds.Width);

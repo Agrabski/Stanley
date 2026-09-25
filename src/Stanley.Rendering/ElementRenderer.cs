@@ -100,7 +100,7 @@ public static class ElementRenderer
     public static double NeededHeight(TextElement text)
     {
         var area = TextArea(text);
-        using var font = Lettering.Font((float)text.Style.FontSizeMm, text.Style.Bold, text.Style.Italic);
+        using var font = Lettering.Font((float)text.Style.FontSizeMm, text.Style.Bold, text.Style.Italic, text.Style.FontFamily);
         using var paint = new SKPaint { IsAntialias = true };
         var lines = Lettering.Wrap(text.Text, font, paint, (float)Math.Max(area.Width, 0.1));
         return Math.Max(1, lines.Count) * font.Spacing + 2 * Padding(text);
@@ -129,7 +129,7 @@ public static class ElementRenderer
             return;
 
         var fontSize = (float)text.Style.FontSizeMm;
-        using var font = Lettering.Font(fontSize, text.Style.Bold, text.Style.Italic);
+        using var font = Lettering.Font(fontSize, text.Style.Bold, text.Style.Italic, text.Style.FontFamily);
         // Hollow letters (no fill) still need a paint to measure with; they just aren't filled.
         using var paint = new SKPaint { Color = text.Style.Color is { } letters ? FigureGeometry.ToSk(letters) : SKColors.Transparent, IsAntialias = true };
         var maxWidth = (float)area.Width;

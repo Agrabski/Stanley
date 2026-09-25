@@ -183,7 +183,24 @@ public class TextEditingTests
 
         Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption));
         Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption with { FontSizeMm = 6 }));
+        Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption with { FontFamily = "DejaVu Serif" }));
         Assert.Null(TextStylePresets.Of(caption with { Bold = true }));
+    }
+
+    [Fact]
+    public void Font_names_are_trimmed_blank_means_the_default_and_nonsense_is_refused()
+    {
+        var text = TextEditing.Create(new Rect2D(0, 0, 30, 5), TextStylePresets.Style(TextStylePreset.Plain)).Value;
+
+        Assert.Equal("Comic Neue", TextEditing.SetStyle(text, text.Style with { FontFamily = "  Comic Neue " }).Value.Style.FontFamily);
+        Assert.Null(TextEditing.SetStyle(text, text.Style with { FontFamily = " " }).Value.Style.FontFamily);
+        Assert.False(TextEditing.SetStyle(text, text.Style with { FontFamily = "Two\nLines" }).IsValid);
+        Assert.False(TextEditing.CleanFontName(new string('x', TextEditing.MaxFontNameLength + 1)).IsValid);
+
+        var bubble = BubbleEditing.Create(new Rect2D(0, 0, 40, 20), Stanley.ProjectModel.Bubbles.BubbleStylePreset.Speech).Value;
+        Assert.Equal("Inter", BubbleEditing.SetFont(bubble, "Inter ").Value.FontFamily);
+        Assert.Null(BubbleEditing.SetFont(bubble with { FontFamily = "Inter" }, null).Value.FontFamily);
+        Assert.False(BubbleEditing.SetFont(bubble, "Tab\tName").IsValid);
     }
 
     [Fact]

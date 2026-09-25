@@ -78,6 +78,7 @@ public enum TextAlign
 /// <param name="OutlineWidthMm">The letter outline's thickness; null keeps it in proportion to the letter size.</param>
 /// <param name="BoxStrokeWidthMm">The box outline's thickness (a bubble's, by default).</param>
 /// <param name="BoxDash">The box outline's pattern.</param>
+/// <param name="FontFamily">The typeface's family name - one Stanley bundles or one installed on the computer; null is the default lettering font. A family the computer doesn't have draws in the default until it's installed, and the name is kept.</param>
 public sealed record TextStyle(
     double FontSizeMm,
     ColorValue? Color,
@@ -89,7 +90,8 @@ public sealed record TextStyle(
     ColorValue? BoxStroke = null,
     double? OutlineWidthMm = null,
     double BoxStrokeWidthMm = TextStyle.DefaultBoxStrokeWidthMm,
-    LineDash BoxDash = LineDash.Solid)
+    LineDash BoxDash = LineDash.Solid,
+    string? FontFamily = null)
 {
     public const double DefaultBoxStrokeWidthMm = 0.35;
 }

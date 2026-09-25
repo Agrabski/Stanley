@@ -74,6 +74,13 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
+          <ComboBox Name="HomeFontBox" Classes="fontBox" VerticalAlignment="Center" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
+                    PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
+          <TextBlock Classes="groupLabel" Text="Font" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <StackPanel Spacing="2" Margin="0,4,0,0">
             <local:ColorMenuButton Name="HomeShapeFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
                                    Command="{Binding SetFillColorCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentShapeStyle.Fill}"
@@ -599,6 +606,12 @@
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
+          <ComboBox Name="BubbleFontBox" Classes="fontBox" VerticalAlignment="Center" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
+                    PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
+          <TextBlock Classes="groupLabel" Text="Font" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the bubble's text (Enter, or double-click the bubble)">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
@@ -733,6 +746,8 @@
         <DockPanel Classes="group">
           <StackPanel Spacing="2" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="1">
+              <ComboBox Name="TextFontBox" Classes="fontBox" Margin="0,0,3,0" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
+                        PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
               <Button Name="BiggerTextButton" Classes="small" Command="{Binding BiggerTextCommand}" ToolTip.Tip="Bigger letters" FontWeight="SemiBold">A+</Button>
               <Button Name="SmallerTextButton" Classes="small" Command="{Binding SmallerTextCommand}" ToolTip.Tip="Smaller letters">A−</Button>
               <TextBlock Name="TextSizeReadout" Text="{Binding TextSizeText}" Width="48" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" />

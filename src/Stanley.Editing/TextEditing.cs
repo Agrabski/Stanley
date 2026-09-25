@@ -49,9 +49,9 @@ public static class TextStylePresets
         _ => 35
     };
 
-    /// <summary>The preset <paramref name="style"/> is, if it's exactly one (size aside - a bigger caption is still a caption).</summary>
+    /// <summary>The preset <paramref name="style"/> is, if it's exactly one (size and font aside - a bigger caption, or one in another font, is still a caption).</summary>
     public static TextStylePreset? Of(TextStyle style) =>
-        All.Cast<TextStylePreset?>().FirstOrDefault(p => Style(p!.Value) with { FontSizeMm = style.FontSizeMm } == style);
+        All.Cast<TextStylePreset?>().FirstOrDefault(p => Style(p!.Value) with { FontSizeMm = style.FontSizeMm, FontFamily = style.FontFamily } == style);
 }
 
 /// <summary>
@@ -65,6 +65,7 @@ public static class TextEditing
     public const double MinFontSizeMm = 1;
     public const double MaxFontSizeMm = 60;
     public const int MaxTextLength = 2000;
+    public const int MaxFontNameLength = 100;
 
     /// <summary>The letter sizes Bigger/Smaller step through, in mm (3.5 is the usual ~10pt dialogue size).</summary>
     public static IReadOnlyList<double> SizeSteps { get; } = [2.5, 3, 3.5, 4, 5, 6, 8, 10, 12, 16, 20, 28, 40, 60];
@@ -81,10 +82,26 @@ public static class TextEditing
             ? EditResult<TextElement>.Failure($"Text can't exceed {MaxTextLength} characters.")
             : EditResult<TextElement>.Success(text with { Text = value });
 
-    public static EditResult<TextElement> SetStyle(TextElement text, TextStyle style) =>
-        style.FontSizeMm < MinFontSizeMm || style.FontSizeMm > MaxFontSizeMm
-            ? EditResult<TextElement>.Failure($"Letters must be {MinFontSizeMm}-{MaxFontSizeMm}mm tall.")
-            : EditResult<TextElement>.Success(text with { Style = style });
+    public static EditResult<TextElement> SetStyle(TextElement text, TextStyle style)
+    {
+        if (style.FontSizeMm < MinFontSizeMm || style.FontSizeMm > MaxFontSizeMm)
+            return EditResult<TextElement>.Failure($"Letters must be {MinFontSizeMm}-{MaxFontSizeMm}mm tall.");
+        var font = CleanFontName(style.FontFamily);
+        return font.IsValid
+            ? EditResult<TextElement>.Success(text with { Style = style with { FontFamily = font.Value } })
+            : EditResult<TextElement>.Failure(font.Error!);
+    }
+
+    /// <summary>A font family name as it's stored: trimmed, and null (the default lettering font) when blank. Names are free text - any installed family, even one this computer lacks - but short and on one line.</summary>
+    public static EditResult<string?> CleanFontName(string? family)
+    {
+        var name = family?.Trim();
+        if (string.IsNullOrEmpty(name))
+            return EditResult<string?>.Success(null);
+        if (name.Length > MaxFontNameLength || name.Any(char.IsControl))
+            return EditResult<string?>.Failure("That isn't a font name.");
+        return EditResult<string?>.Success(name);
+    }
 
     public static EditResult<TextElement> Resize(TextElement text, Rect2D bounds) =>
         bounds.Width < MinWidthMm - 1e-9 || bounds.Height < MinHeightMm - 1e-9

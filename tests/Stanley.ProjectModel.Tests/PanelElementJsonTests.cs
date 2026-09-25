@@ -1,3 +1,4 @@
+using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
@@ -45,6 +46,27 @@ public class PanelElementJsonTests
 
         Assert.DoesNotContain("boxFill", json, StringComparison.Ordinal);
         Assert.DoesNotContain("outline", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("fontFamily", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Text_and_bubble_fonts_round_trip_and_older_files_read_as_the_default_font()
+    {
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi",
+            new TextStyle(3.5, ColorValue.FromHex("#000000"), FontFamily: "Comic Neue"));
+        var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(20, 20, 40, 20)).Anchors), BubbleStylePreset.Speech, [], "Hey!", FontFamily: "DejaVu Serif");
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [], [bubble], [text]);
+
+        var json = ProjectJson.Serialize(panel);
+        Assert.Contains("\"fontFamily\": \"Comic Neue\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"fontFamily\": \"DejaVu Serif\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, ProjectJson.Deserialize<Panel>(json), strict: true);
+
+        var older = ProjectJson.Deserialize<Panel>(json
+            .Replace("\"fontFamily\": \"Comic Neue\",", "", StringComparison.Ordinal)
+            .Replace("\"fontFamily\": \"DejaVu Serif\",", "", StringComparison.Ordinal));
+        Assert.Null(older.Bubbles[0].FontFamily);
+        Assert.Null(((TextElement)older.Elements[0]).Style.FontFamily);
     }
 
     [Fact]
