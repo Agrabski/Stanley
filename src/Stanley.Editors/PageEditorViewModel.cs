@@ -42,7 +42,7 @@ public enum ViewportRequest
     FocusPage
 }
 
-public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
+public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>, IDragGesture
 {
     /// <summary>Default size for a bubble created with a single click, in mm - roughly two short lines of lettering.</summary>
     public const double DefaultBubbleWidthMm = 42;
@@ -141,6 +141,19 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         InitializeFieldCommands();
         InitializeFaceCommands();
     }
+
+    // A ribbon slider (the Speed Lines tab's "Lines" and "Thickness") is a drag gesture too,
+    // like a character's body sliders: the view calls BeginSliderDrag on press and
+    // EndSliderDrag on release, so one drag is one undo step - wired up here through
+    // IDragGesture so `local:DragGesture.Target="{Binding}"` can bind straight to this view
+    // model, the same as everywhere else that attaches a slider to a drag gesture.
+    public void BeginSliderDrag() => BeginGesture();
+
+    public void EndSliderDrag() => CommitGesture();
+
+    void IDragGesture.BeginDrag() => BeginSliderDrag();
+
+    void IDragGesture.EndDrag() => EndSliderDrag();
 
     // ---------------------------------------------------------------- ribbon commands
     //
@@ -726,6 +739,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
         _ when HasSelectedShape => "Drag to move the shape · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
+        _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
         _ when HasSelectedText => "Drag to move the text · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",

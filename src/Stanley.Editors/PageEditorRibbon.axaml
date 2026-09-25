@@ -241,6 +241,15 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
+          <Button Name="InsertSpeedLinesButton" Classes="tool" Command="{Binding InsertSpeedLinesCommand}"
+                  ToolTip.Tip="A burst of lines radiating out from a point, in the selected panel - drag the clear circle to where they should converge">
+            <StackPanel><PathIcon Data="{StaticResource SpeedLinesIcon}" /><TextBlock Text="Speed lines" /></StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Effects" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <DockPanel Classes="group">
           <DropDownButton Name="InsertBackgroundButton" Classes="slotGallery" Width="100" IsEnabled="{Binding HasSelectedPanel}"
                           ToolTip.Tip="Fill the selected panel behind everything in it: a colour or a sky (select a panel, or anything in one, first)">
             <StackPanel Spacing="2">
@@ -840,6 +849,67 @@
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
             <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture (Delete)">
+              <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+        </DockPanel>
+      </StackPanel>
+    </TabItem>
+
+    <!-- ============================== SPEED LINES (contextual) ============================== -->
+    <TabItem Name="SpeedLinesTab" Classes="contextual shape" IsVisible="{Binding IsSpeedLinesContext}">
+      <TabItem.Header><TextBlock Classes="shapeHeader" Text="Speed Lines" /></TabItem.Header>
+      <StackPanel Classes="tabContent">
+        <DockPanel Classes="group">
+          <local:ColorMenuButton Name="SpeedLinesColorButton" Label="Color" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#1c1c1c"
+                                 Command="{Binding SetSpeedLinesColorCommand}" MoreLabel="More Colors…" CurrentColor="{Binding CurrentSpeedLinesStyle.Color}"
+                                 ToolTip.Tip="The lines' colour" />
+          <TextBlock Classes="groupLabel" Text="Speed Lines Styles" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <Grid ColumnDefinitions="Auto,Auto,44" RowDefinitions="24,24" ColumnSpacing="6">
+            <TextBlock Text="Lines" FontSize="12" VerticalAlignment="Center" />
+            <Slider Name="SpeedLinesCountSlider" Grid.Column="1" Classes="body" Width="150" Minimum="8" Maximum="300" Value="{Binding SpeedLinesCount}"
+                    local:DragGesture.Target="{Binding}" ToolTip.Tip="How many lines radiate out - few for a subtle nudge, many for a full burst" />
+            <TextBlock Grid.Column="2" Text="{Binding SpeedLinesCount, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1" Text="Thickness" FontSize="12" VerticalAlignment="Center" />
+            <Slider Name="SpeedLinesThicknessSlider" Grid.Row="1" Grid.Column="1" Classes="body" Width="150" Minimum="0.2" Maximum="4" Value="{Binding SpeedLinesThickness}"
+                    local:DragGesture.Target="{Binding}" ToolTip.Tip="How wide each line is at its outer end" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding SpeedLinesThickness, StringFormat='{}{0:0.0}mm'}" FontSize="12" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Classes="groupLabel" Text="Lines" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <Button Name="ShuffleSpeedLinesButton" Classes="tool" Command="{Binding ShuffleSpeedLinesCommand}" ToolTip.Tip="A fresh, differently jittered burst - same colour, count and thickness">
+            <StackPanel><PathIcon Data="{StaticResource ShuffleIcon}" /><TextBlock Text="Shuffle" /></StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Randomness" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <RadioButton Name="SpeedLinesBehindButton" Classes="tool" GroupName="SpeedLinesLayer" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsElementBehind}"
+                         ToolTip.Tip="Scenery: drawn behind the panel's characters">
+              <StackPanel><PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" /></StackPanel>
+            </RadioButton>
+            <RadioButton Name="SpeedLinesInFrontButton" Classes="tool" GroupName="SpeedLinesLayer" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsElementInFront}"
+                         ToolTip.Tip="Foreground: drawn in front of the panel's characters (bubbles stay on top)">
+              <StackPanel><PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" /></StackPanel>
+            </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Layer" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
+              <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
+            </StackPanel>
+            <Button Name="DeleteSpeedLinesButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines (Delete)">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
