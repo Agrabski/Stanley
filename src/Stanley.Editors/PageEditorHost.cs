@@ -42,7 +42,9 @@ public static class PageEditorHost
         characters.PlaceRequested += id =>
         {
             navigator.Reveal(navigator.CurrentPage);
-            navigator.CurrentPage.Editor.InsertCharacter(id);
+            var page = navigator.CurrentPage.Editor;
+            page.InsertCharacter(id);
+            page.FocusPage(); // the keyboard too: Delete, arrows, F/S on the new character
         };
 
         // "In 3 panels" and whether Delete is allowed follow every page edit - the comic's title page's too, even while this issue shows its own.

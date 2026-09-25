@@ -117,4 +117,15 @@ public sealed record Sticker(
             };
 
     public bool IsFromLibrary => Source is not null;
+
+    /// <summary>
+    /// The variant it shows worn in <paramref name="slot"/>: the expression's for that slot if
+    /// it has that one, else "neutral" if it has one, else its first.
+    /// </summary>
+    public string VariantFor(string slot, IReadOnlyDictionary<string, string>? expression)
+    {
+        if (expression is not null && expression.TryGetValue(slot, out var wanted) && Variants.Contains(wanted))
+            return wanted;
+        return Variants.Contains("neutral") ? "neutral" : Variants.Count > 0 ? Variants[0] : DefaultVariant;
+    }
 }

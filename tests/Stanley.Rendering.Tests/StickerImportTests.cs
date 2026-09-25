@@ -104,6 +104,36 @@ public class StickerImportTests
 public class LookRenderingTests
 {
     [Fact]
+    public void A_new_expression_starts_as_a_copy_of_one_in_every_view_and_saves_go_to_it()
+    {
+        var front = ArtFile.Svg(StickerTemplates.Export(ViewAngle.Front, StickerSlots.Mouth));
+        var side = ArtFile.Svg(StickerTemplates.Export(ViewAngle.Profile, StickerSlots.Mouth));
+        var sticker = new Sticker(StickerId.New(), "Simple", StickerSlots.Mouth, [], new SortedDictionary<string, ColorValue>(), ["neutral", "smile"], Source: "library:mouth/simple");
+        var asset = new StickerAsset(sticker, new Dictionary<string, ArtFile>
+        {
+            ["variants/smile/front.svg"] = front,
+            ["variants/smile/profile.svg"] = side,
+            ["variants/neutral/front.svg"] = ArtFile.Svg("<svg/>"),
+        });
+
+        var added = StickerImport.WithVariant(asset, "myMouth", copyOf: "smile");
+
+        Assert.Equal(["neutral", "smile", "myMouth"], added.Sticker.Variants);
+        Assert.Null(added.Sticker.Source); // the user's own from now on
+        Assert.Same(front, added.Files["variants/myMouth/front.svg"]);
+        Assert.Same(side, added.Files["variants/myMouth/profile.svg"]);
+        Assert.Equal(front.Text, StickerImport.ArtToEdit(added, ViewAngle.Front, "myMouth"));
+
+        var redrawn = StickerTemplates.Export(ViewAngle.Profile, StickerSlots.Mouth).Replace("</svg>", "<!-- mine --></svg>");
+        var saved = StickerImport.WithArt(added, ViewAngle.Profile, redrawn, "myMouth").Asset!;
+        Assert.Equal(redrawn, saved.Files["variants/myMouth/profile.svg"].Text);
+        Assert.Same(side, saved.Files["variants/smile/profile.svg"]); // the one it was copied from is untouched
+
+        // A drawing saved for a variant the sticker doesn't list (its "new" was undone) brings it back.
+        Assert.Equal(["neutral", "smile", "crying"], StickerImport.WithArt(asset, ViewAngle.Front, redrawn, "crying").Asset!.Sticker.Variants);
+    }
+
+    [Fact]
     public void An_instance_is_drawn_in_its_issue_look_unless_it_picks_its_own()
     {
         var sticker = new Sticker(StickerId.New(), "Top", StickerSlots.Top, [new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 0.9))],

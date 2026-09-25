@@ -1298,7 +1298,21 @@ public sealed class PageCanvasControl : Control
             poses.ItemsSource = PosePresets.All.Select(preset => Item(preset.Name, () => vm.ApplyPosePreset(characterPanel, index, preset))).ToList();
             items.Add(poses);
             var expressions = new MenuItem { Header = "Expression" };
-            expressions.ItemsSource = ExpressionPresets.All.Select(preset => Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset))).ToList();
+            // The presets, the character's saved faces, then a mix of your own: Eyes ▸, Brows ▸, Mouth ▸ one at a time.
+            var saved = vm.SavedFaceChoices;
+            var mixer = vm.ExpressionMixer;
+            expressions.ItemsSource = ExpressionPresets.All.Select(preset => (Control)Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset)))
+                .Concat(saved.Count > 0 ? [new Separator()] : Array.Empty<Control>())
+                .Concat(saved.Select(face => (Control)Item((face.IsCurrent ? "✓ " : "") + face.Name, () => vm.ApplySavedFace(characterPanel, index, face.Face))))
+                .Concat(mixer.Count > 0 ? [new Separator()] : Array.Empty<Control>())
+                .Concat(mixer.Select(row => (Control)new MenuItem
+                {
+                    Header = row.Label,
+                    ItemsSource = row.Choices
+                        .Select(choice => Item((choice.IsCurrent ? "✓ " : "") + choice.Name, () => vm.SetExpressionVariant(characterPanel, index, row.Slot, choice.Variant)))
+                        .ToList()
+                }))
+                .ToList();
             items.Add(expressions);
             if (vm.PanelLookChoices is { Count: > 2 } looks)
             {

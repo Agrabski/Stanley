@@ -50,6 +50,26 @@ public class ProjectJsonTests : IDisposable
     }
 
     [Fact]
+    public void A_characters_saved_faces_round_trip_and_are_left_out_when_there_are_none()
+    {
+        var plain = Stanley.ProjectModel.Characters.CharacterDefinition.Create("Pip");
+        var path = Path.Combine(_dir, "character.json");
+        ProjectJson.Write(path, plain);
+        Assert.DoesNotContain("expressions", File.ReadAllText(path));
+
+        var withFaces = plain with
+        {
+            Expressions = [new Stanley.ProjectModel.Characters.SavedExpression("Grin", new SortedDictionary<string, string> { ["eyes"] = "happy", ["mouth"] = "open" })]
+        };
+        ProjectJson.Write(path, withFaces);
+        var reloaded = ProjectJson.Read<Stanley.ProjectModel.Characters.CharacterDefinition>(path);
+
+        var face = Assert.Single(reloaded.Expressions!);
+        Assert.Equal("Grin", face.Name);
+        Assert.Equal(withFaces.Expressions[0].Variants, face.Variants);
+    }
+
+    [Fact]
     public void Write_creates_missing_parent_directories()
     {
         var path = Path.Combine(_dir, "nested", "deep", "manifest.json");

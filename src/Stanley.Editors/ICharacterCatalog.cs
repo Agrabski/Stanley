@@ -1,4 +1,5 @@
 using Stanley.ProjectModel.Characters;
+using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 
 namespace Stanley.Editors;
@@ -24,4 +25,18 @@ public interface ICharacterCatalog
 
     /// <summary>Shows the character's editor in place of the page.</summary>
     void OpenCharacter(CharacterId id);
+
+    /// <summary>
+    /// Changes a character from outside its editor - a face saved from the page - as one undo
+    /// step recorded as <paramref name="source"/>'s, so undoing it brings that place back
+    /// rather than the character's editor.
+    /// </summary>
+    void EditCharacter(CharacterId id, string description, Func<CharacterDefinition, CharacterDefinition> edit, object? source);
+
+    /// <summary>
+    /// Opens one of a character's stickers - its <paramref name="variant"/> seen from
+    /// <paramref name="view"/> - in the user's SVG editor; every save there comes back as one
+    /// undo step, <paramref name="source"/>'s. Returns what to tell the user.
+    /// </summary>
+    string DrawVariant(CharacterId id, StickerId sticker, string variant, ViewAngle view, object? source);
 }

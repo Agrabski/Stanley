@@ -15,6 +15,7 @@ namespace Stanley.ProjectModel.Characters;
 /// <param name="ColorSlots">Named colours the user picked; <see cref="SkinSlot"/> fills the body. A slot the character hasn't set falls back to its stickers' defaults.</param>
 /// <param name="Stickers">Slot -&gt; the stickers worn by default, bottom to top (ids in <see cref="Wardrobe"/>).</param>
 /// <param name="Fabrics">Colour slot -&gt; pattern/texture on top of its colour; absent when there are none.</param>
+/// <param name="Expressions">Faces saved to use again in any panel, in the order they were saved; absent when there are none.</param>
 public sealed record CharacterDefinition(
     CharacterId Id,
     string Name,
@@ -22,7 +23,8 @@ public sealed record CharacterDefinition(
     Skeleton Skeleton,
     SortedDictionary<string, ColorValue> ColorSlots,
     SortedDictionary<string, IReadOnlyList<StickerId>> Stickers,
-    SortedDictionary<string, Fabric>? Fabrics = null)
+    SortedDictionary<string, Fabric>? Fabrics = null,
+    IReadOnlyList<SavedExpression>? Expressions = null)
 {
     /// <summary>
     /// The character's stickers (worn or not) and pattern tiles, loaded from its folder -

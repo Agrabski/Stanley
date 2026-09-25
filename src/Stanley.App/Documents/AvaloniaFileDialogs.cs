@@ -14,6 +14,18 @@ public sealed class AvaloniaFileDialogs(Window owner) : IFileDialogs
         return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
     }
 
+    public async Task<string?> PickSaveLocationAsync(string title, string suggestedName)
+    {
+        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggestedName,
+            // A comic is a folder, and a name that's taken gets "(2)" rather than replacing anything - nothing to confirm.
+            ShowOverwritePrompt = false
+        });
+        return file?.TryGetLocalPath();
+    }
+
     public async Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName)
     {
         var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions

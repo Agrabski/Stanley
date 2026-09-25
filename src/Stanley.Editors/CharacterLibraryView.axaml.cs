@@ -15,6 +15,13 @@ public partial class CharacterLibraryView : UserControl
     private Point _pressPoint;
     private bool _dragging;
 
+    // The character the last click opened, which a second click of the same burst puts on the page.
+    private CharacterItem? _clickedItem;
+    // The character a double-click just put on the page (a third click of the burst leaves it there),
+    // and the press that did it - the handler sees each press on the way down and again on the way up.
+    private CharacterItem? _placedItem;
+    private PointerPressedEventArgs? _placedBy;
+
     public CharacterLibraryView()
     {
         InitializeComponent();
@@ -34,9 +41,29 @@ public partial class CharacterLibraryView : UserControl
 
     private void OnListPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(CharacterList).Properties.IsLeftButtonPressed)
+        if (!e.GetCurrentPoint(CharacterList).Properties.IsLeftButtonPressed || ReferenceEquals(e, _placedBy))
             return;
-        _pressedItem = ItemFrom(e.Source);
+        var item = ItemFrom(e.Source);
+        // A double-click puts the character on the page. Its first click opened the
+        // character already; placing it goes back to the page. Handled here, on the way
+        // down, so the list doesn't take the focus the page gets.
+        if (e.ClickCount >= 2 && item != null && (ReferenceEquals(item, _clickedItem) || ReferenceEquals(item, _placedItem)) && ViewModel is { } vm)
+        {
+            _placedBy = e;
+            _pressedItem = null;
+            _pressArgs = null;
+            _clickedItem = null;
+            if (!ReferenceEquals(item, _placedItem))
+            {
+                _placedItem = item;
+                vm.PlaceOnPage(item);
+            }
+            ShowCurrentSelection();
+            e.Handled = true;
+            return;
+        }
+        _placedItem = null;
+        _pressedItem = item;
         _pressArgs = e;
         _pressPoint = e.GetPosition(CharacterList);
         _dragging = false;
@@ -51,6 +78,7 @@ public partial class CharacterLibraryView : UserControl
             return;
 
         _dragging = true;
+        _clickedItem = null;
         var data = new DataTransfer();
         data.Add(DataTransferItem.Create(CharacterDrag.Format, item.Id.Value));
         try
@@ -71,7 +99,10 @@ public partial class CharacterLibraryView : UserControl
         // A click - press and release on the same character without dragging - opens it
         // (the one already current too, e.g. after going back to the page).
         if (!_dragging && _pressedItem is { } item && ViewModel is { } vm && ItemFrom(e.Source) == item)
+        {
+            _clickedItem = item;
             vm.Show(item);
+        }
         _pressedItem = null;
         _pressArgs = null;
         ShowCurrentSelection();

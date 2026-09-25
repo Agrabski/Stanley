@@ -146,6 +146,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         InitializeElementCommands();
         InitializeTitlePageCommands();
         InitializeFieldCommands();
+        InitializeFaceCommands();
     }
 
     // ---------------------------------------------------------------- ribbon commands
@@ -194,8 +195,28 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Raised for zoom/fit requests; the pane's view owns the transform and applies them.</summary>
     public event Action<ViewportRequest>? ViewportRequested;
 
-    /// <summary>Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>).</summary>
-    public void FocusPage() => ViewportRequested?.Invoke(ViewportRequest.FocusPage);
+    /// <summary>
+    /// Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>). If
+    /// no view is showing the page just now - it's only just been switched back to - the
+    /// view that shows it next takes the keyboard (<see cref="TakeFocusRequest"/>).
+    /// </summary>
+    public void FocusPage()
+    {
+        if (ViewportRequested is { } requested)
+            requested(ViewportRequest.FocusPage);
+        else
+            _focusWhenShown = true;
+    }
+
+    private bool _focusWhenShown;
+
+    /// <summary>Whether a <see cref="FocusPage"/> is waiting for a view to show this page; asking clears it.</summary>
+    public bool TakeFocusRequest()
+    {
+        var wanted = _focusWhenShown;
+        _focusWhenShown = false;
+        return wanted;
+    }
 
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;
@@ -244,6 +265,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     private void NotifyCommands()
     {
         DeleteSelectionCommand.NotifyCanExecuteChanged();
+        SaveFaceCommand?.NotifyCanExecuteChanged(); // null while the constructor is still setting up
         SplitColumnsCommand.NotifyCanExecuteChanged();
         SplitRowsCommand.NotifyCanExecuteChanged();
         ApplyLayoutCommand.NotifyCanExecuteChanged();
@@ -285,6 +307,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             OnPropertyChanged(nameof(IsPanTool));
             OnPropertyChanged(nameof(ShowBubbleStyle));
             RaiseToolFlagsChanged();
+            _notice = null;
             OnPropertyChanged(nameof(Hint));
         }
     }
@@ -597,6 +620,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         _selectedBubbleIndex = bubbleIndex;
         _selectedCharacterIndex = characterIndex;
         _selectedElementIndex = elementIndex;
+        _notice = null;
         RaiseSelectionChanged();
     }
 
@@ -697,7 +721,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     // ---------------------------------------------------------------- status
 
     /// <summary>A one-line "what can I do here" for the status bar, so nothing depends on having read a manual.</summary>
-    public string Hint => Tool switch
+    public string Hint => _notice ?? Tool switch
     {
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
@@ -1265,7 +1289,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(HasCharacterChoices));
         OnPropertyChanged(nameof(SelectedCharacterName));
         OnPropertyChanged(nameof(PoseChoices));
-        OnPropertyChanged(nameof(ExpressionChoices));
+        RaiseFaceChoicesChanged();
         RaiseLookChoicesChanged();
         NotifyCommands();
     }
@@ -1585,6 +1609,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(SelectedLookName));
         OnPropertyChanged(nameof(PanelLookChoices));
         OnPropertyChanged(nameof(IssueLookChoices));
+        RaiseFaceChoicesChanged(); // another look can mean another face to mix from
     }
 
     /// <summary>Gives the character <paramref name="preset"/>'s face, in one undo step. The pose is untouched.</summary>
@@ -1598,12 +1623,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         RaiseCharacterViewChanged();
     }
 
-    /// <summary>The Character tab's expression gallery: every preset, as a close-up of the selected character.</summary>
+    /// <summary>The Character tab's expression gallery: every preset, as a close-up of the selected character (dressed as this panel shows it).</summary>
     public IReadOnlyList<ExpressionPresetChoice> ExpressionChoices
     {
         get
         {
-            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+            if (SelectedCharacter is not { } instance || SelectedPanelView is not { } character)
                 return [];
             var current = ExpressionPresets.Of(instance.Pose);
             var standing = new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>());
@@ -1613,8 +1638,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         }
     }
 
-    /// <summary>The selected character's expression, for the gallery button: a preset's name, or "Custom" for a mix.</summary>
-    public string SelectedExpressionName => SelectedCharacter is { } instance ? ExpressionPresets.Of(instance.Pose)?.Name ?? "Custom" : "";
+    /// <summary>The selected character's expression, for the gallery button: a preset's name, a saved face's, or "Custom" for a mix.</summary>
+    public string SelectedExpressionName => SelectedCharacter is { } instance
+        ? ExpressionPresets.Of(instance.Pose)?.Name ?? (SelectedCharacterDefinition is { } character ? SavedFaces.Of(character, instance.Pose)?.Name : null) ?? "Custom"
+        : "";
 
     public IRelayCommand<ExpressionPresetChoice> ApplyExpressionCommand { get; }
 
@@ -1690,8 +1717,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         if (expressionKey != _expressionChoicesKey)
         {
             _expressionChoicesKey = expressionKey;
-            OnPropertyChanged(nameof(ExpressionChoices));
-            OnPropertyChanged(nameof(SelectedExpressionName));
+            RaiseFaceChoicesChanged();
         }
         OnPropertyChanged(nameof(SelectedCharacterView));
         OnPropertyChanged(nameof(IsSelectedCharacterFront));

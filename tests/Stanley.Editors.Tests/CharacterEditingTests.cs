@@ -175,6 +175,157 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Mixing_your_own_expression_sets_one_face_slot_at_a_time_each_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+
+        var mixer = page.ExpressionMixer;
+        Assert.Equal(["Eyes", "Brows", "Mouth"], mixer.Select(r => r.Label));
+        Assert.Equal("happy", mixer[0].Choices.Single(c => c.IsCurrent).Variant);
+        var open = mixer[2].Choices.Single(c => c.Variant == "open");
+        Assert.Equal("happy", open.Pose.Expression[StickerSlots.Eyes]); // previewed with the rest of the face as it is
+        page.SetExpressionVariantCommand.Execute(open);
+
+        var face = page.Working.Panels[left].CharacterInstances[0].Pose.Expression;
+        Assert.Equal("happy", face[StickerSlots.Eyes]);
+        Assert.Equal("open", face[StickerSlots.Mouth]);
+        Assert.Equal("Custom", page.SelectedExpressionName);
+        Assert.True(page.ExpressionMixer[2].Choices.Single(c => c.Variant == "open").IsCurrent);
+        Assert.DoesNotContain(page.ExpressionChoices, c => c.IsCurrent);
+
+        session.Workspace.History.Undo();
+        Assert.Equal("Happy", page.SelectedExpressionName);
+    }
+
+    [Fact]
+    public void A_face_saved_on_the_page_is_the_characters_to_use_in_any_panel_and_undoes_as_a_page_step()
+    {
+        var (session, page, left, right) = NewSession();
+        var item = Add(session, "Pip");
+        page.InsertCharacter(item.Id, right);
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+        page.SetExpressionVariantCommand.Execute(page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).Choices.Single(c => c.Variant == "open"));
+        Assert.False(page.HasSavedFaces);
+        Assert.False(page.SaveFaceCommand.CanExecute(null)); // nothing to call it yet
+
+        page.NewFaceName = "Grinning";
+        page.SaveFaceCommand.Execute(null);
+
+        Assert.Equal("", page.NewFaceName);
+        var face = Assert.Single(item.Editor.Committed.Expressions!);
+        Assert.Equal(("happy", "open"), (face.Variants[StickerSlots.Eyes], face.Variants[StickerSlots.Mouth]));
+        Assert.Equal("Grinning", page.SelectedExpressionName);
+        Assert.Equal("Pip's faces", page.SavedFacesTitle);
+        Assert.True(Assert.Single(page.SavedFaceChoices).IsCurrent);
+
+        // Another panel: one click.
+        page.SelectCharacter(right, 0);
+        Assert.Equal("Neutral", page.SelectedExpressionName);
+        page.SavedFaceChoices.Single().Apply.Execute(null);
+        Assert.Equal("open", page.Working.Panels[right].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Equal("Grinning", page.SelectedExpressionName);
+
+        var saved = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());
+        Assert.Equal("Grinning", Assert.Single(ComicProject.Open(saved).Characters.Single().Expressions!).Name);
+
+        // Deleting it leaves the panels their faces.
+        page.SavedFaceChoices.Single().Delete.Execute(null);
+        Assert.Null(item.Editor.Committed.Expressions);
+        Assert.Equal("Custom", page.SelectedExpressionName);
+
+        session.Workspace.History.Undo(); // the delete
+        session.Workspace.History.Undo(); // the face on the right
+        session.Workspace.History.Undo(); // saving it
+        Assert.Null(item.Editor.Committed.Expressions);
+        Assert.Same(page, session.Workspace.ActiveEditor); // undone on the page, not in the character's editor
+    }
+
+    [Fact]
+    public void A_new_expression_drawn_from_the_page_starts_as_the_one_shown_is_worn_and_each_save_comes_back()
+    {
+        var (session, page, left, _) = NewSession();
+        var art = new FakeArtEditing();
+        session.Characters.ArtEditing = art;
+        var item = Add(session, "Pip");
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+        var mouthRow = page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth);
+        Assert.True(mouthRow.CanDraw);
+
+        mouthRow.DrawNew.Execute(null);
+
+        var mouth = item.Editor.Committed.Wardrobe.Stickers.Values.Single(a => a.Sticker.Slot == StickerSlots.Mouth);
+        Assert.Equal("myMouth", mouth.Sticker.Variants[^1]);
+        Assert.Equal(mouth.Files["variants/smile/front.svg"].Text, mouth.Files["variants/myMouth/front.svg"].Text);
+        Assert.Equal("myMouth", page.Working.Panels[left].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Equal("My mouth", page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).Choices.Single(c => c.IsCurrent).Name);
+        var (_, text, save) = Assert.Single(art.Opened);
+        Assert.Equal(mouth.Files["variants/myMouth/front.svg"].Text, text);
+        Assert.Contains("/drawing/", page.Hint);
+
+        var redrawn = text.Replace("</svg>", "<!-- mine --></svg>");
+        save(redrawn);
+        Assert.Equal(redrawn, item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Files["variants/myMouth/front.svg"].Text);
+        Assert.Same(page, session.Workspace.ActiveEditor);
+
+        session.Workspace.History.Undo(); // the save
+        Assert.Equal(text, item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Files["variants/myMouth/front.svg"].Text);
+        session.Workspace.History.Undo(); // the new mouth and wearing it: one step
+        Assert.DoesNotContain("myMouth", item.Editor.Committed.Wardrobe.Find(mouth.Id)!.Sticker.Variants);
+        Assert.Equal("smile", page.Working.Panels[left].CharacterInstances[0].Pose.Expression[StickerSlots.Mouth]);
+        Assert.Same(page, session.Workspace.ActiveEditor);
+
+        // The pen redraws the one shown.
+        page.ExpressionMixer.Single(r => r.Slot == StickerSlots.Mouth).EditDrawing.Execute(null);
+        Assert.Equal(mouth.Files["variants/smile/front.svg"].Text, art.Opened[^1].Text);
+    }
+
+    [Fact]
+    public void Placing_a_character_from_the_pane_puts_it_on_the_page_and_closes_the_tab_the_first_click_opened()
+    {
+        var (session, page, _, _) = NewSession();
+        var item = Add(session, "A");
+        session.Characters.Show(item); // a double-click's first click opens it
+        Assert.Same(item.Editor, session.Workspace.ActiveEditor);
+
+        session.Characters.PlaceOnPage(item);
+
+        Assert.Same(page, session.Workspace.ActiveEditor);
+        Assert.Null(session.Characters.Current);
+        Assert.DoesNotContain(item.Editor, Dockables(session));
+        var placed = Assert.Single(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+        Assert.Equal(item.Id, placed.CharacterId);
+        Assert.True(page.IsCharacterContext);
+
+        // Another character's tab, open in the background, stays open.
+        var other = Add(session, "B");
+        session.Characters.Show(other);
+        session.Characters.ReturnToPage();
+        session.Characters.Show(item);
+        session.Characters.Show(other);
+        session.Characters.PlaceOnPage(other);
+        Assert.Contains(item.Editor, Dockables(session));
+        Assert.DoesNotContain(other.Editor, Dockables(session));
+    }
+
+    private static IEnumerable<IDockable> Dockables(EditorSession session)
+    {
+        var pending = new Stack<IDockable>([session.Workspace.Layout]);
+        while (pending.Count > 0)
+        {
+            var next = pending.Pop();
+            yield return next;
+            if (next is IDock { VisibleDockables: { } children })
+                foreach (var child in children)
+                    pending.Push(child);
+        }
+    }
+
+    [Fact]
     public void The_character_editor_previews_an_expression_without_an_undo_step_and_says_what_a_face_lacks()
     {
         var (session, _, _, _) = NewSession();

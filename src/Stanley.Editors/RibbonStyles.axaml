@@ -476,4 +476,20 @@
     <Setter Property="Width" Value="72" />
     <Setter Property="Height" Value="80" />
   </Style>
+  <!-- The expression gallery's tiny draw buttons (+, pen) under a mix-your-own row's name. -->
+  <Style Selector=":is(Button).small.faceDraw">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="MinWidth" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector=":is(Button).small.faceDraw PathIcon">
+    <Setter Property="Width" Value="11" />
+    <Setter Property="Height" Value="11" />
+  </Style>
+  <!-- A smaller close-up, for a row of eyes, brows or mouths in the expression gallery's "mix your own". -->
+  <Style Selector=":is(Button).small.choice.sticker.closeup.mini">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="56" />
+  </Style>
 </Styles>

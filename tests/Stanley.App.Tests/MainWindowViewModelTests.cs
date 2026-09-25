@@ -14,6 +14,16 @@ public sealed class FakeFileDialogs : IFileDialogs
 
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(Folders.Count > 0 ? Folders.Dequeue() : null);
 
+    /// <summary>The names Save As offered in its name box.</summary>
+    public List<string> SuggestedNames { get; } = [];
+
+    /// <summary>Answers with the next of <see cref="Folders"/>: the place and the name typed, as one path.</summary>
+    public Task<string?> PickSaveLocationAsync(string title, string suggestedName)
+    {
+        SuggestedNames.Add(suggestedName);
+        return PickFolderAsync(title);
+    }
+
     public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) =>
         Task.FromResult(ExportPath);
 
@@ -74,6 +84,74 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(folder, vm.Project!.Location);
         Assert.Equal("Comic - Stanley", vm.WindowTitle);
         Assert.Equal(folder, Assert.Single(_recent.Paths));
+    }
+
+    [Fact]
+    public async Task SavingANewComic_AsksForItsName_AndTheNameTypedBecomesItsTitle()
+    {
+        var vm = NewViewModel();
+        MakeAnEdit(vm);
+
+        var folder = Path.Combine(_root, "Kot Filemon");
+        _dialogs.Folders.Enqueue(folder); // the place picked, and the name typed over the suggestion
+        Assert.True(await vm.SaveAsync());
+
+        Assert.Equal(["Untitled comic"], _dialogs.SuggestedNames);
+        Assert.Equal(folder, vm.Project!.Location);
+        Assert.Equal("Kot Filemon", vm.DocumentTitle);
+        Assert.Equal("Kot Filemon - saved", vm.DocumentCaption);
+        Assert.Equal(new Stanley.ProjectModel.Issues.TextFields("Kot Filemon", "1"), vm.Editor!.Fields);
+        Assert.Equal("Kot Filemon", Stanley.Editors.ComicProject.Open(folder).Title);
+    }
+
+    [Fact]
+    public async Task SavingUnderANameThatsTaken_SavesBesideIt_AndLeavesWhatsThereAlone()
+    {
+        var taken = Path.Combine(_root, "Comic");
+        Directory.CreateDirectory(taken);
+        File.WriteAllText(Path.Combine(taken, "notes.txt"), "mine");
+        var vm = NewViewModel();
+
+        _dialogs.Folders.Enqueue(taken);
+        Assert.True(await vm.SaveAsync());
+
+        Assert.Equal(Path.Combine(_root, "Comic (2)"), vm.Project!.Location);
+        Assert.Equal("Comic", vm.DocumentTitle);
+        Assert.Equal(["notes.txt"], Directory.GetFileSystemEntries(taken).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public async Task SaveAs_OfASavedComic_OffersItsTitle_AndKeepsIt()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "First"));
+        await vm.SaveAsync();
+        vm.DocumentTitle = "The Big Heist";
+
+        var copy = Path.Combine(_root, "Heist backup");
+        _dialogs.Folders.Enqueue(copy);
+        Assert.True(await vm.SaveAsAsync());
+
+        Assert.Equal("The Big Heist", _dialogs.SuggestedNames[^1]);
+        Assert.Equal(copy, vm.Project!.Location);
+        Assert.Equal("The Big Heist", vm.DocumentTitle); // it's printed on the title page - a copy's folder name doesn't change it
+    }
+
+    [Fact]
+    public async Task SaveAs_ToItsOwnFolderUnderItsOwnName_JustSaves()
+    {
+        var vm = NewViewModel();
+        var folder = Path.Combine(_root, "Comic");
+        _dialogs.Folders.Enqueue(folder);
+        await vm.SaveAsync();
+        MakeAnEdit(vm);
+
+        _dialogs.Folders.Enqueue(folder);
+        Assert.True(await vm.SaveAsAsync());
+
+        Assert.Equal(folder, vm.Project!.Location);
+        Assert.False(vm.IsDirty);
+        Assert.False(Directory.Exists(Path.Combine(_root, "Comic (2)")));
     }
 
     [Fact]
