@@ -100,6 +100,43 @@ public static class AnchorRing
             .ToList();
     }
 
+    /// <summary>A four-corner ring: straight edges, handles on their anchors.</summary>
+    public static List<ShapeAnchor> Rectangle(Rect2D b) =>
+    [
+        Corner(new Point2D(b.Left, b.Top)),
+        Corner(new Point2D(b.Right, b.Top)),
+        Corner(new Point2D(b.Right, b.Bottom)),
+        Corner(new Point2D(b.Left, b.Bottom))
+    ];
+
+    /// <summary>The ellipse filling <paramref name="b"/>: the standard 4-point cubic-bezier approximation (kappa ~= 0.5523), starting at the top and going clockwise.</summary>
+    public static List<ShapeAnchor> Ellipse(Rect2D b)
+    {
+        const double kappa = 0.5522848;
+        var rx = b.Width / 2;
+        var ry = b.Height / 2;
+        var cx = b.MidX;
+        var cy = b.MidY;
+        var ox = rx * kappa;
+        var oy = ry * kappa;
+
+        var top = new Point2D(cx, cy - ry);
+        var right = new Point2D(cx + rx, cy);
+        var bottom = new Point2D(cx, cy + ry);
+        var left = new Point2D(cx - rx, cy);
+
+        return
+        [
+            new ShapeAnchor(top, new Point2D(top.X - ox, top.Y), new Point2D(top.X + ox, top.Y), AnchorHandleKind.Smooth),
+            new ShapeAnchor(right, new Point2D(right.X, right.Y - oy), new Point2D(right.X, right.Y + oy), AnchorHandleKind.Smooth),
+            new ShapeAnchor(bottom, new Point2D(bottom.X + ox, bottom.Y), new Point2D(bottom.X - ox, bottom.Y), AnchorHandleKind.Smooth),
+            new ShapeAnchor(left, new Point2D(left.X, left.Y + oy), new Point2D(left.X, left.Y - oy), AnchorHandleKind.Smooth)
+        ];
+    }
+
+    /// <summary>An anchor with both handles on its point: the edges either side of it are straight there.</summary>
+    public static ShapeAnchor Corner(Point2D p) => new(p, p, p, AnchorHandleKind.Corner);
+
     private static double Wrap01(double t)
     {
         t %= 1.0;

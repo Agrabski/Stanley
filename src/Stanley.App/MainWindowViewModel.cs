@@ -58,6 +58,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private EditorWorkspace? _workspace;
     private PageNavigatorViewModel? _navigator;
     private CharacterLibraryViewModel? _characters;
+    private PictureLibrary? _pictures;
     private bool _titleDirty;
     private bool _isBackstageOpen;
     private BackstagePage _backstagePage = BackstagePage.New;
@@ -227,7 +228,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
             AppLog.Info($"AutoSaved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
         }
@@ -256,7 +257,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
+            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
         }
         catch (Exception e) when (IsFileProblem(e))
         {
@@ -630,7 +631,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
             AppLog.Info($"Saved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
             return true;
@@ -654,7 +655,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks);
+            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             MarkSaved();
             Message = $"Saved to {saved}";
@@ -697,9 +698,9 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks);
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks, _pictures?.Files);
             else
-                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(), issueLooks: _navigator.IssueLooks);
+                ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(), issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files);
             Message = $"Exported to {path}";
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
@@ -743,7 +744,7 @@ public sealed class MainWindowViewModel : ObservableObject
         Unload();
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
-        (_workspace, _navigator, _characters) = PageEditorHost.CreateWorkspace(project);
+        (_workspace, _navigator, _characters, _pictures) = PageEditorHost.CreateWorkspace(project);
         _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory);
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
@@ -768,6 +769,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _workspace = null;
         _navigator = null;
         _characters = null;
+        _pictures = null;
         _titleDirty = false;
         _recoveredUnsaved = false;
         _pendingAutoSave?.Dispose();

@@ -74,6 +74,31 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Saving_writes_an_imported_picture_and_reopening_draws_it_again()
+    {
+        var vm = NewViewModel();
+        var editor = vm.Editor!;
+        var panel = editor.Working.PanelOrder[0];
+        using (var bitmap = new SkiaSharp.SKBitmap(8, 4))
+        {
+            bitmap.Erase(SkiaSharp.SKColors.Orange);
+            using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            Assert.True(editor.ImportPicture(new Stanley.Editors.PictureImportRequest(panel, AsBackground: true), "sunset.png",
+                Stanley.ProjectModel.Characters.ArtFile.Png(data.ToArray())));
+        }
+        var name = ((Stanley.ProjectModel.Issues.InlineBackground)editor.Working.Panels[panel].Background!).ArtFileName;
+
+        var folder = Path.Combine(_root, "Comic");
+        _dialogs.Folders.Enqueue(folder);
+        Assert.True(await vm.SaveAsync());
+
+        Assert.Single(Directory.GetFiles(folder, name, SearchOption.AllDirectories));
+        var reopened = Stanley.Editors.ComicProject.Open(folder);
+        Assert.True(reopened.Pictures.ContainsKey(name));
+    }
+
+    [Fact]
     public async Task SaveAs_Cancelled_LeavesTheComicUntitledAndDirty()
     {
         var vm = NewViewModel();

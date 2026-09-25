@@ -14,9 +14,9 @@ namespace Stanley.Editing;
 /// is still the escape hatch for panel outlines beyond what this editor covers; it just
 /// isn't draggable through these operations.
 ///
-/// A panel's bubbles and characters belong to it: every operation here carries them along
-/// (<see cref="BubbleEditing.Refit"/>, <see cref="CharacterPlacementEditing.Refit"/>) and
-/// keeps bubbles inside the panel's new bounds.
+/// A panel's bubbles, characters and elements belong to it: every operation here carries
+/// them along (<see cref="BubbleEditing.Refit"/>, <see cref="CharacterPlacementEditing.Refit"/>,
+/// <see cref="ElementEditing.Refit"/>) and keeps bubbles inside the panel's new bounds.
 /// </summary>
 public static class PanelLayoutEditing
 {
@@ -37,7 +37,8 @@ public static class PanelLayoutEditing
         {
             Shape = PanelShapes.Rectangle(newBounds),
             CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Refit(c, oldBounds, newBounds)).ToList(),
-            Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList()
+            Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList(),
+            Elements = panel.Elements.Select(e => ElementEditing.Refit(e, oldBounds, newBounds)).ToList()
         });
     }
 
@@ -54,8 +55,10 @@ public static class PanelLayoutEditing
     /// Divides one panel into two rectangles along <paramref name="orientation"/>, at
     /// <paramref name="fraction"/> of its current bounds, leaving <paramref name="gutter"/>
     /// between them. Each bubble goes to whichever half its centre lies in (clamped inside
-    /// it), each character to the half its feet are in (staying exactly where it was on the
-    /// page); the background stays with the first half, which keeps the original id.
+    /// it), each character to the half its feet are in and each element to the half its
+    /// centre is in (both staying where they were on the page). A colour or gradient
+    /// background fills both halves; any other stays with the first, which keeps the
+    /// original id.
     /// </summary>
     public static EditResult<(Panel First, Panel Second)> Split(Panel panel, BoundaryOrientation orientation, double fraction, double gutter = 0)
     {
@@ -93,18 +96,26 @@ public static class PanelLayoutEditing
                 ? c.Placement.Ground.X >= secondBounds.Left - halfGutter
                 : c.Placement.Ground.Y >= secondBounds.Top - halfGutter;
 
+        bool ElementInSecond(PanelElement e)
+        {
+            var box = PanelElements.Bounds(e);
+            return orientation == BoundaryOrientation.Vertical ? box.MidX >= secondBounds.Left - halfGutter : box.MidY >= secondBounds.Top - halfGutter;
+        }
+
         var first = panel with
         {
             Shape = PanelShapes.Rectangle(firstBounds),
             CharacterInstances = panel.CharacterInstances.Where(c => !CharacterInSecond(c)).ToList(),
-            Bubbles = panel.Bubbles.Where(b => !InSecond(b)).Select(b => BubbleEditing.KeepInside(b, firstBounds)).ToList()
+            Bubbles = panel.Bubbles.Where(b => !InSecond(b)).Select(b => BubbleEditing.KeepInside(b, firstBounds)).ToList(),
+            Elements = panel.Elements.Where(e => !ElementInSecond(e)).Select(e => ElementEditing.KeepReachable(e, firstBounds)).ToList()
         };
         var second = new Panel(
             PanelId.New(),
             PanelShapes.Rectangle(secondBounds),
-            Background: null,
+            Background: panel.Background is ColorBackground or GradientBackground ? panel.Background : null,
             CharacterInstances: panel.CharacterInstances.Where(CharacterInSecond).ToList(),
-            Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList());
+            Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList(),
+            Elements: panel.Elements.Where(ElementInSecond).Select(e => ElementEditing.KeepReachable(e, secondBounds)).ToList());
         return EditResult<(Panel, Panel)>.Success((first, second));
     }
 

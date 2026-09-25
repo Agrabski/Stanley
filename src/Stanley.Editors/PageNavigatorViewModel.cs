@@ -51,13 +51,16 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     private PageItem _currentPage;
     private PageNumbering _pageNumbering;
     private readonly ICharacterCatalog? _characters;
+    private readonly PictureLibrary? _pictures;
 
     /// <param name="characters">What every page draws its placed characters from (the Characters pane); null for a comic edited without one.</param>
     /// <param name="issueLooks">The issue's look per character (<see cref="ComicProject.IssueLooks"/>).</param>
+    /// <param name="pictures">The comic's pictures, shared by every page; null for a comic edited without them.</param>
     public PageNavigatorViewModel(EditorHistory history, IEnumerable<ComicPage> pages, PageNumbering? pageNumbering = null, ICharacterCatalog? characters = null,
-        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, PictureLibrary? pictures = null)
     {
         _history = history;
+        _pictures = pictures;
         _issueLooks = new Dictionary<CharacterId, CharacterRevisionId>(issueLooks ?? new Dictionary<CharacterId, CharacterRevisionId>());
         _characters = characters;
         _pageNumbering = pageNumbering ?? PageNumbering.Off;
@@ -311,7 +314,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             CanFloat = false,
             NumberingHost = this,
             LooksHost = this,
-            Characters = _characters
+            Characters = _characters,
+            Pictures = _pictures
         };
         if (settingsFrom != null)
         {

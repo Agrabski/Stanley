@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Stanley.App.Commands;
 using Stanley.App.Diagnostics;
+using Stanley.Editors;
 using Velopack;
 
 namespace Stanley.App;
@@ -60,5 +61,6 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .WithLetteringFonts()
             .LogToTrace();
 }

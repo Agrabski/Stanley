@@ -260,3 +260,26 @@ public readonly record struct BubbleId : IStrongId<BubbleId>, IParsable<BubbleId
     public int CompareTo(BubbleId other) => string.CompareOrdinal(Value, other.Value);
     public override string ToString() => Value;
 }
+
+/// <summary>
+/// Identifies a drawn shape, text or picture within the one panel that embeds it
+/// (<c>Panel.Elements</c>) - stable only within that panel, the same way a
+/// <see cref="BubbleId"/> is.
+/// </summary>
+[JsonConverter(typeof(StrongIdJsonConverter<ElementId>))]
+public readonly record struct ElementId : IStrongId<ElementId>, IParsable<ElementId>, IComparable<ElementId>
+{
+    public string Value { get; }
+    private ElementId(string value) => Value = value;
+    public static ElementId New() => new(EntityIdValue.NewToken());
+    public static ElementId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static ElementId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out ElementId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new ElementId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(ElementId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}

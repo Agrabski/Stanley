@@ -45,7 +45,9 @@ pages of one issue for now — see "Documents" below). Characters exist as a
 panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
 see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
 faces, clothes, accessories — see "Stickers (implemented)" below); no
-three-quarter view yet.
+three-quarter view yet. Panels also hold **drawn shapes, free text and pictures**
+behind or in front of the characters, over a colour, gradient or picture
+**background** — see "Panel elements and backgrounds (implemented)" below.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -87,7 +89,10 @@ coverlet.collector (10.0.1). No linter is configured yet.
 
 Dependencies: **Avalonia** 12.1.3, **SkiaSharp** 4.152.1, **System.CommandLine**
 2.0.12, **CommunityToolkit.Mvvm** 8.4.2, **Dock.Avalonia** / **Dock.Model.Mvvm**
-12.1.0.6 (for dockable panes). Environment notes: on a fresh Linux container,
+12.1.0.6 (for dockable panes), **Avalonia.Controls.ColorPicker** 12.1.3 (MIT; the
+`ColorView` behind "More Colors…", its Fluent theme included from `App.axaml`),
+**Avalonia.Fonts.Inter** 12.1.3 (MIT package; the Inter font in it is SIL OFL 1.1 —
+Stanley's bundled default lettering font, see "Fonts" below). Environment notes: on a fresh Linux container,
 `apt-get install dotnet-sdk-10.0` works when `dot.net`/`builds.dotnet.microsoft.com`
 is egress-blocked (the official dotnet-install script host). SkiaSharp needs an
 explicit `SkiaSharp.NativeAssets.{Linux,macOS,Win32}` package reference per
@@ -122,8 +127,13 @@ the page editor via `PageEditorViewModel`.
   regenerates the shape from current bounds under the new preset while
   preserving tail attachment/target so they don't jump. The anchor model
   itself is the escape hatch for arbitrary hand-edited shapes later.
-- Deferred: text/lettering interactive editing (rendering exists in
-  `BubbleTextRenderer`), thought-bubble style (disjoint circle chain — breaks
+- **Lettering**: the same Font group as free text (see "Fonts" under panel
+  elements): `Bubble.FontFamily` (null = the default font), `FontSizePt` (null =
+  `Bubble.DefaultFontSizePt`, 10pt), `Bold`, `Italic`, `Align` (null = centred) — each
+  written to the file only when chosen (`LetteringFont.ApplyTo` stores defaults as
+  null; `bold`/`italic` are `WhenWritingDefault`). Letters still shrink to fit a
+  bubble too small for them.
+- Deferred: thought-bubble style (disjoint circle chain — breaks
   the single-polygon-per-tail union model), colour slots, character-bound tail
   targets, NativeAOT publish validation. See the design discussion in this
   repo's history for the full reasoning (bezier outlines, boolean-union tails,
@@ -177,6 +187,11 @@ features will read and write.
   preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
   (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
   not its own preset table entry, since bleed isn't part of a paper size).
+  **The one exception is type size: points, as in Word** (the user's call — it's
+  how everyone already sizes type). `TextStyle.FontSizePt` / `Bubble.FontSizePt`
+  store points; `FontPoints` (ProjectModel/Issues) converts, and the renderer
+  draws in millimetres (`TextStyle.FontSizeMm`, JSON-ignored). Everything else
+  — page, panels, line weights, margins — stays in millimetres.
 - **Not yet designed**: any convenience "create new project/character/issue"
   helpers beyond `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and
   NativeAOT publish validation (analyzer-clean under `IsAotCompatible`, not yet
@@ -191,7 +206,8 @@ Editing pipeline layers, bottom to top:
   framework, kept here so EditorFramework never has to reference Editing.
 - **`Stanley.Editing`**: pure editing functions over immutable document
   values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`,
-  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`).
+  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`, and for panel elements
+  `ShapeEditing`, `TextEditing`/`TextStylePresets`, `PictureEditing`, `ElementEditing`).
   Avalonia-free by design — a future `stanley` subcommand could invoke the
   same logic headlessly, with no recompilation needed.
 - **`Stanley.EditorFramework`**: `EditorHistory` (one shared undo/redo stack
@@ -217,15 +233,19 @@ Editing pipeline layers, bottom to top:
     dock factory's active/focused dockable) is the ribbon host's content, and a
     `DataTemplate` scoped to that host maps each editor view-model type to its
     ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
-    editor type adds its own tabs the same way. Page editor tabs: Home (tools,
-    bubble style, add/edit/delete), Insert (panel, speech/shout/whisper bubble),
-    Layout (inline preset gallery, margin/gutter, snap, split), View (fit/actual
-    size/zoom, margin guides), plus contextual **Panel** (blue) and **Bubble**
-    (orange) tabs visible only for that selection (`IsPanelContext` /
-    `IsBubbleContext`); like Word they aren't forced open, and if the selected one
-    disappears the ribbon falls back to Home. The ribbon only talks to its pane
-    through the view model: commands plus events for view-only work
-    (`ViewportRequested` for zoom, `TextEditRequested` for the inline text editor).
+    editor type adds its own tabs the same way. Page editor tabs: Home (tools incl.
+    Draw and Text, bubble style, Font, Shape Styles: Shape Fill / Shape Outline,
+    add/edit/delete), Insert (panel, speech/shout/whisper bubble,
+    caption/text/sound effect, shapes, picture, backgrounds, characters), Layout
+    (inline preset gallery, margin/gutter, snap, split, lock, Page numbers menu),
+    View (fit/actual size/zoom, margin guides), plus contextual **Panel** (blue), **Character** (green), **Bubble**
+    (orange), **Shape** and **Picture** (purple) and **Text** (teal) tabs visible
+    only for that selection (`IsPanelContext`, `IsBubbleContext`, `IsShapeContext`,
+    ...); like Word they aren't forced open, and if the selected one disappears
+    the ribbon falls back to Home. The ribbon only talks to its pane through the
+    view model: commands plus events for view-only work (`ViewportRequested` for
+    zoom, `TextEditRequested` / `ElementTextEditRequested` for the inline text
+    editor, `PictureImportRequested` for the picture file picker).
     Ribbon buttons are non-focusable so shortcuts keep reaching the page. Shared
     look and icon geometries: `RibbonStyles.axaml`, included from `App.axaml`.
     Group labels are pinned to the bottom (`DockPanel.group`).
@@ -248,9 +268,13 @@ Editing pipeline layers, bottom to top:
     `Issue.PageNumbering` (absent when off, so older files read unchanged). The
     navigator owns it (`IPageNumberingHost`, undoable) and sets each page
     editor's `Folio` (`PageFolios.For`: odd numbers are right-hand pages, so
-    "outer" flips sides). Changed from the Insert tab's "Page numbers" group via
-    the shown page editor's `PageNumberOption`/`PageNumberStart`/`NumberFirstPage`
-    (they write through to the host, so they apply to every page). Drawn by
+    "outer" flips sides). Changed from the Layout tab's Page numbers menu (Word's
+    Page Number menu: Top of page ▸, Bottom of page ▸, Remove page numbers, Number
+    the first page, Start at ▸ - a `MenuFlyout`; its check marks bind
+    `IsPageNumbersTopOuter`/`...BottomCenter`/`...BottomOuter` two-way, as
+    `MenuItem.IsChecked` is one-way by default) via the shown page editor's
+    `PageNumberOption`/`PageNumberStart`/`NumberFirstPage` (they write through to
+    the host, so they apply to every page). Drawn by
     `PageRenderer.DrawFolio` in the margin — on the canvas, thumbnails and
     exports alike.
   - **Pane** (`PageEditorView`): just the canvas, inline text editor, and a status
@@ -307,7 +331,9 @@ all pages of the first issue, with a blank one created on the fly for a project 
 none (e.g. straight from `stanley init`). `Save(pages)` (from
 `PageNavigatorViewModel.Snapshot()`) writes the manifest title, the issue's page
 order, every page and panel, and deletes the folders/files of pages and panels
-removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`);
+removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`); with
+the session's pictures it also writes the ones pages use into the issue's `art/`
+folder and deletes the ones a page used at the last save but none uses now;
 nothing else in the folder is touched. A page's label and trim override survive a
 save. Multi-issue navigation isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
@@ -381,13 +407,135 @@ point at a temp folder):
   Timers go through `IDelayScheduler` (`DispatcherDelayScheduler` for real; tests
   use a manual one). Shortcuts:
 Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S / F12 save as, Alt+F File view,
-Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. `Ctrl+Z`/`Ctrl+Shift+Z`
+Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. On the
+page: V select, P panel, B bubble, D draw, L line, R rectangle, E ellipse, T text,
+H pan. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
 
 The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a
 future editor or subcommand can reach `BubbleEditing`, `PanelLayoutEditing`
 etc. without pulling in Avalonia dependencies. `EditorHistory` has no such
 reuse requirement, so it's fine for it to couple to Avalonia/MVVM.
+
+## Panel elements and backgrounds (implemented)
+
+What a panel holds besides characters and bubbles. Draw order inside the panel clip:
+**background → background elements → characters → foreground elements → bubbles**.
+
+- **Model** (ProjectModel/Issues): `Panel.Elements` — an ordered list (the z-order
+  within each layer, end = front; absent in older panel files, which read as empty)
+  of `PanelElement`s, each with an `ElementId` (stable within its panel, like a
+  bubble's) and an `ElementLayer` (`Background` = behind the characters,
+  `Foreground` = in front, still under the bubbles). Kinds (JSON `kind`):
+  `ShapeElement` (the same anchor model as panels/bubbles, `Closed` or an open line,
+  `ShapeStyle` stroke/fill colours — null = none — width in mm and `LineDash`),
+  `TextElement` (`Bounds`, `Text`, `TextStyle`: size in points (`FontSizePt`), colour — null = hollow
+  letters — bold, italic, `TextAlign`, letter `Outline` and `OutlineWidthMm` — null
+  = in proportion to the letters — and the box: `BoxFill`, `BoxStroke`,
+  `BoxStrokeWidthMm`, `BoxDash` — plus `FontFamily`), `PictureElement` (`Bounds` +
+  `ArtFileName`).
+  `LineDash` is Word's Dashes (solid, round/square dot, dash, dash dot, long dash,
+  long dash dot), drawn scaled to the line's width (`LinePatterns`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
+  and `GradientBackground` (top → bottom) beside the existing `InlineBackground`
+  (a picture covering the panel). `PanelElements.Bounds` / `ArtFileNames`.
+- **Pictures on disk**: `issues/<id>/art/<hash>.<ext>` — named after the content
+  (`IssueArt.NameFor`: SHA-256 prefix, so the same picture is one file and names
+  never collide), PNG/JPEG/WebP/GIF/BMP bytes or SVG text as `ArtFile`;
+  `ProjectRepository.LoadIssueArt`/`SaveIssueArt`/`DeleteIssueArt` only accept plain
+  picture file names. `ComicProject.Pictures` holds the ones pages use; `Save`,
+  `SaveAs`, `WriteCopy` (recovery) and export take the session's pictures. In the
+  editor a session-wide `PictureLibrary` (`EditorSession.Pictures`) only ever
+  grows (undo can bring a deleted picture back); `PictureLibrary.UsedBy` is what
+  a save needs.
+- **Rendering** (`ElementRenderer`, `PictureRenderer`, `Lettering`): shapes (round
+  caps/joins on open lines), text (greedy wrap shared with bubbles through
+  `Lettering.Wrap`, shrink to fit, box padding, letter outline; bold/italic use the
+  font's real faces or fake them), pictures (decoded once per file value;
+  SVG replayed as vectors; a missing file draws a grey placeholder).
+  `PageRenderer.Draw/DrawPanels/Export*` take `pictures`; `DrawPanels` takes
+  `hideText` for the element the inline editor is showing.
+- **Editing** (Stanley.Editing): `ShapeEditing.Freehand` turns a pointer trail
+  into a shape (Ramer–Douglas–Peucker simplification at ~1 screen px, then a
+  Catmull-Rom-style curve through the points that keeps bends over 70° as
+  corners; a trail ending near its start closes and fills), plus `Line`,
+  `Rectangle`, `Ellipse` (`AnchorRing.Rectangle`/`Ellipse`), `Resize` (a flat line
+  keeps its zero height) and `SetStyle`. `TextEditing` (Word's size list and
+  its Grow/Shrink Font ladder for bigger/smaller — below 8pt a point at a time, above
+  72pt by tens up to 1638 — `GrowToFit` so typed text never has to shrink) and
+  `TextStylePresets` (Caption: boxed, left-aligned; Plain; Sound effect: big,
+  bold italic, outlined). `PictureEditing.Place` fits 80% of the panel at the
+  picture's own shape; `Resize` keeps the shape, pinned to the edges that didn't
+  move. `ElementEditing`: move, resize, layer, reorder, `KeepReachable` (may hang
+  out of the panel, never out of reach, like characters) and `Refit` (carried
+  along at its own size when the panel moves or resizes). `PanelLayoutEditing`
+  carries elements through resize/move/split; a split copies a colour/gradient
+  background into both halves.
+- **Page editor** (`PageEditorViewModel.Elements.cs`, `.Pictures.cs`): tools
+  Draw (the pen stays on), Line/Rectangle/Ellipse (Shift constrains; a click
+  places a 30×20mm one; they hand back to Select with the shape selected) and Text
+  (click or drag a box, the inline editor opens; Esc/empty removes bare text, a
+  boxed caption stays). Drawing is a live gesture — the shape is in `Working`
+  while you drag, one undo step on release. `SelectedElementIndex` joins the
+  bubble/character selection. One style control for the selection and the next
+  new element, like the bubble style (`CurrentShapeStyle`, `CurrentTextStyle`,
+  `CurrentElementLayer`); picking a drawing/text tool lets go of a selected
+  element so the ribbon shows the pen. `SetPanelBackground` is not a layout
+  change, so a locked layout allows it. The canvas hit-tests front to back:
+  foreground elements over characters, background elements under them but never
+  over a panel's draggable edge; unfilled shapes are only hit along their line.
+  Empty bare text shows a faint (unprinted) outline.
+- **Fonts**: `TextStyle.FontFamily` and `Bubble.FontFamily` name a family (null =
+  the default lettering font; absent from the file then, so older files read
+  unchanged). `Lettering` (Stanley.Rendering, Skia only) resolves it: fonts Stanley
+  ships with (`AddBundledFace`, one of them the default), then any family installed
+  on the computer (`SystemFamilies`: each font once — aliases fontconfig lists under
+  a second name, e.g. a Japanese font's Latin and Japanese names, still count as
+  installed but aren't listed twice), else the default — a comic made on another
+  computer keeps the name and comes back when the font is installed.
+  `LetteringFonts` (Stanley.Editors) installs the bundled ones: **Inter**, from the
+  Avalonia.Fonts.Inter package (every weight, read from its `avares://` assets with
+  `StandardAssetLoader`, registered as the default), for both Skia and Avalonia
+  (`AppBuilder.WithLetteringFonts()` in `Program` and the headless `TestAppBuilder`;
+  the Editors tests install it in a module initializer so the default never changes
+  mid-run), and maps a family to the Avalonia `FontFamily` the inline editor types in.
+  No comic lettering font is on NuGet, so Inter (a clean sans) is the one bundled;
+  more would be OFL/Apache fonts, in a package or embedded, never proprietary ones.
+  UI: one **Font group** control (`FontGroup.axaml`, Word's Font group), the same on
+  the Home, Bubble and Text tabs: font box, size box, A+/A−, bold, italic,
+  alignment. It shows `PageEditorViewModel.CurrentLettering` (`PageEditorViewModel.Fonts.cs`;
+  a `LetteringFont` — Stanley.Editing: family, size, bold, italic, alignment, with
+  `Of`/`ApplyTo` for bubbles and `TextStyle`s): the selected bubble's or text's, else
+  what's added next (the next text's while the Text tool is on). Every change goes
+  through `SetLettering` — the selection, one undo step, and it becomes what new
+  ones get; with nothing selected it sets the next bubble *and* the next text.
+  The font box (`ComboBox.fontBox`) shows each name in its own face, Stanley's own
+  fonts first. Picking the default stores null; a text preset (Caption, …) keeps
+  the font. A font the computer lacks leaves the box empty with "<name> (missing)"
+  as its placeholder and a tooltip saying so.
+  Beside it, Word's font size box (`FontSizeBox`, code-only like
+  `ColorMenuButton`): the size in points as editable text plus an arrow listing
+  Word's sizes, `TextEditing.SizeSteps` (8–72, the current one ticked); type any
+  size and press Enter or click away (`TextEditing.ParseSize`: "12", "10,5" or
+  "12 pt", rounded to the half point, 1–1638 as in Word; "5 mm" is turned into
+  points) — Esc cancels, a bad entry puts the real size back and says why in the status
+  bar. Picking or entering a size hands the keyboard back to the page
+  (`PageEditorViewModel.FocusPage` → `ViewportRequest.FocusPage`), so shortcuts work
+  again.
+- **Colour controls, as in Word** (`ColorMenus.cs`): `ColorMenuButton` is Word's
+  Shape Fill / Shape Outline / Text Fill / Text Outline — a small split button, its
+  icon over a bar in the last colour picked (the face applies it again), the arrow
+  opening `ColorMenu`: Theme Colors (the Office theme's ten, then five rows of
+  lighter/darker shades worked out in HSL like Word's), Standard Colors, Recent
+  Colors (custom picks this session), No Fill / No Outline, More … Colors… (a
+  `ColorView` flyout), and for outlines Weight ▸ (0.1–5 mm) and Dashes ▸; the
+  selection's colour is highlighted, its weight/dash checked. A `MenuFlyout` keeps
+  showing the items it first opened with, so `ColorMenu` is built when the button's
+  commands are bound and only `Update`d on opening. Shapes: Shape Fill / Shape
+  Outline (Home › Shape Styles and the Shape tab); text: Shape Fill / Shape
+  Outline for its box and Text Fill / Text Outline for its letters (Text tab).
+  The canvas's right-click menu uses the same `ColorMenus.Items`. Palettes live in
+  `DrawingPalette` (also the weights, dashes and the `BackgroundPicker`'s paper +
+  13 colours + 7 gradient skies).
 
 ## Command-line interface (implemented)
 
@@ -766,7 +914,9 @@ needed — check this first on a release/nightly `403`); branch protection on
 The project is **AGPL-3.0**. Check the licence of every dependency before adding
 it — including its transitive dependencies (e.g. Svg.Skia is MIT but sits on
 MS-PL SVG.NET code, which the FSF lists as GPL-incompatible; VectSharp.SVG,
-LGPL-3.0, is the chosen SVG reader instead). The starter sticker/pattern library's
+LGPL-3.0, is the chosen SVG reader instead) — and of every bundled *font*: SIL OFL
+1.1 or Apache-2.0 fonts may ship alongside AGPL code, as Inter does; fonts free
+only for personal use, like many comic lettering fonts, may not. The starter sticker/pattern library's
 *art* is **CC0-1.0**, not AGPL, so comics made with it carry no obligations —
 only add original or already-CC0 art to it. Some character-animation runtimes
 need proprietary or per-user licences (for example the Spine runtimes and the

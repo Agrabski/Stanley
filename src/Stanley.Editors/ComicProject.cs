@@ -37,13 +37,19 @@ public sealed class ComicProject
     private Dictionary<PageId, HashSet<PanelId>> _savedPanels;
     // Characters on disk as of the last open/save, so a save can delete removed ones.
     private HashSet<CharacterId> _savedCharacters;
+    // Pictures in the issue's art folder the pages used as of the last open/save, so a save
+    // can delete the ones no page uses any more (and never touches other files there).
+    private HashSet<string> _savedPictures;
 
     private ComicProject(string? location, string title, PageTrim trim, Issue issue, IReadOnlyList<ComicPage> pages,
         Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels,
-        IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters)
+        IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
+        IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures)
     {
         Characters = characters;
         _savedCharacters = savedCharacters;
+        Pictures = pictures;
+        _savedPictures = savedPictures;
         Location = location;
         Title = title;
         Trim = trim;
@@ -72,6 +78,9 @@ public sealed class ComicProject
     /// <summary>The project's characters as they were opened, sorted by name.</summary>
     public IReadOnlyList<CharacterDefinition> Characters { get; }
 
+    /// <summary>The pictures the pages use (background pictures, picture elements) as they were opened, by art file name. One a page names but that isn't on disk is missing here and draws as a placeholder.</summary>
+    public IReadOnlyDictionary<string, ArtFile> Pictures { get; }
+
     /// <summary>The issue's printed page numbers, as opened.</summary>
     public PageNumbering PageNumbering => _issue.PageNumbering ?? PageNumbering.Off;
 
@@ -83,7 +92,7 @@ public sealed class ComicProject
     {
         var issue = NewIssue();
         var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
-        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], [], [], []);
+        return new ComicProject(null, UntitledTitle, trim, issue, [page], [], [], [], [], NoPictures, []);
     }
 
     public static ComicProject CreateNew(MetricPaperSize paper = MetricPaperSize.A4, PanelLayoutPreset? layout = null) =>
@@ -115,8 +124,17 @@ public sealed class ComicProject
             pages.Add(NewPage(manifest.DefaultPageTrim));
 
         var characters = repository.ListCharacters();
+        var pictures = new Dictionary<string, ArtFile>(StringComparer.Ordinal);
+        if (manifest.IssueIds.Contains(issue.Id))
+        {
+            foreach (var name in pages.SelectMany(p => p.Document.Panels.Values).SelectMany(PanelElements.ArtFileNames).Distinct())
+            {
+                if (repository.LoadIssueArt(issue.Id, name) is { } file)
+                    pictures[name] = file;
+            }
+        }
         return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, issue, pages, records, saved,
-            characters, [.. characters.Select(c => c.Id)]);
+            characters, [.. characters.Select(c => c.Id)], pictures, [.. pictures.Keys]);
     }
 
     /// <summary>A blank page at the project's size: one panel filling the live area.</summary>
@@ -130,8 +148,10 @@ public sealed class ComicProject
     /// removed since; without, leaves the characters on disk alone.
     /// </summary>
     /// <param name="issueLooks">The issue's look per character; null leaves the issue's as it was.</param>
+    /// <param name="pictures">The comic's pictures by art file name: the ones the pages use are written to the issue's art folder, and ones a page used at the last save but none uses now are deleted. Null leaves the art folder alone.</param>
     public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -141,6 +161,8 @@ public sealed class ComicProject
             : ProjectRepository.Initialize(Location, Title, Trim);
 
         (_issue, _pageRecords, _savedPanels) = WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: true);
+        if (pictures != null)
+            _savedPictures = WritePictures(repository, pages, pictures, prune: true);
         if (characters != null)
             _savedCharacters = WriteCharacters(repository, Tidied(characters, pages), prune: true);
     }
@@ -184,10 +206,12 @@ public sealed class ComicProject
     /// can line it back up with the original folder.
     /// </summary>
     public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim);
         WritePages(repository, pages, pageNumbering ?? PageNumbering, issueLooks, prune: false);
+        WritePictures(repository, pages, pictures ?? Pictures, prune: false);
         WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
     }
 
@@ -204,9 +228,9 @@ public sealed class ComicProject
         {
             var original = Open(originalLocation);
             return new ComicProject(original.Location, copy.Title, original.Trim, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
-                copy.Characters, original._savedCharacters);
+                copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], [], copy.Characters, []);
+        return new ComicProject(null, copy.Title, copy.Trim, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
@@ -259,6 +283,29 @@ public sealed class ComicProject
     }
 
     /// <summary>
+    /// Writes the pictures <paramref name="pages"/> use into the issue's art folder (a file
+    /// already holding the same content is left alone) and, with <paramref name="prune"/>,
+    /// deletes the ones used at the last save that no page uses now. Returns the names in use.
+    /// </summary>
+    private HashSet<string> WritePictures(ProjectRepository repository, IReadOnlyList<(PageId Id, PageDocument Document)> pages,
+        IReadOnlyDictionary<string, ArtFile> pictures, bool prune)
+    {
+        var used = pages.SelectMany(p => p.Document.Panels.Values).SelectMany(PanelElements.ArtFileNames)
+            .Where(IssueArt.IsValidName).ToHashSet(StringComparer.Ordinal);
+        foreach (var name in used)
+        {
+            if (pictures.TryGetValue(name, out var file))
+                repository.SaveIssueArt(_issue.Id, name, file);
+        }
+        if (prune)
+        {
+            foreach (var removed in _savedPictures.Except(used))
+                repository.DeleteIssueArt(_issue.Id, removed);
+        }
+        return used;
+    }
+
+    /// <summary>
     /// Saves to a new location and makes it this comic's home, like Word's Save As. If
     /// <paramref name="folder"/> isn't empty the project goes into a new subfolder named
     /// after the title instead, so Save As never mixes files into (or overwrites) an
@@ -267,7 +314,8 @@ public sealed class ComicProject
     /// Returns the folder actually saved to.
     /// </summary>
     public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
-        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
@@ -280,28 +328,32 @@ public sealed class ComicProject
             CopyProject(source, target);
 
         Location = target;
-        Save(pages, pageNumbering, characters, issueLooks);
+        Save(pages, pageNumbering, characters, issueLooks, pictures);
         return target;
     }
 
     /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
     public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks);
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks, pictures);
     }
 
     /// <summary>One page as a PNG.</summary>
     public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null,
-        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null)
+        IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
+        IReadOnlyDictionary<string, ArtFile>? pictures = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks);
+        PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks, pictures);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>
         document.PanelOrder.Where(document.Panels.ContainsKey).Select(id => document.Panels[id]).ToList();
+
+    private static readonly IReadOnlyDictionary<string, ArtFile> NoPictures = new Dictionary<string, ArtFile>();
 
     private static Issue NewIssue() => new(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
 

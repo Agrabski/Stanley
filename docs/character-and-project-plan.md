@@ -263,6 +263,12 @@ MyComic/
   reference — no shared scene graph spanning panels.
 
 ### Backgrounds
+- *Built so far* (see "Panel elements and backgrounds" in `CLAUDE.md`): the inline
+  tier - a panel's own colour, gradient or picture background - plus per-panel
+  shapes, text and pictures in a back layer (behind the characters) and a front
+  layer (in front of them, under the bubbles), which is this section's back/front
+  split at panel level. The library tier (`backgrounds/`, `props/`, revisions,
+  crops) isn't built yet.
 - Two tiers, same as before: an **inline** background (a panel points
   straight at one image, no library entry — the default/simple path) or a
   **library entry** under `backgrounds/` for recurring locations, referenced
@@ -294,7 +300,10 @@ MyComic/
   character to editable layers.
 
 ### Open questions (ask the user before deciding)
-- Lettering/text rendering (deferred, same as the bubble POC).
+- Lettering fonts beyond what's built: bubble and free text can use any installed font
+  or the bundled default (Inter); a comic-style lettering font to bundle (OFL, none is
+  on NuGet), and carrying fonts with a project so it looks the same on a computer that
+  lacks them, are still open.
 - Export/print output pipeline.
 - Whether an "extract inline background to a reusable library entry" action
   is worth building, or manual promotion (copy the file, add

@@ -18,7 +18,16 @@ public enum PageEditorTool
     Select,
     Panel,
     Bubble,
-    Pan
+    Pan,
+
+    /// <summary>Freehand pen: every drag draws a stroke; the tool stays on for the next one.</summary>
+    Draw,
+    Line,
+    Rectangle,
+    Ellipse,
+
+    /// <summary>Click in a panel to type text there, or drag to size its box.</summary>
+    Text
 }
 
 /// <summary>View changes the ribbon can ask for; the view that owns the zoom transform carries them out.</summary>
@@ -27,10 +36,13 @@ public enum ViewportRequest
     ZoomIn,
     ZoomOut,
     FitPage,
-    ActualSize
+    ActualSize,
+
+    /// <summary>Give the keyboard back to the page - after typing into a ribbon box, so shortcuts reach the page again.</summary>
+    FocusPage
 }
 
-public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
+public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 {
     /// <summary>Default size for a bubble created with a single click, in mm - roughly two short lines of lettering.</summary>
     public const double DefaultBubbleWidthMm = 42;
@@ -59,17 +71,23 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageBounds = pageBounds;
         PropertyChanged += OnSelfPropertyChanged;
 
-        DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelectedBubble || HasSelectedCharacter || (HasSelectedPanel && !Working.LayoutLocked));
+        DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement || (HasSelectedPanel && !Working.LayoutLocked));
         SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel && !Working.LayoutLocked);
         SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel && !Working.LayoutLocked);
         AddBubbleCommand = new RelayCommand(AddBubbleToSelectedPanel, () => Working.PanelOrder.Count > 0);
-        EditTextCommand = new RelayCommand(() => RequestTextEdit(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
+        EditTextCommand = new RelayCommand(() =>
+        {
+            if (HasSelectedBubble)
+                RequestTextEdit(_selectedPanelId!.Value, _selectedBubbleIndex);
+            else
+                RequestElementTextEdit(_selectedPanelId!.Value, _selectedElementIndex);
+        }, () => HasSelectedBubble || HasSelectedText);
         AddTailCommand = new RelayCommand(() => AddBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
         RemoveTailCommand = new RelayCommand(
             () => RemoveBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex, SelectedBubble!.Tails.Count - 1),
             () => SelectedBubbleHasTails);
-        BringToFrontCommand = new RelayCommand(() => ReorderSelection(toFront: true), () => HasSelectedBubble || HasSelectedCharacter);
-        SendToBackCommand = new RelayCommand(() => ReorderSelection(toFront: false), () => HasSelectedBubble || HasSelectedCharacter);
+        BringToFrontCommand = new RelayCommand(() => ReorderSelection(toFront: true), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
+        SendToBackCommand = new RelayCommand(() => ReorderSelection(toFront: false), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
         InsertCharacterCommand = new RelayCommand<CharacterDefinition>(character =>
         {
             if (character != null)
@@ -123,6 +141,9 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         ZoomOutCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomOut));
         FitPageCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.FitPage));
         ActualSizeCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ActualSize));
+        RemovePageNumbersCommand = new RelayCommand(() => _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = PageNumberPosition.None }),
+            () => PageNumbersEnabled);
+        InitializeElementCommands();
     }
 
     // ---------------------------------------------------------------- ribbon commands
@@ -170,6 +191,9 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     /// <summary>Raised for zoom/fit requests; the pane's view owns the transform and applies them.</summary>
     public event Action<ViewportRequest>? ViewportRequested;
+
+    /// <summary>Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>).</summary>
+    public void FocusPage() => ViewportRequested?.Invoke(ViewportRequest.FocusPage);
 
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;
@@ -235,6 +259,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         SmallerCharacterCommand.NotifyCanExecuteChanged();
         MatchCharacterSizeCommand.NotifyCanExecuteChanged();
         EditCharacterCommand.NotifyCanExecuteChanged();
+        NotifyElementCommands();
     }
 
     // ---------------------------------------------------------------- tool & settings
@@ -245,6 +270,10 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         set
         {
             SetProperty(ref _tool, value);
+            // A drawing or text tool shows (and changes) the style of what it makes next, not
+            // of a selected element, so let go of the element.
+            if ((IsShapeTool || value == PageEditorTool.Text) && HasSelectedElement)
+                Select(_selectedPanelId);
             // Always re-raise every flag: a toggle button bound to one of them may have
             // flipped itself off locally, and needs to hear "no, you're still on".
             OnPropertyChanged(nameof(IsSelectTool));
@@ -252,6 +281,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             OnPropertyChanged(nameof(IsBubbleTool));
             OnPropertyChanged(nameof(IsPanTool));
             OnPropertyChanged(nameof(ShowBubbleStyle));
+            RaiseToolFlagsChanged();
             OnPropertyChanged(nameof(Hint));
         }
     }
@@ -385,6 +415,33 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public bool PageNumbersEnabled => CurrentNumbering.Position != PageNumberPosition.None;
 
+    // The Layout tab's Page Numbers menu: one check mark per position, like Word's Page Number menu.
+    public bool IsPageNumbersTopOuter { get => IsNumbering(PageNumberPosition.TopOuter); set => SetNumbering(PageNumberPosition.TopOuter, value); }
+    public bool IsPageNumbersBottomCenter { get => IsNumbering(PageNumberPosition.BottomCenter); set => SetNumbering(PageNumberPosition.BottomCenter, value); }
+    public bool IsPageNumbersBottomOuter { get => IsNumbering(PageNumberPosition.BottomOuter); set => SetNumbering(PageNumberPosition.BottomOuter, value); }
+
+    /// <summary>What the Page Numbers button says under its name.</summary>
+    public string PageNumbersSummary => CurrentNumbering.Position switch
+    {
+        PageNumberPosition.BottomCenter => "Bottom, centred",
+        PageNumberPosition.BottomOuter => "Bottom, outer",
+        PageNumberPosition.TopOuter => "Top, outer",
+        _ => "None"
+    };
+
+    /// <summary>Page Numbers › Remove page numbers.</summary>
+    public IRelayCommand RemovePageNumbersCommand { get; private set; } = null!;
+
+    private bool IsNumbering(PageNumberPosition position) => CurrentNumbering.Position == position;
+
+    private void SetNumbering(PageNumberPosition position, bool value)
+    {
+        if (value && CurrentNumbering.Position != position)
+            _numberingHost?.SetPageNumbering(CurrentNumbering with { Position = position });
+        else
+            RaisePageNumberingChanged(); // a check mark that flipped itself off hears "no, you're still on"
+    }
+
     private void RaisePageNumberingChanged()
     {
         OnPropertyChanged(nameof(HasPageNumbering));
@@ -392,6 +449,11 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(PageNumberStart));
         OnPropertyChanged(nameof(NumberFirstPage));
         OnPropertyChanged(nameof(PageNumbersEnabled));
+        OnPropertyChanged(nameof(IsPageNumbersTopOuter));
+        OnPropertyChanged(nameof(IsPageNumbersBottomCenter));
+        OnPropertyChanged(nameof(IsPageNumbersBottomOuter));
+        OnPropertyChanged(nameof(PageNumbersSummary));
+        RemovePageNumbersCommand?.NotifyCanExecuteChanged();
     }
 
     /// <summary>Whether the canvas draws the dashed margin (live area) guide.</summary>
@@ -439,7 +501,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Index into the selected panel's <see cref="Panel.Bubbles"/>, or -1.</summary>
     public int SelectedBubbleIndex => _selectedBubbleIndex;
 
-    /// <summary>Index into the selected panel's <see cref="Panel.CharacterInstances"/>, or -1. At most one of this and <see cref="SelectedBubbleIndex"/> is set.</summary>
+    /// <summary>Index into the selected panel's <see cref="Panel.CharacterInstances"/>, or -1. At most one of this, <see cref="SelectedBubbleIndex"/> and <see cref="SelectedElementIndex"/> is set.</summary>
     public int SelectedCharacterIndex => _selectedCharacterIndex;
 
     public bool HasSelectedPanel => _selectedPanelId is not null;
@@ -449,7 +511,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
     public bool SelectedBubbleHasTails => SelectedBubble is { Tails.Count: > 0 };
 
     /// <summary>A comic panel (and nothing in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
-    public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter;
+    public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter && !HasSelectedElement;
 
     /// <summary>A placed character is selected: the ribbon shows its "Character" contextual groups.</summary>
     public bool IsCharacterContext => HasSelectedCharacter;
@@ -483,23 +545,28 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     /// <remarks>
     /// With the layout locked, panels themselves can't be selected: asking for a panel with
-    /// no bubble or character in it clears the selection instead. Bubbles and characters
-    /// inside panels stay selectable.
+    /// nothing in it picked clears the selection instead. Bubbles, characters and elements
+    /// inside panels stay selectable. At most one thing in the panel is selected: a bubble
+    /// wins over a character, a character over an element.
     /// </remarks>
-    public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1)
+    public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1, int elementIndex = -1)
     {
-        if (Working.LayoutLocked && bubbleIndex < 0 && characterIndex < 0)
+        if (Working.LayoutLocked && bubbleIndex < 0 && characterIndex < 0 && elementIndex < 0)
             panelId = null;
         if (panelId is null)
-            bubbleIndex = characterIndex = -1;
+            bubbleIndex = characterIndex = elementIndex = -1;
         if (bubbleIndex >= 0)
-            characterIndex = -1;
-        if (Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex && _selectedCharacterIndex == characterIndex)
+            characterIndex = elementIndex = -1;
+        if (characterIndex >= 0)
+            elementIndex = -1;
+        if (Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex && _selectedCharacterIndex == characterIndex
+            && _selectedElementIndex == elementIndex)
             return;
 
         _selectedPanelId = panelId;
         _selectedBubbleIndex = bubbleIndex;
         _selectedCharacterIndex = characterIndex;
+        _selectedElementIndex = elementIndex;
         RaiseSelectionChanged();
     }
 
@@ -525,6 +592,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(ShowBubbleStyle));
         OnPropertyChanged(nameof(BubbleContextTitle));
         RaiseBubbleDerivedChanged();
+        RaiseElementSelectionChanged();
         OnPropertyChanged(nameof(Hint));
         NotifyCommands();
         SelectionChanged?.Invoke();
@@ -537,6 +605,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(IsSpeechStyle));
         OnPropertyChanged(nameof(IsShoutStyle));
         OnPropertyChanged(nameof(IsWhisperStyle));
+        RaiseFontChanged();
     }
 
     /// <summary>Undo/redo or a delete can remove what's selected out from under us; drop whatever no longer exists instead of pointing at a stale index.</summary>
@@ -549,7 +618,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             if (!Working.Panels.TryGetValue(id, out var panel))
                 Select(null);
-            else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count)
+            else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count
+                     || _selectedElementIndex >= panel.Elements.Count)
                 Select(id);
             else if (Working.LayoutLocked && IsPanelContext)
                 Select(null); // just locked (or redone a lock) with a panel selected
@@ -559,6 +629,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(Hint));
         RaiseCharacterViewChanged();
         RaiseBubbleDerivedChanged();
+        RaiseElementDerivedChanged();
         NotifyCommands();
     }
 
@@ -601,11 +672,18 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
+        PageEditorTool.Draw => "Drag inside a panel to draw; end where you started to close the shape (it fills). Pick colours on the Home tab · Esc when done.",
+        PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
+        PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
+        PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
+        _ when HasSelectedShape => "Drag to move the shape · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
+        _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
+        _ when HasSelectedText => "Drag to move the text · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
         _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
-        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
+        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; D draws, T adds text; Insert › Character adds a character."
     };
 
     public Rect2D PanelBounds(PanelId id) => AnchorRing.BoundingBox(Working.Panels[id].Shape.Anchors);
@@ -919,7 +997,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             return -1;
         }
 
-        var bubble = BubbleEditing.KeepInside(created.Value, panelBounds);
+        var bubble = BubbleEditing.KeepInside(_newBubbleLettering.ApplyTo(created.Value), panelBounds);
         bubble = WithDefaultTail(bubble, panelBounds);
         var index = panel.Bubbles.Count;
         Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Bubbles = [.. p.Bubbles, bubble] })));
@@ -959,6 +1037,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
         if (HasSelectedBubble)
             Apply(EditBubbleInPanel(Working, panelId, _selectedBubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy)));
+        else if (HasSelectedElement)
+            Apply(EditElementInPanel(Working, panelId, _selectedElementIndex, e => EditResult<PanelElement>.Success(ElementEditing.Move(e, dx, dy))));
         else if (HasSelectedCharacter)
             Apply(EditCharacterInPanel(Working, panelId, _selectedCharacterIndex, c => CharacterPlacementEditing.Move(c, dx, dy)));
         else if (!Working.LayoutLocked)
@@ -1034,7 +1114,7 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             Select(panelId, newIndex);
     }
 
-    /// <summary>Deletes the selected bubble or character if there is one, otherwise the selected panel.</summary>
+    /// <summary>Deletes the selected bubble, character or element if there is one, otherwise the selected panel.</summary>
     public void DeleteSelection()
     {
         if (_selectedPanelId is not { } panelId)
@@ -1042,6 +1122,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
         if (HasSelectedBubble)
             DeleteBubble(panelId, _selectedBubbleIndex);
+        else if (HasSelectedElement)
+            DeleteElement(panelId, _selectedElementIndex);
         else if (HasSelectedCharacter)
             DeleteCharacter(panelId, _selectedCharacterIndex);
         else
@@ -1603,6 +1685,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
             ReorderBubble(panelId, _selectedBubbleIndex, toFront);
         else if (HasSelectedCharacter)
             ReorderCharacter(panelId, _selectedCharacterIndex, toFront);
+        else if (HasSelectedElement)
+            ReorderElement(panelId, _selectedElementIndex, toFront);
     }
 
     /// <summary>How many panels on this page show <paramref name="id"/>.</summary>
