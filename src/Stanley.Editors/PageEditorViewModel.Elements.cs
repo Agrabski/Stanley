@@ -229,16 +229,7 @@ public sealed partial class PageEditorViewModel
         SetBoxDashCommand = new RelayCommand<LineDash>(dash =>
             SetCurrentTextStyle(CurrentTextStyle with { BoxDash = dash, BoxStroke = CurrentTextStyle.BoxStroke ?? TextStylePresets.Ink }));
         ApplyTextPresetCommand = new RelayCommand<TextStylePreset>(preset => SetCurrentTextStyle(TextStylePresets.Style(preset) with { FontFamily = CurrentTextStyle.FontFamily }));
-        BiggerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Bigger(CurrentTextStyle.FontSizeMm) }));
-        SmallerTextCommand = new RelayCommand(() => SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = TextEditing.Smaller(CurrentTextStyle.FontSizeMm) }));
-        SetTextSizeCommand = new RelayCommand<string>(entry =>
-        {
-            var size = TextEditing.ParseSize(entry);
-            if (size.IsValid)
-                SetCurrentTextStyle(CurrentTextStyle with { FontSizeMm = size.Value });
-            else
-                Apply(EditResult<PageDocument>.Failure(size.Error!));
-        });
+        InitializeFontCommands();
         InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
         InitializePictureCommands();
@@ -286,12 +277,6 @@ public sealed partial class PageEditorViewModel
     public IRelayCommand<ShapeWeightChoice> SetBoxWeightCommand { get; private set; } = null!;
     public IRelayCommand<LineDash> SetBoxDashCommand { get; private set; } = null!;
     public IRelayCommand<TextStylePreset> ApplyTextPresetCommand { get; private set; } = null!;
-    public IRelayCommand BiggerTextCommand { get; private set; } = null!;
-    public IRelayCommand SmallerTextCommand { get; private set; } = null!;
-
-    /// <summary>The font size box: a size picked from its list or typed ("7.5", "7,5 mm"), for the selected text and new text; a bad entry changes nothing and says why.</summary>
-    public IRelayCommand<string> SetTextSizeCommand { get; private set; } = null!;
-
     /// <summary>Insert tab: text of that kind in the selected (or first) panel, ready to type into.</summary>
     public IRelayCommand<TextStylePreset> InsertTextCommand { get; private set; } = null!;
 
@@ -393,13 +378,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(TextColorBrush));
         OnPropertyChanged(nameof(TextBoxBrush));
         OnPropertyChanged(nameof(TextOutlineBrush));
-        OnPropertyChanged(nameof(TextSizeMm));
         OnPropertyChanged(nameof(TextPresetName));
-        OnPropertyChanged(nameof(IsTextBold));
-        OnPropertyChanged(nameof(IsTextItalic));
-        OnPropertyChanged(nameof(IsTextAlignLeft));
-        OnPropertyChanged(nameof(IsTextAlignCenter));
-        OnPropertyChanged(nameof(IsTextAlignRight));
         OnPropertyChanged(nameof(CurrentElementLayer));
         OnPropertyChanged(nameof(IsElementBehind));
         OnPropertyChanged(nameof(IsElementInFront));
@@ -684,36 +663,7 @@ public sealed partial class PageEditorViewModel
     public IBrush TextColorBrush => DrawingPalette.BrushOf(CurrentTextStyle.Color);
     public IBrush TextBoxBrush => DrawingPalette.BrushOf(CurrentTextStyle.BoxFill);
     public IBrush TextOutlineBrush => DrawingPalette.BrushOf(CurrentTextStyle.Outline);
-    /// <summary>The letters' size in mm, as the font size box shows it.</summary>
-    public double TextSizeMm => CurrentTextStyle.FontSizeMm;
-
-    /// <summary>The sizes the font size box lists (any other can be typed).</summary>
-    public IReadOnlyList<double> TextSizeChoices => TextEditing.SizeSteps;
     public string TextPresetName => TextStylePresets.Of(CurrentTextStyle) is { } preset ? TextStylePresets.Name(preset) : "Custom";
-
-    public bool IsTextBold
-    {
-        get => CurrentTextStyle.Bold;
-        set => SetCurrentTextStyle(CurrentTextStyle with { Bold = value });
-    }
-
-    public bool IsTextItalic
-    {
-        get => CurrentTextStyle.Italic;
-        set => SetCurrentTextStyle(CurrentTextStyle with { Italic = value });
-    }
-
-    public bool IsTextAlignLeft { get => CurrentTextStyle.Align == TextAlign.Left; set => SetAlign(TextAlign.Left, value); }
-    public bool IsTextAlignCenter { get => CurrentTextStyle.Align == TextAlign.Center; set => SetAlign(TextAlign.Center, value); }
-    public bool IsTextAlignRight { get => CurrentTextStyle.Align == TextAlign.Right; set => SetAlign(TextAlign.Right, value); }
-
-    private void SetAlign(TextAlign align, bool value)
-    {
-        if (value)
-            SetCurrentTextStyle(CurrentTextStyle with { Align = align });
-        else
-            RaiseToggles(); // a toggle that flipped itself off hears "no, you're still on"
-    }
 
     /// <summary>Re-raises the ribbon's toggle states even though nothing changed: a toggle button that flipped itself off locally needs to hear it's still on.</summary>
     private void RaiseToggles()

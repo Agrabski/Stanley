@@ -188,6 +188,26 @@ public class TextEditingTests
     }
 
     [Fact]
+    public void Bubble_lettering_stores_only_what_differs_from_the_default()
+    {
+        var bubble = BubbleEditing.Create(new Rect2D(0, 0, 40, 20), Stanley.ProjectModel.Bubbles.BubbleStylePreset.Speech).Value;
+
+        Assert.Equal(LetteringFont.BubbleDefault, LetteringFont.Of(bubble));
+        var styled = BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizeMm = 6, Bold = true, Align = TextAlign.Left }).Value;
+        Assert.Equal(6, styled.FontSizeMm);
+        Assert.True(styled.Bold);
+        Assert.Equal(TextAlign.Left, styled.Align);
+
+        var back = BubbleEditing.SetLettering(styled, LetteringFont.BubbleDefault).Value;
+        Assert.Null(back.FontSizeMm);
+        Assert.Null(back.Align);
+        Assert.Equal(bubble, back);
+
+        Assert.False(BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizeMm = 0.2 }).IsValid);
+        Assert.Equal("Inter", BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { Family = " Inter " }).Value.FontFamily);
+    }
+
+    [Fact]
     public void Font_names_are_trimmed_blank_means_the_default_and_nonsense_is_refused()
     {
         var text = TextEditing.Create(new Rect2D(0, 0, 30, 5), TextStylePresets.Style(TextStylePreset.Plain)).Value;

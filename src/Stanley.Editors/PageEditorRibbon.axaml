@@ -73,11 +73,7 @@
         </DockPanel>
         <Rectangle Classes="divider" />
 
-        <DockPanel Classes="group">
-          <ComboBox Name="HomeFontBox" Classes="fontBox" VerticalAlignment="Center" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
-                    PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
-          <TextBlock Classes="groupLabel" Text="Font" />
-        </DockPanel>
+        <local:FontGroup Name="HomeFontGroup" />
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
@@ -605,11 +601,7 @@
           <TextBlock Classes="groupLabel" Text="Style" />
         </DockPanel>
         <Rectangle Classes="divider" />
-        <DockPanel Classes="group">
-          <ComboBox Name="BubbleFontBox" Classes="fontBox" VerticalAlignment="Center" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
-                    PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
-          <TextBlock Classes="groupLabel" Text="Font" />
-        </DockPanel>
+        <local:FontGroup Name="BubbleFontGroup" />
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
@@ -743,26 +735,7 @@
           <TextBlock Classes="groupLabel" Text="{Binding TextPresetName, StringFormat='Kind: {0}'}" />
         </DockPanel>
         <Rectangle Classes="divider" />
-        <DockPanel Classes="group">
-          <StackPanel Spacing="2" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="1">
-              <ComboBox Name="TextFontBox" Classes="fontBox" Margin="0,0,3,0" ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
-                        PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
-              <local:FontSizeBox Name="TextSizeBox" Margin="0,0,3,0" Value="{Binding TextSizeMm}" Sizes="{Binding TextSizeChoices}" Command="{Binding SetTextSizeCommand}"
-                                 ToolTip.Tip="Font Size - the letters' height in millimetres: pick one, or type any size and press Enter" />
-              <Button Name="BiggerTextButton" Classes="small" Command="{Binding BiggerTextCommand}" ToolTip.Tip="Bigger letters" FontWeight="SemiBold">A+</Button>
-              <Button Name="SmallerTextButton" Classes="small" Command="{Binding SmallerTextCommand}" ToolTip.Tip="Smaller letters">A−</Button>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="1">
-              <ToggleButton Name="BoldButton" Classes="small" IsChecked="{Binding IsTextBold}" ToolTip.Tip="Bold" FontWeight="Bold" Focusable="False">B</ToggleButton>
-              <ToggleButton Name="ItalicButton" Classes="small" IsChecked="{Binding IsTextItalic}" ToolTip.Tip="Italic" FontStyle="Italic" Focusable="False">I</ToggleButton>
-              <RadioButton Name="AlignLeftButton" Classes="small" GroupName="TextAlign" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsTextAlignLeft}" ToolTip.Tip="Line up on the left"><PathIcon Data="{StaticResource AlignLeftIcon}" /></RadioButton>
-              <RadioButton Name="AlignCenterButton" Classes="small" GroupName="TextAlign" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsTextAlignCenter}" ToolTip.Tip="Centre each line"><PathIcon Data="{StaticResource AlignCenterIcon}" /></RadioButton>
-              <RadioButton Name="AlignRightButton" Classes="small" GroupName="TextAlign" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsTextAlignRight}" ToolTip.Tip="Line up on the right"><PathIcon Data="{StaticResource AlignRightIcon}" /></RadioButton>
-            </StackPanel>
-          </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Font" />
-        </DockPanel>
+        <local:FontGroup Name="TextFontGroup" />
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Spacing="2" Margin="0,4,0,0">

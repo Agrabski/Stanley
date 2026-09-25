@@ -16,13 +16,16 @@ public class FontBoxTests
 {
     private static PageEditorRibbon Ribbon(MainWindow window) => window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
 
-    private static ComboBox FontBox(MainWindow window, string tab, string name)
+    /// <summary>The Font group on <paramref name="tab"/> - the one shared control every tab that letters something shows.</summary>
+    private static FontGroup FontGroup(MainWindow window, string tab)
     {
         var ribbon = Ribbon(window);
         ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == tab);
         Dispatcher.UIThread.RunJobs();
-        return ribbon.GetVisualDescendants().OfType<ComboBox>().Single(b => b.Name == name);
+        return ribbon.GetVisualDescendants().OfType<FontGroup>().Single();
     }
+
+    private static ComboBox FontBox(MainWindow window, string tab) => FontGroup(window, tab).Fonts;
 
     private static FontChoice AnotherFont(ComboBox box) =>
         box.Items.OfType<FontChoice>().FirstOrDefault(c => c.Name.Contains("Serif", StringComparison.Ordinal)) ?? box.Items.OfType<FontChoice>().Skip(1).First();
@@ -39,7 +42,7 @@ public class FontBoxTests
         var index = editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
         editor.SetBubbleText(panelId, index, "Who's there?");
 
-        var box = FontBox(window, "BubbleTab", "BubbleFontBox");
+        var box = FontBox(window, "BubbleTab");
         var fonts = box.Items.OfType<FontChoice>().ToList();
         Assert.Equal(LetteringFonts.Inter, fonts[0].Name); // Stanley's own font first
         Assert.True(fonts.Count > 1, "the computer's own fonts are listed too");
@@ -82,14 +85,14 @@ public class FontBoxTests
         var index = editor.CreateText(panelId, new Point2D(bounds.MidX, bounds.MidY));
         editor.SetElementText(panelId, index, "Meanwhile...");
 
-        var box = FontBox(window, "TextTab", "TextFontBox");
+        var box = FontBox(window, "TextTab");
         var font = AnotherFont(box);
         box.SelectedItem = font;
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(font.Name, ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style.FontFamily);
         LookTabTests.Snapshot(window, "font-text-tab");
 
-        var home = FontBox(window, "HomeTab", "HomeFontBox");
+        var home = FontBox(window, "HomeTab");
         Assert.Same(font, home.SelectedItem);
     }
 
@@ -107,10 +110,7 @@ public class FontBoxTests
         editor.SetElementText(panelId, index, "BOOM");
         double Size() => ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style.FontSizeMm;
 
-        var ribbon = Ribbon(window);
-        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "TextTab");
-        Dispatcher.UIThread.RunJobs();
-        var box = ribbon.GetVisualDescendants().OfType<FontSizeBox>().Single(b => b.Name == "TextSizeBox");
+        var box = FontGroup(window, "TextTab").Sizes;
         var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
         Assert.Equal(FontSizeBox.Format(Size()), box.Entry.Text);
 
@@ -157,6 +157,67 @@ public class FontBoxTests
         Assert.Equal(FontSizeBox.Format(20), box.Entry.Text);
     }
 
+    /// <summary>Home, Bubble and Text all show the same Font group, and on a bubble every part of it works: size, bold, italic, alignment.</summary>
+    [Fact]
+    public void Every_tab_shows_the_same_Font_group_and_it_letters_a_bubble_too()
+    {
+        var window = new MainWindow();
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var editor = window.Editor;
+        var panelId = editor.Working.PanelOrder[0];
+        var bounds = editor.PanelBounds(panelId);
+        var index = editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
+        editor.SetBubbleText(panelId, index, "Look out!");
+        Stanley.ProjectModel.Bubbles.Bubble Bubble() => editor.Working.Panels[panelId].Bubbles[index];
+
+        var home = FontGroup(window, "HomeTab");
+        var group = FontGroup(window, "BubbleTab");
+        Assert.NotSame(home, group); // one control type, placed on each tab
+
+        Assert.Equal(FontSizeBox.Format(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), group.Sizes.Entry.Text);
+        group.Sizes.Entry.Focus();
+        Dispatcher.UIThread.RunJobs();
+        window.KeyTextInput("5");
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+        FindButton(group, "BiggerButton").Command!.Execute(null);
+        Toggle(group, "BoldButton");
+        Toggle(group, "ItalicButton");
+        Toggle(group, "AlignLeftButton");
+        Dispatcher.UIThread.RunJobs();
+
+        var bubble = Bubble();
+        Assert.Equal(6, bubble.FontSizeMm); // 5, then one step bigger
+        Assert.True(bubble.Bold);
+        Assert.True(bubble.Italic);
+        Assert.Equal(TextAlign.Left, bubble.Align);
+        LookTabTests.Snapshot(window, "font-group-bubble");
+
+        // Home's copy shows the same bubble's lettering.
+        home = FontGroup(window, "HomeTab");
+        Assert.Equal(FontSizeBox.Format(6), home.Sizes.Entry.Text);
+        Assert.True(home.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>().Single(b => b.Name == "BoldButton").IsChecked);
+
+        // The inline editor types in it.
+        var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
+        editor.EditTextCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Avalonia.Media.FontWeight.Bold, view.TextEditor.FontWeight);
+        Assert.Equal(Avalonia.Media.FontStyle.Italic, view.TextEditor.FontStyle);
+        Assert.Equal(Avalonia.Media.TextAlignment.Left, view.TextEditor.TextAlignment);
+        window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private static Button FindButton(Control group, string name) => group.GetVisualDescendants().OfType<Button>().Single(b => b.Name == name);
+
+    private static void Toggle(Control group, string name)
+    {
+        var toggle = group.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>().Single(b => b.Name == name);
+        toggle.IsChecked = true;
+    }
+
     [Fact]
     public void A_font_missing_from_this_computer_is_named_in_the_box_and_drawn_in_the_default()
     {
@@ -169,7 +230,7 @@ public class FontBoxTests
         var index = editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
         editor.SetBubbleFont(panelId, index, "Wild Words Pro");
 
-        var box = FontBox(window, "BubbleTab", "BubbleFontBox");
+        var box = FontBox(window, "BubbleTab");
 
         Assert.Null(box.SelectedItem);
         Assert.Equal("Wild Words Pro (missing)", box.PlaceholderText);

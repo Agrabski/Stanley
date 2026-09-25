@@ -145,6 +145,56 @@ public class FontsTests
     }
 
     [Fact]
+    public void The_font_group_letters_the_selected_bubble_one_undo_step_per_change_and_new_bubbles_follow()
+    {
+        var (editor, history, panel) = NewEditor();
+        var index = editor.CreateBubble(panel, new Point2D(50, 50));
+        Stanley.ProjectModel.Bubbles.Bubble Bubble(int i) => editor.Working.Panels[panel].Bubbles[i];
+        Assert.Equal(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm, editor.TextSizeMm);
+        Assert.True(editor.IsTextAlignCenter);
+
+        editor.IsTextBold = true;
+        editor.SetTextSizeCommand.Execute("6");
+        editor.IsTextAlignRight = true;
+
+        Assert.True(Bubble(index).Bold);
+        Assert.Equal(6, Bubble(index).FontSizeMm);
+        Assert.Equal(TextAlign.Right, Bubble(index).Align);
+        Assert.Equal(6, editor.TextSizeMm);
+        Assert.True(editor.IsTextAlignRight);
+
+        history.Undo();
+        Assert.Null(Bubble(index).Align);
+        history.Undo();
+        Assert.Null(Bubble(index).FontSizeMm);
+        history.Undo();
+        Assert.False(Bubble(index).Bold);
+
+        var next = editor.CreateBubble(panel, new Point2D(80, 80));
+        Assert.True(Bubble(next).Bold);
+        Assert.Equal(6, Bubble(next).FontSizeMm);
+    }
+
+    [Fact]
+    public void With_nothing_selected_the_font_group_sets_the_next_bubble_and_the_next_text()
+    {
+        var (editor, _, panel) = NewEditor();
+
+        editor.IsTextItalic = true;
+        editor.BiggerTextCommand.Execute(null);
+
+        var bubbleIndex = editor.CreateBubble(panel, new Point2D(50, 50));
+        var bubble = editor.Working.Panels[panel].Bubbles[bubbleIndex];
+        Assert.True(bubble.Italic);
+        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), bubble.FontSizeMm);
+        editor.Select(null);
+        var textIndex = editor.CreateText(panel, new Point2D(40, 90));
+        var text = ((TextElement)editor.Working.Panels[panel].Elements[textIndex]).Style;
+        Assert.True(text.Italic);
+        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), text.FontSizeMm);
+    }
+
+    [Fact]
     public void A_font_this_computer_lacks_is_kept_and_named_in_the_box()
     {
         var (editor, _, panel) = NewEditor();

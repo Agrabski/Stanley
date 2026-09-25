@@ -215,19 +215,20 @@ public partial class PageEditorView : UserControl
         InlineTextEditor.SelectAll();
     }
 
-    /// <summary>Bubble lettering is plain black and centred in the bubble's font; a text element's editor takes on its style, so what's typed looks like what it'll be.</summary>
+    /// <summary>The editor takes on the lettering's font - a bubble's or a text's - and a text's colours, so what's typed looks like what it'll be (bubble lettering is black).</summary>
     private void StyleTextEditor()
     {
         var style = EditedText()?.Style;
-        InlineTextEditor.FontFamily = LetteringFonts.AvaloniaFamily(style is not null ? style.FontFamily : EditedBubble()?.FontFamily);
-        InlineTextEditor.TextAlignment = style?.Align switch
+        var font = style is not null ? LetteringFont.Of(style) : EditedBubble() is { } bubble ? LetteringFont.Of(bubble) : LetteringFont.BubbleDefault;
+        InlineTextEditor.FontFamily = LetteringFonts.AvaloniaFamily(font.Family);
+        InlineTextEditor.TextAlignment = font.Align switch
         {
             TextAlign.Left => Avalonia.Media.TextAlignment.Left,
             TextAlign.Right => Avalonia.Media.TextAlignment.Right,
             _ => Avalonia.Media.TextAlignment.Center
         };
-        InlineTextEditor.FontWeight = style?.Bold == true ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal;
-        InlineTextEditor.FontStyle = style?.Italic == true ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
+        InlineTextEditor.FontWeight = font.Bold ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal;
+        InlineTextEditor.FontStyle = font.Italic ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
         // Hollow letters (no fill) are typed in their outline's colour, so they can be seen.
         InlineTextEditor.Foreground = style is { } s && (s.Color ?? s.Outline) is { } visible ? DrawingPalette.BrushOf(visible) : Avalonia.Media.Brushes.Black;
         InlineTextEditor.MaxLength = style is null ? BubbleEditing.MaxTextLength : TextEditing.MaxTextLength;
@@ -257,8 +258,9 @@ public partial class PageEditorView : UserControl
         }
         else
         {
-            rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(vm.Working.Panels[editing.Panel].Bubbles[index]));
-            fontSize = Math.Clamp(PageCanvasDrawOperation.FontSizeMm * PageCanvas.Zoom * 0.95, 11, 40);
+            var bubble = vm.Working.Panels[editing.Panel].Bubbles[index];
+            rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(bubble));
+            fontSize = Math.Clamp(LetteringFont.Of(bubble).SizeMm * PageCanvas.Zoom * 0.95, 11, 160);
         }
         // Height follows the text, so no line is ever clipped: when there's more text than
         // fits (or the box is smaller than a readable line at this zoom) it grows past it -

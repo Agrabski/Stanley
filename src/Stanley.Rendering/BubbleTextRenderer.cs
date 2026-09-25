@@ -1,11 +1,13 @@
 using SkiaSharp;
 using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Issues;
 
 namespace Stanley.Rendering;
 
 /// <summary>
-/// Draws a bubble's text in its font, word-wrapped and centered within its shape's bounding box.
+/// Draws a bubble's text in its font, word-wrapped and lined up (centred unless the bubble
+/// says otherwise) within its shape's bounding box.
 /// SkiaSharp-only measurement/layout (no Avalonia text stack available here) - a plain
 /// greedy word wrap, not full text shaping; good enough for short dialogue lines.
 /// </summary>
@@ -23,8 +25,10 @@ public static class BubbleTextRenderer
         return new Rect2D(bounds.Left + dx, bounds.Top + dy, bounds.Width - 2 * dx, bounds.Height - 2 * dy);
     }
 
+    /// <summary>Draws the text at the bubble's own size, or <paramref name="fontSize"/> when it has none (in the canvas's units).</summary>
     public static void Draw(SKCanvas canvas, Bubble bubble, float fontSize = 18f, SKColor? color = null)
     {
+        fontSize = bubble.FontSizeMm is { } own ? (float)own : fontSize;
         var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
         var skBounds = SKRect.Create(
             (float)bounds.Left, (float)bounds.Top, (float)bounds.Width, (float)bounds.Height);
@@ -34,7 +38,7 @@ public static class BubbleTextRenderer
         if (maxWidth <= 0 || maxHeight <= 0)
             return;
 
-        using var font = Lettering.Font(fontSize, family: bubble.FontFamily);
+        using var font = Lettering.Font(fontSize, bubble.Bold, bubble.Italic, bubble.FontFamily);
         using var paint = new SKPaint { Color = color ?? SKColors.Black, IsAntialias = true };
 
         var lines = WrapLines(bubble.Text, font, paint, maxWidth);
@@ -52,11 +56,17 @@ public static class BubbleTextRenderer
             totalHeight = lineHeight * lines.Count;
         }
 
+        var (x, align) = bubble.Align switch
+        {
+            TextAlign.Left => (skBounds.MidX - maxWidth / 2, SKTextAlign.Left),
+            TextAlign.Right => (skBounds.MidX + maxWidth / 2, SKTextAlign.Right),
+            _ => (skBounds.MidX, SKTextAlign.Center)
+        };
         var startY = skBounds.MidY - totalHeight / 2 + font.Metrics.Ascent * -1;
         for (var i = 0; i < lines.Count; i++)
         {
             var y = startY + lineHeight * i;
-            canvas.DrawText(lines[i], skBounds.MidX, y, SKTextAlign.Center, font, paint);
+            canvas.DrawText(lines[i], x, y, align, font, paint);
         }
     }
 

@@ -70,6 +70,24 @@ public class PanelElementJsonTests
     }
 
     [Fact]
+    public void A_bubbles_lettering_is_only_written_when_chosen_and_round_trips()
+    {
+        var plain = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(20, 20, 40, 20)).Anchors), BubbleStylePreset.Speech, [], "Hey!");
+        var styled = plain with { Id = BubbleId.New(), FontSizeMm = 6, Bold = true, Italic = true, Align = TextAlign.Right };
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [], [plain]);
+
+        var json = ProjectJson.Serialize(panel);
+        foreach (var key in new[] { "fontSizeMm", "bold", "italic", "align" })
+            Assert.DoesNotContain($"\"{key}\"", json, StringComparison.Ordinal);
+
+        var both = panel with { Bubbles = [plain, styled] };
+        var read = ProjectJson.Deserialize<Panel>(ProjectJson.Serialize(both));
+        Assert.Equivalent(both, read, strict: true);
+        Assert.Equal(TextAlign.Right, read.Bubbles[1].Align);
+        Assert.Null(read.Bubbles[0].Align);
+    }
+
+    [Fact]
     public void A_colour_background_round_trips()
     {
         var panel = PanelWith(new ColorBackground(ColorValue.FromHex("#1b2a49")));

@@ -127,8 +127,12 @@ the page editor via `PageEditorViewModel`.
   regenerates the shape from current bounds under the new preset while
   preserving tail attachment/target so they don't jump. The anchor model
   itself is the escape hatch for arbitrary hand-edited shapes later.
-- **Lettering font**: `Bubble.FontFamily` (null = the default font; see "Fonts" under
-  panel elements) — the font box on the Bubble and Home tabs.
+- **Lettering**: the same Font group as free text (see "Fonts" under panel
+  elements): `Bubble.FontFamily` (null = the default font), `FontSizeMm` (null =
+  `Bubble.DefaultFontSizeMm`, 3.5), `Bold`, `Italic`, `Align` (null = centred) — each
+  written to the file only when chosen (`LetteringFont.ApplyTo` stores defaults as
+  null; `bold`/`italic` are `WhenWritingDefault`). Letters still shrink to fit a
+  bubble too small for them.
 - Deferred: thought-bubble style (disjoint circle chain — breaks
   the single-polygon-per-tail union model), colour slots, character-bound tail
   targets, NativeAOT publish validation. See the design discussion in this
@@ -225,7 +229,7 @@ Editing pipeline layers, bottom to top:
     `DataTemplate` scoped to that host maps each editor view-model type to its
     ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
     editor type adds its own tabs the same way. Page editor tabs: Home (tools incl.
-    Draw and Text, bubble style, Shape Styles: Shape Fill / Shape Outline,
+    Draw and Text, bubble style, Font, Shape Styles: Shape Fill / Shape Outline,
     add/edit/delete), Insert (panel, speech/shout/whisper bubble,
     caption/text/sound effect, shapes, picture, backgrounds, characters), Layout
     (inline preset gallery, margin/gutter, snap, split, lock, Page numbers menu),
@@ -490,14 +494,19 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   mid-run), and maps a family to the Avalonia `FontFamily` the inline editor types in.
   No comic lettering font is on NuGet, so Inter (a clean sans) is the one bundled;
   more would be OFL/Apache fonts, in a package or embedded, never proprietary ones.
-  UI: Word's font box (`ComboBox.fontBox`, each name in its own face, Stanley's own
-  fonts first) on the Home, Bubble and Text tabs, all bound to
-  `PageEditorViewModel.SelectedFont` (`PageEditorViewModel.Fonts.cs`): the selected
-  bubble's or text's font, one undo step to change; with nothing selected it sets
-  the font of the next bubble and text. Picking the default stores null; a text
-  preset (Caption, …) keeps the font. A font the computer lacks leaves the box empty
-  with "<name> (missing)" as its placeholder and a tooltip saying so.
-  Beside it on the Text tab, Word's font size box (`FontSizeBox`, code-only like
+  UI: one **Font group** control (`FontGroup.axaml`, Word's Font group), the same on
+  the Home, Bubble and Text tabs: font box, size box, A+/A−, bold, italic,
+  alignment. It shows `PageEditorViewModel.CurrentLettering` (`PageEditorViewModel.Fonts.cs`;
+  a `LetteringFont` — Stanley.Editing: family, size, bold, italic, alignment, with
+  `Of`/`ApplyTo` for bubbles and `TextStyle`s): the selected bubble's or text's, else
+  what's added next (the next text's while the Text tool is on). Every change goes
+  through `SetLettering` — the selection, one undo step, and it becomes what new
+  ones get; with nothing selected it sets the next bubble *and* the next text.
+  The font box (`ComboBox.fontBox`) shows each name in its own face, Stanley's own
+  fonts first. Picking the default stores null; a text preset (Caption, …) keeps
+  the font. A font the computer lacks leaves the box empty with "<name> (missing)"
+  as its placeholder and a tooltip saying so.
+  Beside it, Word's font size box (`FontSizeBox`, code-only like
   `ColorMenuButton`): the size as editable text in mm plus an arrow listing
   `TextEditing.SizeSteps` (the current one ticked); type any size and press Enter or
   click away (`TextEditing.ParseSize`: "7.5", "7,5" or "7.5 mm", rounded to 0.1 mm,

@@ -997,7 +997,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             return -1;
         }
 
-        var bubble = BubbleEditing.KeepInside(created.Value with { FontFamily = _newBubbleFont }, panelBounds);
+        var bubble = BubbleEditing.KeepInside(_newBubbleLettering.ApplyTo(created.Value), panelBounds);
         bubble = WithDefaultTail(bubble, panelBounds);
         var index = panel.Bubbles.Count;
         Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Bubbles = [.. p.Bubbles, bubble] })));

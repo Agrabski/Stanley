@@ -158,9 +158,13 @@ public static class BubbleEditing
 
     /// <summary>Letters the bubble in <paramref name="family"/> (null or blank: the default lettering font).</summary>
     public static EditResult<Bubble> SetFont(Bubble bubble, string? family) =>
-        TextEditing.CleanFontName(family) is { IsValid: true } name
-            ? EditResult<Bubble>.Success(bubble with { FontFamily = name.Value })
-            : EditResult<Bubble>.Failure(TextEditing.CleanFontName(family).Error!);
+        SetLettering(bubble, LetteringFont.Of(bubble) with { Family = family });
+
+    /// <summary>Letters the bubble in <paramref name="font"/> - typeface, size, bold, italic, alignment - or says why it can't.</summary>
+    public static EditResult<Bubble> SetLettering(Bubble bubble, LetteringFont font) =>
+        font.Validate() is { IsValid: true } valid
+            ? EditResult<Bubble>.Success(valid.Value.ApplyTo(bubble))
+            : EditResult<Bubble>.Failure(font.Validate().Error!);
 
     private static double NextAttachmentT(IReadOnlyList<BubbleTail> tails)
     {

@@ -1,5 +1,7 @@
+using System.Text.Json.Serialization;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
 
 namespace Stanley.ProjectModel.Bubbles;
 
@@ -10,12 +12,28 @@ namespace Stanley.ProjectModel.Bubbles;
 /// <c>Stanley.Rendering</c> turns this into pixels; <c>Stanley.Editing</c> owns what
 /// counts as a valid edit to it (minimum size, non-empty shape, etc.) - this record has
 /// no behaviour of its own.
+/// <para>
+/// The lettering's font is the same set of choices free text has (see <c>TextStyle</c>),
+/// every one optional: a bubble that leaves them alone letters in the default font at
+/// <see cref="DefaultFontSizeMm"/>, upright and centred, and its file says nothing about
+/// them. The letters shrink to fit a bubble too small for them.
+/// </para>
 /// </summary>
-/// <param name="FontFamily">The lettering's typeface family (see <c>TextStyle.FontFamily</c>); null is the default lettering font.</param>
+/// <param name="FontFamily">The typeface family (see <c>TextStyle.FontFamily</c>); null is the default lettering font.</param>
+/// <param name="FontSizeMm">The letters' size in page millimetres; null is <see cref="DefaultFontSizeMm"/>.</param>
+/// <param name="Align">How lines line up; null is centred, as dialogue usually is.</param>
 public sealed record Bubble(
     BubbleId Id,
     BubbleShape Shape,
     BubbleStylePreset Style,
     IReadOnlyList<BubbleTail> Tails,
     string Text,
-    string? FontFamily = null);
+    string? FontFamily = null,
+    double? FontSizeMm = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Bold = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Italic = false,
+    TextAlign? Align = null)
+{
+    /// <summary>The usual dialogue size, about 10pt: bubble lettering's size unless one is chosen.</summary>
+    public const double DefaultFontSizeMm = 3.5;
+}

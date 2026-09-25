@@ -98,6 +98,35 @@ public class LetteringTests
         Assert.NotEqual(Pixels(bubble), Pixels(bubble with { FontFamily = other }));
     }
 
+    [Fact]
+    public void A_bubble_letters_at_its_own_size_weight_and_alignment()
+    {
+        var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(0, 0, 60, 30)).Anchors), BubbleStylePreset.Speech, [], "Hi");
+
+        Assert.Equal(Pixels(bubble), Pixels(bubble with { FontSizeMm = 8 })); // the size Draw was given is the default's
+        Assert.NotEqual(Pixels(bubble), Pixels(bubble with { FontSizeMm = 10 }));
+        Assert.True(Ink(bubble with { Bold = true }) > Ink(bubble));
+        Assert.True(InkCentre(bubble with { Align = TextAlign.Left }) < InkCentre(bubble) - 5);
+        Assert.True(InkCentre(bubble with { Align = TextAlign.Right }) > InkCentre(bubble) + 5);
+    }
+
+    private static int Ink(Bubble bubble) => Dark(bubble).Count();
+
+    private static double InkCentre(Bubble bubble) => Dark(bubble).Average();
+
+    /// <summary>The x of every dark pixel the text drew.</summary>
+    private static IEnumerable<int> Dark(Bubble bubble)
+    {
+        using var bitmap = new SKBitmap(60, 30);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        BubbleTextRenderer.Draw(canvas, bubble, 8);
+        for (var y = 0; y < 30; y++)
+        for (var x = 0; x < 60; x++)
+            if (bitmap.GetPixel(x, y).Red < 128)
+                yield return x;
+    }
+
     private static byte[] Pixels(Bubble bubble)
     {
         using var bitmap = new SKBitmap(60, 30);
