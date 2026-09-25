@@ -45,7 +45,9 @@ pages of one issue for now — see "Documents" below). Characters exist as a
 panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
 see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
 faces, clothes, accessories — see "Stickers (implemented)" below); no
-three-quarter view yet.
+three-quarter view yet. Panels also hold **drawn shapes, free text and pictures**
+behind or in front of the characters, over a colour, gradient or picture
+**background** — see "Panel elements and backgrounds (implemented)" below.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; currently just
 `init`) instead, without touching Avalonia at all — one binary, not a
@@ -122,8 +124,7 @@ the page editor via `PageEditorViewModel`.
   regenerates the shape from current bounds under the new preset while
   preserving tail attachment/target so they don't jump. The anchor model
   itself is the escape hatch for arbitrary hand-edited shapes later.
-- Deferred: text/lettering interactive editing (rendering exists in
-  `BubbleTextRenderer`), thought-bubble style (disjoint circle chain — breaks
+- Deferred: thought-bubble style (disjoint circle chain — breaks
   the single-polygon-per-tail union model), colour slots, character-bound tail
   targets, NativeAOT publish validation. See the design discussion in this
   repo's history for the full reasoning (bezier outlines, boolean-union tails,
@@ -191,7 +192,8 @@ Editing pipeline layers, bottom to top:
   framework, kept here so EditorFramework never has to reference Editing.
 - **`Stanley.Editing`**: pure editing functions over immutable document
   values (currently `BubbleEditing`, `PanelLayoutEditing`, `PanelBoundaryDrag`,
-  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`).
+  `PanelSnapping`, `PanelGutters`, `PanelLayoutPresets`, and for panel elements
+  `ShapeEditing`, `TextEditing`/`TextStylePresets`, `PictureEditing`, `ElementEditing`).
   Avalonia-free by design — a future `stanley` subcommand could invoke the
   same logic headlessly, with no recompilation needed.
 - **`Stanley.EditorFramework`**: `EditorHistory` (one shared undo/redo stack
@@ -217,15 +219,19 @@ Editing pipeline layers, bottom to top:
     dock factory's active/focused dockable) is the ribbon host's content, and a
     `DataTemplate` scoped to that host maps each editor view-model type to its
     ribbon (`PageEditorViewModel` → `PageEditorRibbon`, a `TabControl`). A new
-    editor type adds its own tabs the same way. Page editor tabs: Home (tools,
-    bubble style, add/edit/delete), Insert (panel, speech/shout/whisper bubble),
-    Layout (inline preset gallery, margin/gutter, snap, split), View (fit/actual
-    size/zoom, margin guides), plus contextual **Panel** (blue) and **Bubble**
-    (orange) tabs visible only for that selection (`IsPanelContext` /
-    `IsBubbleContext`); like Word they aren't forced open, and if the selected one
-    disappears the ribbon falls back to Home. The ribbon only talks to its pane
-    through the view model: commands plus events for view-only work
-    (`ViewportRequested` for zoom, `TextEditRequested` for the inline text editor).
+    editor type adds its own tabs the same way. Page editor tabs: Home (tools incl.
+    Draw and Text, bubble style, Pen: outline/fill/line, add/edit/delete), Insert
+    (panel, speech/shout/whisper bubble, caption/text/sound effect, shapes,
+    picture, backgrounds, characters, page numbers), Layout (inline preset
+    gallery, margin/gutter, snap, split), View (fit/actual size/zoom, margin
+    guides), plus contextual **Panel** (blue), **Character** (green), **Bubble**
+    (orange), **Shape** and **Picture** (purple) and **Text** (teal) tabs visible
+    only for that selection (`IsPanelContext`, `IsBubbleContext`, `IsShapeContext`,
+    ...); like Word they aren't forced open, and if the selected one disappears
+    the ribbon falls back to Home. The ribbon only talks to its pane through the
+    view model: commands plus events for view-only work (`ViewportRequested` for
+    zoom, `TextEditRequested` / `ElementTextEditRequested` for the inline text
+    editor, `PictureImportRequested` for the picture file picker).
     Ribbon buttons are non-focusable so shortcuts keep reaching the page. Shared
     look and icon geometries: `RibbonStyles.axaml`, included from `App.axaml`.
     Group labels are pinned to the bottom (`DockPanel.group`).
@@ -307,7 +313,9 @@ all pages of the first issue, with a blank one created on the fly for a project 
 none (e.g. straight from `stanley init`). `Save(pages)` (from
 `PageNavigatorViewModel.Snapshot()`) writes the manifest title, the issue's page
 order, every page and panel, and deletes the folders/files of pages and panels
-removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`);
+removed since the last save (`ProjectRepository.DeletePage` / `DeletePanel`); with
+the session's pictures it also writes the ones pages use into the issue's `art/`
+folder and deletes the ones a page used at the last save but none uses now;
 nothing else in the folder is touched. A page's label and trim override survive a
 save. Multi-issue navigation isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
@@ -381,13 +389,80 @@ point at a temp folder):
   Timers go through `IDelayScheduler` (`DispatcherDelayScheduler` for real; tests
   use a manual one). Shortcuts:
 Ctrl+N new, Ctrl+O open, Ctrl+S save, Ctrl+Shift+S / F12 save as, Alt+F File view,
-Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. `Ctrl+Z`/`Ctrl+Shift+Z`
+Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo/redo, Esc back out of the File view. On the
+page: V select, P panel, B bubble, D draw, L line, R rectangle, E ellipse, T text,
+H pan. `Ctrl+Z`/`Ctrl+Shift+Z`
   bound globally to history's undo/redo commands.
 
 The separation (editing Avalonia-free, undo/redo Avalonia-coupled) means a
 future editor or subcommand can reach `BubbleEditing`, `PanelLayoutEditing`
 etc. without pulling in Avalonia dependencies. `EditorHistory` has no such
 reuse requirement, so it's fine for it to couple to Avalonia/MVVM.
+
+## Panel elements and backgrounds (implemented)
+
+What a panel holds besides characters and bubbles. Draw order inside the panel clip:
+**background → background elements → characters → foreground elements → bubbles**.
+
+- **Model** (ProjectModel/Issues): `Panel.Elements` — an ordered list (the z-order
+  within each layer, end = front; absent in older panel files, which read as empty)
+  of `PanelElement`s, each with an `ElementId` (stable within its panel, like a
+  bubble's) and an `ElementLayer` (`Background` = behind the characters,
+  `Foreground` = in front, still under the bubbles). Kinds (JSON `kind`):
+  `ShapeElement` (the same anchor model as panels/bubbles, `Closed` or an open line,
+  `ShapeStyle` stroke/fill colours — null = none — and width in mm), `TextElement`
+  (`Bounds`, `Text`, `TextStyle`: size in mm, colour, bold, italic, `TextAlign`,
+  letter `Outline`, caption `BoxFill`/`BoxStroke`), `PictureElement` (`Bounds` +
+  `ArtFileName`). `Panel.Background` (`PanelBackground`) gains `ColorBackground`
+  and `GradientBackground` (top → bottom) beside the existing `InlineBackground`
+  (a picture covering the panel). `PanelElements.Bounds` / `ArtFileNames`.
+- **Pictures on disk**: `issues/<id>/art/<hash>.<ext>` — named after the content
+  (`IssueArt.NameFor`: SHA-256 prefix, so the same picture is one file and names
+  never collide), PNG/JPEG/WebP/GIF/BMP bytes or SVG text as `ArtFile`;
+  `ProjectRepository.LoadIssueArt`/`SaveIssueArt`/`DeleteIssueArt` only accept plain
+  picture file names. `ComicProject.Pictures` holds the ones pages use; `Save`,
+  `SaveAs`, `WriteCopy` (recovery) and export take the session's pictures. In the
+  editor a session-wide `PictureLibrary` (`EditorSession.Pictures`) only ever
+  grows (undo can bring a deleted picture back); `PictureLibrary.UsedBy` is what
+  a save needs.
+- **Rendering** (`ElementRenderer`, `PictureRenderer`, `Lettering`): shapes (round
+  caps/joins on open lines), text (greedy wrap shared with bubbles through
+  `Lettering.Wrap`, shrink to fit, box padding, letter outline; bold/italic use the
+  default family's real faces or fake them), pictures (decoded once per file value;
+  SVG replayed as vectors; a missing file draws a grey placeholder).
+  `PageRenderer.Draw/DrawPanels/Export*` take `pictures`; `DrawPanels` takes
+  `hideText` for the element the inline editor is showing.
+- **Editing** (Stanley.Editing): `ShapeEditing.Freehand` turns a pointer trail
+  into a shape (Ramer–Douglas–Peucker simplification at ~1 screen px, then a
+  Catmull-Rom-style curve through the points that keeps bends over 70° as
+  corners; a trail ending near its start closes and fills), plus `Line`,
+  `Rectangle`, `Ellipse` (`AnchorRing.Rectangle`/`Ellipse`), `Resize` (a flat line
+  keeps its zero height) and `SetStyle`. `TextEditing` (size ladder for
+  bigger/smaller, `GrowToFit` so typed text never has to shrink) and
+  `TextStylePresets` (Caption: boxed, left-aligned; Plain; Sound effect: big,
+  bold italic, outlined). `PictureEditing.Place` fits 80% of the panel at the
+  picture's own shape; `Resize` keeps the shape, pinned to the edges that didn't
+  move. `ElementEditing`: move, resize, layer, reorder, `KeepReachable` (may hang
+  out of the panel, never out of reach, like characters) and `Refit` (carried
+  along at its own size when the panel moves or resizes). `PanelLayoutEditing`
+  carries elements through resize/move/split; a split copies a colour/gradient
+  background into both halves.
+- **Page editor** (`PageEditorViewModel.Elements.cs`, `.Pictures.cs`): tools
+  Draw (the pen stays on), Line/Rectangle/Ellipse (Shift constrains; a click
+  places a 30×20mm one; they hand back to Select with the shape selected) and Text
+  (click or drag a box, the inline editor opens; Esc/empty removes bare text, a
+  boxed caption stays). Drawing is a live gesture — the shape is in `Working`
+  while you drag, one undo step on release. `SelectedElementIndex` joins the
+  bubble/character selection. One style control for the selection and the next
+  new element, like the bubble style (`CurrentShapeStyle`, `CurrentTextStyle`,
+  `CurrentElementLayer`); picking a drawing/text tool lets go of a selected
+  element so the ribbon shows the pen. `SetPanelBackground` is not a layout
+  change, so a locked layout allows it. The canvas hit-tests front to back:
+  foreground elements over characters, background elements under them but never
+  over a panel's draggable edge; unfilled shapes are only hit along their line.
+  Empty bare text shows a faint (unprinted) outline. Pickers: `ColorPalettePicker`,
+  `WeightPicker`, `BackgroundPicker` (`DrawingPalette`: 19 colours, 5 weights,
+  paper + 13 colours + 7 gradient skies).
 
 ## Command-line interface (implemented)
 
