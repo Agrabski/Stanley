@@ -56,26 +56,69 @@ public sealed class EditorWorkspace : ObservableObject
     }
 
     /// <summary>
-    /// Shows <paramref name="editor"/> in the editor area in place of whatever editor is
-    /// there now, and makes it active - how a navigator switches pages: one page on screen
-    /// at a time, not a growing row of tabs.
+    /// Shows <paramref name="editor"/> as a tab alongside whatever's already open - adding
+    /// it if it isn't there yet - and makes it active. Unlike <see cref="Replace"/>, nothing
+    /// else open is closed: this is how opening a character works, so it never throws away
+    /// the page (or another character) the user was already looking at.
     /// </summary>
-    public void SwitchTo(IEditorPane editor)
+    public void Show(IEditorPane editor)
+    {
+        if (FindEditorsDock() is not { } dock)
+            return;
+
+        if (dock.VisibleDockables is null || !dock.VisibleDockables.Contains(editor))
+            Factory.AddDockable(dock, editor);
+
+        dock.ActiveDockable = editor;
+        Factory.SetActiveDockable(editor);
+        ActiveEditor = editor;
+    }
+
+    /// <summary>
+    /// Shows <paramref name="editor"/> as the active tab - adding it if it isn't open yet -
+    /// and closes <paramref name="closing"/> if it was open. Used where exactly one tab of a
+    /// kind makes sense: the page navigator swaps the current page's tab for the newly
+    /// picked page's, and a character's "back to the page" closes just that character's tab.
+    /// Anything else open (another character's tab) is left alone.
+    /// </summary>
+    public void Replace(IEditorPane? closing, IEditorPane editor)
     {
         if (FindEditorsDock() is not { } dock)
             return;
 
         var shown = dock.VisibleDockables?.ToList() ?? [];
         if (!shown.Contains(editor))
-        {
             Factory.AddDockable(dock, editor);
-            foreach (var old in shown)
-                Factory.RemoveDockable(old, collapse: false);
-        }
+        if (closing != null && !ReferenceEquals(closing, editor) && shown.Contains(closing))
+            Factory.RemoveDockable(closing, collapse: false);
 
         dock.ActiveDockable = editor;
         Factory.SetActiveDockable(editor);
         ActiveEditor = editor;
+    }
+
+    /// <summary>
+    /// Closes <paramref name="editor"/>'s tab if it's open, even if it isn't the active one
+    /// (e.g. deleting a character whose tab is open in the background). If it was active,
+    /// falls back to whatever tab is still open.
+    /// </summary>
+    public void Close(IEditorPane editor)
+    {
+        if (FindEditorsDock() is not { } dock || dock.VisibleDockables is not { } shown || !shown.Contains(editor))
+            return;
+
+        var wasActive = ReferenceEquals(editor, ActiveEditor);
+        Factory.RemoveDockable(editor, collapse: false);
+        if (!wasActive)
+            return;
+
+        var next = dock.VisibleDockables?.OfType<IEditorPane>().FirstOrDefault();
+        if (next != null)
+        {
+            dock.ActiveDockable = next;
+            Factory.SetActiveDockable(next);
+        }
+        ActiveEditor = next;
     }
 
     private IDock? FindEditorsDock()

@@ -481,8 +481,15 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public event Action? SelectionChanged;
 
+    /// <remarks>
+    /// With the layout locked, panels themselves can't be selected: asking for a panel with
+    /// no bubble or character in it clears the selection instead. Bubbles and characters
+    /// inside panels stay selectable.
+    /// </remarks>
     public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1)
     {
+        if (Working.LayoutLocked && bubbleIndex < 0 && characterIndex < 0)
+            panelId = null;
         if (panelId is null)
             bubbleIndex = characterIndex = -1;
         if (bubbleIndex >= 0)
@@ -544,6 +551,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
                 Select(null);
             else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count)
                 Select(id);
+            else if (Working.LayoutLocked && IsPanelContext)
+                Select(null); // just locked (or redone a lock) with a panel selected
         }
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
         OnPropertyChanged(nameof(IsLayoutLocked));
@@ -594,8 +603,8 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
         _ when HasSelectedBubble => "Drag to move the bubble · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
-        _ when IsPanelContext && Working.LayoutLocked => "Layout is locked - unlock it on the Layout tab to move, resize, split or delete panels.",
         _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
+        _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character."
     };
 
@@ -1274,6 +1283,23 @@ public sealed class PageEditorViewModel : EditorViewModel<PageDocument>
         if (Committed.Panels.TryGetValue(panelId, out var panel) && index >= 0 && index < panel.CharacterInstances.Count
             && CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
             _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
+    }
+
+    /// <summary>The elbow/knee handles of a placed character, on the page - a second drag handle per limb that swings the upper arm or thigh.</summary>
+    public IReadOnlyList<(Limb Limb, Point2D Point)> BendHandles(CharacterInstance instance) =>
+        CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
+            ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.BendPoint(character, instance, limb))).ToList()
+            : [];
+
+    public void BeginPoseBend(PanelId panelId, int index, Limb limb) => BeginGesture();
+
+    /// <summary>Drags a limb's elbow/knee handle: the joint follows the pointer (the upper bone reaches towards it); the forearm or shin keeps its bend.</summary>
+    public void UpdatePoseBend(PanelId panelId, int index, Limb limb, Point2D target)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count
+            || !CharacterSnapshot.TryGetValue(panel.CharacterInstances[index].CharacterId, out var character))
+            return;
+        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPosing.Bend(character, c, limb, target)));
     }
 
     /// <summary>The hips, chest and head handles of a placed character, on the page.</summary>

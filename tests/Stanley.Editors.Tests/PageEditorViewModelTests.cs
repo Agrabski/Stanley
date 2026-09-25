@@ -592,4 +592,38 @@ public class PageEditorViewModelTests
         vm.Select(panelId);
         Assert.False(vm.DeleteSelectionCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void SelectPanel_WhileLocked_SelectsNothing()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.IsLayoutLocked = true;
+
+        vm.Select(panelId);
+
+        Assert.Null(vm.SelectedPanelId);
+        Assert.False(vm.HasSelectedPanel);
+        Assert.False(vm.IsPanelContext);
+    }
+
+    [Fact]
+    public void LockingLayout_ClearsAPanelSelectionButKeepsABubbleSelection()
+    {
+        var (history, vm, panelId) = NewEditor();
+        var bubbleIndex = vm.CreateBubble(panelId, new Point2D(60, 60));
+
+        vm.Select(panelId);
+        vm.IsLayoutLocked = true;
+        Assert.Null(vm.SelectedPanelId);
+
+        vm.Select(panelId, bubbleIndex);
+        Assert.True(vm.IsBubbleContext);
+        Assert.Equal(panelId, vm.SelectedPanelId);
+
+        // Unlocking (via undo) makes panels selectable again.
+        history.Undo();
+        Assert.False(vm.IsLayoutLocked);
+        vm.Select(panelId);
+        Assert.True(vm.IsPanelContext);
+    }
 }

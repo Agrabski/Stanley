@@ -53,7 +53,7 @@
       </Button>
     </Border>
     <Grid>
-      <ListBox Name="PageList" ItemsSource="{Binding Pages}" SelectedItem="{Binding CurrentPage}" Background="Transparent"
+      <ListBox Name="PageList" ItemsSource="{Binding Pages}" SelectedItem="{Binding CurrentPage, Mode=OneWay}" Background="Transparent"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled" Padding="4">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>

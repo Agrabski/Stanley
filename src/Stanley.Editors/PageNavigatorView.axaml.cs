@@ -23,7 +23,7 @@ public partial class PageNavigatorView : UserControl
         PageList.AddHandler(PointerPressedEvent, OnListPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         PageList.AddHandler(PointerMovedEvent, OnListPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         PageList.AddHandler(PointerReleasedEvent, OnListPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-        PageList.AddHandler(PointerCaptureLostEvent, (_, _) => EndDrag(apply: false), RoutingStrategies.Bubble, handledEventsToo: true);
+        PageList.AddHandler(PointerCaptureLostEvent, (_, _) => { EndDrag(apply: false); ShowCurrentSelection(); }, RoutingStrategies.Bubble, handledEventsToo: true);
         PageList.ContextRequested += OnContextRequested;
         PageList.KeyDown += OnListKeyDown;
     }
@@ -71,7 +71,23 @@ public partial class PageNavigatorView : UserControl
             e.Pointer.Capture(null);
             e.Handled = true;
         }
+        // A click - press and release on the same page without dragging - shows it, even
+        // when it's already the current page (e.g. coming back from a character's editor):
+        // the list box's own selection only fires on a *change*, which a re-click of the
+        // already-selected item isn't.
+        else if (_pressedItem is { } item && ViewModel is { } vm && ItemFrom(e.Source) == item)
+        {
+            vm.Reveal(item);
+        }
         _pressedItem = null;
+        ShowCurrentSelection();
+    }
+
+    /// <summary>The list box selects on press; put its highlight back on the page that's actually current when that press didn't change it (e.g. an aborted drag).</summary>
+    private void ShowCurrentSelection()
+    {
+        if (ViewModel is { } vm && !ReferenceEquals(PageList.SelectedItem, vm.CurrentPage))
+            PageList.SelectedItem = vm.CurrentPage;
     }
 
     private void EndDrag(bool apply)
@@ -169,7 +185,7 @@ public partial class PageNavigatorView : UserControl
             return;
 
         var item = ItemFrom(e.Source) ?? vm.CurrentPage;
-        vm.CurrentPage = item;
+        vm.Reveal(item);
 
         MenuItem Item(string header, System.Windows.Input.ICommand command, string? gesture = null)
         {
@@ -200,6 +216,13 @@ public partial class PageNavigatorView : UserControl
     {
         if (ViewModel is not { } vm)
             return;
+
+        if (e.Key == Key.Enter && PageList.SelectedItem is PageItem selected)
+        {
+            vm.Reveal(selected);
+            e.Handled = true;
+            return;
+        }
 
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta);
         switch (e.Key)

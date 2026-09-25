@@ -58,9 +58,10 @@ public sealed class CharacterItem : ObservableObject
 /// character" undoes like any edit. It's also the <see cref="ICharacterCatalog"/> the page
 /// editors draw placed characters from.
 ///
-/// Each character has its own <see cref="CharacterEditorViewModel"/>. Showing one swaps
-/// it into the editor area in place of the page (<see cref="CharacterShown"/>), the same
-/// one-thing-at-a-time model as the page navigator; <see cref="ReturnToPage"/> goes back.
+/// Each character has its own <see cref="CharacterEditorViewModel"/>. Showing one opens it
+/// as its own tab alongside the page - and any other character already open - rather than
+/// replacing what's there (<see cref="CharacterShown"/>); <see cref="ReturnToPage"/> ("Close"
+/// in that character's ribbon) closes just that one tab and shows the page.
 /// </summary>
 public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 {
@@ -126,11 +127,14 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         }
     }
 
-    /// <summary>Raised when a character's editor should replace the page in the editor area.</summary>
+    /// <summary>Raised when a character's editor should be shown as a tab (adding it if it isn't open yet).</summary>
     public event Action<CharacterItem>? CharacterShown;
 
-    /// <summary>Raised when the page should come back into the editor area (the character editor's "Close").</summary>
-    public event Action? PageRequested;
+    /// <summary>Raised when the page should become the active tab (the character editor's "Close"); carries the character being left, whose own tab closes, or null if none was current.</summary>
+    public event Action<CharacterItem?>? PageRequested;
+
+    /// <summary>Raised when a character is deleted, so its tab closes even if it wasn't the active one.</summary>
+    public event Action<CharacterItem>? CharacterDeleted;
 
     /// <summary>Raised to put a character on the page being edited (the pane's "Place on page"; dragging onto the page places it where it's dropped instead).</summary>
     public event Action<CharacterId>? PlaceRequested;
@@ -202,10 +206,11 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
     /// <summary>Back to the page: no character is current any more.</summary>
     public void ReturnToPage()
     {
+        var closing = _current;
         _current = null;
         OnPropertyChanged(nameof(Current));
         NotifyCommands();
-        PageRequested?.Invoke();
+        PageRequested?.Invoke(closing);
     }
 
     /// <summary>Forgets which character is current without asking for the page back - the page is already being shown (a page was picked in the navigator).</summary>
@@ -239,17 +244,15 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         return item;
     }
 
-    /// <summary>Removes a character that isn't placed anywhere (placed ones can't be deleted - remove them from their panels first).</summary>
+    /// <summary>Removes a character that isn't placed anywhere (placed ones can't be deleted - remove them from their panels first). Its tab closes too, even if it wasn't the one showing.</summary>
     public void DeleteCharacter(CharacterItem item)
     {
         if (!Items.Contains(item) || _usage(item.Id) > 0)
             return;
         var before = Items.ToList();
         var after = before.Where(i => !ReferenceEquals(i, item)).ToList();
-        var wasCurrent = ReferenceEquals(item, _current);
-        SetItems(after);
-        if (wasCurrent)
-            ReturnToPage();
+        SetItems(after); // returns to the page itself (raising PageRequested) if item was current
+        CharacterDeleted?.Invoke(item);
         _history.Push($"Delete character \"{item.Name}\"", () => SetItems(before), () => SetItems(after), this);
     }
 

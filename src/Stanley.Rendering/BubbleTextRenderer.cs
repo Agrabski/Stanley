@@ -14,6 +14,15 @@ public static class BubbleTextRenderer
     private const float HorizontalPaddingFraction = 0.18f;
     private const float VerticalPaddingFraction = 0.22f;
 
+    /// <summary>The box inside the bubble the text is laid out in (its bounding box minus padding), so an editor can put a text box exactly where the lettering goes.</summary>
+    public static Rect2D TextArea(Bubble bubble)
+    {
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var dx = bounds.Width * HorizontalPaddingFraction;
+        var dy = bounds.Height * VerticalPaddingFraction;
+        return new Rect2D(bounds.Left + dx, bounds.Top + dy, bounds.Width - 2 * dx, bounds.Height - 2 * dy);
+    }
+
     public static void Draw(SKCanvas canvas, Bubble bubble, float fontSize = 18f, SKColor? color = null)
     {
         var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);

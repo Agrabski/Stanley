@@ -69,6 +69,22 @@ public class PageNavigatorViewModelTests
     }
 
     [Fact]
+    public void Reveal_OnTheAlreadyCurrentPage_StillRaisesCurrentPageChanged()
+    {
+        // Simply re-setting CurrentPage to itself wouldn't fire the change event (nothing
+        // changed) - Reveal exists so bringing the current page back (e.g. after a
+        // character's editor was shown over it) always works.
+        var (_, navigator) = NewNavigator();
+        var current = navigator.CurrentPage;
+        var seen = new List<PageItem>();
+        navigator.CurrentPageChanged += p => seen.Add(p);
+
+        navigator.Reveal(current);
+
+        Assert.Equal([current], seen);
+    }
+
+    [Fact]
     public void MovePage_Reorders_AndDeleteNeverRemovesTheLastPage()
     {
         var (_, navigator) = NewNavigator();

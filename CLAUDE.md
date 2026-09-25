@@ -270,7 +270,10 @@ Editing pipeline layers, bottom to top:
     bubbles along (`BubbleEditing.Refit`, split sends each bubble to the half its
     centre is in). Double-click in a panel (or the Bubble tool, or "Add bubble")
     creates a bubble with a tail already aimed into free space, and opens an inline
-    text editor over it (Enter = done, Shift+Enter = newline, Esc = cancel).
+    text editor in it (Enter = done, Shift+Enter = newline, Esc = cancel). Nothing
+    may cover the bubble while typing: the text box is transparent and borderless,
+    sits in `BubbleTextRenderer.TextArea`, and the canvas (`PageCanvasControl.EditingBubble`)
+    leaves that bubble's lettering and handles off; key hints go in the status bar.
   - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm):
     panel edges snap to the page margin, one gutter from neighbours, and into line
     with neighbours' edges; Alt disables it for one drag. Gutter drags
@@ -285,6 +288,10 @@ Editing pipeline layers, bottom to top:
     Bubbles and characters are unaffected - a deliberately separate code path, so
     lettering and posing keep working on a protected page. Toggling the lock itself
     is a normal undoable edit (`IsLayoutLocked` reads/writes through `Working`).
+    Panels can't even be *selected* while locked: `Select` turns a panel-only
+    selection into none (and locking clears one), and the canvas offers no panel
+    handles, edges, gutters, hover or selection outline - a click on a panel acts
+    like the pasteboard; double-click still adds a bubble.
   - Gesture `Update*` methods compute from `Committed` (the gesture baseline), never
     `Working`, so a drag is a pure function of the current pointer position.
 - **`Stanley.App`**: `MainWindow` + `MainWindowViewModel` own the document
@@ -519,11 +526,14 @@ body and placement only.
 - **Posing** (`CharacterPosing`, Stanley.Editing), by dragging a selected
   character's handles: green hand/foot dots → `Reach` (two-bone IK, exact in reach,
   pointing at the target out of reach; bend side held per drag via `BendSign`,
-  anatomical side on); hollow rings → `MoveHips` (feet pinned by re-solving both
-  legs; drop limited by `MaxHipsDrop` ≈ half the leg), `Lean` (chest) and `TiltHead`
-  - inverse kinematics too (`SolveTrunkChain`: damped least squares over the spine or
-  neck joints with a smoothness term, so the bend is shared along the chain, never a
-  rigid rotation; `Lean` also keeps the arms' direction, so hanging arms keep hanging).
+  anatomical side on); green elbow/knee squares → `Bend` (the upper
+  bone swings about the shoulder/hip so the joint follows the pointer — one-bone IK,
+  pointing at it out of reach; the forearm/shin keeps its bend and rides along); hollow
+  rings → `MoveHips` (feet pinned by re-solving both legs; drop limited by
+  `MaxHipsDrop` ≈ half the leg), `Lean` (chest) and `TiltHead` - inverse kinematics
+  too (`SolveTrunkChain`: damped least squares over the spine or neck joints with a
+  smoothness term, so the bend is shared along the chain, never a rigid rotation;
+  `Lean` also keeps the arms' direction, so hanging arms keep hanging).
   `MirrorPose` swaps left/right (front: negated) or near/far (side). Presets
   (`PosePresets`: Stand, Wave, Cheer, Point, Hands on hips, Shrug, Think, Crouch,
   Walk, Run, Sit) are hand/foot *goals relative to each limb's own root and length*
