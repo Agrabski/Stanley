@@ -230,6 +230,38 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task InfosTitleAndIssueNumber_ShowWhereverAPageHasTheirFields_AndAreSaved()
+    {
+        var vm = NewViewModel();
+        Assert.Equal("1", vm.IssueNumber);
+
+        vm.DocumentTitle = "Moon Pie";
+        vm.IssueNumber = " 4 ";
+
+        Assert.True(vm.IsDirty);
+        Assert.Equal(new Stanley.ProjectModel.Issues.TextFields("Moon Pie", "4"), vm.Editor!.Fields);
+        var folder = Path.Combine(_root, "Moon Pie");
+        _dialogs.Folders.Enqueue(folder);
+        Assert.True(await vm.SaveAsync());
+        Assert.False(vm.IsDirty);
+        Assert.Equal("4", Stanley.Editors.ComicProject.Open(folder).IssueNumber);
+    }
+
+    [Fact]
+    public async Task AMarginSetOnTheLayoutTab_IsSavedWithTheComic()
+    {
+        var vm = NewViewModel();
+        vm.Editor!.MarginMm = 14;
+        Assert.True(vm.IsDirty);
+
+        var folder = Path.Combine(_root, "Margins");
+        _dialogs.Folders.Enqueue(folder);
+        Assert.True(await vm.SaveAsync());
+
+        Assert.Equal(14, Stanley.Editors.ComicProject.Open(folder).Grid.MarginMm);
+    }
+
+    [Fact]
     public void AComicBooksInfo_StillNamesItsPaper() =>
         Assert.Equal("A4 · 210 × 297 mm, 3 mm bleed", NewViewModel().PageSizeText);
 }

@@ -89,6 +89,64 @@ public class TitlePageAndTemplateTests
     }
 
     [Fact]
+    public void A_field_clicked_on_the_Text_tab_while_typing_goes_in_at_the_caret_and_shows_the_issue_number()
+    {
+        var window = Open();
+        var editor = window.Editor;
+        var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
+        var panelId = editor.Working.PanelOrder[0];
+        var bounds = editor.PanelBounds(panelId);
+        var index = editor.CreateText(panelId, new Point2D(bounds.Left + 20, bounds.Top + 30), new Rect2D(bounds.Left + 20, bounds.Top + 30, 80, 12));
+        editor.SetElementText(panelId, index, "Wydanie # tom 2");
+        window.ViewModel.IssueNumber = "7";
+        editor.RequestElementTextEdit(panelId, index);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(view.TextEditor.IsFocused);
+        view.TextEditor.CaretIndex = "Wydanie #".Length;
+        ShowTab(window, "TextTab");
+
+        var issue = Ribbon(window).GetVisualDescendants().OfType<Button>().Single(b => b.DataContext is TextFieldChoice { Token: "{issue}" });
+        var at = issue.TranslatePoint(new Point(issue.Bounds.Width / 2, issue.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(view.TextEditor.IsVisible, "the ribbon button mustn't take the keyboard away from the text being typed");
+        Assert.Equal("Wydanie #{issue} tom 2", view.TextEditor.Text);
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Wydanie #{issue} tom 2", ((Stanley.ProjectModel.Issues.TextElement)editor.Working.Panels[panelId].Elements[index]).Text);
+        Assert.Equal("Wydanie #7 tom 2", editor.Fields!.Fill("Wydanie #{issue} tom 2"));
+        LookTabTests.Snapshot(window, "field-issue");
+    }
+
+    [Fact]
+    public void The_Layout_tab_margin_moves_every_pages_panels_onto_it_as_one_undo_step()
+    {
+        var window = Open();
+        var navigator = window.ViewModel.Navigator!;
+        navigator.AddPageAfter(navigator.CurrentPage);
+        navigator.CurrentPage = navigator.Pages[0];
+        Dispatcher.UIThread.RunJobs();
+        ShowTab(window, "LayoutTab");
+        var margin = Ribbon(window).GetVisualDescendants().OfType<NumericUpDown>().Single(n => n.Name == "MarginInput");
+        double Left(PageItem page) => AnchorRing.BoundingBox(page.Editor.Working.Panels.Values.Single().Shape.Anchors).Left;
+        Assert.All(navigator.Pages, p => Assert.Equal(10, Left(p), 6));
+
+        margin.Value = 20;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.All(navigator.Pages, p => Assert.Equal(20, Left(p), 6));
+        Assert.All(navigator.Pages, p => Assert.Equal(20, p.Editor.Grid.MarginMm));
+        LookTabTests.Snapshot(window, "margin-20");
+
+        window.ViewModel.UndoCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.All(navigator.Pages, p => Assert.Equal(10, Left(p), 6));
+        Assert.Equal(10m, margin.Value);
+    }
+
+    [Fact]
     public void The_panel_tab_border_switch_takes_a_panels_border_off_and_back_on()
     {
         var window = Open();

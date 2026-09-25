@@ -30,6 +30,15 @@ public interface IPageNumberingHost
 }
 
 /// <summary>
+/// Where the comic's margin and gutter live (the page navigator): one setting every page
+/// lays out and snaps with. Changing it is one undoable step.
+/// </summary>
+public interface IPageSpacingHost
+{
+    void SetSpacing(Stanley.Editing.PanelGrid spacing);
+}
+
+/// <summary>
 /// Where an issue's look per character lives (<see cref="ProjectModel.Issues.Issue.CharacterRevisions"/>):
 /// what its panels show each character in unless a panel picks its own. Changing it is
 /// one undoable step that every page redraws for.

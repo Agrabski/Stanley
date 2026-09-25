@@ -145,6 +145,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             () => PageNumbersEnabled);
         InitializeElementCommands();
         InitializeTitlePageCommands();
+        InitializeFieldCommands();
     }
 
     // ---------------------------------------------------------------- ribbon commands
@@ -260,6 +261,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         SmallerCharacterCommand.NotifyCanExecuteChanged();
         MatchCharacterSizeCommand.NotifyCanExecuteChanged();
         EditCharacterCommand.NotifyCanExecuteChanged();
+        InsertFieldCommand.NotifyCanExecuteChanged();
         NotifyElementCommands();
     }
 
@@ -294,31 +296,58 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     private void SetToolFlag(PageEditorTool tool, bool value) => Tool = value ? tool : Tool;
 
-    /// <summary>Margin and gutter used for snapping, splitting and layout presets.</summary>
+    /// <summary>Margin and gutter used for snapping, splitting and layout presets - the comic's, set by its <see cref="SpacingHost"/>.</summary>
     public PanelGrid Grid
     {
         get => _grid;
-        set => SetProperty(ref _grid, value);
+        set
+        {
+            if (!SetProperty(ref _grid, value))
+                return;
+            OnPropertyChanged(nameof(MarginMm));
+            OnPropertyChanged(nameof(GutterMm));
+        }
     }
 
+    /// <summary>Where the comic's margin and gutter live (the navigator), so the Layout tab sets them for every page; null for a page edited on its own, which keeps its own.</summary>
+    public IPageSpacingHost? SpacingHost { get; set; }
+
+    /// <summary>Layout tab › Margin: the page edge to panel distance, for the whole comic. Panel edges on the old margin follow it.</summary>
     public double MarginMm
     {
         get => Grid.MarginMm;
-        set
-        {
-            Grid = Grid with { MarginMm = Math.Max(0, value) };
-            OnPropertyChanged();
-        }
+        set => SetSpacing(Grid with { MarginMm = Math.Max(0, value) });
     }
 
+    /// <summary>Layout tab › Gutter: the space between neighbouring panels, for the whole comic.</summary>
     public double GutterMm
     {
         get => Grid.GutterMm;
-        set
+        set => SetSpacing(Grid with { GutterMm = Math.Max(0, value) });
+    }
+
+    private void SetSpacing(PanelGrid grid)
+    {
+        if (grid == Grid)
+            return;
+        if (SpacingHost is { } host)
         {
-            Grid = Grid with { GutterMm = Math.Max(0, value) };
-            OnPropertyChanged();
+            host.SetSpacing(grid);
+            return;
         }
+        var oldMargin = Grid.MarginMm;
+        Grid = grid;
+        MoveMargin(oldMargin, grid.MarginMm);
+    }
+
+    /// <summary>The comic's margin moved from <paramref name="oldMarginMm"/>: panel edges that sat on it move onto the new one (<see cref="PanelLayoutEditing.MoveMargin"/>), one undo step - unless the layout is locked.</summary>
+    public void MoveMargin(double oldMarginMm, double newMarginMm)
+    {
+        if (Committed.LayoutLocked)
+            return;
+        var panels = PanelLayoutEditing.MoveMargin(Committed.Panels, PageBounds, oldMarginMm, newMarginMm);
+        if (!ReferenceEquals(panels, Committed.Panels))
+            Apply(EditResult<PageDocument>.Success(Committed with { Panels = panels }));
     }
 
     // ---------------------------------------------------------------- page numbers

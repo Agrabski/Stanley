@@ -79,16 +79,20 @@ public class TitlePagesTests
             .Select(p => p with { Elements = p.Elements.Where(e => e.Id != TitlePages.SubtitleId).ToList() })
             .ToList();
 
-        var read = TitlePages.WordsOn(panels, TitlePages.DefaultWords("Other", "9"));
+        var read = TitlePages.WordsOn(panels, TitlePages.DefaultWords);
 
-        Assert.Equal(new TitlePageWords("The Big Heist", "Issue #9", "Story and art by Sam"), read);
+        Assert.Equal(new TitlePageWords("The Big Heist", "Issue #{issue}", "Story and art by Sam"), read);
     }
 
     [Fact]
-    public void DefaultWords_UseTheComicsTitleAndIssue_OrPlaceholders()
+    public void DefaultWords_LetStanleyFillInTheTitleAndIssueNumber()
     {
-        Assert.Equal(new TitlePageWords("Moon Pie", "Issue #2", "Story and art by Your Name"), TitlePages.DefaultWords(" Moon Pie ", "2"));
-        Assert.Equal(new TitlePageWords("Comic Title", "Issue #1", "Story and art by Your Name"), TitlePages.DefaultWords(null, ""));
+        var words = TitlePages.DefaultWords;
+        var fields = new TextFields("Moon Pie", "2");
+
+        Assert.Equal(("{title}", "Issue #{issue}"), (words.Title, words.Subtitle));
+        Assert.Equal(("Moon Pie", "Issue #2"), (fields.Fill(words.Title), fields.Fill(words.Subtitle)));
+        Assert.Equal("Wydanie #2", fields.Fill(words.Subtitle.Replace("Issue", "Wydanie", StringComparison.Ordinal)));
     }
 
     private static bool Inside(Rect2D inner, Rect2D outer) =>

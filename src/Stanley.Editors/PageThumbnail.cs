@@ -65,7 +65,7 @@ public sealed class PageThumbnail : Control
     private void OnPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(PageEditorViewModel.Working) or nameof(PageEditorViewModel.Folio) or nameof(PageEditorViewModel.CharacterSnapshot)
-            or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.PictureSnapshot))
+            or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields))
             InvalidateVisual();
     }
 
@@ -80,13 +80,13 @@ public sealed class PageThumbnail : Control
     {
         if (Page is not { } page)
             return;
-        context.Custom(new ThumbnailDrawOperation(new Rect(Bounds.Size), page.PageBounds, page.Working, page.Folio, page.CharacterSnapshot, page.IssueLooks, page.PictureSnapshot));
+        context.Custom(new ThumbnailDrawOperation(new Rect(Bounds.Size), page.PageBounds, page.Working, page.Folio, page.CharacterSnapshot, page.IssueLooks, page.PictureSnapshot, page.Fields));
     }
 
     internal sealed class ThumbnailDrawOperation(Rect bounds, Rect2D pageBounds, PageDocument document, PageFolio? folio,
         IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Characters.CharacterDefinition> characters,
         IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Ids.CharacterRevisionId> issueLooks,
-        IReadOnlyDictionary<string, ProjectModel.Characters.ArtFile> pictures) : ICustomDrawOperation
+        IReadOnlyDictionary<string, ProjectModel.Characters.ArtFile> pictures, ProjectModel.Issues.TextFields? fields) : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
 
@@ -112,7 +112,7 @@ public sealed class PageThumbnail : Control
             PageRenderer.Draw(canvas, pageBounds, document.PanelOrder
                 .Where(document.Panels.ContainsKey)
                 .Select(id => document.Panels[id])
-                .ToList(), folio, characters, issueLooks, pictures);
+                .ToList(), folio, characters, issueLooks, pictures, fields);
             canvas.Restore();
         }
     }

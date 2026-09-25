@@ -22,7 +22,7 @@ namespace Stanley.Editors;
 public partial class PageEditorView : UserControl
 {
     private const string DialogueHint = "Type the dialogue · Enter = done · Shift+Enter = new line · Esc = cancel";
-    private const string TextHint = "Type the text · Enter = done · Shift+Enter = new line · Esc = cancel";
+    private const string TextHint = "Type the text - {title} and {issue} show the comic's title and issue number · Enter = done · Shift+Enter = new line · Esc = cancel";
 
     private PageEditorViewModel? _subscribed;
 
@@ -61,6 +61,7 @@ public partial class PageEditorView : UserControl
             _subscribed.ElementTextEditRequested -= BeginElementTextEdit;
             _subscribed.ViewportRequested -= OnViewportRequested;
             _subscribed.PictureImportRequested -= OnPictureImportRequested;
+            _subscribed.FieldInsertRequested -= OnFieldInsertRequested;
         }
         _subscribed = ViewModel;
         if (_subscribed != null)
@@ -70,6 +71,7 @@ public partial class PageEditorView : UserControl
             _subscribed.ElementTextEditRequested += BeginElementTextEdit;
             _subscribed.ViewportRequested += OnViewportRequested;
             _subscribed.PictureImportRequested += OnPictureImportRequested;
+            _subscribed.FieldInsertRequested += OnFieldInsertRequested;
         }
 
         PageCanvas.ViewModel = ViewModel;
@@ -78,6 +80,22 @@ public partial class PageEditorView : UserControl
             PageInfoText.Text = $"{DescribePaper(vm.PageBounds)} · {vm.PageBounds.Width:0.#} × {vm.PageBounds.Height:0.#} mm";
         }
         UpdateZoomText();
+    }
+
+    /// <summary>Text tab › Fields while typing: the field goes in at the caret (replacing any selection), and typing carries on. The ribbon's buttons don't take the keyboard, so the editor is still open.</summary>
+    private void OnFieldInsertRequested(FieldInsertRequest request)
+    {
+        if (_editing is null)
+            return;
+        var text = InlineTextEditor.Text ?? "";
+        var start = Math.Min(InlineTextEditor.SelectionStart, InlineTextEditor.SelectionEnd);
+        var end = Math.Max(InlineTextEditor.SelectionStart, InlineTextEditor.SelectionEnd);
+        start = Math.Clamp(start, 0, text.Length);
+        end = Math.Clamp(end, start, text.Length);
+        InlineTextEditor.Text = text[..start] + request.Token + text[end..];
+        InlineTextEditor.SelectionStart = InlineTextEditor.SelectionEnd = InlineTextEditor.CaretIndex = start + request.Token.Length;
+        InlineTextEditor.Focus();
+        request.Handled = true;
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

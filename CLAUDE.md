@@ -218,7 +218,9 @@ Editing pipeline layers, bottom to top:
   and `EditorViewModel<TDocument>` (gesture lifecycle: `BeginGesture()`
   captures state, `UpdateGesture(result)` applies on every pointer move for
   live preview, `CommitGesture()` records in history, `CancelGesture()` reverts
-  to baseline). Allows Avalonia coupling (extends Dock.Avalonia's `Document`
+  to baseline). `EditorHistory.Group(description, source)` makes everything pushed
+  until the scope is disposed - by any editor - one undo step (undone in reverse; a
+  nested group joins it, an empty one leaves nothing). Allows Avalonia coupling (extends Dock.Avalonia's `Document`
   directly) since undo/redo and pane lifecycle have no lower-level reuse
   requirement. `TDocument` must be immutable (`record` satisfies this).
 - **`Stanley.Editors`**: concrete editor implementations (`PageEditorViewModel`
@@ -301,7 +303,8 @@ Editing pipeline layers, bottom to top:
     may cover the bubble while typing: the text box is transparent and borderless,
     sits in `BubbleTextRenderer.TextArea`, and the canvas (`PageCanvasControl.EditingBubble`)
     leaves that bubble's lettering and handles off; key hints go in the status bar.
-  - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm):
+  - **Snapping** (`PanelSnapping`, `PanelGrid` = margin + gutter, default 10mm/4mm,
+    one for the whole comic - see "Margin and gutter are the comic's" below):
     panel edges snap to the page margin, one gutter from neighbours, and into line
     with neighbours' edges; Alt disables it for one drag. Gutter drags
     (`PanelGutters.FindAt`) move the whole aligned run of panels on both sides,
@@ -351,11 +354,12 @@ with.
 `MainWindowViewModel` (Stanley.App) runs New / Open / Save / Save As / Close /
 Export and the File ("backstage") view, `Backstage.axaml`: full-window, blue command
 rail, pages New (comic book: paper size + layout tiles; then comic strip and webcomic
-template tiles), Open (Browse + Recent), Info (editable title, location, size — named
-after its paper or template, with a webcomic's export size), Save As, Export. With no comic open the window *is* the File
+template tiles), Open (Browse + Recent), Info (editable title and issue number, location,
+size — named after its paper or template, with a webcomic's export size), Save As, Export.
+With no comic open the window *is* the File
 view. Dirty state is `EditorHistory.IsDirty` (undo-stack top vs. the top at
-`MarkSaved()`, so undoing back to the saved state is clean again) or an unsaved title
-edit; New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
+`MarkSaved()`, so undoing back to the saved state is clean again) or an unsaved File ›
+Info edit (title, issue number - not undo steps, like Word's document properties); New/Open/Close/window-close ask Save / Don't Save / Cancel first. Errors show in
 the File view, not modals. OS dialogs sit behind `IFileDialogs`
 (`AvaloniaFileDialogs` for real; tests script a fake). Recent comics:
 `RecentProjects`, a plain text file under the user's app-data folder.
@@ -559,10 +563,10 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   cover, a daily strip or a 4-koma; everything on it edits like any other page. The
   three texts have fixed element ids (`TitleId`/`SubtitleId`/`CreditsId`), so picking
   another design redoes the title page *in place* keeping its words
-  (`TitlePages.WordsOn`), one undo step. Words start as the comic's title, "Issue #n"
-  and "Story and art by Your Name" (`PageEditorHost` sets
-  `PageNavigatorViewModel.NewTitlePageWords`; read when the page is made, not bound
-  to the title afterwards). The navigator owns it (`ITitlePageHost`:
+  (`TitlePages.WordsOn`), one undo step. Words start as `{title}`, `Issue #{issue}`
+  and "Story and art by Your Name" (`TitlePages.DefaultWords`): the title and issue
+  number are *fields* Stanley fills in (below), so they follow File › Info, and the
+  words around them are the user's ("Wydanie #{issue}"). The navigator owns it (`ITitlePageHost`:
   `InsertTitlePage` — a new first page, or the existing one redone and shown —
   `RemoveTitlePage`, never the only page); it's marked `PageDocument.IsTitlePage` /
   `Page.TitlePage` (written only when set; a new one's folder slug is `title-page`),
@@ -583,10 +587,33 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   (`ComicProject.Grid`) and every *new* page with its panels
   (`ComicProject.NewPageLayout` → `PageNavigatorViewModel(..., grid, newPageLayout)`;
   a comic book's new pages stay one panel), and PNG export keeps the pixel size.
-  Changing margin/gutter on the Layout tab is still session-only, as for comic books.
+  The Layout tab's margin/gutter changes are saved in the same `Format` (spacing only
+  for a comic book - absent while it's the default), below.
   `ComicTemplates.Matching(size)` names the format in File › Info and the status bar.
   `LayoutPresetPreview` takes an optional `PageSize`/`Grid` to draw a template's page
   to shape.
+- **Fields** (`TextFields`, ProjectModel/Issues; like Word's): `{title}` and `{issue}`
+  (case-insensitive; anything else in braces stays as typed) in a text element or a
+  bubble show the comic's title and the issue's number (`Issue.Number`, free text,
+  editable in File › Info beside the title). The file keeps the field; `PageRenderer`
+  fills it in (`fields` on `Draw`/`DrawPanels`/`Export*`, one pass so a value that
+  looks like a field isn't filled again), so the canvas, thumbnails and exports all
+  show the value and follow File › Info at once. The navigator holds the comic's
+  `Fields` and pushes them to every page editor (`PageEditorViewModel.Fields`);
+  `MainWindowViewModel` refreshes them on a title/issue edit or a first Save As.
+  The inline editor shows the raw text. Text tab › Fields (`TextFieldChoice.All`,
+  `InsertFieldCommand`): plain non-focusable ribbon buttons, so while typing the view
+  inserts at the caret (`FieldInsertRequested`, marked handled) without closing the
+  editor; otherwise the field is appended to the selected text or bubble.
+- **Margin and gutter are the comic's** (Layout tab › Spacing): the navigator owns them
+  (`IPageSpacingHost.SetSpacing`, `Spacing`, `SpacingChanged`) and sets every page
+  editor's `Grid` (also pages an undo brings back - `SyncPages`), so snapping, layout
+  presets and splits use them on every page; `MainWindowViewModel` keeps
+  `ComicProject.Grid` in step and it's saved in `SeriesManifest.Format`. A new margin
+  also moves panel edges that sat on the old margin line onto the new one
+  (`PanelLayoutEditing.MoveMargin`: gutters and bleeds stay, a panel that would drop
+  under 20mm is left alone) on every page whose layout isn't locked - the spacing and
+  every page's panels in one undo step (`EditorHistory.Group`).
 
 ## Command-line interface (implemented)
 

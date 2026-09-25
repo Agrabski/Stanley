@@ -192,4 +192,44 @@ public static class PanelLayoutEditing
 
         return EditResult<IReadOnlyList<Rect2D>>.Success(rects);
     }
+
+    /// <summary>
+    /// A new page margin, applied to the layout: every panel edge lying on the old margin
+    /// line moves onto the new one, the panel and what's in it resized along, so the
+    /// layout keeps hugging the margin. Edges anywhere else - gutters, a panel bleeding to
+    /// the page edge - stay put, and a panel that would end up too small is left alone.
+    /// Returns <paramref name="panels"/> itself when nothing moved.
+    /// </summary>
+    public static IReadOnlyDictionary<PanelId, Panel> MoveMargin(IReadOnlyDictionary<PanelId, Panel> panels, Rect2D pageBounds, double oldMarginMm, double newMarginMm)
+    {
+        const double onLine = 0.5;
+        var oldLive = new PanelGrid(oldMarginMm, 0).LiveArea(pageBounds);
+        var newLive = new PanelGrid(newMarginMm, 0).LiveArea(pageBounds);
+        if (Math.Abs(newMarginMm - oldMarginMm) < 1e-9)
+            return panels;
+
+        Dictionary<PanelId, Panel>? moved = null;
+        foreach (var (id, panel) in panels)
+        {
+            var bounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+            var follows = false;
+            double Follow(double edge, double oldLine, double newLine)
+            {
+                if (Math.Abs(edge - oldLine) >= onLine)
+                    return edge;
+                follows = true;
+                return newLine;
+            }
+            var target = Rect2D.FromEdges(
+                Follow(bounds.Left, oldLive.Left, newLive.Left),
+                Follow(bounds.Top, oldLive.Top, newLive.Top),
+                Follow(bounds.Right, oldLive.Right, newLive.Right),
+                Follow(bounds.Bottom, oldLive.Bottom, newLive.Bottom));
+            if (!follows || Resize(panel, target, pageBounds) is not { IsValid: true } resized)
+                continue;
+            moved ??= new Dictionary<PanelId, Panel>(panels);
+            moved[id] = resized.Value;
+        }
+        return moved ?? panels;
+    }
 }

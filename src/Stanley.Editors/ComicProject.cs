@@ -30,6 +30,8 @@ public sealed class ComicProject
     public const double DefaultBleedMm = 3;
 
     private Issue _issue;
+    // The template the comic was made from, if any: new pages' panels and the export width.
+    private readonly ComicFormat? _format;
     // What's on disk (at Location) as of the last open/save: page records (kept so a
     // page's label and trim override survive a save) and each page's panel ids, so a
     // save can delete the files of pages and panels removed since.
@@ -46,7 +48,8 @@ public sealed class ComicProject
         IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
         IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures)
     {
-        Format = format;
+        _format = format;
+        Grid = GridOf(format);
         Characters = characters;
         _savedCharacters = savedCharacters;
         Pictures = pictures;
@@ -71,20 +74,34 @@ public sealed class ComicProject
     /// <summary>The project's default page size - what new pages get.</summary>
     public PageTrim Trim { get; }
 
-    /// <summary>What the comic was set up as (<see cref="SeriesManifest.Format"/>) - a strip, a webcomic; null for a comic book.</summary>
-    public ComicFormat? Format { get; }
+    /// <summary>
+    /// What the comic was set up as (<see cref="SeriesManifest.Format"/>): a strip or
+    /// webcomic template's, with the comic's current <see cref="Grid"/>; for a comic book,
+    /// just the spacing - or null while that's the default, so its file stays as it was.
+    /// </summary>
+    public ComicFormat? Format =>
+        _format is { } format && (format.PanelsPerRow != null || format.ExportWidthPx != null) ? format with { MarginMm = Grid.MarginMm, GutterMm = Grid.GutterMm }
+        : Grid == PanelGrid.Default ? null
+        : new ComicFormat(Grid.MarginMm, Grid.GutterMm);
 
-    /// <summary>The margin and gutter the comic's pages are laid out with: its format's, else the comic book default.</summary>
-    public PanelGrid Grid => GridOf(Format);
+    /// <summary>The margin and gutter every page is laid out and snapped with (Layout tab), saved with the comic. Kept in step with the page navigator's by whoever runs the session.</summary>
+    public PanelGrid Grid { get; set; }
 
     /// <summary>The panels a new page starts with (a strip's row of four); null for one panel filling the page.</summary>
-    public PanelLayoutPreset? NewPageLayout => LayoutOf(Format);
+    public PanelLayoutPreset? NewPageLayout => LayoutOf(_format);
 
     /// <summary>For a comic read on screen, the width in pixels a page is exported at as a PNG; null for print resolution.</summary>
-    public int? ExportWidthPx => Format?.ExportWidthPx;
+    public int? ExportWidthPx => _format?.ExportWidthPx;
 
-    /// <summary>The issue's number as displayed ("1", "0", "1.5"), for a title page.</summary>
-    public string IssueNumber => _issue.Number;
+    /// <summary>The issue's number as displayed ("1", "0", "1.5") - free text, editable from File › Info, shown wherever a text has <c>{issue}</c>.</summary>
+    public string IssueNumber
+    {
+        get => _issue.Number;
+        set => _issue = _issue with { Number = value };
+    }
+
+    /// <summary>What the fields in the comic's texts show: its title and issue number.</summary>
+    public TextFields Fields => new(Title, IssueNumber);
 
     public Rect2D PageBounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 
@@ -161,7 +178,7 @@ public sealed class ComicProject
     }
 
     /// <summary>A new page at the project's size: one panel filling the live area, or the format's panels.</summary>
-    public ComicPage CreateBlankPage() => NewPage(Trim, Format);
+    public ComicPage CreateBlankPage() => NewPage(Trim, _format);
 
     /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
@@ -250,10 +267,10 @@ public sealed class ComicProject
         if (originalLocation != null && ProjectRepository.IsInitialized(originalLocation))
         {
             var original = Open(originalLocation);
-            return new ComicProject(original.Location, copy.Title, original.Trim, copy.Format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
+            return new ComicProject(original.Location, copy.Title, original.Trim, copy._format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
                 copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy.Format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
+        return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, []);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
@@ -358,22 +375,22 @@ public sealed class ComicProject
     /// <summary>Every page, in order, as one PDF at trim size (bleed isn't drawn yet).</summary>
     public static void ExportPdf(string path, IEnumerable<(Rect2D Bounds, PageDocument Document, PageFolio? Folio)> pages,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null)
     {
         using var stream = File.Create(path);
-        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks, pictures);
+        PageRenderer.ExportPdf(stream, pages.Select(p => (p.Bounds, InOrder(p.Document), p.Folio)).ToList(), characters, issueLooks, pictures, fields);
     }
 
     /// <summary>One page as a PNG: at <paramref name="dpi"/>, or exactly <paramref name="widthPx"/> pixels wide when given (a webcomic's <see cref="ExportWidthPx"/>).</summary>
     public static void ExportPng(string path, Rect2D bounds, PageDocument document, int dpi = 300, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null, int? widthPx = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, int? widthPx = null, TextFields? fields = null)
     {
         using var stream = File.Create(path);
         if (widthPx is { } width)
-            PageRenderer.ExportPngAtWidth(stream, bounds, InOrder(document), width, folio, characters, issueLooks, pictures);
+            PageRenderer.ExportPngAtWidth(stream, bounds, InOrder(document), width, folio, characters, issueLooks, pictures, fields);
         else
-            PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks, pictures);
+            PageRenderer.ExportPng(stream, bounds, InOrder(document), dpi, folio, characters, issueLooks, pictures, fields);
     }
 
     private static IEnumerable<PanelModel> InOrder(PageDocument document) =>

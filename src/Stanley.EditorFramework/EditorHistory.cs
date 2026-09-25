@@ -19,6 +19,9 @@ public sealed class EditorHistory : ObservableObject
     // saved state counts as clean again, the way Word's "saved" indicator behaves.
     private HistoryEntry? _savedTop;
 
+    // While a Group is open, pushes collect here and become one entry when it closes.
+    private List<HistoryEntry>? _group;
+
     public EditorHistory()
     {
         UndoCommand = new RelayCommand(Undo, () => CanUndo);
@@ -48,9 +51,39 @@ public sealed class EditorHistory : ObservableObject
     /// <param name="source">Who made the edit (usually the editor pane). Reported by <see cref="Restored"/> so undoing an edit made elsewhere - on another page, say - can bring that place back into view first.</param>
     public void Push(string description, Action restoreBefore, Action restoreAfter, object? source = null)
     {
-        _undo.Push(new HistoryEntry(description, restoreBefore, restoreAfter, source));
+        var entry = new HistoryEntry(description, restoreBefore, restoreAfter, source);
+        if (_group != null)
+        {
+            _group.Add(entry);
+            return;
+        }
+        _undo.Push(entry);
         _redo.Clear();
         NotifyChanged();
+    }
+
+    /// <summary>
+    /// Everything pushed until the returned scope is disposed - by any editor - becomes one
+    /// undo step: undone in reverse order, redone in order. For one action that changes
+    /// several panes at once, such as a margin every page follows. A group opened inside
+    /// another just joins it; an empty group leaves no step at all.
+    /// </summary>
+    public IDisposable Group(string description, object? source = null)
+    {
+        if (_group != null)
+            return new GroupScope(null);
+        var entries = new List<HistoryEntry>();
+        _group = entries;
+        return new GroupScope(() =>
+        {
+            _group = null;
+            if (entries.Count == 0)
+                return;
+            Push(description,
+                () => { for (var i = entries.Count - 1; i >= 0; i--) entries[i].RestoreBefore(); },
+                () => { foreach (var entry in entries) entry.RestoreAfter(); },
+                source);
+        });
     }
 
     public void Undo()
@@ -87,4 +120,15 @@ public sealed class EditorHistory : ObservableObject
     }
 
     private sealed record HistoryEntry(string Description, Action RestoreBefore, Action RestoreAfter, object? Source);
+
+    private sealed class GroupScope(Action? close) : IDisposable
+    {
+        private Action? _close = close;
+
+        public void Dispose()
+        {
+            _close?.Invoke();
+            _close = null;
+        }
+    }
 }

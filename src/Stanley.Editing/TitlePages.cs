@@ -17,7 +17,7 @@ public enum TitlePageDesign
     Classic
 }
 
-/// <summary>The words a title page shows: the comic's title, a line under it (the issue, a chapter) and who made it.</summary>
+/// <summary>The words a title page shows: the comic's title, a line under it (the issue, a chapter) and who made it - fields (<see cref="TextFields"/>) and all.</summary>
 public sealed record TitlePageWords(string Title, string Subtitle, string Credits);
 
 /// <summary>
@@ -26,9 +26,11 @@ public sealed record TitlePageWords(string Title, string Subtitle, string Credit
 /// restyle them, swap the background, add characters or a picture. Pure functions, like
 /// <see cref="PanelLayoutEditing"/>.
 ///
-/// The three texts carry fixed element ids (<see cref="TitleId"/>, <see cref="SubtitleId"/>,
-/// <see cref="CreditsId"/>), so a page redone in another design keeps whatever was typed
-/// into them (<see cref="WordsOn"/>) - the way Word's cover pages keep the document title.
+/// The title and issue number are fields (<see cref="TextFields"/>): Stanley fills them in
+/// from the comic, so they follow File › Info, and the words around them are the user's
+/// to change ("Wydanie #{issue}"). The three texts carry fixed element ids
+/// (<see cref="TitleId"/>, <see cref="SubtitleId"/>, <see cref="CreditsId"/>), so a page
+/// redone in another design keeps whatever was typed into them (<see cref="WordsOn"/>).
 /// </summary>
 public static class TitlePages
 {
@@ -68,11 +70,8 @@ public static class TitlePages
         _ => throw new ArgumentOutOfRangeException(nameof(design), design, null)
     };
 
-    /// <summary>The words a new title page starts with: the comic's title and issue, and a credit line to fill in.</summary>
-    public static TitlePageWords DefaultWords(string? comicTitle, string? issueNumber) => new(
-        string.IsNullOrWhiteSpace(comicTitle) ? "Comic Title" : comicTitle.Trim(),
-        string.IsNullOrWhiteSpace(issueNumber) ? "Issue #1" : $"Issue #{issueNumber.Trim()}",
-        "Story and art by Your Name");
+    /// <summary>The words a new title page starts with: the comic's title and issue number as fields, and a credit line to fill in.</summary>
+    public static TitlePageWords DefaultWords { get; } = new(TextFields.TitleField, $"Issue #{TextFields.IssueField}", "Story and art by Your Name");
 
     /// <summary>The words on an existing title page, found by their element ids; <paramref name="fallback"/>'s for any it no longer has.</summary>
     public static TitlePageWords WordsOn(IEnumerable<Panel> panels, TitlePageWords fallback)

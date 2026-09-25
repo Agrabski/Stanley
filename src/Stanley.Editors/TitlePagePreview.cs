@@ -5,6 +5,7 @@ using Stanley.Editing;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
 
 namespace Stanley.Editors;
 
@@ -15,7 +16,8 @@ namespace Stanley.Editors;
 /// </summary>
 public sealed class TitlePagePreview : Control
 {
-    private static readonly TitlePageWords SampleWords = TitlePages.DefaultWords(null, null);
+    // What the fields show with no comic to take them from.
+    private static readonly TextFields SampleFields = new("Comic Title", "1");
     private static readonly IReadOnlyDictionary<CharacterId, CharacterDefinition> NoCharacters = new Dictionary<CharacterId, CharacterDefinition>();
     private static readonly IReadOnlyDictionary<CharacterId, CharacterRevisionId> NoLooks = new Dictionary<CharacterId, CharacterRevisionId>();
     private static readonly IReadOnlyDictionary<string, ArtFile> NoPictures = new Dictionary<string, ArtFile>();
@@ -68,7 +70,7 @@ public sealed class TitlePagePreview : Control
         if (_document is null)
         {
             _pageBounds = Page?.PageBounds ?? _pageBounds;
-            var panels = TitlePages.Compose(Design, _pageBounds, Page?.Grid ?? PanelGrid.Default, SampleWords);
+            var panels = TitlePages.Compose(Design, _pageBounds, Page?.Grid ?? PanelGrid.Default, TitlePages.DefaultWords);
             _document = new PageDocument(panels.Select(p => p.Id).ToList(), panels.ToDictionary(p => p.Id), IsTitlePage: true);
         }
 
@@ -76,7 +78,7 @@ public sealed class TitlePagePreview : Control
         var scale = Math.Min(Bounds.Width / _pageBounds.Width, Bounds.Height / _pageBounds.Height);
         var size = new Size(_pageBounds.Width * scale, _pageBounds.Height * scale);
         var frame = new Rect(new Point((Bounds.Width - size.Width) / 2, (Bounds.Height - size.Height) / 2), size);
-        context.Custom(new PageThumbnail.ThumbnailDrawOperation(frame, _pageBounds, _document, null, NoCharacters, NoLooks, NoPictures));
+        context.Custom(new PageThumbnail.ThumbnailDrawOperation(frame, _pageBounds, _document, null, NoCharacters, NoLooks, NoPictures, Page?.Fields ?? SampleFields));
         context.DrawRectangle(null, new Pen(Brushes.Gray, 1), frame);
     }
 }

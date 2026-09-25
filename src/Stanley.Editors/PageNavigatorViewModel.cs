@@ -53,7 +53,7 @@ public sealed class PageItem : ObservableObject
 /// Ctrl+Z undoes "deleted page 3" as naturally as "moved a bubble". Undoing an edit made
 /// on another page switches to that page first, so the change is never invisible.
 /// </summary>
-public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLooksHost, ITitlePageHost
+public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLooksHost, ITitlePageHost, IPageSpacingHost
 {
     private IReadOnlyDictionary<CharacterId, CharacterRevisionId> _issueLooks;
     private readonly EditorHistory _history;
@@ -61,8 +61,9 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     private PageNumbering _pageNumbering;
     private readonly ICharacterCatalog? _characters;
     private readonly PictureLibrary? _pictures;
-    private readonly PanelGrid _grid;
+    private PanelGrid _grid;
     private readonly PanelLayoutPreset? _newPageLayout;
+    private TextFields? _fields;
 
     /// <param name="characters">What every page draws its placed characters from (the Characters pane); null for a comic edited without one.</param>
     /// <param name="issueLooks">The issue's look per character (<see cref="ComicProject.IssueLooks"/>).</param>
@@ -88,7 +89,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         Pages = new ObservableCollection<PageItem>(pages.Select(p => new PageItem(p.Id, CreateEditor(p.Id, p.Bounds, p.Document, null))));
         if (Pages.Count == 0)
             throw new ArgumentException("A comic needs at least one page.", nameof(pages));
-        Renumber();
+        SyncPages();
         _currentPage = Pages[0];
 
         AddPageCommand = new RelayCommand(() => AddPageAfter(CurrentPage));
@@ -169,6 +170,59 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         IssueLooksChanged?.Invoke();
     }
 
+    // ---------------------------------------------------------------- spacing and fields
+
+    /// <summary>The margin and gutter every page lays out and snaps with (Layout tab); one setting for the whole comic, saved with it.</summary>
+    public PanelGrid Spacing => _grid;
+
+    public event Action? SpacingChanged;
+
+    /// <summary>
+    /// Layout tab › Margin / Gutter, for the whole comic: every page lays out and snaps to
+    /// it. A new margin also moves the panel edges that sat on the old one onto it, on every
+    /// page whose layout isn't locked, so the layouts keep hugging the margin. One undo step.
+    /// </summary>
+    public void SetSpacing(PanelGrid grid)
+    {
+        grid = new PanelGrid(Math.Max(0, grid.MarginMm), Math.Max(0, grid.GutterMm));
+        if (grid == _grid)
+            return;
+
+        var before = _grid;
+        using (_history.Group("Margins", this))
+        {
+            ApplySpacing(grid);
+            _history.Push("Margins", () => ApplySpacing(before), () => ApplySpacing(grid), this);
+            if (Math.Abs(grid.MarginMm - before.MarginMm) > 1e-9)
+            {
+                foreach (var page in Pages)
+                    page.Editor.MoveMargin(before.MarginMm, grid.MarginMm);
+            }
+        }
+    }
+
+    private void ApplySpacing(PanelGrid grid)
+    {
+        _grid = grid;
+        SyncPages();
+        OnPropertyChanged(nameof(Spacing));
+        SpacingChanged?.Invoke();
+    }
+
+    /// <summary>What the fields in texts show on every page (the comic's title and issue number); the session keeps it up to date.</summary>
+    public TextFields? Fields
+    {
+        get => _fields;
+        set
+        {
+            if (Equals(value, _fields))
+                return;
+            _fields = value;
+            SyncPages();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>The comic's page numbering; each page's <see cref="PageEditorViewModel.Folio"/> follows it and the page order.</summary>
     public PageNumbering PageNumbering => _pageNumbering;
 
@@ -188,7 +242,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     private void ApplyPageNumbering(PageNumbering numbering)
     {
         _pageNumbering = numbering;
-        Renumber();
+        SyncPages();
         OnPropertyChanged(nameof(PageNumbering));
         PageNumberingChanged?.Invoke();
     }
@@ -206,7 +260,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     {
         var bounds = after.Editor.PageBounds;
         var id = PageId.New();
-        var item = new PageItem(id, CreateEditor(id, bounds, ComicProject.BlankDocument(bounds, after.Editor.Grid, _newPageLayout), after.Editor));
+        var item = new PageItem(id, CreateEditor(id, bounds, ComicProject.BlankDocument(bounds, _grid, _newPageLayout), after.Editor));
         var order = Pages.ToList();
         order.Insert(order.IndexOf(after) + 1, item);
         ChangePages("Add page", order, item);
@@ -271,9 +325,6 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     /// <summary>Whether the title page can go: it can't if it's the comic's only page.</summary>
     public bool CanRemoveTitlePage => HasTitlePage && Pages.Count > 1;
 
-    /// <summary>The words a new title page starts with; the session hands in the comic's own title and issue.</summary>
-    public Func<TitlePageWords> NewTitlePageWords { get; set; } = () => TitlePages.DefaultWords(null, null);
-
     public event Action? TitlePageChanged;
 
     /// <summary>
@@ -286,7 +337,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         if (TitlePage is { } existing)
         {
             var editor = existing.Editor;
-            var words = TitlePages.WordsOn(editor.Committed.Panels.Values, NewTitlePageWords());
+            var words = TitlePages.WordsOn(editor.Committed.Panels.Values, TitlePages.DefaultWords);
             var redone = TitlePageDocument(design, editor.PageBounds, editor.Grid, words) with { LayoutLocked = editor.Committed.LayoutLocked };
             editor.Apply(EditResult<PageDocument>.Success(redone));
             Reveal(existing);
@@ -295,7 +346,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
 
         var bounds = Pages[0].Editor.PageBounds;
         var id = PageId.New();
-        var item = new PageItem(id, CreateEditor(id, bounds, TitlePageDocument(design, bounds, CurrentPage.Editor.Grid, NewTitlePageWords()), CurrentPage.Editor));
+        var item = new PageItem(id, CreateEditor(id, bounds, TitlePageDocument(design, bounds, _grid, TitlePages.DefaultWords), CurrentPage.Editor));
         var order = Pages.ToList();
         order.Insert(0, item);
         ChangePages("Insert title page", order, item);
@@ -346,7 +397,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         while (Pages.Count > order.Count)
             Pages.RemoveAt(Pages.Count - 1);
 
-        Renumber();
+        SyncPages();
         if (ReferenceEquals(current, _currentPage))
         {
             OnPropertyChanged(nameof(CurrentPage)); // re-assert the selection the list may have dropped
@@ -361,12 +412,15 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         TitlePageChanged?.Invoke();
     }
 
-    private void Renumber()
+    /// <summary>Brings every page up to date with its position and the comic-wide settings - including a page an undo just brought back, which missed changes made while it was gone.</summary>
+    private void SyncPages()
     {
         for (var i = 0; i < Pages.Count; i++)
         {
             Pages[i].Number = i + 1;
             Pages[i].Editor.Folio = PageFolios.For(_pageNumbering, i);
+            Pages[i].Editor.Grid = _grid;
+            Pages[i].Editor.Fields = _fields;
         }
     }
 
@@ -393,13 +447,14 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             NumberingHost = this,
             LooksHost = this,
             TitlePageHost = this,
+            SpacingHost = this,
             Characters = _characters,
             Pictures = _pictures,
-            Grid = _grid
+            Grid = _grid,
+            Fields = _fields
         };
         if (settingsFrom != null)
         {
-            editor.Grid = settingsFrom.Grid;
             editor.SnapEnabled = settingsFrom.SnapEnabled;
             editor.ShowMarginGuides = settingsFrom.ShowMarginGuides;
         }

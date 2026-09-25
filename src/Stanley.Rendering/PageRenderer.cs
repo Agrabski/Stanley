@@ -32,12 +32,13 @@ public static class PageRenderer
     /// <param name="characters">The project's characters, to draw the panels' character instances with; an instance whose character isn't in here draws as a placeholder.</param>
     /// <param name="issueLooks">The issue's look per character (<see cref="Issue.CharacterRevisions"/>), for instances without a look of their own.</param>
     /// <param name="pictures">The comic's pictures by art file name, for background pictures and picture elements; one missing from here draws as a placeholder.</param>
+    /// <param name="fields">The comic's values for the fields texts can hold ({title}, {issue}); without them a field shows as typed.</param>
     public static void Draw(SKCanvas canvas, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null)
     {
         DrawPaper(canvas, pageBounds);
-        DrawPanels(canvas, panelsInOrder, characters, issueLooks, pictures: pictures);
+        DrawPanels(canvas, panelsInOrder, characters, issueLooks, pictures: pictures, fields: fields);
         if (folio != null)
             DrawFolio(canvas, pageBounds, folio);
     }
@@ -78,8 +79,10 @@ public static class PageRenderer
     /// top (unless it's <see cref="Panel.Borderless"/>).
     /// </summary>
     /// <param name="hideText">An element whose lettering to leave off (the editor's inline text box is showing it instead).</param>
+    /// <param name="fields">What the fields in texts and bubbles show (<see cref="TextFields"/>); null leaves them as typed.</param>
     public static void DrawPanels(SKCanvas canvas, IEnumerable<Panel> panelsInOrder, IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null,
-        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, ElementId? hideText = null, IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null, ElementId? hideText = null, IReadOnlyDictionary<string, ArtFile>? pictures = null,
+        TextFields? fields = null)
     {
         using var border = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, StrokeWidth = PanelBorderMm, IsAntialias = true, StrokeJoin = SKStrokeJoin.Miter };
         using var panelFill = new SKPaint { Color = SKColors.White };
@@ -92,12 +95,13 @@ public static class PageRenderer
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
             DrawBackground(canvas, panel.Background, AnchorRing.BoundingBox(panel.Shape.Anchors), pictures);
-            DrawElements(canvas, panel, ElementLayer.Background, hideText, pictures);
+            DrawElements(canvas, panel, ElementLayer.Background, hideText, pictures, fields);
             foreach (var instance in panel.CharacterInstances)
                 CharacterRenderers.DrawInstance(canvas, instance, characters, CharacterStrokeMm, issueLooks);
-            DrawElements(canvas, panel, ElementLayer.Foreground, hideText, pictures);
+            DrawElements(canvas, panel, ElementLayer.Foreground, hideText, pictures, fields);
             foreach (var bubble in panel.Bubbles)
-                BubbleRenderer.Draw(canvas, bubble, SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
+                BubbleRenderer.Draw(canvas, fields is null ? bubble : bubble with { Text = fields.Fill(bubble.Text) },
+                    SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
 
             if (!panel.Borderless)
@@ -105,12 +109,14 @@ public static class PageRenderer
         }
     }
 
-    private static void DrawElements(SKCanvas canvas, Panel panel, ElementLayer layer, ElementId? hideText, IReadOnlyDictionary<string, ArtFile>? pictures)
+    private static void DrawElements(SKCanvas canvas, Panel panel, ElementLayer layer, ElementId? hideText, IReadOnlyDictionary<string, ArtFile>? pictures, TextFields? fields)
     {
         foreach (var element in panel.Elements)
         {
-            if (element.Layer == layer)
-                ElementRenderer.Draw(canvas, element, drawText: element.Id != hideText, pictures);
+            if (element.Layer != layer)
+                continue;
+            var shown = element is TextElement text && fields is not null ? text with { Text = fields.Fill(text.Text) } : element;
+            ElementRenderer.Draw(canvas, shown, drawText: element.Id != hideText, pictures);
         }
     }
 
@@ -139,13 +145,13 @@ public static class PageRenderer
     /// <summary>Writes the page as a one-page vector PDF at its real trim size.</summary>
     public static void ExportPdf(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null) =>
-        ExportPdf(output, [(pageBounds, panelsInOrder, folio)], characters, issueLooks, pictures);
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null) =>
+        ExportPdf(output, [(pageBounds, panelsInOrder, folio)], characters, issueLooks, pictures, fields);
 
     /// <summary>Writes every page, in order, into one vector PDF, each at its real trim size.</summary>
     public static void ExportPdf(Stream output, IEnumerable<(Rect2D Bounds, IEnumerable<Panel> PanelsInOrder, PageFolio? Folio)> pages,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null)
     {
         const float pointsPerMm = 72f / 25.4f;
         using var document = SKDocument.CreatePdf(output)
@@ -155,7 +161,7 @@ public static class PageRenderer
             var canvas = document.BeginPage((float)pageBounds.Width * pointsPerMm, (float)pageBounds.Height * pointsPerMm);
             canvas.Scale(pointsPerMm);
             canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
-            Draw(canvas, pageBounds, panels, folio, characters, issueLooks, pictures);
+            Draw(canvas, pageBounds, panels, folio, characters, issueLooks, pictures, fields);
             document.EndPage();
         }
         document.Close();
@@ -164,18 +170,18 @@ public static class PageRenderer
     /// <summary>Writes the page as a PNG at <paramref name="dpi"/> (300 = print quality).</summary>
     public static void ExportPng(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, int dpi = 300, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null) =>
-        RenderPng(output, pageBounds, panelsInOrder, dpi / 25.4, folio, characters, issueLooks, pictures);
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null) =>
+        RenderPng(output, pageBounds, panelsInOrder, dpi / 25.4, folio, characters, issueLooks, pictures, fields);
 
     /// <summary>Writes the page as a PNG exactly <paramref name="widthPx"/> pixels wide, its height in proportion - a webcomic's picture size.</summary>
     public static void ExportPngAtWidth(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, int widthPx, PageFolio? folio = null,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null) =>
-        RenderPng(output, pageBounds, panelsInOrder, widthPx / pageBounds.Width, folio, characters, issueLooks, pictures);
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, TextFields? fields = null) =>
+        RenderPng(output, pageBounds, panelsInOrder, widthPx / pageBounds.Width, folio, characters, issueLooks, pictures, fields);
 
     private static void RenderPng(Stream output, Rect2D pageBounds, IEnumerable<Panel> panelsInOrder, double pixelsPerMillimetre, PageFolio? folio,
         IReadOnlyDictionary<CharacterId, CharacterDefinition>? characters, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks,
-        IReadOnlyDictionary<string, ArtFile>? pictures)
+        IReadOnlyDictionary<string, ArtFile>? pictures, TextFields? fields)
     {
         var pixelsPerMm = (float)pixelsPerMillimetre;
         var width = (int)Math.Round(pageBounds.Width * pixelsPerMillimetre);
@@ -186,7 +192,7 @@ public static class PageRenderer
         canvas.Clear(SKColors.White);
         canvas.Scale(pixelsPerMm);
         canvas.Translate(-(float)pageBounds.Left, -(float)pageBounds.Top);
-        Draw(canvas, pageBounds, panelsInOrder, folio, characters, issueLooks, pictures);
+        Draw(canvas, pageBounds, panelsInOrder, folio, characters, issueLooks, pictures, fields);
 
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);

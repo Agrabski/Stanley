@@ -30,7 +30,7 @@ public sealed class TitlePageTests : IDisposable
     }
 
     [Fact]
-    public void InsertTitlePage_PutsItAtTheFront_WithTheComicsTitle_AsOneUndoStep()
+    public void InsertTitlePage_PutsItAtTheFront_WithTheTitleAndIssueAsFields_AsOneUndoStep()
     {
         var project = ComicProject.CreateNew();
         project.Title = "Moon Pie";
@@ -47,7 +47,9 @@ public sealed class TitlePageTests : IDisposable
         Assert.True(title.Editor.Committed.IsTitlePage);
         Assert.Equal("Title", title.Caption);
         Assert.Equal("2", first.Caption);
-        Assert.Equal("Moon Pie", Text(title.Editor.Committed, TitlePages.TitleId).Text);
+        Assert.Equal("{title}", Text(title.Editor.Committed, TitlePages.TitleId).Text);
+        Assert.Equal("Issue #{issue}", Text(title.Editor.Committed, TitlePages.SubtitleId).Text);
+        Assert.Equal(new TextFields("Moon Pie", "1"), title.Editor.Fields); // what the fields show
         Assert.Equal(first.Editor.PageBounds, title.Editor.PageBounds);
 
         session.Workspace.History.Undo();

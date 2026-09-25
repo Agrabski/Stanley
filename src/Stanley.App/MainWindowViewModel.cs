@@ -59,7 +59,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private PageNavigatorViewModel? _navigator;
     private CharacterLibraryViewModel? _characters;
     private PictureLibrary? _pictures;
-    private bool _titleDirty;
+    private bool _infoDirty;
     private bool _isBackstageOpen;
     private BackstagePage _backstagePage = BackstagePage.New;
     private MetricPaperSize _newPaperSize = MetricPaperSize.A4;
@@ -146,8 +146,8 @@ public sealed class MainWindowViewModel : ObservableObject
     public PageEditorViewModel? Editor => _navigator?.CurrentPage.Editor;
     public bool HasDocument => _project is not null;
 
-    /// <summary>Unsaved edits (anything undoable since the last save), an unsaved title change, or recovered work not yet saved back.</summary>
-    public bool IsDirty => HasDocument && ((_workspace?.History.IsDirty ?? false) || _titleDirty || _recoveredUnsaved);
+    /// <summary>Unsaved edits (anything undoable since the last save), an unsaved File › Info change (title, issue number), or recovered work not yet saved back.</summary>
+    public bool IsDirty => HasDocument && ((_workspace?.History.IsDirty ?? false) || _infoDirty || _recoveredUnsaved);
 
     // ---------------------------------------------------------------- appearance
 
@@ -442,7 +442,7 @@ public sealed class MainWindowViewModel : ObservableObject
         : IsDirty ? $"{DocumentTitle} - unsaved changes"
         : $"{DocumentTitle} - saved";
 
-    /// <summary>The comic's title, editable from File &gt; Info. Saved with the project.</summary>
+    /// <summary>The comic's title, editable from File &gt; Info. Saved with the project; texts show it wherever they have <c>{title}</c>.</summary>
     public string DocumentTitle
     {
         get => _project?.Title ?? "";
@@ -451,10 +451,36 @@ public sealed class MainWindowViewModel : ObservableObject
             if (_project is null || value == _project.Title || string.IsNullOrWhiteSpace(value))
                 return;
             _project.Title = value.Trim();
-            _titleDirty = true;
-            RaiseDocumentChanged();
-            ScheduleBackgroundSaves();
+            InfoChanged();
         }
+    }
+
+    /// <summary>The issue's number, editable from File &gt; Info - free text ("1", "0", "1.5"). Saved with the issue; texts show it wherever they have <c>{issue}</c>.</summary>
+    public string IssueNumber
+    {
+        get => _project?.IssueNumber ?? "";
+        set
+        {
+            if (_project is null || value.Trim() == _project.IssueNumber || string.IsNullOrWhiteSpace(value))
+                return;
+            _project.IssueNumber = value.Trim();
+            InfoChanged();
+        }
+    }
+
+    /// <summary>A File › Info edit: not an undo step (like Word's document properties), but unsaved work - and the pages' fields show it straight away.</summary>
+    private void InfoChanged()
+    {
+        _infoDirty = true;
+        RefreshFields();
+        RaiseDocumentChanged();
+        ScheduleBackgroundSaves();
+    }
+
+    private void RefreshFields()
+    {
+        if (_navigator != null && _project != null)
+            _navigator.Fields = _project.Fields;
     }
 
     public string LocationText => _project?.Location ?? "Not saved yet - Save picks a folder for it.";
@@ -679,6 +705,7 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
+            RefreshFields(); // an untitled comic took its folder's name
             MarkSaved();
             Message = $"Saved to {saved}";
             OnPropertyChanged(nameof(AutoSaveEnabled)); // no longer untitled - AutoSave can apply
@@ -720,10 +747,11 @@ public sealed class MainWindowViewModel : ObservableObject
         try
         {
             if (isPdf)
-                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks, _pictures?.Files);
+                ComicProject.ExportPdf(path, _navigator.Pages.Select(p => (p.Editor.PageBounds, p.Editor.Committed, p.Editor.Folio)), CommittedCharacters(), _navigator.IssueLooks,
+                    _pictures?.Files, _project.Fields);
             else
                 ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(),
-                    issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files, widthPx: _project.ExportWidthPx);
+                    issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files, widthPx: _project.ExportWidthPx, fields: _project.Fields);
             Message = $"Exported to {path}";
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
@@ -771,7 +799,8 @@ public sealed class MainWindowViewModel : ObservableObject
         _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory);
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
-        _titleDirty = false;
+        _navigator.SpacingChanged += OnSpacingChanged;
+        _infoDirty = false;
         Message = null;
         SetProperty(ref _isBackstageOpen, false, nameof(IsBackstageOpen));
         RaiseDocumentChanged();
@@ -787,13 +816,16 @@ public sealed class MainWindowViewModel : ObservableObject
         if (_workspace != null)
             _workspace.History.PropertyChanged -= OnHistoryChanged;
         if (_navigator != null)
+        {
             _navigator.CurrentPageChanged -= OnCurrentPageChanged;
+            _navigator.SpacingChanged -= OnSpacingChanged;
+        }
         _project = null;
         _workspace = null;
         _navigator = null;
         _characters = null;
         _pictures = null;
-        _titleDirty = false;
+        _infoDirty = false;
         _recoveredUnsaved = false;
         _pendingAutoSave?.Dispose();
         _pendingAutoSave = null;
@@ -811,7 +843,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private void MarkSaved()
     {
         _workspace?.History.MarkSaved();
-        _titleDirty = false;
+        _infoDirty = false;
         _recoveredUnsaved = false;
         _recovery?.Clear();
         Message = null;
@@ -838,6 +870,13 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private void OnCurrentPageChanged(PageItem page) => OnPropertyChanged(nameof(Editor));
 
+    /// <summary>The Layout tab's margin and gutter are the comic's, saved with it (an undoable edit, so the history already says it's unsaved).</summary>
+    private void OnSpacingChanged()
+    {
+        if (_project != null && _navigator != null)
+            _project.Grid = _navigator.Spacing;
+    }
+
     private static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
 
     private void RaiseDocumentChanged()
@@ -847,6 +886,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(DocumentCaption));
         OnPropertyChanged(nameof(DocumentTitle));
+        OnPropertyChanged(nameof(IssueNumber));
         OnPropertyChanged(nameof(LocationText));
         OnPropertyChanged(nameof(PageSizeText));
         OnPropertyChanged(nameof(PngExportText));
