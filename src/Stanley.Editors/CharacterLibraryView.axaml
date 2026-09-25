@@ -1,8 +1,8 @@
 <!--
   The Characters pane (docked left, a tab beside Pages): every character in the comic
   with a little figure, its name, height and where it's used. Click to edit its body,
-  drag onto a panel to place it there, right-click for more, "New character" at the
-  bottom. Like the page navigator it's not an editor - the ribbon keeps showing
+  double-click to put it on the page, drag onto a panel to place it there, right-click
+  for more, "New character" at the bottom. Like the page navigator it's not an editor - the ribbon keeps showing
   whatever is being edited. The list's selection only *shows* which character is
   open: opening happens on a click's release (or Enter), never on press, so pressing
   to drag a character out leaves the page on screen to drop it onto.
@@ -42,13 +42,13 @@
       </Button>
     </Border>
     <Grid>
-      <TextBlock Text="No characters yet. Create one, then drag it onto a panel." TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+      <TextBlock Text="No characters yet. Create one, then double-click it or drag it onto a panel." TextWrapping="Wrap" Opacity="0.7" FontSize="12"
                  Margin="12" IsVisible="{Binding HasNoCharacters}" />
       <ListBox Name="CharacterList" ItemsSource="{Binding Items}" SelectedItem="{Binding Current, Mode=OneWay}" Background="Transparent"
                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="local:CharacterItem">
-            <DockPanel ToolTip.Tip="Click to edit this character's body · drag onto a panel to place it">
+            <DockPanel ToolTip.Tip="Click to edit this character's body · double-click to put it on the page · drag onto a panel to place it there">
               <Border DockPanel.Dock="Left" Width="40" Height="56" Margin="0,0,8,0" CornerRadius="3" Background="White"
                       BorderBrush="{DynamicResource StanleyThumbBorderBrush}" BorderThickness="1">
                 <local:CharacterFigure Character="{Binding Character}" />

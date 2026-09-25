@@ -350,7 +350,12 @@ nothing else in the folder is touched. A page's label and trim override survive 
 save. Multi-issue navigation (an issue switcher in the UI) isn't implemented yet.
 `SaveAs` copies the whole project folder (minus `.git`) to the new location first,
 and never writes into a non-empty folder — it uses a subfolder named after the title
-instead. An untitled comic takes its folder's name as title on first save. Export
+instead. File › Save As (and a new comic's first Save) is the system's Save dialog
+(`IFileDialogs.PickSaveLocationAsync`): a name box, the title suggested, and a place;
+the comic is saved as a folder of that name there — "name (2)" beside it if the name is
+taken (`ComicProject.FreeFolder`), a plain Save if it's the comic's own folder — and a
+comic's first save takes the name typed as its title (a later Save As keeps the title,
+which title pages print). Export
 (all pages as one PDF at trim size; the current page as a 300 dpi PNG, or a
 webcomic's at its format's pixel width — `ComicProject.ExportWidthPx`,
 `PageRenderer.ExportPngAtWidth`) goes through
@@ -813,12 +818,18 @@ body and placement only.
   back; undoing a body edit re-opens that character). Placed characters can't be
   deleted. `CharacterEditorRibbon` = Body tab (presets, sliders — one drag = one
   undo step via `BeginSliderDrag`/`EndSliderDrag` — skin, name, line-up, Close).
+  The Front/Side view switch (`PreviewAngle`) is also in the character editor's
+  status bar, like Word's view buttons, so it's there whichever tab is open.
   Page editor: `SelectedCharacterIndex`, contextual green **Character** tab,
   Insert › Characters gallery + New character, drag from the pane onto a panel
   (`CharacterDrag.Format`; feet land at the drop point), double-click opens the body
   editor. The pane opens a character on click *release* (or Enter), never on press —
   its list selection is OneWay from `Current` — so a drag starts with the page still
-  on screen to drop onto.
+  on screen to drop onto. A double-click in the pane puts the character on the page
+  (`CharacterLibraryViewModel.PlaceOnPage`, also right-click › Place on page): back to
+  the page, closing the tab the first click opened, the new character selected and the
+  page given the keyboard (`PageEditorViewModel.FocusPage` waits for the page's view,
+  `TakeFocusRequest`, when the page is only just coming back).
   `PageEditorHost.CreateWorkspace` returns an `EditorSession(Workspace, Navigator,
   Characters)`.
 - **Persistence**: `ProjectRepository.ListCharacters()` (scans `characters/`, no
@@ -941,7 +952,12 @@ fabrics, drawn stickers, expressions, draw your own and import, named looks.
   (neutral stores nothing; other slots' variants are kept). A sticker without the
   variant shows its neutral one (`StickerArtPieces.VariantFor`). Page editor:
   Character tab › Expression dropdown (close-ups of the selected character,
-  `ExpressionChoices`, one undo step) and right-click › Expression.
+  `ExpressionChoices`, one undo step) and right-click › Expression. **Mix your own**
+  (for a face no preset has - happy eyes over an open mouth): the same dropdown has a
+  row per face slot, Eyes / Brows / Mouth (`ExpressionMixer`, `ExpressionPresets.FaceSlots`,
+  `VariantName`), each choice a close-up with the rest of the face as it is; a pick sets
+  that slot only (`ExpressionPresets.SetVariant`, one undo step) and the button then
+  reads "Custom". Right-click › Expression › Eyes ▸ / Brows ▸ / Mouth ▸ does the same.
 
 ## Builds, versioning & releases
 

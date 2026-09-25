@@ -152,9 +152,9 @@
           <TextBlock Text="Current location" Opacity="0.7" />
           <TextBlock Text="{Binding LocationText}" Margin="0,4,0,20" TextWrapping="Wrap" />
           <Button Name="BrowseSaveAsButton" Command="{Binding SaveAsCommand}" Padding="14,10">
-            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Choose a folder…" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Browse…" /></StackPanel>
           </Button>
-          <TextBlock Text="Pick an empty folder, or any folder to save the comic into a new folder inside it, named after its title. The whole comic is copied - nothing at the old location changes."
+          <TextBlock Text="Name the comic and choose where it goes: it's saved as a folder of that name (a new comic takes the name as its title, too). The whole comic is copied - nothing at the old location changes."
                      Opacity="0.7" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" />
         </StackPanel>
 

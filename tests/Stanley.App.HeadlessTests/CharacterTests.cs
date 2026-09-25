@@ -83,10 +83,7 @@ public class CharacterTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(0, page.SelectedCharacterIndex); // a side-on character is still clickable through its near arm
 
-        window.MouseDown(chest, MouseButton.Left, RawInputModifiers.None);
-        window.MouseUp(chest, MouseButton.Left);
-        window.MouseDown(chest, MouseButton.Left, RawInputModifiers.None);
-        window.MouseUp(chest, MouseButton.Left);
+        window.DoubleClick(chest);
         Dispatcher.UIThread.RunJobs();
         Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
     }
@@ -143,6 +140,26 @@ public class CharacterTests
         window.MouseUp(itemCenter, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
         Assert.Same(characters.Items[0].Editor, window.Workspace.ActiveEditor);
+    }
+
+    [Fact]
+    public void Double_clicking_a_character_in_the_pane_puts_it_on_the_page_and_the_page_stays_showing()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        var page = window.Editor;
+        var (_, itemCenter) = ShowPane(window, characters);
+
+        window.DoubleClick(itemCenter);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(page, window.Workspace.ActiveEditor);
+        Assert.Empty(window.GetVisualDescendants().OfType<CharacterEditorView>()); // the tab the first click opened is closed again
+        var placed = Assert.Single(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+        Assert.Equal(characters.Items[0].Id, placed.CharacterId);
+        Assert.Null(characters.Current);
+        Assert.True(Single<PageEditorRibbon>(window.RibbonBarControl).FindControl<TabItem>("CharacterTab")!.IsVisible);
+        Assert.True(Single<PageCanvasControl>(window).IsFocused); // Delete, arrows and F/S reach the new character
     }
 
     [Fact]
@@ -281,6 +298,44 @@ public class CharacterTests
 
         Assert.Equal("Surprised", page.SelectedExpressionName);
         Assert.Equal("wide", page.Working.Panels[panelId].CharacterInstances[0].Pose.Expression["eyes"]);
+
+        // Mix your own: the same flyout has a row per face slot - here, a smile under the surprised eyes.
+        var smile = content.GetLogicalDescendants().OfType<Button>().Single(b => b.DataContext is ExpressionVariantChoice { Slot: "mouth", Variant: "smile" });
+        Assert.True(smile.GetVisualDescendants().OfType<CharacterFigure>().Single().Closeup);
+        smile.Command!.Execute(smile.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        LookTabTests.Snapshot(window, "page-expression-mixer");
+
+        var face = page.Working.Panels[panelId].CharacterInstances[0].Pose.Expression;
+        Assert.Equal(("wide", "smile"), (face["eyes"], face["mouth"]));
+        Assert.Equal("Custom", page.SelectedExpressionName);
+    }
+
+    [Fact]
+    public void The_character_editors_Front_and_Side_switch_is_in_its_status_bar_whichever_tab_is_open()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        characters.OpenCharacter(created.Id);
+        Dispatcher.UIThread.RunJobs();
+        var ribbon = Single<CharacterEditorRibbon>(window.RibbonBarControl);
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var view = Single<CharacterEditorView>(window);
+        var side = view.FindControl<RadioButton>("StatusSideButton")!;
+        Assert.True(side.IsEffectivelyVisible);
+        var point = side.TranslatePoint(new Point(side.Bounds.Width / 2, side.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        LookTabTests.Snapshot(window, "character-status-view-switch");
+        var editor = characters.Items.Single().Editor;
+        Assert.Equal(ProjectModel.Geometry.ViewAngle.Profile, editor.PreviewAngle);
+        Assert.Equal(ProjectModel.Geometry.ViewAngle.Profile, view.Figure.Angle);
+        Assert.False(view.FindControl<RadioButton>("StatusFrontButton")!.IsChecked);
+        Assert.True(ribbon.FindControl<RadioButton>("SidePreviewButton")!.IsChecked); // the Body tab's switch follows
     }
 
     [Fact]

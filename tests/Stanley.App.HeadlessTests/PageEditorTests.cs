@@ -234,10 +234,7 @@ public class PageEditorTests
         var bounds = window.Editor.PanelBounds(panelId);
 
         var point = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
+        window.DoubleClick(point);
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible, "the inline text editor should open over the new bubble");
@@ -402,7 +399,7 @@ public class PageEditorTests
         Assert.False(window.BackstageControl.IsVisible);
     }
 
-    /// <summary>Ctrl+S on a new comic asks for a folder (Save As), saves there, and the title bar stops showing unsaved changes.</summary>
+    /// <summary>Ctrl+S on a new comic asks where to save it and under what name (Save As), saves there, and the title bar stops showing unsaved changes.</summary>
     [Fact]
     public void CtrlS_OnANewComic_SavesToThePickedFolder()
     {
@@ -508,6 +505,7 @@ public class PageEditorTests
     private sealed class ScriptedDialogs(string folder) : Stanley.App.Documents.IFileDialogs
     {
         public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(folder);
+        public Task<string?> PickSaveLocationAsync(string title, string suggestedName) => Task.FromResult<string?>(folder);
         public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) => Task.FromResult<string?>(null);
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
     }
@@ -538,10 +536,7 @@ public class PageEditorTests
         }
 
         var centre = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
-        window.MouseDown(centre, MouseButton.Left);
-        window.MouseUp(centre, MouseButton.Left);
-        window.MouseDown(centre, MouseButton.Left);
-        window.MouseUp(centre, MouseButton.Left);
+        window.DoubleClick(centre);
         Dispatcher.UIThread.RunJobs();
         Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
         Assert.True(window.Editor.IsBubbleContext);

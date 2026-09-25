@@ -94,7 +94,7 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         PlaceOnPageCommand = new RelayCommand<CharacterItem?>(item =>
         {
             if ((item ?? Current) is { } target)
-                PlaceRequested?.Invoke(target.Id);
+                PlaceOnPage(target);
         });
 
         Items = new ObservableCollection<CharacterItem>(characters.Select(c => CreateItem(c)));
@@ -136,7 +136,7 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
     /// <summary>Raised when a character is deleted, so its tab closes even if it wasn't the active one.</summary>
     public event Action<CharacterItem>? CharacterDeleted;
 
-    /// <summary>Raised to put a character on the page being edited (the pane's "Place on page"; dragging onto the page places it where it's dropped instead).</summary>
+    /// <summary>Raised to put a character on the page being edited (a double-click in the pane, or its "Place on page"; dragging onto the page places it where it's dropped instead).</summary>
     public event Action<CharacterId>? PlaceRequested;
 
     public IRelayCommand<CharacterItem?> PlaceOnPageCommand { get; }
@@ -201,6 +201,20 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
         OnPropertyChanged(nameof(Current));
         NotifyCommands();
         CharacterShown?.Invoke(item);
+    }
+
+    /// <summary>
+    /// Puts <paramref name="item"/> on the page being edited and brings the page back: a
+    /// double-click in the pane, or its "Place on page". A double-click's first click has
+    /// already opened the character, so if it's the one showing its tab closes again.
+    /// </summary>
+    public void PlaceOnPage(CharacterItem item)
+    {
+        if (!Items.Contains(item))
+            return;
+        if (ReferenceEquals(item, _current))
+            ReturnToPage();
+        PlaceRequested?.Invoke(item.Id);
     }
 
     /// <summary>Back to the page: no character is current any more.</summary>

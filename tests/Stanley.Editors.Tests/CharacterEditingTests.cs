@@ -175,6 +175,73 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Mixing_your_own_expression_sets_one_face_slot_at_a_time_each_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+        page.ApplyExpressionCommand.Execute(page.ExpressionChoices.Single(c => c.Preset.Preset == ExpressionPreset.Happy));
+
+        var mixer = page.ExpressionMixer;
+        Assert.Equal(["Eyes", "Brows", "Mouth"], mixer.Select(r => r.Label));
+        Assert.Equal("happy", mixer[0].Choices.Single(c => c.IsCurrent).Variant);
+        var open = mixer[2].Choices.Single(c => c.Variant == "open");
+        Assert.Equal("happy", open.Pose.Expression[StickerSlots.Eyes]); // previewed with the rest of the face as it is
+        page.SetExpressionVariantCommand.Execute(open);
+
+        var face = page.Working.Panels[left].CharacterInstances[0].Pose.Expression;
+        Assert.Equal("happy", face[StickerSlots.Eyes]);
+        Assert.Equal("open", face[StickerSlots.Mouth]);
+        Assert.Equal("Custom", page.SelectedExpressionName);
+        Assert.True(page.ExpressionMixer[2].Choices.Single(c => c.Variant == "open").IsCurrent);
+        Assert.DoesNotContain(page.ExpressionChoices, c => c.IsCurrent);
+
+        session.Workspace.History.Undo();
+        Assert.Equal("Happy", page.SelectedExpressionName);
+    }
+
+    [Fact]
+    public void Placing_a_character_from_the_pane_puts_it_on_the_page_and_closes_the_tab_the_first_click_opened()
+    {
+        var (session, page, _, _) = NewSession();
+        var item = Add(session, "A");
+        session.Characters.Show(item); // a double-click's first click opens it
+        Assert.Same(item.Editor, session.Workspace.ActiveEditor);
+
+        session.Characters.PlaceOnPage(item);
+
+        Assert.Same(page, session.Workspace.ActiveEditor);
+        Assert.Null(session.Characters.Current);
+        Assert.DoesNotContain(item.Editor, Dockables(session));
+        var placed = Assert.Single(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+        Assert.Equal(item.Id, placed.CharacterId);
+        Assert.True(page.IsCharacterContext);
+
+        // Another character's tab, open in the background, stays open.
+        var other = Add(session, "B");
+        session.Characters.Show(other);
+        session.Characters.ReturnToPage();
+        session.Characters.Show(item);
+        session.Characters.Show(other);
+        session.Characters.PlaceOnPage(other);
+        Assert.Contains(item.Editor, Dockables(session));
+        Assert.DoesNotContain(other.Editor, Dockables(session));
+    }
+
+    private static IEnumerable<IDockable> Dockables(EditorSession session)
+    {
+        var pending = new Stack<IDockable>([session.Workspace.Layout]);
+        while (pending.Count > 0)
+        {
+            var next = pending.Pop();
+            yield return next;
+            if (next is IDock { VisibleDockables: { } children })
+                foreach (var child in children)
+                    pending.Push(child);
+        }
+    }
+
+    [Fact]
     public void The_character_editor_previews_an_expression_without_an_undo_step_and_says_what_a_face_lacks()
     {
         var (session, _, _, _) = NewSession();

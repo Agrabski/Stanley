@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Stanley.Editing;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -72,6 +73,10 @@ public partial class PageEditorView : UserControl
             _subscribed.ViewportRequested += OnViewportRequested;
             _subscribed.PictureImportRequested += OnPictureImportRequested;
             _subscribed.FieldInsertRequested += OnFieldInsertRequested;
+            // Asked for the keyboard while no view showed the page (a character was just put on
+            // it from the Characters pane): take it once this view is in place.
+            if (_subscribed.TakeFocusRequest())
+                Dispatcher.UIThread.Post(() => PageCanvas.Focus());
         }
 
         PageCanvas.ViewModel = ViewModel;

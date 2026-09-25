@@ -122,6 +122,11 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
             if (choice != null && HasSelectedCharacter)
                 ApplyExpression(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Preset);
         });
+        SetExpressionVariantCommand = new RelayCommand<ExpressionVariantChoice>(choice =>
+        {
+            if (choice != null && HasSelectedCharacter)
+                SetExpressionVariant(_selectedPanelId!.Value, _selectedCharacterIndex, choice.Slot, choice.Variant);
+        });
         MirrorPoseCommand = new RelayCommand(() => MirrorCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         ResetPoseCommand = new RelayCommand(() => ResetCharacterPose(_selectedPanelId!.Value, _selectedCharacterIndex), () => SelectedCharacterIsPosed);
         EditCharacterCommand = new RelayCommand(() => _catalog?.OpenCharacter(SelectedCharacter!.CharacterId), () => HasSelectedCharacter && _catalog != null);
@@ -194,8 +199,28 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
     /// <summary>Raised for zoom/fit requests; the pane's view owns the transform and applies them.</summary>
     public event Action<ViewportRequest>? ViewportRequested;
 
-    /// <summary>Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>).</summary>
-    public void FocusPage() => ViewportRequested?.Invoke(ViewportRequest.FocusPage);
+    /// <summary>
+    /// Hands the keyboard back to the page (see <see cref="ViewportRequest.FocusPage"/>). If
+    /// no view is showing the page just now - it's only just been switched back to - the
+    /// view that shows it next takes the keyboard (<see cref="TakeFocusRequest"/>).
+    /// </summary>
+    public void FocusPage()
+    {
+        if (ViewportRequested is { } requested)
+            requested(ViewportRequest.FocusPage);
+        else
+            _focusWhenShown = true;
+    }
+
+    private bool _focusWhenShown;
+
+    /// <summary>Whether a <see cref="FocusPage"/> is waiting for a view to show this page; asking clears it.</summary>
+    public bool TakeFocusRequest()
+    {
+        var wanted = _focusWhenShown;
+        _focusWhenShown = false;
+        return wanted;
+    }
 
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;
@@ -1266,6 +1291,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         OnPropertyChanged(nameof(SelectedCharacterName));
         OnPropertyChanged(nameof(PoseChoices));
         OnPropertyChanged(nameof(ExpressionChoices));
+        OnPropertyChanged(nameof(ExpressionMixer));
         RaiseLookChoicesChanged();
         NotifyCommands();
     }
@@ -1618,6 +1644,45 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
 
     public IRelayCommand<ExpressionPresetChoice> ApplyExpressionCommand { get; }
 
+    /// <summary>Sets one face slot's variant - happy eyes, an open mouth - keeping the rest of the face: a mix of your own, in one undo step.</summary>
+    public void SetExpressionVariant(PanelId panelId, int index, string slot, string variant)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+            return;
+        if (ExpressionPresets.VariantOf(panel.CharacterInstances[index].Pose, slot) == variant)
+            return;
+        Apply(EditCharacterInPanel(Working, panelId, index, c => c with { Pose = ExpressionPresets.SetVariant(c.Pose, slot, variant) }));
+        RaiseCharacterViewChanged();
+    }
+
+    /// <summary>
+    /// The expression gallery's "mix your own" rows - eyes, brows, mouth - for when no preset
+    /// is quite it: each variant a close-up of the selected character with the rest of its
+    /// face as it is, so what's shown is what a click gives.
+    /// </summary>
+    public IReadOnlyList<ExpressionSlotRow> ExpressionMixer
+    {
+        get
+        {
+            if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+                return [];
+            var face = new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [],
+                new SortedDictionary<string, string>(instance.Pose.Expression ?? [], StringComparer.Ordinal));
+            return ExpressionPresets.FaceSlots
+                .Select(slot =>
+                {
+                    var current = ExpressionPresets.VariantOf(face, slot);
+                    return new ExpressionSlotRow(slot, StickerSlots.Get(slot).Label, ExpressionPresets.Vocabulary[slot]
+                        .Select(variant => new ExpressionVariantChoice(slot, variant, ExpressionPresets.VariantName(slot, variant), character,
+                            ExpressionPresets.SetVariant(face, slot, variant), variant == current))
+                        .ToList());
+                })
+                .ToList();
+        }
+    }
+
+    public IRelayCommand<ExpressionVariantChoice> SetExpressionVariantCommand { get; }
+
     /// <summary>The Character tab's pose gallery: every preset, previewed on the selected character.</summary>
     public IReadOnlyList<PosePresetChoice> PoseChoices
     {
@@ -1691,6 +1756,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>
         {
             _expressionChoicesKey = expressionKey;
             OnPropertyChanged(nameof(ExpressionChoices));
+            OnPropertyChanged(nameof(ExpressionMixer));
             OnPropertyChanged(nameof(SelectedExpressionName));
         }
         OnPropertyChanged(nameof(SelectedCharacterView));

@@ -521,31 +521,63 @@
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
-          <DropDownButton Name="ExpressionGallery" Classes="slotGallery" ToolTip.Tip="The face: happy, sad, surprised... (for this panel only)">
+          <DropDownButton Name="ExpressionGallery" Classes="slotGallery" ToolTip.Tip="The face: happy, sad, surprised... or mix your own (for this panel only)">
             <StackPanel Spacing="1">
               <TextBlock Text="Face" FontSize="12" HorizontalAlignment="Center" />
               <TextBlock Text="{Binding SelectedExpressionName}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
             </StackPanel>
             <DropDownButton.Flyout>
               <Flyout Placement="BottomEdgeAlignedLeft">
-                <ItemsControl Name="ExpressionChoices" ItemsSource="{Binding ExpressionChoices}" MaxWidth="320">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="local:ExpressionPresetChoice">
-                      <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
-                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyExpressionCommand}"
-                              CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
-                        <DockPanel>
-                          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                          <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" Closeup="True" />
+                <!-- Sized to fit a flyout (Fluent caps them at 456 px): the presets six to a row, a mixer row's eight choices in one line. -->
+                <StackPanel Spacing="4" Width="424">
+                  <ItemsControl Name="ExpressionChoices" ItemsSource="{Binding ExpressionChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:ExpressionPresetChoice">
+                        <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsCurrent}" Width="68" Margin="1" Padding="2"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyExpressionCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" Closeup="True" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <!-- Mix your own: eyes, brows and mouth one at a time, each choice showing the whole face it gives. -->
+                  <TextBlock Text="Mix your own" FontSize="11" FontWeight="SemiBold" Margin="1,6,0,0" />
+                  <ItemsControl Name="ExpressionMixer" ItemsSource="{Binding ExpressionMixer}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:ExpressionSlotRow">
+                        <DockPanel Margin="0,1">
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Label}" FontSize="11" Width="38" VerticalAlignment="Center" />
+                          <ItemsControl ItemsSource="{Binding Choices}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:ExpressionVariantChoice">
+                                <Button Classes="small choice sticker closeup mini" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                        Command="{Binding $parent[ItemsControl;1].((local:PageEditorViewModel)DataContext).SetExpressionVariantCommand}"
+                                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                  <DockPanel>
+                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="8" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" Closeup="True" />
+                                  </DockPanel>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
                         </DockPanel>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </Flyout>
             </DropDownButton.Flyout>
           </DropDownButton>

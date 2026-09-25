@@ -213,10 +213,7 @@ public class DrawingAndTextTests
 
         var box = ((TextElement)window.Editor.Working.Panels[panelId].Elements[index]).Bounds;
         var point = At(window, canvas, box.MidX, box.MidY);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
+        window.DoubleClick(point);
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible);

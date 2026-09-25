@@ -14,8 +14,15 @@ public enum SaveChangesChoice
 /// </summary>
 public interface IFileDialogs
 {
-    /// <summary>A folder to open a project from or save one into; null if cancelled.</summary>
+    /// <summary>A project folder to open; null if cancelled.</summary>
     Task<string?> PickFolderAsync(string title);
+
+    /// <summary>
+    /// Where to save the comic and what to call it, as any program's Save As asks: a name box
+    /// starting as <paramref name="suggestedName"/>, and a place. Returns the place joined with
+    /// the name typed - the comic's folder to be; null if cancelled.
+    /// </summary>
+    Task<string?> PickSaveLocationAsync(string title, string suggestedName);
 
     /// <summary>A file path to export to; null if cancelled.</summary>
     Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName);

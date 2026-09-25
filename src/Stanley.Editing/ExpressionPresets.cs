@@ -53,6 +53,9 @@ public static class ExpressionPresets
         [StickerSlots.Mouth] = [Neutral, "smile", "grin", "open", "shout", "frown", "o", "smirk"],
     };
 
+    /// <summary>The face slots an expression sets, in the order a mix of your own lists them.</summary>
+    public static IReadOnlyList<string> FaceSlots { get; } = [StickerSlots.Eyes, StickerSlots.Brows, StickerSlots.Mouth];
+
     public static IReadOnlyList<ExpressionPresetDefinition> All { get; } =
     [
         new(ExpressionPreset.Neutral, "Neutral", Neutral, Neutral, Neutral),
@@ -91,6 +94,35 @@ public static class ExpressionPresets
 
     public static CharacterInstance Apply(CharacterInstance instance, ExpressionPresetDefinition preset) =>
         instance with { Pose = Apply(instance.Pose, preset) };
+
+    /// <summary>The variant <paramref name="slot"/> shows in <paramref name="pose"/> (a slot left out is neutral).</summary>
+    public static string VariantOf(PoseData pose, string slot) => pose.Expression?.GetValueOrDefault(slot) ?? Neutral;
+
+    /// <summary>
+    /// A mix of your own: <paramref name="pose"/> with just <paramref name="slot"/> showing
+    /// <paramref name="variant"/> - happy eyes over an open mouth, say. The rest of the face
+    /// is kept; neutral leaves the slot out, as a preset does.
+    /// </summary>
+    public static PoseData SetVariant(PoseData pose, string slot, string variant)
+    {
+        var expression = new SortedDictionary<string, string>(pose.Expression ?? [], StringComparer.Ordinal);
+        if (variant == Neutral)
+            expression.Remove(slot);
+        else
+            expression[slot] = variant;
+        return pose with { Expression = expression };
+    }
+
+    /// <summary>A variant's name for people: "halfClosed" is "Half closed", "o" an "Oh" mouth.</summary>
+    public static string VariantName(string slot, string variant) => (slot, variant) switch
+    {
+        (_, "halfClosed") => "Half closed",
+        (StickerSlots.Eyes, "wide") => "Wide open",
+        (StickerSlots.Mouth, "o") => "Oh",
+        _ => Capitalized(variant),
+    };
+
+    private static string Capitalized(string word) => word.Length == 0 ? word : char.ToUpperInvariant(word[0]) + word[1..];
 
     /// <summary>The preset <paramref name="pose"/>'s face matches (a slot left out counts as neutral), or null for a mix of its own.</summary>
     public static ExpressionPresetDefinition? Of(PoseData pose) =>

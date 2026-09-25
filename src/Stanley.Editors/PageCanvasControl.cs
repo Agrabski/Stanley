@@ -1298,7 +1298,23 @@ public sealed class PageCanvasControl : Control
             poses.ItemsSource = PosePresets.All.Select(preset => Item(preset.Name, () => vm.ApplyPosePreset(characterPanel, index, preset))).ToList();
             items.Add(poses);
             var expressions = new MenuItem { Header = "Expression" };
-            expressions.ItemsSource = ExpressionPresets.All.Select(preset => Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset))).ToList();
+            var pose = vm.Working.Panels[characterPanel].CharacterInstances[index].Pose;
+            // The presets, then a mix of your own: Eyes ▸, Brows ▸, Mouth ▸ one at a time.
+            expressions.ItemsSource = ExpressionPresets.All.Select(preset => (Control)Item(preset.Name, () => vm.ApplyExpression(characterPanel, index, preset)))
+                .Append(new Separator())
+                .Concat(ExpressionPresets.FaceSlots.Select(slot =>
+                {
+                    var current = ExpressionPresets.VariantOf(pose, slot);
+                    return (Control)new MenuItem
+                    {
+                        Header = ProjectModel.Characters.StickerSlots.Get(slot).Label,
+                        ItemsSource = ExpressionPresets.Vocabulary[slot]
+                            .Select(variant => Item((variant == current ? "✓ " : "") + ExpressionPresets.VariantName(slot, variant),
+                                () => vm.SetExpressionVariant(characterPanel, index, slot, variant)))
+                            .ToList()
+                    };
+                }))
+                .ToList();
             items.Add(expressions);
             if (vm.PanelLookChoices is { Count: > 2 } looks)
             {

@@ -692,20 +692,33 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// File › Save As (and a new comic's first Save): the system's Save dialog, with a box for
+    /// the comic's name and a place to put it. The comic is saved as a folder of that name
+    /// there ("name (2)" if the name is taken), and a comic's first save names it, as it
+    /// does a document in Word. Returns whether it was saved.
+    /// </summary>
     public async Task<bool> SaveAsAsync()
     {
         if (_project is null || _navigator is null)
             return false;
 
-        var folder = await _dialogs.PickFolderAsync("Save the comic in a folder");
-        if (folder is null)
+        var chosen = await _dialogs.PickSaveLocationAsync("Save the comic", DocumentTitle);
+        if (chosen is null)
             return false;
+        if (_project.Location is { } current && PathsEqual(current, chosen))
+            return await SaveAsync(); // its own folder, under its own name: nothing to copy
 
+        var title = _project.Title;
         try
         {
-            var saved = _project.SaveAs(folder, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
+            var path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(chosen));
+            if (_project.IsUntitled && Path.GetFileName(path).Trim() is { Length: > 0 } name)
+                _project.Title = name;
+            var saved = _project.SaveAs(ComicProject.FreeFolder(path), _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks,
+                _pictures?.Files);
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
-            RefreshFields(); // an untitled comic took its folder's name
+            RefreshFields(); // a new comic took the name it was saved under
             MarkSaved();
             Message = $"Saved to {saved}";
             OnPropertyChanged(nameof(AutoSaveEnabled)); // no longer untitled - AutoSave can apply
@@ -714,7 +727,8 @@ public sealed class MainWindowViewModel : ObservableObject
         }
         catch (Exception e) when (IsFileProblem(e))
         {
-            AppLog.Error($"Save As of \"{DocumentTitle}\" to {folder} failed.", e);
+            _project.Title = title;
+            AppLog.Error($"Save As of \"{DocumentTitle}\" to {chosen} failed.", e);
             ShowError($"Couldn't save: {e.Message}");
             return false;
         }

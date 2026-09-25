@@ -46,6 +46,34 @@ public class ExpressionPresetsTests
     }
 
     [Fact]
+    public void Mixing_your_own_sets_one_face_slot_and_keeps_the_rest()
+    {
+        var happy = ExpressionPresets.Apply(Rest, ExpressionPresets.Get(ExpressionPreset.Happy));
+
+        var openMouthed = ExpressionPresets.SetVariant(happy, StickerSlots.Mouth, "open");
+
+        Assert.Equal("happy", ExpressionPresets.VariantOf(openMouthed, StickerSlots.Eyes));
+        Assert.Equal(ExpressionPresets.Neutral, ExpressionPresets.VariantOf(openMouthed, StickerSlots.Brows));
+        Assert.Equal("open", ExpressionPresets.VariantOf(openMouthed, StickerSlots.Mouth));
+        Assert.Null(ExpressionPresets.Of(openMouthed)); // a mix of its own, no preset
+        Assert.Equal([StickerSlots.Eyes], ExpressionPresets.SetVariant(openMouthed, StickerSlots.Mouth, ExpressionPresets.Neutral).Expression.Keys);
+        Assert.Equal(ExpressionPreset.Happy, ExpressionPresets.Of(ExpressionPresets.SetVariant(openMouthed, StickerSlots.Mouth, "smile"))?.Preset);
+    }
+
+    [Theory]
+    [InlineData(StickerSlots.Eyes, "halfClosed", "Half closed")]
+    [InlineData(StickerSlots.Eyes, "wide", "Wide open")]
+    [InlineData(StickerSlots.Mouth, "o", "Oh")]
+    [InlineData(StickerSlots.Mouth, "grin", "Grin")]
+    [InlineData(StickerSlots.Brows, "neutral", "Neutral")]
+    public void Variants_have_names_people_can_read(string slot, string variant, string name) =>
+        Assert.Equal(name, ExpressionPresets.VariantName(slot, variant));
+
+    [Fact]
+    public void The_face_slots_are_the_ones_the_vocabulary_covers() =>
+        Assert.Equal(ExpressionPresets.Vocabulary.Keys.Order(), ExpressionPresets.FaceSlots.Order());
+
+    [Fact]
     public void Every_preset_asks_only_for_the_standard_vocabulary()
     {
         foreach (var preset in ExpressionPresets.All)

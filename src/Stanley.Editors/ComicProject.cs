@@ -506,6 +506,26 @@ public sealed class ComicProject
     private static PanelLayoutPreset? LayoutOf(ComicFormat? format) =>
         format?.PanelsPerRow is { Count: > 0 } rows ? new PanelLayoutPreset("New page", rows) : null;
 
+    /// <summary>
+    /// <paramref name="path"/> if nothing is there yet (or only an empty folder), else the
+    /// first free "name (2)", "name (3)"... beside it: where a comic saved under a name that's
+    /// already taken goes, so saving never mixes into or replaces what's there.
+    /// </summary>
+    public static string FreeFolder(string path)
+    {
+        static bool IsFree(string candidate) =>
+            !File.Exists(candidate) && (!Directory.Exists(candidate) || !Directory.EnumerateFileSystemEntries(candidate).Any());
+
+        if (IsFree(path))
+            return path;
+        for (var n = 2; ; n++)
+        {
+            var candidate = $"{path} ({n})";
+            if (IsFree(candidate))
+                return candidate;
+        }
+    }
+
     private string ChooseTargetFolder(string folder)
     {
         if (!Directory.Exists(folder) || !Directory.EnumerateFileSystemEntries(folder).Any())
