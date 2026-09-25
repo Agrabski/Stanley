@@ -108,7 +108,7 @@ public class FontBoxTests
         var bounds = editor.PanelBounds(panelId);
         var index = editor.CreateText(panelId, new Point2D(bounds.MidX, bounds.MidY));
         editor.SetElementText(panelId, index, "BOOM");
-        double Size() => ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style.FontSizeMm;
+        double Size() => ((TextElement)editor.Working.Panels[panelId].Elements[index]).Style.FontSizePt;
 
         var box = FontGroup(window, "TextTab").Sizes;
         var view = window.GetVisualDescendants().OfType<PageEditorView>().Single();
@@ -175,7 +175,7 @@ public class FontBoxTests
         var group = FontGroup(window, "BubbleTab");
         Assert.NotSame(home, group); // one control type, placed on each tab
 
-        Assert.Equal(FontSizeBox.Format(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), group.Sizes.Entry.Text);
+        Assert.Equal(FontSizeBox.Format(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizePt), group.Sizes.Entry.Text);
         group.Sizes.Entry.Focus();
         Dispatcher.UIThread.RunJobs();
         window.KeyTextInput("5");
@@ -188,7 +188,7 @@ public class FontBoxTests
         Dispatcher.UIThread.RunJobs();
 
         var bubble = Bubble();
-        Assert.Equal(6, bubble.FontSizeMm); // 5, then one step bigger
+        Assert.Equal(6, bubble.FontSizePt); // 5, then one step bigger
         Assert.True(bubble.Bold);
         Assert.True(bubble.Italic);
         Assert.Equal(TextAlign.Left, bubble.Align);

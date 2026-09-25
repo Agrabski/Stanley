@@ -136,7 +136,7 @@ public class ElementRendererTests
     public void Text_wraps_inside_its_box_and_a_caption_box_is_drawn_behind_it()
     {
         var caption = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(15, 15, 40, 20), "Meanwhile, back at the lab",
-            new TextStyle(3.5, Black, Align: TextAlign.Left, BoxFill: ColorValue.FromHex("#ffff00"), BoxStroke: Black));
+            new TextStyle(10, Black, Align: TextAlign.Left, BoxFill: ColorValue.FromHex("#ffff00"), BoxStroke: Black));
 
         using var bitmap = Render(PanelWith(null, [], caption));
 
@@ -154,20 +154,20 @@ public class ElementRendererTests
     [Fact]
     public void Needed_height_grows_with_the_text_and_counts_the_box_padding()
     {
-        var style = new TextStyle(3.5, Black);
+        var style = new TextStyle(10, Black);
         var one = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 40, 5), "Hi", style);
         var many = one with { Text = "Hi\nthere\nyou\nfour" };
         var boxed = one with { Style = style with { BoxFill = ColorValue.FromHex("#ffffff") } };
 
         Assert.True(ElementRenderer.NeededHeight(many) > 3.5 * ElementRenderer.NeededHeight(one));
-        Assert.Equal(ElementRenderer.NeededHeight(one) + 2 * 3.5 * ElementRenderer.BoxPaddingFraction, ElementRenderer.NeededHeight(boxed), 3);
+        Assert.Equal(ElementRenderer.NeededHeight(one) + 2 * style.FontSizeMm * ElementRenderer.BoxPaddingFraction, ElementRenderer.NeededHeight(boxed), 3);
     }
 
     [Fact]
     public void Lettering_can_be_left_off_while_the_box_still_draws()
     {
         var caption = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(15, 15, 40, 20), "WHAM",
-            new TextStyle(8, Black, BoxFill: ColorValue.FromHex("#ffff00")));
+            new TextStyle(23, Black, BoxFill: ColorValue.FromHex("#ffff00")));
         var panel = PanelWith(null, [], caption);
 
         using var bitmap = new SKBitmap(100, 100);
@@ -221,14 +221,14 @@ public class LineStyleRenderingTests
     public void Hollow_letters_draw_only_their_outline_and_a_heavier_box_border_is_thicker()
     {
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 80, 40), "O",
-            new TextStyle(30, Color: null, Bold: true, Outline: Black, OutlineWidthMm: 1));
+            new TextStyle(85, Color: null, Bold: true, Outline: Black, OutlineWidthMm: 1));
         using var hollow = Render(text);
         using var filled = Render(text with { Style = text.Style with { Color = Black } });
         int Ink(SKBitmap b) { var n = 0; for (var y = 20; y < 60; y++) n += InkAlong(b, y, 10, 90); return n; }
         Assert.True(Ink(hollow) > 0);
         Assert.True(Ink(hollow) < Ink(filled) * 0.7, "a hollow O should be mostly empty inside");
 
-        var thin = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 80, 40), "", new TextStyle(3.5, Black, BoxStroke: Black));
+        var thin = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(10, 20, 80, 40), "", new TextStyle(10, Black, BoxStroke: Black));
         using var thinBox = Render(thin);
         using var thickBox = Render(thin with { Style = thin.Style with { BoxStrokeWidthMm = 3 } });
         Assert.True(InkAlong(thickBox, 40, 5, 15) > InkAlong(thinBox, 40, 5, 15));

@@ -17,8 +17,8 @@ public sealed record PageFolio(string Text, PageNumberPosition Position, bool Is
 /// </summary>
 public static class PageRenderer
 {
-    /// <summary>Lettering size: ~10pt, the usual comic dialogue size at print.</summary>
-    public const float FontSizeMm = (float)ProjectModel.Bubbles.Bubble.DefaultFontSizeMm;
+    /// <summary>Bubble lettering's size when a bubble has none of its own: 10pt, the usual comic dialogue size at print, in mm.</summary>
+    public const float FontSizeMm = (float)(ProjectModel.Bubbles.Bubble.DefaultFontSizePt * ProjectModel.Issues.FontPoints.MmPerPoint);
     public const float BubbleStrokeMm = 0.35f;
     public const float PanelBorderMm = 0.7f;
     public const float TailBaseHalfWidthMm = 2.5f;

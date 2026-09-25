@@ -260,7 +260,7 @@ public partial class PageEditorView : UserControl
         {
             var bubble = vm.Working.Panels[editing.Panel].Bubbles[index];
             rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(bubble));
-            fontSize = Math.Clamp(LetteringFont.Of(bubble).SizeMm * PageCanvas.Zoom * 0.95, 11, 160);
+            fontSize = Math.Clamp(FontPoints.ToMm(LetteringFont.Of(bubble).SizePt) * PageCanvas.Zoom * 0.95, 11, 160);
         }
         // Height follows the text, so no line is ever clipped: when there's more text than
         // fits (or the box is smaller than a readable line at this zoom) it grows past it -

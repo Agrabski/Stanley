@@ -114,23 +114,28 @@ public class FontsTests
         var (editor, history, panel) = NewEditor();
         var index = editor.CreateText(panel, new Point2D(40, 40));
         editor.SelectElement(panel, index);
-        var before = editor.TextSizeMm;
+        var before = editor.TextSizePt;
         var changes = new List<string?>();
         editor.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
 
-        editor.SetTextSizeCommand.Execute("7,5 mm");
+        editor.SetTextSizeCommand.Execute("10,5 pt");
 
-        Assert.Equal(7.5, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizeMm);
-        Assert.Equal(7.5, editor.TextSizeMm);
-        Assert.Contains(nameof(PageEditorViewModel.TextSizeMm), changes);
+        Assert.Equal(10.5, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizePt);
+        Assert.Equal(10.5, editor.TextSizePt);
+        Assert.Contains(nameof(PageEditorViewModel.TextSizePt), changes);
         Assert.Contains(12, editor.TextSizeChoices);
+        Assert.Contains(72, editor.TextSizeChoices);
+
+        editor.SetTextSizeCommand.Execute("5 mm"); // millimetres still work, turned into points
+        Assert.Equal(14, editor.TextSizePt);
 
         editor.SetTextSizeCommand.Execute("huge");
-        Assert.Equal(7.5, editor.TextSizeMm);
+        Assert.Equal(14, editor.TextSizePt);
         Assert.NotNull(editor.LastError);
 
         history.Undo();
-        Assert.Equal(before, editor.TextSizeMm);
+        history.Undo();
+        Assert.Equal(before, editor.TextSizePt);
     }
 
     [Fact]
@@ -141,7 +146,7 @@ public class FontsTests
         editor.SetTextSizeCommand.Execute("9");
         var index = editor.CreateText(panel, new Point2D(40, 40));
 
-        Assert.Equal(9, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizeMm);
+        Assert.Equal(9, ((TextElement)editor.Working.Panels[panel].Elements[index]).Style.FontSizePt);
     }
 
     [Fact]
@@ -150,7 +155,7 @@ public class FontsTests
         var (editor, history, panel) = NewEditor();
         var index = editor.CreateBubble(panel, new Point2D(50, 50));
         Stanley.ProjectModel.Bubbles.Bubble Bubble(int i) => editor.Working.Panels[panel].Bubbles[i];
-        Assert.Equal(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm, editor.TextSizeMm);
+        Assert.Equal(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizePt, editor.TextSizePt);
         Assert.True(editor.IsTextAlignCenter);
 
         editor.IsTextBold = true;
@@ -158,21 +163,21 @@ public class FontsTests
         editor.IsTextAlignRight = true;
 
         Assert.True(Bubble(index).Bold);
-        Assert.Equal(6, Bubble(index).FontSizeMm);
+        Assert.Equal(6, Bubble(index).FontSizePt);
         Assert.Equal(TextAlign.Right, Bubble(index).Align);
-        Assert.Equal(6, editor.TextSizeMm);
+        Assert.Equal(6, editor.TextSizePt);
         Assert.True(editor.IsTextAlignRight);
 
         history.Undo();
         Assert.Null(Bubble(index).Align);
         history.Undo();
-        Assert.Null(Bubble(index).FontSizeMm);
+        Assert.Null(Bubble(index).FontSizePt);
         history.Undo();
         Assert.False(Bubble(index).Bold);
 
         var next = editor.CreateBubble(panel, new Point2D(80, 80));
         Assert.True(Bubble(next).Bold);
-        Assert.Equal(6, Bubble(next).FontSizeMm);
+        Assert.Equal(6, Bubble(next).FontSizePt);
     }
 
     [Fact]
@@ -186,12 +191,12 @@ public class FontsTests
         var bubbleIndex = editor.CreateBubble(panel, new Point2D(50, 50));
         var bubble = editor.Working.Panels[panel].Bubbles[bubbleIndex];
         Assert.True(bubble.Italic);
-        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), bubble.FontSizeMm);
+        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizePt), bubble.FontSizePt);
         editor.Select(null);
         var textIndex = editor.CreateText(panel, new Point2D(40, 90));
         var text = ((TextElement)editor.Working.Panels[panel].Elements[textIndex]).Style;
         Assert.True(text.Italic);
-        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizeMm), text.FontSizeMm);
+        Assert.Equal(TextEditing.Bigger(Stanley.ProjectModel.Bubbles.Bubble.DefaultFontSizePt), text.FontSizePt);
     }
 
     [Fact]

@@ -91,7 +91,7 @@ public class LetteringTests
         Assert.SkipWhen(other is null, "no installed font with different widths from the default");
 
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 5), "WWWW iiii WWWW iiii WWWW iiii",
-            new TextStyle(4, ColorValue.FromHex("#000000")));
+            new TextStyle(11, ColorValue.FromHex("#000000")));
         Assert.NotEqual(ElementRenderer.NeededHeight(text), ElementRenderer.NeededHeight(text with { Style = text.Style with { FontFamily = other } }));
 
         var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(0, 0, 60, 30)).Anchors), BubbleStylePreset.Speech, [], "WWWW");
@@ -103,8 +103,8 @@ public class LetteringTests
     {
         var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(0, 0, 60, 30)).Anchors), BubbleStylePreset.Speech, [], "Hi");
 
-        Assert.Equal(Pixels(bubble), Pixels(bubble with { FontSizeMm = 8 })); // the size Draw was given is the default's
-        Assert.NotEqual(Pixels(bubble), Pixels(bubble with { FontSizeMm = 10 }));
+        Assert.Equal(Pixels(bubble), Pixels(bubble with { FontSizePt = FontPoints.FromMm(8) })); // the size Draw was given (8mm) is the default's
+        Assert.NotEqual(Pixels(bubble), Pixels(bubble with { FontSizePt = 28 }));
         Assert.True(Ink(bubble with { Bold = true }) > Ink(bubble));
         Assert.True(InkCentre(bubble with { Align = TextAlign.Left }) < InkCentre(bubble) - 5);
         Assert.True(InkCentre(bubble with { Align = TextAlign.Right }) > InkCentre(bubble) + 5);

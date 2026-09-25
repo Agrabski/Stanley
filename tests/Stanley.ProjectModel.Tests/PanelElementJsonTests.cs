@@ -21,13 +21,15 @@ public class PanelElementJsonTests
         var line = new ShapeElement(ElementId.New(), ElementLayer.Foreground, [Corner(20, 20), Corner(80, 20)], Closed: false,
             new ShapeStyle(ColorValue.FromHex("#1c1c1c"), Fill: null, 1.4));
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(12, 12, 40, 10), "Meanwhile...",
-            new TextStyle(3.5, ColorValue.FromHex("#000000"), Bold: true, Align: TextAlign.Left, BoxFill: ColorValue.FromHex("#fff3b0"), BoxStroke: ColorValue.FromHex("#000000")));
+            new TextStyle(10, ColorValue.FromHex("#000000"), Bold: true, Align: TextAlign.Left, BoxFill: ColorValue.FromHex("#fff3b0"), BoxStroke: ColorValue.FromHex("#000000")));
         var panel = PanelWith(new GradientBackground(ColorValue.FromHex("#5dade2"), ColorValue.FromHex("#f4f4f4")), shape, line, text);
 
         var json = ProjectJson.Serialize(panel);
         var read = ProjectJson.Deserialize<Panel>(json);
 
         Assert.Contains("\"kind\": \"shape\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"fontSizePt\": 10", json, StringComparison.Ordinal); // points, as in Word
+        Assert.DoesNotContain("fontSizeMm", json, StringComparison.Ordinal);
         Assert.Contains("\"kind\": \"text\"", json, StringComparison.Ordinal);
         Assert.Contains("\"kind\": \"gradient\"", json, StringComparison.Ordinal);
         Assert.Contains("\"layer\": \"foreground\"", json, StringComparison.Ordinal);
@@ -40,7 +42,7 @@ public class PanelElementJsonTests
     [Fact]
     public void Unset_style_colours_are_left_out_of_the_file()
     {
-        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi", new TextStyle(3.5, ColorValue.FromHex("#000000")));
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi", new TextStyle(10, ColorValue.FromHex("#000000")));
 
         var json = ProjectJson.Serialize(PanelWith(null, text));
 
@@ -53,7 +55,7 @@ public class PanelElementJsonTests
     public void Text_and_bubble_fonts_round_trip_and_older_files_read_as_the_default_font()
     {
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi",
-            new TextStyle(3.5, ColorValue.FromHex("#000000"), FontFamily: "Comic Neue"));
+            new TextStyle(10, ColorValue.FromHex("#000000"), FontFamily: "Comic Neue"));
         var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(20, 20, 40, 20)).Anchors), BubbleStylePreset.Speech, [], "Hey!", FontFamily: "DejaVu Serif");
         var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [], [bubble], [text]);
 
@@ -73,11 +75,11 @@ public class PanelElementJsonTests
     public void A_bubbles_lettering_is_only_written_when_chosen_and_round_trips()
     {
         var plain = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(20, 20, 40, 20)).Anchors), BubbleStylePreset.Speech, [], "Hey!");
-        var styled = plain with { Id = BubbleId.New(), FontSizeMm = 6, Bold = true, Italic = true, Align = TextAlign.Right };
+        var styled = plain with { Id = BubbleId.New(), FontSizePt = 18, Bold = true, Italic = true, Align = TextAlign.Right };
         var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [], [plain]);
 
         var json = ProjectJson.Serialize(panel);
-        foreach (var key in new[] { "fontSizeMm", "bold", "italic", "align" })
+        foreach (var key in new[] { "fontSizePt", "bold", "italic", "align" })
             Assert.DoesNotContain($"\"{key}\"", json, StringComparison.Ordinal);
 
         var both = panel with { Bubbles = [plain, styled] };

@@ -128,8 +128,8 @@ the page editor via `PageEditorViewModel`.
   preserving tail attachment/target so they don't jump. The anchor model
   itself is the escape hatch for arbitrary hand-edited shapes later.
 - **Lettering**: the same Font group as free text (see "Fonts" under panel
-  elements): `Bubble.FontFamily` (null = the default font), `FontSizeMm` (null =
-  `Bubble.DefaultFontSizeMm`, 3.5), `Bold`, `Italic`, `Align` (null = centred) — each
+  elements): `Bubble.FontFamily` (null = the default font), `FontSizePt` (null =
+  `Bubble.DefaultFontSizePt`, 10pt), `Bold`, `Italic`, `Align` (null = centred) — each
   written to the file only when chosen (`LetteringFont.ApplyTo` stores defaults as
   null; `bold`/`italic` are `WhenWritingDefault`). Letters still shrink to fit a
   bubble too small for them.
@@ -187,6 +187,11 @@ features will read and write.
   preset table anywhere; `stanley init` defaults to A4 with a 3mm bleed
   (a static `PageSize` field in `InitCommand` plus a plain `const` bleed,
   not its own preset table entry, since bleed isn't part of a paper size).
+  **The one exception is type size: points, as in Word** (the user's call — it's
+  how everyone already sizes type). `TextStyle.FontSizePt` / `Bubble.FontSizePt`
+  store points; `FontPoints` (ProjectModel/Issues) converts, and the renderer
+  draws in millimetres (`TextStyle.FontSizeMm`, JSON-ignored). Everything else
+  — page, panels, line weights, margins — stays in millimetres.
 - **Not yet designed**: any convenience "create new project/character/issue"
   helpers beyond `ProjectRepository.Initialize` and raw `SaveX`/`LoadX`, and
   NativeAOT publish validation (analyzer-clean under `IsAotCompatible`, not yet
@@ -424,7 +429,7 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   `Foreground` = in front, still under the bubbles). Kinds (JSON `kind`):
   `ShapeElement` (the same anchor model as panels/bubbles, `Closed` or an open line,
   `ShapeStyle` stroke/fill colours — null = none — width in mm and `LineDash`),
-  `TextElement` (`Bounds`, `Text`, `TextStyle`: size in mm, colour — null = hollow
+  `TextElement` (`Bounds`, `Text`, `TextStyle`: size in points (`FontSizePt`), colour — null = hollow
   letters — bold, italic, `TextAlign`, letter `Outline` and `OutlineWidthMm` — null
   = in proportion to the letters — and the box: `BoxFill`, `BoxStroke`,
   `BoxStrokeWidthMm`, `BoxDash` — plus `FontFamily`), `PictureElement` (`Bounds` +
@@ -454,8 +459,9 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   Catmull-Rom-style curve through the points that keeps bends over 70° as
   corners; a trail ending near its start closes and fills), plus `Line`,
   `Rectangle`, `Ellipse` (`AnchorRing.Rectangle`/`Ellipse`), `Resize` (a flat line
-  keeps its zero height) and `SetStyle`. `TextEditing` (size ladder for
-  bigger/smaller, `GrowToFit` so typed text never has to shrink) and
+  keeps its zero height) and `SetStyle`. `TextEditing` (Word's size list and
+  its Grow/Shrink Font ladder for bigger/smaller — below 8pt a point at a time, above
+  72pt by tens up to 1638 — `GrowToFit` so typed text never has to shrink) and
   `TextStylePresets` (Caption: boxed, left-aligned; Plain; Sound effect: big,
   bold italic, outlined). `PictureEditing.Place` fits 80% of the panel at the
   picture's own shape; `Resize` keeps the shape, pinned to the edges that didn't
@@ -507,10 +513,11 @@ What a panel holds besides characters and bubbles. Draw order inside the panel c
   the font. A font the computer lacks leaves the box empty with "<name> (missing)"
   as its placeholder and a tooltip saying so.
   Beside it, Word's font size box (`FontSizeBox`, code-only like
-  `ColorMenuButton`): the size as editable text in mm plus an arrow listing
-  `TextEditing.SizeSteps` (the current one ticked); type any size and press Enter or
-  click away (`TextEditing.ParseSize`: "7.5", "7,5" or "7.5 mm", rounded to 0.1 mm,
-  1–60) — Esc cancels, a bad entry puts the real size back and says why in the status
+  `ColorMenuButton`): the size in points as editable text plus an arrow listing
+  Word's sizes, `TextEditing.SizeSteps` (8–72, the current one ticked); type any
+  size and press Enter or click away (`TextEditing.ParseSize`: "12", "10,5" or
+  "12 pt", rounded to the half point, 1–1638 as in Word; "5 mm" is turned into
+  points) — Esc cancels, a bad entry puts the real size back and says why in the status
   bar. Picking or entering a size hands the keyboard back to the page
   (`PageEditorViewModel.FocusPage` → `ViewportRequest.FocusPage`), so shortcuts work
   again.

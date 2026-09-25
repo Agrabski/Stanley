@@ -319,7 +319,7 @@ public class PageElementsTests
         var bigger = (TextElement)editor.Working.Panels[panel].Elements[index];
         Assert.True(bigger.Style.Bold);
         Assert.Equal(TextAlign.Right, bigger.Style.Align);
-        Assert.Equal(TextEditing.Bigger(3.5), bigger.Style.FontSizeMm);
+        Assert.Equal(TextEditing.Bigger(10), bigger.Style.FontSizePt);
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class PageElementsTests
         Assert.Equal(TextStylePresets.Ink, Style().BoxStroke);
         editor.SetBoxWeightCommand.Execute(DrawingPalette.Weights.Single(w => w.Mm == 1));
         editor.SetBoxOutlineCommand.Execute(DrawingPalette.StandardColors.Single(c => c.Name == "Dark Red"));
-        Assert.Equal(new TextStyle(3.5, TextStylePresets.Ink, BoxFill: ColorValue.FromHex("#ffffff"), BoxStroke: ColorValue.FromHex("#c00000"),
+        Assert.Equal(new TextStyle(10, TextStylePresets.Ink, BoxFill: ColorValue.FromHex("#ffffff"), BoxStroke: ColorValue.FromHex("#c00000"),
             BoxStrokeWidthMm: 1, BoxDash: LineDash.Dash), Style());
 
         editor.SetBoxOutlineCommand.Execute(DrawingPalette.None);

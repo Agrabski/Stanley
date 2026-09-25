@@ -74,13 +74,13 @@ public enum TextAlign
 /// behind the text (<paramref name="BoxFill"/>) or around it (<paramref name="BoxStroke"/>)
 /// - a caption is text with both.
 /// </summary>
-/// <param name="FontSizeMm">Letter size in page millimetres (3.5mm is the usual ~10pt dialogue size).</param>
+/// <param name="FontSizePt">Letter size in points, as in Word (10pt is the usual dialogue size); see <see cref="FontPoints"/>.</param>
 /// <param name="OutlineWidthMm">The letter outline's thickness; null keeps it in proportion to the letter size.</param>
 /// <param name="BoxStrokeWidthMm">The box outline's thickness (a bubble's, by default).</param>
 /// <param name="BoxDash">The box outline's pattern.</param>
 /// <param name="FontFamily">The typeface's family name - one Stanley bundles or one installed on the computer; null is the default lettering font. A family the computer doesn't have draws in the default until it's installed, and the name is kept.</param>
 public sealed record TextStyle(
-    double FontSizeMm,
+    double FontSizePt,
     ColorValue? Color,
     bool Bold = false,
     bool Italic = false,
@@ -94,6 +94,10 @@ public sealed record TextStyle(
     string? FontFamily = null)
 {
     public const double DefaultBoxStrokeWidthMm = 0.35;
+
+    /// <summary>The letter size in page millimetres, which is what the renderer draws in.</summary>
+    [JsonIgnore]
+    public double FontSizeMm => FontPoints.ToMm(FontSizePt);
 }
 
 /// <summary>

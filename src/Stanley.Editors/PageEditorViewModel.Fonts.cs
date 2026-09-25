@@ -21,19 +21,19 @@ public sealed partial class PageEditorViewModel
     {
         BiggerTextCommand = new RelayCommand(() =>
         {
-            var size = TextEditing.Bigger(CurrentLettering.SizeMm);
-            SetLettering(f => f with { SizeMm = size });
+            var size = TextEditing.Bigger(CurrentLettering.SizePt);
+            SetLettering(f => f with { SizePt = size });
         });
         SmallerTextCommand = new RelayCommand(() =>
         {
-            var size = TextEditing.Smaller(CurrentLettering.SizeMm);
-            SetLettering(f => f with { SizeMm = size });
+            var size = TextEditing.Smaller(CurrentLettering.SizePt);
+            SetLettering(f => f with { SizePt = size });
         });
         SetTextSizeCommand = new RelayCommand<string>(entry =>
         {
             var size = TextEditing.ParseSize(entry);
             if (size.IsValid)
-                SetLettering(f => f with { SizeMm = size.Value });
+                SetLettering(f => f with { SizePt = size.Value });
             else
                 Apply(EditResult<PageDocument>.Failure(size.Error!));
         });
@@ -80,8 +80,8 @@ public sealed partial class PageEditorViewModel
             ? $"Font - {family} isn't on this computer, so it's shown in {Lettering.DefaultFamily}; install it and it comes back."
             : "Font - for the selected bubble or text, and what you add next";
 
-    /// <summary>The letters' size in mm, as the font size box shows it.</summary>
-    public double TextSizeMm => CurrentLettering.SizeMm;
+    /// <summary>The letters' size in points, as the font size box shows it (as in Word).</summary>
+    public double TextSizePt => CurrentLettering.SizePt;
 
     /// <summary>The sizes the font size box lists (any other can be typed).</summary>
     public IReadOnlyList<double> TextSizeChoices => TextEditing.SizeSteps;
@@ -89,7 +89,7 @@ public sealed partial class PageEditorViewModel
     public IRelayCommand BiggerTextCommand { get; private set; } = null!;
     public IRelayCommand SmallerTextCommand { get; private set; } = null!;
 
-    /// <summary>The font size box: a size picked from its list or typed ("7.5", "7,5 mm"); a bad entry changes nothing and says why.</summary>
+    /// <summary>The font size box: a size in points picked from its list or typed ("10.5", "12 pt", or "5 mm", turned into points); a bad entry changes nothing and says why.</summary>
     public IRelayCommand<string> SetTextSizeCommand { get; private set; } = null!;
 
     public bool IsTextBold
@@ -167,7 +167,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(SelectedFont));
         OnPropertyChanged(nameof(FontPlaceholder));
         OnPropertyChanged(nameof(FontTip));
-        OnPropertyChanged(nameof(TextSizeMm));
+        OnPropertyChanged(nameof(TextSizePt));
         OnPropertyChanged(nameof(IsTextBold));
         OnPropertyChanged(nameof(IsTextItalic));
         OnPropertyChanged(nameof(IsTextAlignLeft));

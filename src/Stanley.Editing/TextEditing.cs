@@ -30,9 +30,9 @@ public static class TextStylePresets
 
     public static TextStyle Style(TextStylePreset preset) => preset switch
     {
-        TextStylePreset.Caption => new TextStyle(3.5, Ink, Align: TextAlign.Left, BoxFill: CaptionYellow, BoxStroke: Ink),
-        TextStylePreset.Plain => new TextStyle(3.5, Ink),
-        TextStylePreset.SoundEffect => new TextStyle(10, EffectYellow, Bold: true, Italic: true, Outline: Ink),
+        TextStylePreset.Caption => new TextStyle(10, Ink, Align: TextAlign.Left, BoxFill: CaptionYellow, BoxStroke: Ink),
+        TextStylePreset.Plain => new TextStyle(10, Ink),
+        TextStylePreset.SoundEffect => new TextStyle(28, EffectYellow, Bold: true, Italic: true, Outline: Ink),
         _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, null)
     };
 
@@ -52,7 +52,7 @@ public static class TextStylePresets
 
     /// <summary>The preset <paramref name="style"/> is, if it's exactly one (size and font aside - a bigger caption, or one in another font, is still a caption).</summary>
     public static TextStylePreset? Of(TextStyle style) =>
-        All.Cast<TextStylePreset?>().FirstOrDefault(p => Style(p!.Value) with { FontSizeMm = style.FontSizeMm, FontFamily = style.FontFamily } == style);
+        All.Cast<TextStylePreset?>().FirstOrDefault(p => Style(p!.Value) with { FontSizePt = style.FontSizePt, FontFamily = style.FontFamily } == style);
 }
 
 /// <summary>
@@ -63,13 +63,17 @@ public static class TextEditing
 {
     public const double MinWidthMm = 5;
     public const double MinHeightMm = 2;
-    public const double MinFontSizeMm = 1;
-    public const double MaxFontSizeMm = 60;
+    /// <summary>Word's smallest and largest font sizes, in points.</summary>
+    public const double MinFontSizePt = 1;
+    public const double MaxFontSizePt = 1638;
     public const int MaxTextLength = 2000;
     public const int MaxFontNameLength = 100;
 
-    /// <summary>The letter sizes Bigger/Smaller step through, in mm (3.5 is the usual ~10pt dialogue size).</summary>
-    public static IReadOnlyList<double> SizeSteps { get; } = [2.5, 3, 3.5, 4, 5, 6, 8, 10, 12, 16, 20, 28, 40, 60];
+    /// <summary>Word's font size list, in points (10 is the usual dialogue size) - what the size box lists and Bigger/Smaller step through.</summary>
+    public static IReadOnlyList<double> SizeSteps { get; } = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+
+    /// <summary>Why a size was refused: Word's range.</summary>
+    public static string SizeRangeError { get; } = $"Font size must be between {MinFontSizePt} and {MaxFontSizePt} points.";
 
     public static EditResult<TextElement> Create(Rect2D bounds, TextStyle style, ElementLayer layer = ElementLayer.Foreground, string text = "")
     {
@@ -85,8 +89,8 @@ public static class TextEditing
 
     public static EditResult<TextElement> SetStyle(TextElement text, TextStyle style)
     {
-        if (style.FontSizeMm < MinFontSizeMm || style.FontSizeMm > MaxFontSizeMm)
-            return EditResult<TextElement>.Failure($"Letters must be {MinFontSizeMm}-{MaxFontSizeMm}mm tall.");
+        if (!IsValidSize(style.FontSizePt))
+            return EditResult<TextElement>.Failure(SizeRangeError);
         var font = CleanFontName(style.FontFamily);
         return font.IsValid
             ? EditResult<TextElement>.Success(text with { Style = style with { FontFamily = font.Value } })
@@ -116,25 +120,54 @@ public static class TextEditing
     public static TextElement GrowToFit(TextElement text, double neededHeight) =>
         neededHeight > text.Bounds.Height + 1e-6 ? text with { Bounds = text.Bounds with { Height = neededHeight } } : text;
 
+    public static bool IsValidSize(double points) => double.IsFinite(points) && points >= MinFontSizePt && points <= MaxFontSizePt;
+
     /// <summary>
-    /// A size typed into the font size box, in millimetres: "3.5", "3,5" or "3.5 mm", rounded
-    /// to a tenth. Refused, with a reason, when it isn't a number or letters can't be that size.
+    /// A size typed into the font size box, in points as in Word: "12", "10.5", "10,5" or
+    /// "12 pt", rounded to the half point like Word's; "5 mm" is taken too, and turned into
+    /// points. Refused, with a reason, when it isn't a number or Word wouldn't take it.
     /// </summary>
     public static EditResult<double> ParseSize(string? entry)
     {
         var text = (entry ?? string.Empty).Trim();
-        if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+        var millimetres = false;
+        if (text.EndsWith("pt", StringComparison.OrdinalIgnoreCase))
+        {
             text = text[..^2].TrimEnd();
+        }
+        else if (text.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[..^2].TrimEnd();
+            millimetres = true;
+        }
         if (!double.TryParse(text.Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var size) || !double.IsFinite(size))
-            return EditResult<double>.Failure("Type the letters' size in millimetres, like 3.5.");
-        size = Math.Round(size, 1);
-        return size < MinFontSizeMm || size > MaxFontSizeMm
-            ? EditResult<double>.Failure($"Letters must be {MinFontSizeMm}-{MaxFontSizeMm}mm tall.")
-            : EditResult<double>.Success(size);
+            return EditResult<double>.Failure("Type a font size in points, like 12.");
+        if (millimetres)
+            size = FontPoints.FromMm(size);
+        size = Math.Round(size * 2, MidpointRounding.AwayFromZero) / 2;
+        return IsValidSize(size) ? EditResult<double>.Success(size) : EditResult<double>.Failure(SizeRangeError);
     }
 
-    /// <summary>The next size up the <see cref="SizeSteps"/> ladder (Word's "Grow font").</summary>
-    public static double Bigger(double size) => SizeSteps.FirstOrDefault(s => s > size + 1e-6, Math.Min(size * 1.25, MaxFontSizeMm));
+    /// <summary>
+    /// Word's Grow Font: the next size up <see cref="SizeSteps"/>; below it, a point at a
+    /// time; above it, to the next ten, up to <see cref="MaxFontSizePt"/>.
+    /// </summary>
+    public static double Bigger(double size)
+    {
+        if (size < SizeSteps[0])
+            return Math.Min(Math.Floor(size) + 1, SizeSteps[0]);
+        var next = SizeSteps.FirstOrDefault(s => s > size + 1e-6);
+        return next > 0 ? next : Math.Min(Math.Floor(size / 10 + 1e-9) * 10 + 10, MaxFontSizePt);
+    }
 
-    public static double Smaller(double size) => SizeSteps.LastOrDefault(s => s < size - 1e-6, Math.Max(size / 1.25, MinFontSizeMm));
+    /// <summary>Word's Shrink Font: the next size down <see cref="SizeSteps"/>; below it, a point at a time down to <see cref="MinFontSizePt"/>; above it, to the ten below, down to the list's last size.</summary>
+    public static double Smaller(double size)
+    {
+        if (size <= SizeSteps[0] + 1e-6)
+            return Math.Max(Math.Ceiling(size - 1e-9) - 1, MinFontSizePt);
+        var last = SizeSteps[^1];
+        if (size > last + 1e-6)
+            return Math.Max(Math.Ceiling(size / 10 - 1e-9) * 10 - 10, last);
+        return SizeSteps.Last(s => s < size - 1e-6);
+    }
 }

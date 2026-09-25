@@ -173,7 +173,8 @@ public class TextEditingTests
         Assert.Null(plain.BoxFill);
         Assert.NotNull(effect.Outline);
         Assert.True(effect.Bold);
-        Assert.True(effect.FontSizeMm > plain.FontSizeMm);
+        Assert.True(effect.FontSizePt > plain.FontSizePt);
+        Assert.Equal(10, plain.FontSizePt); // Word's usual body size, and comic dialogue's
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public class TextEditingTests
         var caption = TextStylePresets.Style(TextStylePreset.Caption);
 
         Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption));
-        Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption with { FontSizeMm = 6 }));
+        Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption with { FontSizePt = 14 }));
         Assert.Equal(TextStylePreset.Caption, TextStylePresets.Of(caption with { FontFamily = "DejaVu Serif" }));
         Assert.Null(TextStylePresets.Of(caption with { Bold = true }));
     }
@@ -193,17 +194,17 @@ public class TextEditingTests
         var bubble = BubbleEditing.Create(new Rect2D(0, 0, 40, 20), Stanley.ProjectModel.Bubbles.BubbleStylePreset.Speech).Value;
 
         Assert.Equal(LetteringFont.BubbleDefault, LetteringFont.Of(bubble));
-        var styled = BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizeMm = 6, Bold = true, Align = TextAlign.Left }).Value;
-        Assert.Equal(6, styled.FontSizeMm);
+        var styled = BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizePt = 18, Bold = true, Align = TextAlign.Left }).Value;
+        Assert.Equal(18, styled.FontSizePt);
         Assert.True(styled.Bold);
         Assert.Equal(TextAlign.Left, styled.Align);
 
         var back = BubbleEditing.SetLettering(styled, LetteringFont.BubbleDefault).Value;
-        Assert.Null(back.FontSizeMm);
+        Assert.Null(back.FontSizePt);
         Assert.Null(back.Align);
         Assert.Equal(bubble, back);
 
-        Assert.False(BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizeMm = 0.2 }).IsValid);
+        Assert.False(BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { SizePt = 0.2 }).IsValid);
         Assert.Equal("Inter", BubbleEditing.SetLettering(bubble, LetteringFont.BubbleDefault with { Family = " Inter " }).Value.FontFamily);
     }
 
@@ -223,25 +224,56 @@ public class TextEditingTests
         Assert.False(BubbleEditing.SetFont(bubble, "Tab\tName").IsValid);
     }
 
+    [Theory]
+    [InlineData(10, 10.5)]
+    [InlineData(10.5, 11)]
+    [InlineData(12, 14)]
+    [InlineData(28, 36)]
+    [InlineData(48, 72)]
+    [InlineData(72, 80)]
+    [InlineData(80, 90)]
+    [InlineData(85, 90)]
+    [InlineData(1630, 1638)]
+    [InlineData(1638, 1638)]
+    [InlineData(5, 6)]
+    [InlineData(7.5, 8)]
+    [InlineData(1, 2)]
+    public void Bigger_is_Words_grow_font(double size, double bigger) =>
+        Assert.Equal(bigger, TextEditing.Bigger(size));
+
+    [Theory]
+    [InlineData(10, 9)]
+    [InlineData(11, 10.5)]
+    [InlineData(72, 48)]
+    [InlineData(80, 72)]
+    [InlineData(95, 90)]
+    [InlineData(9, 8)]
+    [InlineData(8, 7)]
+    [InlineData(7.5, 7)]
+    [InlineData(2, 1)]
+    [InlineData(1, 1)]
+    public void Smaller_is_Words_shrink_font(double size, double smaller) =>
+        Assert.Equal(smaller, TextEditing.Smaller(size));
+
     [Fact]
-    public void Bigger_and_smaller_step_through_the_size_ladder()
+    public void The_size_list_is_Words()
     {
-        Assert.Equal(4, TextEditing.Bigger(3.5));
-        Assert.Equal(3, TextEditing.Smaller(3.5));
-        Assert.Equal(4, TextEditing.Bigger(3.7));
-        Assert.Equal(TextEditing.MaxFontSizeMm, TextEditing.Bigger(TextEditing.MaxFontSizeMm));
-        Assert.True(TextEditing.Smaller(TextEditing.SizeSteps[0]) < TextEditing.SizeSteps[0]);
+        Assert.Equal([8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72], TextEditing.SizeSteps);
     }
 
     [Theory]
-    [InlineData("4", 4)]
-    [InlineData(" 7.5 ", 7.5)]
-    [InlineData("7,5", 7.5)]
-    [InlineData("12 mm", 12)]
-    [InlineData("12MM", 12)]
-    [InlineData("3.14159", 3.1)]
-    [InlineData("60", 60)]
-    public void A_typed_size_is_read_in_millimetres(string entry, double size) =>
+    [InlineData("12", 12)]
+    [InlineData(" 10.5 ", 10.5)]
+    [InlineData("10,5", 10.5)]
+    [InlineData("12 pt", 12)]
+    [InlineData("12PT", 12)]
+    [InlineData("11.3", 11.5)] // Word keeps half points
+    [InlineData("11.2", 11)]
+    [InlineData("1638", 1638)]
+    [InlineData("1", 1)]
+    [InlineData("5 mm", 14)] // millimetres are turned into points
+    [InlineData("25.4mm", 72)]
+    public void A_typed_size_is_read_in_points(string entry, double size) =>
         Assert.Equal(size, TextEditing.ParseSize(entry).Value);
 
     [Theory]
@@ -249,9 +281,10 @@ public class TextEditingTests
     [InlineData("big")]
     [InlineData("-3")]
     [InlineData("0.5")]
-    [InlineData("61")]
+    [InlineData("1639")]
     [InlineData("1e3")]
     [InlineData("NaN")]
+    [InlineData("12 px")]
     public void A_typed_size_that_isnt_one_is_refused_with_a_reason(string entry)
     {
         var result = TextEditing.ParseSize(entry);
@@ -268,7 +301,7 @@ public class TextEditingTests
         Assert.False(TextEditing.Create(new Rect2D(0, 0, 2, 10), style).IsValid);
         var text = TextEditing.Create(new Rect2D(0, 0, 30, 5), style).Value;
         Assert.False(TextEditing.SetText(text, new string('x', TextEditing.MaxTextLength + 1)).IsValid);
-        Assert.False(TextEditing.SetStyle(text, style with { FontSizeMm = 0.2 }).IsValid);
+        Assert.False(TextEditing.SetStyle(text, style with { FontSizePt = 0.2 }).IsValid);
         Assert.False(TextEditing.Resize(text, new Rect2D(0, 0, 30, 1)).IsValid);
     }
 

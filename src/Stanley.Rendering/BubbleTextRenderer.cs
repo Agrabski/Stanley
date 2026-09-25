@@ -25,10 +25,10 @@ public static class BubbleTextRenderer
         return new Rect2D(bounds.Left + dx, bounds.Top + dy, bounds.Width - 2 * dx, bounds.Height - 2 * dy);
     }
 
-    /// <summary>Draws the text at the bubble's own size, or <paramref name="fontSize"/> when it has none (in the canvas's units).</summary>
+    /// <summary>Draws the text at the bubble's own size (points, drawn in millimetres - the page's units), or <paramref name="fontSize"/> when it has none (in the canvas's units).</summary>
     public static void Draw(SKCanvas canvas, Bubble bubble, float fontSize = 18f, SKColor? color = null)
     {
-        fontSize = bubble.FontSizeMm is { } own ? (float)own : fontSize;
+        fontSize = bubble.FontSizePt is { } own ? (float)FontPoints.ToMm(own) : fontSize;
         var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
         var skBounds = SKRect.Create(
             (float)bounds.Left, (float)bounds.Top, (float)bounds.Width, (float)bounds.Height);

@@ -623,9 +623,9 @@ public sealed partial class PageEditorViewModel
     /// <summary>Restyles a text element; its box grows if the new style needs more room.</summary>
     public void SetTextStyle(PanelId panelId, int index, TextStyle style) =>
         Apply(EditElementInPanel(Working, panelId, index, e => e is TextElement text
-            ? TextEditing.SetStyle(text, style) is { IsValid: true } styled
+            ? TextEditing.SetStyle(text, style) is var styled && styled.IsValid
                 ? EditResult<PanelElement>.Success(TextEditing.GrowToFit(styled.Value, ElementRenderer.NeededHeight(styled.Value)))
-                : EditResult<PanelElement>.Failure($"Letters must be {TextEditing.MinFontSizeMm}-{TextEditing.MaxFontSizeMm}mm tall.")
+                : EditResult<PanelElement>.Failure(styled.Error!)
             : EditResult<PanelElement>.Failure("That isn't text.")));
 
     // ---------------------------------------------------------------- style: the selection's, and the next new one's
