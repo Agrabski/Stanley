@@ -81,8 +81,9 @@ public sealed partial class CharacterEditorViewModel
         }
         _artEdits[(id, view)] = session;
         ShowMessage(error is not null
-            ? $"Drawing {asset.Sticker.Name}: {error}."
-            : $"Drawing {asset.Sticker.Name} in your SVG editor ({session.Path}) - every save there updates it here." +
+            ? $"Drawing {asset.Sticker.Name}: {error}. Ctrl+Z undoes adding {asset.Sticker.Name}."
+            : $"Drawing {asset.Sticker.Name}: {session.Path} opened in your system's app for SVG files - every save there updates it here. " +
+              $"If that's not an SVG editor (Inkscape is a free one), install one and try again, or Ctrl+Z to undo adding {asset.Sticker.Name}." +
               (view == ViewAngle.Front ? " Switch to Side and draw again for the side view." : ""));
     }
 
