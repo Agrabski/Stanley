@@ -24,7 +24,6 @@ public abstract class EditorViewModel<TDocument> : Document, IEditorPane
     private TDocument _gestureBaseline;
     private bool _gestureActive;
     private bool _gestureDirty;
-    private string? _lastError;
 
     protected EditorViewModel(EditorHistory history, string title, TDocument initial)
     {
@@ -53,8 +52,8 @@ public abstract class EditorViewModel<TDocument> : Document, IEditorPane
     /// <summary>The most recent validation failure from <see cref="UpdateGesture"/>/<see cref="Apply"/>, or null. An invalid result during a gesture leaves <see cref="Working"/> at its last valid value rather than advancing the preview.</summary>
     public string? LastError
     {
-        get => _lastError;
-        private set => SetProperty(ref _lastError, value);
+        get;
+        private set => SetProperty(ref field, value);
     }
 
     /// <summary>The shared undo/redo stack this editor commits into, so a pane's toolbar can offer undo/redo without being handed it separately.</summary>

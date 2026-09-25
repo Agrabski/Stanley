@@ -6,9 +6,6 @@ using Stanley.ProjectModel.Ids;
 
 namespace Stanley.Editors;
 
-/// <summary>A look in the character editor's Look dropdown: the default, or a named look.</summary>
-public sealed record LookItem(string Name, CharacterRevisionId? Id, bool IsCurrent, CharacterDefinition Preview);
-
 /// <summary>
 /// Named looks (docs/sticker-system.md §13.1; revisions in the code): the Look tab edits
 /// one look at a time - the default, or a named one such as "Winter" - and the stage

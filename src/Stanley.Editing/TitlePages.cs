@@ -97,50 +97,50 @@ public static class TitlePages
         switch (design)
         {
             case TitlePageDesign.Cover:
-            {
-                var titleBox = new Rect2D(live.Left, live.Top, live.Width, 2 * title);
-                var subtitleBox = Centred(live, titleBox.Bottom + 0.2 * subtitle, Math.Min(live.Width, 3.5 * title), 1.4 * subtitle);
-                return
-                [
-                    Plain(page, new GradientBackground(Sky, PaleSky),
+                {
+                    var titleBox = new Rect2D(live.Left, live.Top, live.Width, 2 * title);
+                    var subtitleBox = Centred(live, titleBox.Bottom + 0.2 * subtitle, Math.Min(live.Width, 3.5 * title), 1.4 * subtitle);
+                    return
+                    [
+                        Plain(page, new GradientBackground(Sky, PaleSky),
                         Text(TitleId, titleBox, words.Title, new TextStyle(Points(title), TextStylePresets.EffectYellow, Bold: true, Outline: TextStylePresets.Ink)),
                         Text(SubtitleId, subtitleBox, words.Subtitle, new TextStyle(Points(0.8 * subtitle), TextStylePresets.Ink, Bold: true, BoxFill: White, BoxStroke: TextStylePresets.Ink)),
                         Text(CreditsId, new Rect2D(live.Left, live.Bottom - credits, live.Width, credits), words.Credits, new TextStyle(Points(credits), TextStylePresets.Ink)))
-                ];
-            }
+                    ];
+                }
             case TitlePageDesign.Banner:
-            {
-                var band = Rect2D.FromEdges(page.Left, page.Top, page.Right, live.Top + 2 * title + subtitle + 0.25 * title);
-                var creditsBox = new Rect2D(live.Left, live.Bottom - credits, live.Width, credits);
-                var art = Rect2D.FromEdges(live.Left, band.Bottom + grid.GutterMm, live.Right, creditsBox.Top - grid.GutterMm);
-                return
-                [
-                    Plain(band, new ColorBackground(Navy),
+                {
+                    var band = Rect2D.FromEdges(page.Left, page.Top, page.Right, live.Top + 2 * title + subtitle + 0.25 * title);
+                    var creditsBox = new Rect2D(live.Left, live.Bottom - credits, live.Width, credits);
+                    var art = Rect2D.FromEdges(live.Left, band.Bottom + grid.GutterMm, live.Right, creditsBox.Top - grid.GutterMm);
+                    return
+                    [
+                        Plain(band, new ColorBackground(Navy),
                         Text(TitleId, new Rect2D(live.Left, live.Top, live.Width, 2 * title), words.Title, new TextStyle(Points(title), White, Bold: true)),
                         Text(SubtitleId, new Rect2D(live.Left, live.Top + 2 * title, live.Width, subtitle), words.Subtitle, new TextStyle(Points(subtitle), TextStylePresets.EffectYellow, Bold: true))),
                     // The cover art's panel: bordered, empty, the size of what's left.
                     new Panel(PanelId.New(), PanelShapes.Rectangle(art.Height > 0 ? art : live), Background: null, CharacterInstances: [], Bubbles: []),
                     Plain(Rect2D.FromEdges(page.Left, creditsBox.Top, page.Right, page.Bottom), background: null,
                         Text(CreditsId, creditsBox, words.Credits, new TextStyle(Points(credits), TextStylePresets.Ink)))
-                ];
-            }
+                    ];
+                }
             case TitlePageDesign.Classic:
-            {
-                var titleBox = new Rect2D(live.Left, page.Top + 0.3 * page.Height - title, live.Width, 2 * title);
-                var ruleY = titleBox.Bottom + 0.4 * subtitle;
-                var ruleHalf = 0.15 * live.Width;
-                var rule = new ShapeElement(ElementId.New(), ElementLayer.Foreground,
-                    [AnchorRing.Corner(new Point2D(page.MidX - ruleHalf, ruleY)), AnchorRing.Corner(new Point2D(page.MidX + ruleHalf, ruleY))],
-                    Closed: false, new ShapeStyle(TextStylePresets.Ink, Fill: null, StrokeWidthMm: Math.Max(0.35, 0.0035 * unit)));
-                return
-                [
-                    Plain(page, background: null,
+                {
+                    var titleBox = new Rect2D(live.Left, page.Top + 0.3 * page.Height - title, live.Width, 2 * title);
+                    var ruleY = titleBox.Bottom + 0.4 * subtitle;
+                    var ruleHalf = 0.15 * live.Width;
+                    var rule = new ShapeElement(ElementId.New(), ElementLayer.Foreground,
+                        [AnchorRing.Corner(new Point2D(page.MidX - ruleHalf, ruleY)), AnchorRing.Corner(new Point2D(page.MidX + ruleHalf, ruleY))],
+                        Closed: false, new ShapeStyle(TextStylePresets.Ink, Fill: null, StrokeWidthMm: Math.Max(0.35, 0.0035 * unit)));
+                    return
+                    [
+                        Plain(page, background: null,
                         Text(TitleId, titleBox, words.Title, new TextStyle(Points(title), TextStylePresets.Ink, Bold: true)),
                         rule,
                         Text(SubtitleId, new Rect2D(live.Left, ruleY + 0.4 * subtitle, live.Width, subtitle), words.Subtitle, new TextStyle(Points(subtitle), TextStylePresets.Ink, Italic: true)),
                         Text(CreditsId, new Rect2D(live.Left, page.Top + 0.8 * page.Height, live.Width, credits), words.Credits, new TextStyle(Points(credits), TextStylePresets.Ink)))
-                ];
-            }
+                    ];
+                }
             default:
                 throw new ArgumentOutOfRangeException(nameof(design), design, null);
         }

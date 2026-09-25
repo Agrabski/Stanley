@@ -14,7 +14,6 @@ namespace Stanley.Editors;
 /// <summary>One entry in the page navigator: a page's id, its editor (which holds its content and undo), and its 1-based position.</summary>
 public sealed class PageItem : ObservableObject
 {
-    private int _number;
 
     public PageItem(PageId id, PageEditorViewModel editor)
     {
@@ -28,10 +27,10 @@ public sealed class PageItem : ObservableObject
 
     public int Number
     {
-        get => _number;
+        get;
         set
         {
-            if (SetProperty(ref _number, value))
+            if (SetProperty(ref field, value))
             {
                 Editor.Title = $"Page {value}";
                 OnPropertyChanged(nameof(Caption));

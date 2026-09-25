@@ -29,7 +29,7 @@ public partial class CharacterEditorView : UserControl
             vm.SelectSticker(Stage.StickerAt(p));
             if (vm.SelectedSticker is { HasArt: true } && Stage.MainPlacement is { } placement && vm.BeginArtDrag())
             {
-                _artDrag = (placement.ToFigure(new Point2D(p.X, p.Y)), placement, p);
+                _artDrag = (placement.ToFigure(new(p.X, p.Y)), placement, p);
                 _artMoving = false;
                 e.Pointer.Capture(Stage);
                 e.Handled = true;
@@ -43,8 +43,8 @@ public partial class CharacterEditorView : UserControl
             if (!_artMoving && Math.Abs(p.X - drag.Pressed.X) < DragThreshold && Math.Abs(p.Y - drag.Pressed.Y) < DragThreshold)
                 return;
             _artMoving = true;
-            var now = drag.Placement.ToFigure(new Point2D(p.X, p.Y));
-            vm.UpdateArtDrag(new Point2D(now.X - drag.Start.X, now.Y - drag.Start.Y));
+            var now = drag.Placement.ToFigure(new(p.X, p.Y));
+            vm.UpdateArtDrag(new(now.X - drag.Start.X, now.Y - drag.Start.Y));
         };
         Stage.PointerReleased += (_, e) => EndDrag(e.Pointer);
         Stage.PointerCaptureLost += (_, _) => EndDrag(null);

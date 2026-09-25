@@ -52,7 +52,6 @@ public sealed class MainWindowViewModel : ObservableObject
     private IDisposable? _pendingUpdateCheck;
     private bool _recoveredUnsaved;
     private bool _isCheckingForUpdates;
-    private string? _updateStatus;
     private AvailableUpdate? _availableUpdate;
     private ComicProject? _project;
     private EditorWorkspace? _workspace;
@@ -61,9 +60,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private PictureLibrary? _pictures;
     private bool _infoDirty;
     private bool _isBackstageOpen;
-    private BackstagePage _backstagePage = BackstagePage.New;
     private MetricPaperSize _newPaperSize = MetricPaperSize.A4;
-    private string? _message;
 
     /// <param name="settings">User preferences (AutoSave); in-memory defaults if null.</param>
     /// <param name="recovery">Crash recovery; none if null.</param>
@@ -384,7 +381,11 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public bool IsCheckingForUpdates { get => _isCheckingForUpdates; private set => SetProperty(ref _isCheckingForUpdates, value); }
 
-    public string? UpdateStatus { get => _updateStatus; private set => SetProperty(ref _updateStatus, value); }
+    public string? UpdateStatus
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
 
     public bool HasUpdateAvailable => _availableUpdate is not null;
 
@@ -545,8 +546,8 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <summary>The latest problem (or confirmation) from a file operation, shown in the title bar and the File view.</summary>
     public string? Message
     {
-        get => _message;
-        private set => SetProperty(ref _message, value);
+        get;
+        private set => SetProperty(ref field, value);
     }
 
     // ---------------------------------------------------------------- backstage (File view)
@@ -565,10 +566,10 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public BackstagePage BackstagePage
     {
-        get => _backstagePage;
+        get;
         set
         {
-            SetProperty(ref _backstagePage, value);
+            SetProperty(ref field, value);
             OnPropertyChanged(nameof(IsNewPage));
             OnPropertyChanged(nameof(IsOpenPage));
             OnPropertyChanged(nameof(IsInfoPage));
@@ -576,7 +577,7 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(IsExportPage));
             OnPropertyChanged(nameof(IsOptionsPage));
         }
-    }
+    } = BackstagePage.New;
 
     public bool IsNewPage { get => BackstagePage == BackstagePage.New; set => SetPageFlag(BackstagePage.New, value); }
     public bool IsOpenPage { get => BackstagePage == BackstagePage.Open; set => SetPageFlag(BackstagePage.Open, value); }

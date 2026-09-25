@@ -23,13 +23,12 @@ public sealed class FieldInsertRequest(string token)
 
 public sealed partial class PageEditorViewModel
 {
-    private TextFields? _fields;
 
     /// <summary>What the fields in this page's texts show - the comic's title and issue number (set by the navigator); null draws them as typed.</summary>
     public TextFields? Fields
     {
-        get => _fields;
-        set => SetProperty(ref _fields, value);
+        get;
+        set => SetProperty(ref field, value);
     }
 
     public IReadOnlyList<TextFieldChoice> TextFieldChoices => TextFieldChoice.All;
