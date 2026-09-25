@@ -306,4 +306,60 @@ public sealed class FabricEditingTests
                 Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void A_custom_colour_picked_for_skin_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed();
+        var customColor = ColorValue.FromHex("#ff00ff");
+        var originalSkin = editor.Working.Skin;
+
+        editor.SetSkin(customColor);
+
+        Assert.Equal(customColor, editor.Working.Skin);
+        Assert.NotEqual(originalSkin, editor.Working.Skin);
+        Assert.True(session.Workspace.History.CanUndo);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(originalSkin, editor.Working.Skin);
+    }
+
+    [Fact]
+    public void A_custom_colour_picked_for_a_slot_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var customColor = ColorValue.FromHex("#00ff00");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        var originalColor = top.Color;
+
+        var choice = new ColorSwatchChoice("top", "Custom", customColor);
+        top.SetColor.Execute(choice);
+
+        Assert.Equal(customColor, top.Color);
+        Assert.NotEqual(originalColor, top.Color);
+        Assert.True(session.Workspace.History.CanUndo);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(originalColor, top.Color);
+    }
+
+    [Fact]
+    public void A_custom_colour_picked_for_a_pattern_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var customColor = ColorValue.FromHex("#0000ff");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Stripes"));
+        var originalPatternColor = top.Fabric?.Pattern?.Colors[0] ?? ColorValue.FromHex("#000000");
+
+        var choice = new ColorSwatchChoice("top", "Custom", customColor);
+        top.SetPatternColor.Execute(choice);
+
+        Assert.Equal(customColor, top.Fabric?.Pattern?.Colors[0]);
+        Assert.NotEqual(originalPatternColor, top.Fabric?.Pattern?.Colors[0]);
+        Assert.True(session.Workspace.History.CanUndo);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(originalPatternColor, top.Fabric?.Pattern?.Colors[0]);
+    }
 }

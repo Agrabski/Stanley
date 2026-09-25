@@ -84,6 +84,26 @@ public sealed class CharacterFigure : Control
         }
     }
 
+    /// <summary>The faded (line-up) character whose drawn extent contains <paramref name="point"/> (control coordinates), or null. Returns null in closeup mode.</summary>
+    public CharacterDefinition? LineUpCharacterAt(Point point)
+    {
+        if (Character is not { } character || Closeup)
+            return null;
+        var angle = Pose?.ViewAngle ?? Angle;
+        var figures = Arrange(new(Bounds.Size), character, LineUp ?? [], ShowGuides, angle, Pose, Closeup);
+        foreach (var (figure, placement, faded, _) in figures)
+        {
+            if (!faded)
+                continue;
+            var extent = CharacterRenderers.Default.Extent(figure, angle, null);
+            var pageExtent = placement.ToPage(extent);
+            if (pageExtent.Left <= point.X && point.X <= pageExtent.Right &&
+                pageExtent.Top <= point.Y && point.Y <= pageExtent.Bottom)
+                return figure;
+        }
+        return null;
+    }
+
     /// <summary>Where each figure stands in <paramref name="bounds"/>: everyone to one scale, the main character in the middle, the others alternating right and left of it.</summary>
     private static List<(CharacterDefinition Character, CharacterPlacement Placement, bool Faded, double Unit)> Arrange(Rect bounds, CharacterDefinition main,
         IReadOnlyList<CharacterDefinition> others, bool guides, ViewAngle angle, ProjectModel.Poses.PoseData? pose, bool closeup = false)

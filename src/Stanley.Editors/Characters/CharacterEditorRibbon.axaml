@@ -139,22 +139,26 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
-          <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="84">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="local:SkinSwatch">
-                <Button Classes="small" Width="26" Height="22" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                        Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetSkinCommand}"
-                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
-                  <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
-                </Button>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <StackPanel DockPanel.Dock="Left" Orientation="Vertical" Spacing="4">
+            <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="84">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="local:SkinSwatch">
+                  <Button Classes="small" Width="26" Height="22" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                          Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetSkinCommand}"
+                          CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                    <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Name="MoreSkinColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
+                    Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">More…</Button>
+          </StackPanel>
           <TextBlock Classes="groupLabel" Text="Skin" />
         </DockPanel>
         <Rectangle Classes="divider" />
@@ -315,19 +319,23 @@
                     <Flyout Placement="BottomEdgeAlignedLeft">
                       <StackPanel Spacing="6" Width="340">
                         <TextBlock Text="Colour" FontSize="11" FontWeight="SemiBold" />
-                        <ItemsControl ItemsSource="{Binding Swatches}">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="local:ColorSwatchChoice">
-                              <Button Classes="small" Width="38" Height="24" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                      Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetColor}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
-                                <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
-                              </Button>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <StackPanel Spacing="4">
+                          <ItemsControl ItemsSource="{Binding Swatches}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:ColorSwatchChoice">
+                                <Button Classes="small" Width="38" Height="24" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetColor}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                  <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button Name="MoreSlotColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
+                                  Command="{Binding PickCustomColor}" CommandParameter="{Binding $self}">More…</Button>
+                        </StackPanel>
 
                         <StackPanel Spacing="6" IsVisible="{Binding CanHaveFabric}">
                           <TextBlock Text="Pattern" FontSize="11" FontWeight="SemiBold" />
@@ -352,20 +360,24 @@
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <StackPanel Spacing="4" IsVisible="{Binding HasPattern}">
-                            <ItemsControl ItemsSource="{Binding PatternSwatches}">
-                              <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                              </ItemsControl.ItemsPanel>
-                              <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="local:ColorSwatchChoice">
-                                  <Button Classes="small" Width="19" Height="16" Padding="2" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                          Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPatternColor}" CommandParameter="{Binding}"
-                                          ToolTip.Tip="{Binding Name, StringFormat='Pattern in {0}'}">
-                                    <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="1" />
-                                  </Button>
-                                </DataTemplate>
-                              </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <StackPanel Spacing="4">
+                              <ItemsControl ItemsSource="{Binding PatternSwatches}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:ColorSwatchChoice">
+                                    <Button Classes="small" Width="19" Height="16" Padding="2" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                            Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPatternColor}" CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding Name, StringFormat='Pattern in {0}'}">
+                                      <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="1" />
+                                    </Button>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <Button Name="MorePatternColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
+                                      Command="{Binding PickCustomPatternColor}" CommandParameter="{Binding $self}">More…</Button>
+                            </StackPanel>
                             <Grid ColumnDefinitions="54,*" RowDefinitions="22,22" ColumnSpacing="4">
                               <TextBlock Text="Size" FontSize="11" VerticalAlignment="Center" />
                               <Slider Grid.Column="1" Classes="body" Width="250" Minimum="1" Maximum="25" Value="{Binding PatternSize}" local:DragGesture.Target="{Binding}"

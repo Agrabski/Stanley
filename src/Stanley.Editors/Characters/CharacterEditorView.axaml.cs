@@ -21,11 +21,18 @@ public partial class CharacterEditorView : UserControl
         InitializeComponent();
         // Click a garment on the character to work on it (the Sticker tab); click skin or
         // the background to let it go. Drawn art, once selected, drags to move it.
+        // Clicking a compared (faded) character switches to it.
         Stage.PointerPressed += (_, e) =>
         {
             if (DataContext is not CharacterEditorViewModel vm || !e.GetCurrentPoint(Stage).Properties.IsLeftButtonPressed)
                 return;
             var p = e.GetPosition(Stage);
+            if (Stage.LineUpCharacterAt(p) is { } lineUpCharacter)
+            {
+                vm.Library?.OpenCharacter(lineUpCharacter.Id);
+                e.Handled = true;
+                return;
+            }
             vm.SelectSticker(Stage.StickerAt(p));
             if (vm.SelectedSticker is { HasArt: true } && Stage.MainPlacement is { } placement && vm.BeginArtDrag())
             {
@@ -37,14 +44,27 @@ public partial class CharacterEditorView : UserControl
         };
         Stage.PointerMoved += (_, e) =>
         {
-            if (_artDrag is not { } drag || DataContext is not CharacterEditorViewModel vm)
+            if (DataContext is not CharacterEditorViewModel vm)
                 return;
             var p = e.GetPosition(Stage);
-            if (!_artMoving && Math.Abs(p.X - drag.Pressed.X) < DragThreshold && Math.Abs(p.Y - drag.Pressed.Y) < DragThreshold)
-                return;
-            _artMoving = true;
-            var now = drag.Placement.ToFigure(new(p.X, p.Y));
-            vm.UpdateArtDrag(new(now.X - drag.Start.X, now.Y - drag.Start.Y));
+            if (_artDrag is { } drag)
+            {
+                if (!_artMoving && Math.Abs(p.X - drag.Pressed.X) < DragThreshold && Math.Abs(p.Y - drag.Pressed.Y) < DragThreshold)
+                    return;
+                _artMoving = true;
+                var now = drag.Placement.ToFigure(new(p.X, p.Y));
+                vm.UpdateArtDrag(new(now.X - drag.Start.X, now.Y - drag.Start.Y));
+            }
+            else if (Stage.LineUpCharacterAt(p) is { } hovered)
+            {
+                Stage.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+                vm.ShowMessage($"Click to edit {hovered.Name}");
+            }
+            else
+            {
+                Stage.Cursor = Avalonia.Input.Cursor.Default;
+                vm.ShowMessage(null);
+            }
         };
         Stage.PointerReleased += (_, e) => EndDrag(e.Pointer);
         Stage.PointerCaptureLost += (_, _) => EndDrag(null);
