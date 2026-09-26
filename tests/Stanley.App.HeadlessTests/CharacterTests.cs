@@ -440,4 +440,35 @@ public class CharacterTests
         Assert.Equal("Pip", editor.Committed.Name);
         Assert.Equal("Pip", characters.Items.Single().Name);
     }
+
+    [Fact]
+    public void A_compared_character_can_be_clicked_to_switch_to_it()
+    {
+        var (window, characters) = Open();
+        var first = characters.CreateCharacter();
+        var second = characters.CreateCharacter();
+        characters.OpenCharacter(first.Id);
+        Dispatcher.UIThread.RunJobs();
+
+        var editor = characters.Items.Single(i => i.Id == first.Id).Editor;
+        Assert.True(editor.ShowLineUp); // line-up is shown by default
+        var figure = Single<CharacterEditorView>(window).Figure;
+        Assert.NotNull(figure.LineUp);
+        Assert.Contains(figure.LineUp, c => c.Id == second.Id);
+
+        // Somewhere on the faded figure beside this one - never on the character being edited.
+        var point = Enumerable.Range(0, (int)figure.Bounds.Height / 4).SelectMany(y => Enumerable.Range(0, (int)figure.Bounds.Width / 4).Select(x => new Point(x * 4, y * 4)))
+            .First(p => figure.LineUpCharacterAt(p) is not null);
+        Assert.Equal(second.Id, figure.LineUpCharacterAt(point)!.Id);
+        Assert.DoesNotContain(Enumerable.Range(0, 20).Select(i => new Point(figure.Bounds.Width / 2, figure.Bounds.Height * (0.3 + i * 0.03))),
+            p => figure.LineUpCharacterAt(p)?.Id == first.Id);
+
+        // A click there switches the editor to it.
+        var inWindow = figure.TranslatePoint(point, window)!.Value;
+        window.MouseDown(inWindow, MouseButton.Left, RawInputModifiers.None);
+        window.MouseUp(inWindow, MouseButton.Left, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(second.Id, characters.Current?.Id);
+        Assert.Same(characters.Items.Single(i => i.Id == second.Id).Editor, window.Workspace.ActiveEditor);
+    }
 }

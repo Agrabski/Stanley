@@ -18,6 +18,9 @@ public sealed partial class CharacterEditorViewModel
     public IRelayCommand MoveSelectedUpCommand { get; private set; } = null!;
     public IRelayCommand MoveSelectedDownCommand { get; private set; } = null!;
     public IRelayCommand DeselectStickerCommand { get; private set; } = null!;
+    public IRelayCommand DuplicateSelectedCommand { get; private set; } = null!;
+    public IRelayCommand<string> WearTextCommand { get; private set; } = null!;
+    public IRelayCommand<string> InsertEmojiCommand { get; private set; } = null!;
 
     private void InitializeLook()
     {
@@ -43,6 +46,17 @@ public sealed partial class CharacterEditorViewModel
         MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, +1)), () => SelectedStickerIsWorn);
         MoveSelectedDownCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, -1)), () => SelectedStickerIsWorn);
         DeselectStickerCommand = new RelayCommand(() => SelectSticker(null));
+        DuplicateSelectedCommand = new RelayCommand(DuplicateSelected, () => CanDuplicateSelected);
+        WearTextCommand = new RelayCommand<string>(text =>
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+                WearText(text);
+        });
+        InsertEmojiCommand = new RelayCommand<string>(emoji =>
+        {
+            if (emoji != null)
+                SelectedText += emoji;
+        });
         PreviewExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
         {
             if (choice != null)
@@ -58,8 +72,8 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>The face's galleries (Eyes, Brows, Mouth, Nose).</summary>
     public IReadOnlyList<SlotGallery> FaceGalleries => Galleries(StickerSlots.Eyes, StickerSlots.Brows, StickerSlots.Mouth, StickerSlots.Nose);
 
-    /// <summary>The clothes slots' galleries (Top, Outer, Bottom, Shoes).</summary>
-    public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
+    /// <summary>The clothes slots' galleries (Top, Prints, Outer, Bottom, Shoes).</summary>
+    public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Print, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
 
     /// <summary>Hats, glasses and everything else.</summary>
     public IReadOnlyList<SlotGallery> AccessoryGalleries => Galleries(StickerSlots.Headwear, StickerSlots.Glasses, StickerSlots.Accessory);
@@ -79,27 +93,90 @@ public sealed partial class CharacterEditorViewModel
         var pose = StagePose;
         var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0, pose) };
         var owned = character.Wardrobe.Stickers.Values.Where(a => a.Sticker.Slot == slot).OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
-        foreach (var asset in owned)
-            choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id), pose));
-        var ownedSources = owned.Select(a => a.Sticker.Source).OfType<string>().ToHashSet();
-        foreach (var item in Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
-            choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
-        var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?"));
-        return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand);
+        var library = Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).ToList();
+        if (info.Stacks)
+        {
+            // A design is offered once however many copies are worn (a click stamps another):
+            // the character's own designs, each by the first copy put on (the one further copies
+            // are spotted from), then the library's. Copies of a library print stamp from the
+            // library; a library sticker that isn't placed (gloves) is offered as the worn copy
+            // itself, so a second click takes it off again.
+            var libraryNames = library.Select(l => l.Name).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+            var seen = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            var byWear = worn.Select(id => character.Wardrobe.Find(id)).OfType<StickerAsset>().Concat(owned);
+            foreach (var asset in byWear.Where(a => (!StickerCopies.IsPlaceable(a.Sticker) || !libraryNames.Contains(a.Sticker.Name)) && seen.Add(a.Sticker.Name)))
+                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, IsWornDesign(character, slot, asset.Sticker.Name), pose));
+            foreach (var item in library.Where(l => seen.Add(l.Name)))
+                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, IsWornDesign(character, slot, item.Name), pose));
+        }
+        else
+        {
+            foreach (var asset in owned)
+                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id), pose));
+            var ownedSources = owned.Select(a => a.Sticker.Source).OfType<string>().ToHashSet();
+            foreach (var item in library.Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
+                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
+        }
+        // "Star ×3, HELLO": copies of one design counted, not listed.
+        var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?")
+            .GroupBy(n => n, StringComparer.CurrentCultureIgnoreCase).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key));
+        return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand, slot == StickerSlots.Print ? WearTextCommand : null);
     }
 
     private void Wear(StickerChoice choice)
     {
+        var stacks = StickerSlots.Get(choice.Slot).Stacks;
         if (choice.IsNone)
             ApplyLook(c => LookEditing.ClearSlot(c, choice.Slot));
+        else if (stacks && (choice.Asset?.Sticker ?? choice.Library!.Asset.Sticker) is { } design && StickerCopies.IsPlaceable(design))
+        {
+            // A print or a badge: every click puts on another copy, in the next free spot across the chest.
+            var character = LookWorking;
+            var spot = StickerCopies.Spot(StickerCopies.WornCopies(character, choice.Slot, design.Name));
+            var wearing = choice.Asset is { } own
+                ? (character.Stickers.TryGetValue(choice.Slot, out var worn) && worn.Contains(own.Id) ? StickerCopies.Copy(own, spot) : own)
+                : StickerCopies.Copy(choice.Library!.Instantiate(), spot);
+            ApplyLook(c => LookEditing.Wear(c, wearing));
+            SelectSticker(wearing.Sticker.Id);
+        }
         else if (choice.Asset is { } asset)
-            ApplyLook(c => choice.IsWorn && StickerSlots.Get(choice.Slot).Stacks ? LookEditing.TakeOff(c, asset.Id) : LookEditing.Wear(c, asset));
+            ApplyLook(c => choice.IsWorn && stacks ? LookEditing.TakeOff(c, asset.Id) : LookEditing.Wear(c, asset));
         else
         {
             var copy = choice.Library!.Instantiate();
             ApplyLook(c => LookEditing.Wear(c, copy));
         }
     }
+
+    /// <summary>Whether any worn sticker in <paramref name="slot"/> is the design named <paramref name="name"/>.</summary>
+    private static bool IsWornDesign(CharacterDefinition character, string slot, string name) => StickerCopies.WornCopies(character, slot, name) > 0;
+
+    /// <summary>The Sticker tab's "Duplicate": another copy of the selected print or badge, a small step from it, selected to move.</summary>
+    private void DuplicateSelected()
+    {
+        if (SelectedSticker is not { } asset || !CanDuplicateSelected)
+            return;
+        var copy = StickerCopies.Copy(asset, StickerCopies.DuplicateStep);
+        ApplyLook(c => LookEditing.Wear(c, copy));
+        SelectSticker(copy.Sticker.Id);
+    }
+
+    /// <summary>Whether the selected sticker is worn in a slot that stacks and is placed (art or text), so another copy of it makes sense.</summary>
+    public bool CanDuplicateSelected =>
+        SelectedStickerIsWorn && SelectedSticker is { } asset && StickerSlots.Get(asset.Sticker.Slot).Stacks && StickerCopies.IsPlaceable(asset.Sticker);
+
+    /// <summary>The Prints gallery's "Text" button: wears a new text print, selected so its text can be typed over at once on the Sticker tab.</summary>
+    private void WearText(string text)
+    {
+        var chestTaken = Working.Stickers.TryGetValue(StickerSlots.Print, out var worn) && worn.Count > 0;
+        var asset = TextPrints.New(text, chestTaken ? TextPrints.BelowAnotherPrint : null);
+        ApplyLook(c => LookEditing.Wear(c, asset));
+        SelectSticker(asset.Id);
+        TextPrintWorn?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Raised when the "Text" button has put on a new text print, for the view to open its text box.</summary>
+    public event EventHandler? TextPrintWorn;
 
     // ---------------------------------------------------------------- preview expression
 
@@ -336,7 +413,13 @@ public sealed partial class CharacterEditorViewModel
     public WornStickerItem? SelectedWorn
     {
         get => WornStickers.FirstOrDefault(w => w.Id == _selectedSticker);
-        set => SelectSticker(value?.Id);
+        // The list has no "none" to pick: a null is the list refreshing under it (a text print
+        // renamed as it's typed over), not a choice - Done and the stage let go instead.
+        set
+        {
+            if (value is not null)
+                SelectSticker(value.Id);
+        }
     }
 
     public void SelectSticker(StickerId? id)
@@ -352,12 +435,45 @@ public sealed partial class CharacterEditorViewModel
 
     public string SelectedStickerName => SelectedSticker?.Sticker.Name ?? "";
 
+    // ---------------------------------------------------------------- text prints
+
+    /// <summary>Whether the selected sticker is typed text (a text print): the Sticker tab shows its text box, and hides what only drawn art has.</summary>
+    public bool SelectedIsTextPrint => SelectedSticker?.HasText == true;
+
+    /// <summary>Drawn art only: "Hug the shape" and "Edit drawing..." - text is always pinned, and has no drawing to open.</summary>
+    public bool HasDrawnArt => HasArtParts && !SelectedIsTextPrint;
+
+    /// <summary>The selected text print's typed text - two-way, one undo step per commit (the view binds it to update on losing focus, like the name box).</summary>
+    public string SelectedText
+    {
+        get => SelectedSticker is { } a && TextPrints.Part(a.Sticker) is { Text: { } t } ? t.Text : "";
+        set
+        {
+            if (value == SelectedText)
+                return;
+            EditSelectedSticker(s => TextPrints.WithText(s, value));
+        }
+    }
+
+    public bool SelectedTextBold
+    {
+        get => SelectedSticker is { } a && TextPrints.Part(a.Sticker) is { Text: { } t } ? t.Bold : true;
+        set
+        {
+            if (value != SelectedTextBold)
+                EditSelectedSticker(s => TextPrints.WithBold(s, value));
+        }
+    }
+
+    /// <summary>A row of common emoji the Sticker tab offers to insert into the selected text print.</summary>
+    public IReadOnlyList<string> CommonEmoji { get; } = ["\U0001F480", "❤️", "⭐", "⚡", "\U0001F525", "\U0001F600"];
+
     /// <summary>Gaps in the selected sticker's art, said inline: "No side view", "No wink, sad (shows neutral)" - or null.</summary>
     public string? SelectedStickerWarning
     {
         get
         {
-            if (SelectedSticker is not { HasArt: true } asset)
+            if (SelectedSticker is not { HasArt: true, HasText: false } asset)
                 return null;
             var notes = new List<string>();
             var variant = asset.Sticker.Variants[0];
@@ -441,11 +557,17 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(SelectedLength));
         OnPropertyChanged(nameof(SelectedSleeves));
         OnPropertyChanged(nameof(SelectedFit));
+        OnPropertyChanged(nameof(SelectedIsTextPrint));
+        OnPropertyChanged(nameof(HasDrawnArt));
+        OnPropertyChanged(nameof(SelectedText));
+        OnPropertyChanged(nameof(SelectedTextBold));
         RaiseArtChanged();
         TakeOffSelectedCommand.NotifyCanExecuteChanged();
         RemoveSelectedCommand.NotifyCanExecuteChanged();
         MoveSelectedUpCommand.NotifyCanExecuteChanged();
         MoveSelectedDownCommand.NotifyCanExecuteChanged();
+        DuplicateSelectedCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanDuplicateSelected));
     }
 
     private void RaiseLookChanged()

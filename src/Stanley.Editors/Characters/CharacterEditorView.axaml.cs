@@ -13,6 +13,11 @@ public partial class CharacterEditorView : UserControl
     private (Point2D Start, CharacterPlacement Placement, Avalonia.Point Pressed)? _artDrag;
     private bool _artMoving;
 
+    // The "Click to edit ..." hint shown while the pointer is over a compared character -
+    // kept so leaving it clears only that hint, never a message something else put up.
+    private string? _lineUpHint;
+    private static readonly Cursor HandCursor = new(StandardCursorType.Hand);
+
     /// <summary>How far (pixels) the pointer goes before a press on drawn art becomes a move - so a click to select never nudges it.</summary>
     private const double DragThreshold = 3;
 
@@ -21,11 +26,19 @@ public partial class CharacterEditorView : UserControl
         InitializeComponent();
         // Click a garment on the character to work on it (the Sticker tab); click skin or
         // the background to let it go. Drawn art, once selected, drags to move it.
+        // Clicking a compared (faded) character switches to it.
         Stage.PointerPressed += (_, e) =>
         {
             if (DataContext is not CharacterEditorViewModel vm || !e.GetCurrentPoint(Stage).Properties.IsLeftButtonPressed)
                 return;
             var p = e.GetPosition(Stage);
+            if (Stage.LineUpCharacterAt(p) is { } lineUpCharacter)
+            {
+                ClearLineUpHint(vm);
+                vm.Library?.OpenCharacter(lineUpCharacter.Id);
+                e.Handled = true;
+                return;
+            }
             vm.SelectSticker(Stage.StickerAt(p));
             if (vm.SelectedSticker is { HasArt: true } && Stage.MainPlacement is { } placement && vm.BeginArtDrag())
             {
@@ -37,17 +50,43 @@ public partial class CharacterEditorView : UserControl
         };
         Stage.PointerMoved += (_, e) =>
         {
-            if (_artDrag is not { } drag || DataContext is not CharacterEditorViewModel vm)
+            if (DataContext is not CharacterEditorViewModel vm)
                 return;
             var p = e.GetPosition(Stage);
-            if (!_artMoving && Math.Abs(p.X - drag.Pressed.X) < DragThreshold && Math.Abs(p.Y - drag.Pressed.Y) < DragThreshold)
-                return;
-            _artMoving = true;
-            var now = drag.Placement.ToFigure(new(p.X, p.Y));
-            vm.UpdateArtDrag(new(now.X - drag.Start.X, now.Y - drag.Start.Y));
+            if (_artDrag is { } drag)
+            {
+                if (!_artMoving && Math.Abs(p.X - drag.Pressed.X) < DragThreshold && Math.Abs(p.Y - drag.Pressed.Y) < DragThreshold)
+                    return;
+                _artMoving = true;
+                var now = drag.Placement.ToFigure(new(p.X, p.Y));
+                vm.UpdateArtDrag(new(now.X - drag.Start.X, now.Y - drag.Start.Y));
+            }
+            else if (Stage.LineUpCharacterAt(p) is { } hovered)
+            {
+                Stage.Cursor = HandCursor;
+                _lineUpHint = $"Click to edit {hovered.Name}";
+                vm.ShowMessage(_lineUpHint);
+            }
+            else
+                ClearLineUpHint(vm);
+        };
+        Stage.PointerExited += (_, _) =>
+        {
+            if (DataContext is CharacterEditorViewModel vm)
+                ClearLineUpHint(vm);
         };
         Stage.PointerReleased += (_, e) => EndDrag(e.Pointer);
         Stage.PointerCaptureLost += (_, _) => EndDrag(null);
+    }
+
+    private void ClearLineUpHint(CharacterEditorViewModel vm)
+    {
+        if (_lineUpHint is null)
+            return;
+        Stage.Cursor = Cursor.Default;
+        if (vm.Hint == _lineUpHint)
+            vm.ShowMessage(null);
+        _lineUpHint = null;
     }
 
     private void EndDrag(IPointer? pointer)

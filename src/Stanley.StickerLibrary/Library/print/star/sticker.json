@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "print": "#f1c40f"
+  },
+  "id": "library",
+  "name": "Star",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "clip": "clothes",
+      "name": "print",
+      "region": "torso"
+    }
+  ],
+  "slot": "print",
+  "variants": [
+    "default"
+  ]
+}

@@ -23,7 +23,7 @@ What already exists and the POC can lean on:
 | `CharacterDefinition` / `CharacterRevision` / `Sticker` / `Skeleton` / `PoseData` | Persisted records + `ProjectRepository.Load/Save*` | Storage is there; nothing creates, lists or renders characters. |
 | `CharacterInstance` (in `Panel.CharacterInstances`) | Persisted, always `[]` | **Has no position, size or flip** — it can't be placed yet. |
 | `ProjectRepository` | `LoadCharacter(id)` / `SaveCharacter` | No way to **list** or **delete** characters (the manifest doesn't list them). |
-| `ComicProject` | Loads/saves pages and panels of issue 1 | Ignores `characters/` entirely (Save As copies the folder, so they survive, but that's it). |
+| `ComicProject` | Loads/saves pages and panels of one issue (any issue - the comic can have more than one, switchable and addable) | Ignores `characters/` entirely (Save As copies the folder, so they survive, but that's it). |
 | `PageRenderer` | Panels + bubbles clipped to panel | No character layer; would need a character lookup. |
 | `EditorWorkspace` / ribbon | One editor in the editor area, ribbon follows `ActiveEditor` by `DataTemplate`, left tool panes | A second editor type (and its ribbon) slots in by design. |
 | `EditorHistory` | One stack per project, entries carry a source | Undo of a character edit can switch back to the character editor for free. |

@@ -45,7 +45,7 @@ public sealed partial class CharacterEditorViewModel
         {
             if (SelectedSticker is { } asset)
                 DrawYourOwn(asset.Sticker.Slot);
-        }, () => SelectedSticker is { HasArt: true });
+        }, () => SelectedSticker is { HasArt: true, HasText: false });
     }
 
     private IArtEditing ArtEditing => Library?.ArtEditing ?? _fallbackArtEditing;
@@ -74,7 +74,7 @@ public sealed partial class CharacterEditorViewModel
         }
 
         var view = PreviewAngle;
-        var asset = SelectedSticker is { HasArt: true } selected && selected.Sticker.Slot == slot ? selected : null;
+        var asset = SelectedSticker is { HasArt: true, HasText: false } selected && selected.Sticker.Slot == slot ? selected : null;
         if (asset is null)
         {
             asset = StickerImport.NewDrawn(slot, UniqueName($"My {StickerSlots.Get(slot).Label.ToLowerInvariant()}"), view);

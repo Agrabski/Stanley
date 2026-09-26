@@ -1,3 +1,4 @@
+using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
@@ -25,6 +26,115 @@ public sealed class LookTests : IDisposable
 
     private static StickerChoice Choice(CharacterEditorViewModel editor, string slot, string name) =>
         editor.Gallery(slot).Choices.Single(c => c.Label == name);
+
+    [Fact]
+    public void The_Text_button_wears_a_text_print_and_selects_it_to_type_over()
+    {
+        var (_, editor) = NewCharacter();
+        var raised = false;
+        editor.TextPrintWorn += (_, _) => raised = true;
+
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        var print = editor.SelectedSticker!;
+        Assert.True(print.HasText);
+        Assert.Equal(StickerSlots.Print, print.Sticker.Slot);
+        Assert.Contains(print.Id, editor.Working.Stickers[StickerSlots.Print]);
+        Assert.True(editor.SelectedIsTextPrint);
+        Assert.False(editor.HasDrawnArt);
+        Assert.Equal("HELLO", editor.SelectedText);
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Typing_over_a_text_print_renames_it_and_is_one_undo_step()
+    {
+        var (session, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        editor.SelectedText = "SKATE \U0001F6F9";
+
+        Assert.Equal("SKATE \U0001F6F9", editor.SelectedText);
+        Assert.Equal("SKATE \U0001F6F9", editor.SelectedStickerName);
+        session.Workspace.History.Undo();
+        Assert.Equal("HELLO", editor.SelectedText);
+    }
+
+    [Fact]
+    public void An_emoji_button_adds_to_the_text_and_bold_toggles()
+    {
+        var (_, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        editor.InsertEmojiCommand.Execute("\U0001F480");
+        editor.SelectedTextBold = false;
+
+        Assert.Equal("HELLO\U0001F480", editor.SelectedText);
+        Assert.False(TextPrints.Part(editor.SelectedSticker!.Sticker)!.Text!.Bold);
+    }
+
+    [Fact]
+    public void A_symbol_and_a_text_print_stack_on_the_same_shirt()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "Skull"));
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        Assert.Equal(2, editor.Working.Stickers[StickerSlots.Print].Count);
+        Assert.Contains(editor.ClothesGalleries, g => g.Info.Name == StickerSlots.Print);
+        Assert.Null(editor.Gallery(StickerSlots.Top).WearText); // only prints offer typed text
+    }
+
+    [Fact]
+    public void Each_click_on_a_print_puts_on_another_copy_a_step_clear_of_the_last()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+
+        for (var i = 0; i < 3; i++)
+            editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "Skull"));
+
+        var skulls = editor.Working.Stickers[StickerSlots.Print].Select(id => editor.Working.Wardrobe.Find(id)!.Sticker).ToList();
+        Assert.Equal(3, skulls.Count);
+        Assert.Equal(3, skulls.Select(s => s.Id).Distinct().Count());
+        Assert.Equal(3, skulls.Select(s => s.Parts[0].Art!.Offset ?? default).Distinct().Count());
+        Assert.Equal(skulls[^1].Id, editor.SelectedStickerId); // the new one, ready to drag
+        var entry = Assert.Single(editor.Gallery(StickerSlots.Print).Choices, c => c.Label == "Skull"); // offered once, however many are worn
+        Assert.True(entry.IsWorn);
+    }
+
+    [Fact]
+    public void A_worn_text_print_clicked_in_the_gallery_or_duplicated_adds_another()
+    {
+        var (_, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute("HELLO");
+        var first = editor.SelectedStickerId;
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "HELLO"));
+        Assert.True(editor.CanDuplicateSelected);
+        editor.DuplicateSelectedCommand.Execute(null);
+
+        var worn = editor.Working.Stickers[StickerSlots.Print];
+        Assert.Equal(3, worn.Count);
+        Assert.Contains(first!.Value, worn);
+        Assert.All(worn, id => Assert.Equal("HELLO", editor.Working.Wardrobe.Find(id)!.Sticker.Name));
+        Assert.Equal(worn[^1], editor.SelectedStickerId);
+    }
+
+    [Fact]
+    public void Gloves_still_come_off_with_a_second_click_and_a_T_shirt_has_no_Duplicate()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Accessory, "Gloves"));
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Accessory, "Gloves"));
+        Assert.True(!editor.Working.Stickers.TryGetValue(StickerSlots.Accessory, out var accessories) || accessories.Count == 0);
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.SelectSticker(editor.Working.Stickers[StickerSlots.Top][0]);
+        Assert.False(editor.CanDuplicateSelected);
+        Assert.False(editor.DuplicateSelectedCommand.CanExecute(null));
+    }
 
     [Fact]
     public void The_starter_library_is_all_valid_stickers_in_known_slots()
@@ -305,5 +415,59 @@ public sealed class FabricEditingTests
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public void A_custom_colour_picked_for_skin_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed();
+        var customColor = ColorValue.FromHex("#ff00ff");
+        var originalSkin = editor.Working.Skin;
+
+        editor.SetSkin(customColor);
+
+        Assert.Equal(customColor, editor.Working.Skin);
+        Assert.NotEqual(originalSkin, editor.Working.Skin);
+        Assert.True(session.Workspace.History.CanUndo);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(originalSkin, editor.Working.Skin);
+    }
+
+    [Fact]
+    public void A_custom_colour_picked_for_a_slot_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var customColor = ColorValue.FromHex("#00ff00");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        var originalColor = top.Color;
+
+        var choice = new ColorSwatchChoice("top", "Custom", customColor);
+        top.SetColor.Execute(choice);
+
+        Assert.Equal(customColor, top.Color);
+        Assert.NotEqual(originalColor, top.Color);
+        Assert.True(session.Workspace.History.CanUndo);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(originalColor, top.Color);
+    }
+
+    [Fact]
+    public void A_custom_colour_picked_for_a_pattern_applies_it_in_one_undo_step()
+    {
+        var (session, editor) = Dressed("T-shirt");
+        var customColor = ColorValue.FromHex("#0000ff");
+        var top = editor.ColorEditors.Single(e => e.Slot == "top");
+        top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Stripes"));
+        var before = top.Fabric?.Pattern?.Colors ?? []; // a fresh pattern has no colours of its own yet
+
+        var choice = new ColorSwatchChoice("top", "Custom", customColor);
+        top.SetPatternColor.Execute(choice);
+
+        Assert.Equal(customColor, top.Fabric?.Pattern?.Colors[0]);
+        session.Workspace.History.Undo();
+        Assert.Equal(before, top.Fabric?.Pattern?.Colors ?? []);
+        Assert.Equal(PatternKind.Stripes, top.Fabric?.Pattern?.Kind); // only the colour came off
     }
 }

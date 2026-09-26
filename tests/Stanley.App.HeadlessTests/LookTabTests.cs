@@ -110,6 +110,28 @@ public class LookTabTests
     }
 
     [Fact]
+    public void The_Text_button_opens_the_text_box_and_typing_over_it_keeps_the_print_selected()
+    {
+        var (_, editor, ribbon) = OpenCharacter();
+        ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
+        Dispatcher.UIThread.RunJobs();
+
+        editor.Gallery(StickerSlots.Print).WearText!.Execute("HELLO");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(ribbon.FindControl<TabItem>("StickerTab"), ribbon.TabControl.SelectedItem);
+        var box = ribbon.FindControl<TextBox>("PrintTextBox")!;
+        Assert.Equal("HELLO", box.Text);
+
+        // Typing over it renames the print; the Sticker tab's picker refreshing must not let go of it.
+        editor.SelectedText = "SKATE";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(editor.SelectedSticker);
+        Assert.Equal("SKATE", editor.SelectedStickerName);
+        Assert.Equal("SKATE", box.Text);
+    }
+
+    [Fact]
     public void The_hair_gallery_shows_close_ups_and_dresses_the_head()
     {
         var (window, editor, ribbon) = OpenCharacter();

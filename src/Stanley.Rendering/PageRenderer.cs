@@ -116,7 +116,7 @@ public static class PageRenderer
             if (element.Layer != layer)
                 continue;
             var shown = element is TextElement text && fields is not null ? text with { Text = fields.Fill(text.Text) } : element;
-            ElementRenderer.Draw(canvas, shown, drawText: element.Id != hideText, pictures);
+            ElementRenderer.Draw(canvas, shown, drawText: element.Id != hideText, pictures, AnchorRing.BoundingBox(panel.Shape.Anchors));
         }
     }
 

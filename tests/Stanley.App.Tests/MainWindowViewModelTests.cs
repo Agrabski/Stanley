@@ -345,4 +345,127 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public void AComicBooksInfo_StillNamesItsPaper() =>
         Assert.Equal("A4 · 210 × 297 mm, 3 mm bleed", NewViewModel().PageSizeText);
+
+    [Fact]
+    public async Task NewIssue_OnAnUntitledComic_GoesThroughSaveAs_ThenAddsAndOpensIt()
+    {
+        var vm = NewViewModel();
+        var folder = Path.Combine(_root, "Fresh Comic");
+        _dialogs.Folders.Enqueue(folder);
+
+        await vm.NewIssueAsync();
+
+        Assert.False(vm.Project!.IsUntitled);
+        Assert.Equal(folder, vm.Project.Location);
+        Assert.Equal(2, vm.Issues.Count);
+        Assert.Equal("2", vm.IssueNumber); // now editing the issue just added
+        Assert.Equal("Issue #2 added", vm.Message);
+    }
+
+    [Fact]
+    public async Task NewIssue_OnAnUntitledComic_CancellingSaveAs_AddsNothing()
+    {
+        var vm = NewViewModel(); // no folder queued - the Save As dialog is cancelled
+
+        await vm.NewIssueAsync();
+
+        Assert.True(vm.Project!.IsUntitled);
+        Assert.Single(vm.Issues);
+        Assert.Equal("Save the comic before adding an issue to it.", vm.Message);
+    }
+
+    [Fact]
+    public async Task NewIssue_AddsToTheIssuesList_CurrentOneMarked()
+    {
+        var vm = NewViewModel();
+        var folder = Path.Combine(_root, "Series");
+        _dialogs.Folders.Enqueue(folder);
+        await vm.SaveAsync();
+        Assert.Single(vm.Issues);
+
+        await vm.NewIssueAsync();
+
+        Assert.Equal(2, vm.Issues.Count);
+        var current = Assert.Single(vm.Issues, i => i.IsCurrent);
+        Assert.Equal("2", current.Number);
+        Assert.Equal(current.Id, vm.Project!.IssueId);
+    }
+
+    [Fact]
+    public async Task SwitchingIssue_WithUnsavedEdits_AsksToSaveFirst()
+    {
+        var vm = NewViewModel();
+        var folder = Path.Combine(_root, "Multi");
+        _dialogs.Folders.Enqueue(folder);
+        await vm.SaveAsync();
+        var firstIssueId = vm.Project!.IssueId;
+        await vm.NewIssueAsync();
+        var secondIssueId = vm.Project!.IssueId;
+        Assert.NotEqual(firstIssueId, secondIssueId);
+
+        vm.AutoSaveEnabled = false; // with AutoSave on there'd be nothing to ask (see below)
+        MakeAnEdit(vm);
+        Assert.True(vm.IsDirty);
+
+        _dialogs.SaveChangesAnswers.Enqueue(SaveChangesChoice.Cancel);
+        await vm.SwitchIssueAsync(firstIssueId);
+        Assert.Equal(secondIssueId, vm.Project!.IssueId); // cancelled - stayed on the issue being edited
+        Assert.Equal(1, _dialogs.SaveChangesPrompts);
+
+        _dialogs.SaveChangesAnswers.Enqueue(SaveChangesChoice.DontSave);
+        await vm.SwitchIssueAsync(firstIssueId);
+        Assert.Equal(firstIssueId, vm.Project!.IssueId);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task SwitchingIssue_WithAutoSaveOn_SavesTheEditsAndAsksNothing()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Multi"));
+        await vm.SaveAsync();
+        var firstIssueId = vm.Project!.IssueId;
+        await vm.NewIssueAsync();
+        Assert.True(vm.AutoSaveEnabled);
+        MakeAnEdit(vm);
+        var edited = vm.Project!.IssueId;
+
+        await vm.SwitchIssueAsync(firstIssueId);
+
+        Assert.Equal(firstIssueId, vm.Project!.IssueId);
+        Assert.Equal(0, _dialogs.SaveChangesPrompts);
+        Assert.False(vm.IsDirty);
+        // The bubble was saved with the issue it was added to.
+        var reopened = Stanley.Editors.ComicProject.Open(vm.Project.Location!, edited);
+        Assert.Single(reopened.Pages[0].Document.Panels.Values.SelectMany(panel => panel.Bubbles));
+    }
+
+    [Fact]
+    public async Task SwitchingToTheCurrentIssue_IsANoOp_AndClosesTheFileView()
+    {
+        var vm = NewViewModel();
+        var editor = vm.Editor;
+        vm.IsBackstageOpen = true;
+
+        await vm.SwitchIssueAsync(vm.Project!.IssueId);
+
+        Assert.Same(editor, vm.Editor);
+        Assert.False(vm.IsBackstageOpen);
+    }
+
+    [Fact]
+    public async Task IssueTitle_IsEditableFromInfo_AndIsSaved()
+    {
+        var vm = NewViewModel();
+        Assert.Equal("", vm.IssueTitle);
+
+        vm.IssueTitle = " Annual ";
+        Assert.True(vm.IsDirty);
+
+        var folder = Path.Combine(_root, "Annual");
+        _dialogs.Folders.Enqueue(folder);
+        Assert.True(await vm.SaveAsync());
+
+        Assert.Equal("Annual", Stanley.Editors.ComicProject.Open(folder).IssueTitle);
+    }
 }

@@ -380,6 +380,10 @@ public sealed class PageCanvasControl : Control
             var handleEdges = HitHandles(ProjectModel.Issues.PanelElements.Bounds(element), p, tol, includeMidpoints: true);
             if (handleEdges != RectEdges.None)
                 return new Hit(HitKind.ElementHandle, elementPanel, ElementIndex: vm.SelectedElementIndex, Edges: handleEdges);
+            // Selected speed lines keep their clear circle even where a character stands in it
+            // (the usual place for one), so dragging there always moves where the lines radiate from.
+            if (element is ProjectModel.Issues.SpeedLinesElement speedLines && InEllipse(speedLines.Focus, p))
+                return new Hit(HitKind.ElementBody, elementPanel, ElementIndex: vm.SelectedElementIndex);
         }
 
         // A locked layout offers no panel handles, edges or gutters to grab.
@@ -1266,6 +1270,19 @@ public sealed class PageCanvasControl : Control
                 items.Add(ColorMenu("Outline", new ColorMenuOptions(vm.SetStrokeColorCommand, "No Outline", "More Outline Colors…", style.Stroke,
                     vm.SetStrokeWeightCommand, style.StrokeWidthMm, vm.SetStrokeDashCommand, style.Dash)));
             }
+            else if (element is ProjectModel.Issues.SpeedLinesElement)
+            {
+                var style = vm.CurrentSpeedLinesStyle;
+                items.Add(ColorMenu("Color", new ColorMenuOptions(vm.SetSpeedLinesColorCommand, null, "More Colors…", style.Color)));
+                items.Add(new MenuItem
+                {
+                    Header = "Lines",
+                    ItemsSource = new (string Name, int Count)[] { ("Few", 20), ("Some", 80), ("Many", 200) }
+                        .Select(p => Item(p.Name, () => vm.SpeedLinesCount = p.Count)).ToList()
+                });
+                items.Add(new MenuItem { Header = "Thickness", ItemsSource = vm.WeightChoices.Select(w => Item(w.Name, () => vm.SpeedLinesThickness = w.Mm)).ToList() });
+                items.Add(Item("Shuffle", () => vm.ShuffleSpeedLinesCommand.Execute(null)));
+            }
             items.Add(new Separator());
             var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
             items.Add(Item(inFront ? "Put behind the characters" : "Put in front of the characters",
@@ -1277,6 +1294,7 @@ public sealed class PageCanvasControl : Control
             {
                 ProjectModel.Issues.TextElement => "Delete text",
                 ProjectModel.Issues.PictureElement => "Delete picture",
+                ProjectModel.Issues.SpeedLinesElement => "Delete speed lines",
                 _ => "Delete shape"
             }, () => vm.DeleteElement(elementPanel, index), "Del"));
         }
@@ -1501,6 +1519,15 @@ public sealed class PageCanvasControl : Control
         Rect2D.FromEdges(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
 
     private static bool Contains(Rect2D r, Point2D p) => p.X >= r.Left && p.X <= r.Right && p.Y >= r.Top && p.Y <= r.Bottom;
+
+    private static bool InEllipse(Rect2D r, Point2D p)
+    {
+        if (r.Width <= 0 || r.Height <= 0)
+            return false;
+        var dx = (p.X - r.MidX) / (r.Width / 2);
+        var dy = (p.Y - r.MidY) / (r.Height / 2);
+        return dx * dx + dy * dy <= 1;
+    }
 
     private static double Dist(Point2D a, Point2D b)
     {

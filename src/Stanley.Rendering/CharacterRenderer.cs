@@ -341,8 +341,9 @@ public sealed class FigureRenderer : ICharacterRenderer
             for (var i = 0; i < stickers.Count; i++)
             {
                 var mask = SeamMask(layer, belowOwn[i]);
+                using var clothes = ClothesCoverage(stickers, i, layer.Kind);
                 var own = FigureGeometry.Empty();
-                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, mask, height, tiles))
+                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, clothes, mask, height, tiles))
                 {
                     items.Add(item);
                     own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Area));
@@ -358,8 +359,30 @@ public sealed class FigureRenderer : ICharacterRenderer
         return new FigureDrawing(items, below);
     }
 
-    /// <summary>A worn sticker on the figure: its cover pieces, each with the part it came from, and its drawn parts mapped into figure space.</summary>
-    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art)
+    /// <summary>
+    /// What's worn under sticker <paramref name="exclude"/> in <paramref name="layer"/>: every
+    /// other sticker's own cover pieces there (<see cref="PartClip.Clothes"/>) - what a print
+    /// clips to, so it stays on the garment underneath instead of spilling past its edge. The
+    /// caller disposes it.
+    /// </summary>
+    private static SKPath ClothesCoverage(List<StickerGeometry> stickers, int exclude, FigureLayerKind layer)
+    {
+        var result = FigureGeometry.Empty();
+        for (var j = 0; j < stickers.Count; j++)
+        {
+            if (j == exclude)
+                continue;
+            foreach (var (part, piece) in stickers[j].Covers)
+            {
+                if (piece.Layer == layer && part.Blend != PartBlend.Cut && part.Clip is null)
+                    result = FigureGeometry.Union(result, FigureGeometry.Copy(piece.Path));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>A worn sticker on the figure: its cover pieces, its drawn parts and its typed text parts, each mapped into figure space.</summary>
+    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art, List<TextPiece> Text)
     {
         public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
         {
@@ -371,44 +394,77 @@ public sealed class FigureRenderer : ICharacterRenderer
                     covers.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
             }
 
+            var text = new List<TextPiece>();
+            foreach (var part in sticker.Parts.Where(p => p is { Art: not null, Text: not null }))
+            {
+                foreach (var (side, matrix, runs, color, bounds, anchor) in StickerArtPieces.MapText(figure, part, part.Art!, part.Text!, look))
+                    text.Add(new TextPiece(part, LayerOf(figure, part, side), matrix, runs, color, BoundsArea(bounds, matrix), anchor));
+            }
+
             var art = new List<ArtPiece>();
-            var drawn = sticker.Parts.Where(p => p is { Art: not null, Cover: null }).ToList();
+            var drawn = sticker.Parts.Where(p => p is { Art: not null, Cover: null, Text: null }).ToList();
             if (drawn.Count > 0 && StickerArtPieces.ArtFor(worn.Asset, StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression), figure.Angle) is { } parsed)
             {
                 foreach (var part in drawn)
                 {
                     foreach (var (side, elements, anchor) in StickerArtPieces.Map(figure, worn, part, part.Art!, parsed, look, height, tiles))
-                    {
-                        var layer = part.Depth switch
-                        {
-                            PartDepth.Back => FigureLayerKind.Back,
-                            PartDepth.Front => FigureLayerKind.Front,
-                            _ => figure.LayerOf(part.Region, side)
-                        };
-                        art.Add(new ArtPiece(part, layer, elements, anchor, StickerArtPieces.Area(elements, height)));
-                    }
+                        art.Add(new ArtPiece(part, LayerOf(figure, part, side), elements, anchor, StickerArtPieces.Area(elements, height)));
                 }
             }
-            return new StickerGeometry(covers, art);
+            return new StickerGeometry(covers, art, text);
         }
+
+        private static FigureLayerKind LayerOf(BodyFigure figure, StickerPart part, LimbSide side) => part.Depth switch
+        {
+            PartDepth.Back => FigureLayerKind.Back,
+            PartDepth.Front => FigureLayerKind.Front,
+            _ => figure.LayerOf(part.Region, side)
+        };
     }
 
     /// <summary>One drawn part (one side of it, for a limb) in figure space: its elements and the area they cover.</summary>
     private sealed record ArtPiece(StickerPart Part, FigureLayerKind Layer, IReadOnlyList<ArtStroke> Elements, SKPoint? Anchor, SKPath Area);
 
-    /// <summary>What one worn sticker paints in one layer: its covers merged per colour slot, then its drawn parts - minus its cuts, clipped as asked.</summary>
+    /// <summary>One typed text part (one side of it, for a limb) in figure space: its runs, colour, placement and the area it covers (its bounds rectangle, mapped - not its glyphs' own shape).</summary>
+    private sealed record TextPiece(StickerPart Part, FigureLayerKind Layer, SKMatrix Matrix, IReadOnlyList<Lettering.TextRun> Runs, SKColor Color, SKPath Area, SKPoint? Anchor);
+
+    /// <summary>A text piece's hit-test area: <paramref name="bounds"/> (its own drawing space), mapped through <paramref name="matrix"/> - a quad, not necessarily axis-aligned once turned.</summary>
+    private static SKPath BoundsArea(SKRect bounds, SKMatrix matrix)
+    {
+        using var builder = new SKPathBuilder();
+        builder.MoveTo(matrix.MapPoint(bounds.Left, bounds.Top));
+        builder.LineTo(matrix.MapPoint(bounds.Right, bounds.Top));
+        builder.LineTo(matrix.MapPoint(bounds.Right, bounds.Bottom));
+        builder.LineTo(matrix.MapPoint(bounds.Left, bounds.Bottom));
+        builder.Close();
+        return builder.Detach();
+    }
+
+    /// <summary>What <paramref name="clip"/> keeps a long-lived art or text item inside - an owned copy, since <paramref name="bodySkin"/>, <paramref name="own"/> and <paramref name="clothes"/> are disposed once this layer is done.</summary>
+    private static SKPath? PersistedClip(PartClip? clip, SKPath bodySkin, SKPath own, SKPath clothes) => clip switch
+    {
+        PartClip.Body => FigureGeometry.Copy(bodySkin),
+        PartClip.Sticker => FigureGeometry.Copy(own),
+        PartClip.Clothes => clothes.IsEmpty ? null : FigureGeometry.Copy(clothes),
+        _ => null
+    };
+
+    /// <summary>What one worn sticker paints in one layer: its covers merged per colour slot, then its drawn and typed parts - minus its cuts, clipped as asked.</summary>
     private static IEnumerable<FigureItem> StickerItems(WornSticker worn, StickerGeometry geometry, FigureLayerKind layer,
-        CharacterLook look, SKPath bodySkin, SKPath? mask, double height, Func<string, ArtFile?> tiles)
+        CharacterLook look, SKPath bodySkin, SKPath clothes, SKPath? mask, double height, Func<string, ArtFile?> tiles)
     {
         var here = geometry.Covers.Where(p => p.Piece.Layer == layer).ToList();
         var art = geometry.Art.Where(a => a.Layer == layer).ToList();
-        if (here.Count == 0 && art.Count == 0)
+        var text = geometry.Text.Where(t => t.Layer == layer).ToList();
+        if (here.Count == 0 && art.Count == 0 && text.Count == 0)
             yield break;
         var sticker = worn.Asset.Sticker;
         var cuts = FigureGeometry.Empty();
         foreach (var (_, piece) in here.Where(p => p.Part.Blend == PartBlend.Cut))
             cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Path));
         foreach (var piece in art.Where(a => a.Part.Blend == PartBlend.Cut))
+            cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Area));
+        foreach (var piece in text.Where(t => t.Part.Blend == PartBlend.Cut))
             cuts = FigureGeometry.Union(cuts, FigureGeometry.Copy(piece.Area));
         var own = FigureGeometry.Empty();
         foreach (var (_, piece) in geometry.Covers.Where(p => p.Part.Blend != PartBlend.Cut && p.Part.Clip is null))
@@ -420,9 +476,13 @@ public sealed class FigureRenderer : ICharacterRenderer
             var path = FigureGeometry.Empty();
             foreach (var (part, piece) in group)
             {
-                var shape = part.Clip is { } clip
-                    ? FigureGeometry.Combine(piece.Path, clip == PartClip.Body ? bodySkin : own, SKPathOp.Intersect)
-                    : FigureGeometry.Copy(piece.Path);
+                var shape = part.Clip switch
+                {
+                    PartClip.Body => FigureGeometry.Combine(piece.Path, bodySkin, SKPathOp.Intersect),
+                    PartClip.Sticker => FigureGeometry.Combine(piece.Path, own, SKPathOp.Intersect),
+                    PartClip.Clothes => clothes.IsEmpty ? FigureGeometry.Copy(piece.Path) : FigureGeometry.Combine(piece.Path, clothes, SKPathOp.Intersect),
+                    _ => FigureGeometry.Copy(piece.Path)
+                };
                 path = FigureGeometry.Union(path, shape);
             }
             if (!cuts.IsEmpty)
@@ -443,12 +503,7 @@ public sealed class FigureRenderer : ICharacterRenderer
 
         foreach (var piece in art.Where(a => a.Part.Blend != PartBlend.Cut))
         {
-            var keep = piece.Part.Clip switch
-            {
-                PartClip.Body => FigureGeometry.Copy(bodySkin),
-                PartClip.Sticker => FigureGeometry.Copy(own),
-                _ => null
-            };
+            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes);
             var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
             if (!cuts.IsEmpty)
             {
@@ -463,6 +518,25 @@ public sealed class FigureRenderer : ICharacterRenderer
                 continue;
             }
             yield return new ArtItem(piece.Elements, area, worn.Asset.Id, piece.Anchor, keep, cuts.IsEmpty ? null : FigureGeometry.Copy(cuts));
+        }
+
+        foreach (var piece in text.Where(t => t.Part.Blend != PartBlend.Cut))
+        {
+            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes);
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            if (!cuts.IsEmpty)
+            {
+                var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
+                area.Dispose();
+                area = cut;
+            }
+            if (area.IsEmpty)
+            {
+                area.Dispose();
+                keep?.Dispose();
+                continue;
+            }
+            yield return new TextItem(piece.Runs, piece.Color, piece.Matrix, area, worn.Asset.Id, piece.Anchor, keep, cuts.IsEmpty ? null : FigureGeometry.Copy(cuts));
         }
         cuts.Dispose();
         own.Dispose();

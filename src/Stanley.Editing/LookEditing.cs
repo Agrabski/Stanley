@@ -310,6 +310,108 @@ public static class LookEditing
 }
 
 /// <summary>
+/// Wearing the same design more than once (docs/sticker-system.md §19): in a slot that
+/// stacks, each click on a placeable design - drawn art or text, a print or a badge - puts
+/// on another copy, with its own id and placement (<see cref="Spot"/>), so ten skulls are ten
+/// stickers to move one by one. Pure functions, like <see cref="LookEditing"/>.
+/// </summary>
+public static class StickerCopies
+{
+    /// <summary>Where the Sticker tab's Duplicate puts the copy, from the one it copies, in template units: a small step down and to the right.</summary>
+    public static Point2D DuplicateStep { get; } = new(35, 35);
+
+    /// <summary>The spacing of <see cref="Spot"/>'s grid, in template units - a little more than a library print is wide.</summary>
+    public const double SpotSpacing = 70;
+
+    /// <summary>Whether a sticker is placed rather than generated from the body: it has drawn or typed parts. Only these are worth wearing twice - two identical pairs of gloves would sit exactly on top of each other.</summary>
+    public static bool IsPlaceable(Sticker sticker) => sticker.Parts.Any(p => p.Art is not null);
+
+    /// <summary>
+    /// Where the <paramref name="copy"/>th extra copy of a design goes, from where the design
+    /// itself sits: across the chest and down - centre, right, left, then the next row - so a
+    /// dozen stay on the shirt before any lands on another (the next dozen sit a little aside).
+    /// </summary>
+    public static Point2D Spot(int copy)
+    {
+        if (copy <= 0)
+            return default;
+        var (index, round) = (copy % 12, copy / 12);
+        var column = (index % 3) switch { 0 => 0, 1 => SpotSpacing, _ => -SpotSpacing };
+        return new Point2D(column + round * 10, index / 3 * SpotSpacing + round * 10);
+    }
+
+    /// <summary>
+    /// A copy of <paramref name="asset"/> under a fresh id, its placed parts moved by
+    /// <paramref name="shift"/> (template units). The art files come along unchanged. A
+    /// moved copy is the user's own (no longer an unmodified library copy).
+    /// </summary>
+    public static StickerAsset Copy(StickerAsset asset, Point2D shift)
+    {
+        var sticker = asset.Sticker;
+        var moved = shift != default;
+        var parts = !moved ? sticker.Parts : sticker.Parts.Select(p => p.Art is { } art
+            ? p with { Art = art with { Offset = new Point2D((art.Offset?.X ?? 0) + shift.X, (art.Offset?.Y ?? 0) + shift.Y) } }
+            : p).ToList();
+        return asset with { Sticker = sticker with { Id = StickerId.New(), Parts = parts, Source = moved ? null : sticker.Source } };
+    }
+
+    /// <summary>How many of <paramref name="slot"/>'s worn stickers are the design named <paramref name="name"/> - how many nudges the next copy needs.</summary>
+    public static int WornCopies(CharacterDefinition character, string slot, string name) =>
+        character.Stickers.TryGetValue(slot, out var worn)
+            ? worn.Count(id => character.Wardrobe.Find(id) is { } a && string.Equals(a.Sticker.Name, name, StringComparison.CurrentCultureIgnoreCase))
+            : 0;
+}
+
+/// <summary>
+/// Text prints (docs/sticker-system.md): typed text worn on the clothes instead of a drawn
+/// symbol. Pure functions, like <see cref="LookEditing"/>; the character editor turns each
+/// into one undo step.
+/// </summary>
+public static class TextPrints
+{
+    /// <summary>The colour slot every text print uses by default - the character's own "print" swatch.</summary>
+    public const string ColorSlot = "print";
+
+    /// <summary>Off-white, like the library's skull: it reads on most shirts, and the "print" colour slot changes it.</summary>
+    public static ColorValue DefaultColor { get; } = ColorValue.FromHex("#f4f4f4");
+
+    /// <summary>Where a text print goes when the shirt already has a print on the chest: under it, like the words under a logo.</summary>
+    public static Point2D BelowAnotherPrint { get; } = new(0, 115);
+
+    /// <summary>What the Prints gallery's "Text" button puts on first - there to type over.</summary>
+    public const string DefaultText = "HELLO";
+
+    /// <summary>
+    /// A new print with <paramref name="text"/> typed on it instead of drawn art: one text
+    /// part, pinned on the chest, named after the text. It needs no art files - font
+    /// fallback at draw time handles emoji and symbols the chosen font lacks.
+    /// </summary>
+    /// <param name="offset">Where it sits from the chest, in template units - e.g. <see cref="BelowAnotherPrint"/>.</param>
+    public static StickerAsset New(string text, Point2D? offset = null)
+    {
+        var part = new StickerPart("print", BodyRegion.Torso, Art: new PartArt(ArtMapping.Pin, Offset: offset, KeepReadable: true), Clip: PartClip.Clothes, Text: new PartText(text));
+        var sticker = new Sticker(StickerId.New(), text.Trim().Length == 0 ? "Text" : text.Trim(), StickerSlots.Print,
+            [part], new SortedDictionary<string, ColorValue> { [ColorSlot] = DefaultColor }, [Sticker.DefaultVariant]);
+        return new StickerAsset(sticker, new Dictionary<string, ArtFile>());
+    }
+
+    /// <summary>A text print's part (its only one) - for the Sticker tab's text box and Bold toggle.</summary>
+    public static StickerPart? Part(Sticker sticker) => sticker.Parts.FirstOrDefault(p => p.Text is not null);
+
+    /// <summary>The text sticker with its typed text changed - and renamed to match, like a new one is named after its text.</summary>
+    public static Sticker WithText(Sticker sticker, string text) =>
+        Part(sticker) is not { Text: { } current } part
+            ? sticker
+            : sticker with { Name = text.Trim().Length == 0 ? "Text" : text.Trim(), Parts = sticker.Parts.Select(p => ReferenceEquals(p, part) ? p with { Text = current with { Text = text } } : p).ToList() };
+
+    /// <summary>The text sticker with its Bold toggle changed.</summary>
+    public static Sticker WithBold(Sticker sticker, bool bold) =>
+        Part(sticker) is not { Text: { } current } part
+            ? sticker
+            : sticker with { Parts = sticker.Parts.Select(p => ReferenceEquals(p, part) ? p with { Text = current with { Bold = bold } } : p).ToList() };
+}
+
+/// <summary>
 /// The Sticker tab's sliders for a worn garment: how long it is, how long its sleeves are,
 /// how loose it fits - each one number over the sticker's cover parts.
 /// </summary>

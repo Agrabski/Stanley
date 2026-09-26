@@ -265,10 +265,18 @@ MyComic/
 ### Backgrounds
 - *Built so far* (see "Panel elements and backgrounds" in `CLAUDE.md`): the inline
   tier - a panel's own colour, gradient or picture background - plus per-panel
-  shapes, text and pictures in a back layer (behind the characters) and a front
-  layer (in front of them, under the bubbles), which is this section's back/front
-  split at panel level. The library tier (`backgrounds/`, `props/`, revisions,
-  crops) isn't built yet.
+  shapes, text, pictures and speed lines in a back layer (behind the characters)
+  and a front layer (in front of them, under the bubbles), which is this
+  section's back/front split at panel level. The library tier (`backgrounds/`,
+  `props/`, revisions, crops) isn't built yet.
+- **Speed lines** (`SpeedLinesElement`) are a panel element like the others: a
+  burst of thin, tapered wedges radiating out past the panel's edges from a
+  draggable, resizable clear ellipse (`Focus`) - move and resize handles work
+  the same way as any other element's box. The wedges themselves aren't stored
+  - only `Focus` and a small `SpeedLinesStyle` (colour, count, thickness,
+  jitter, seed) are - and are regenerated deterministically from `Seed` on
+  every draw (a hand-rolled hash, not `System.Random`, so a comic's render is
+  identical on every machine). "Shuffle" just advances the seed.
 - Two tiers, same as before: an **inline** background (a panel points
   straight at one image, no library entry — the default/simple path) or a
   **library entry** under `backgrounds/` for recurring locations, referenced

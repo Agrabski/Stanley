@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "print": "#c0392b"
+  },
+  "id": "library",
+  "name": "Heart",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "clip": "clothes",
+      "name": "print",
+      "region": "torso"
+    }
+  ],
+  "slot": "print",
+  "variants": [
+    "default"
+  ]
+}

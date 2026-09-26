@@ -23,3 +23,6 @@ the body's outline. Faces carry the expression vocabulary as variants (eyes: neu
 happy, sad, angry, wide, closed, wink, halfClosed; brows: neutral, raised, angry, sad,
 skeptical; mouth: neutral, smile, grin, open, shout, frown, o, smirk). Pattern tiles
 are one repeat per view box, with `slot-ground`, `slot-1` and `slot-2` classes.
+Prints (`print/`) are symbols for clothes: one Pin art part named `print` on the
+chest, in `class="slot-print"`, clipped to the clothes underneath (`clip: clothes`);
+leave details as holes rather than fixed colours, so they read in any colour.

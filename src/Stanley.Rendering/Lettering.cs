@@ -1,3 +1,4 @@
+using System.Text;
 using SkiaSharp;
 
 namespace Stanley.Rendering;
@@ -181,6 +182,117 @@ public static class Lettering
             .OrderBy(f => (f.FontStyle.Slant != SKFontStyleSlant.Upright) == italic ? 0 : 1)
             .ThenBy(f => Math.Abs(f.FontStyle.Weight - weight))
             .First();
+    }
+
+    /// <summary>
+    /// One run of <see cref="Text"/> that draws in one <see cref="Font"/> (docs/sticker-system.md,
+    /// prints): see <see cref="FallbackRuns"/>.
+    /// </summary>
+    public readonly record struct TextRun(string Text, SKFont Font);
+
+    /// <summary>
+    /// Splits <paramref name="text"/> into <see cref="TextRun"/>s, each in a font that can draw
+    /// it, a grapheme cluster at a time (so ❤️ with its variation selector, a skin tone or a
+    /// family joined with zero-width joiners stays one piece): an emoji in the system's colour
+    /// emoji font when there is one; anything else in <paramref name="font"/> where it has the
+    /// glyph, or the system's best match (<see cref="SKFontManager.MatchCharacter(int)"/>) for
+    /// the symbols most lettering fonts lack. Falls back to <paramref name="font"/> itself (its
+    /// own missing-glyph box) when nothing installed has the character, so this never throws.
+    /// Used by prints; bubbles and free text draw in one font throughout and don't call this.
+    /// </summary>
+    public static IReadOnlyList<TextRun> FallbackRuns(string text, SKFont font)
+    {
+        if (string.IsNullOrEmpty(text))
+            return [];
+        var runs = new List<TextRun>();
+        var start = 0;
+        SKTypeface? currentFace = null;
+        var clusters = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+        while (clusters.MoveNext())
+        {
+            var cluster = (string)clusters.Current;
+            var index = clusters.ElementIndex;
+            var face = FaceFor(cluster, font);
+            if (currentFace is not null && face != currentFace)
+            {
+                runs.Add(new TextRun(text[start..index], RunFont(currentFace, font)));
+                start = index;
+            }
+            currentFace = face;
+        }
+        if (currentFace is not null)
+            runs.Add(new TextRun(text[start..], RunFont(currentFace, font)));
+        return runs;
+    }
+
+    private static readonly Dictionary<int, SKTypeface?> FallbackFaces = [];
+    private static SKTypeface? _emojiFace;
+    private static bool _emojiLooked;
+
+    /// <summary>The typeface one grapheme cluster draws in (see <see cref="FallbackRuns"/>).</summary>
+    private static SKTypeface FaceFor(string cluster, SKFont font)
+    {
+        Rune.DecodeFromUtf16(cluster, out var first, out _);
+        var cp = first.Value;
+        if (IsEmoji(cluster, cp) && EmojiFace() is { } emoji && emoji.ContainsGlyph(cp))
+            return emoji;
+        if (font.ContainsGlyph(cp))
+            return font.Typeface;
+        lock (Gate)
+        {
+            if (!FallbackFaces.TryGetValue(cp, out var match))
+                FallbackFaces[cp] = match = SKFontManager.Default.MatchCharacter(cp);
+            return match ?? font.Typeface;
+        }
+    }
+
+    /// <summary>A cluster that reads as an emoji: asked for as one (a variation selector, a joiner), or a pictograph that normally is one.</summary>
+    private static bool IsEmoji(string cluster, int cp) =>
+        cluster.Contains('\uFE0F') || cluster.Contains('\u200D') || cp >= 0x1F000
+        || cp is >= 0x2300 and <= 0x23FF or >= 0x2600 and <= 0x27BF or >= 0x2B00 and <= 0x2BFF;
+
+    /// <summary>The system's colour emoji font (Noto Color Emoji, Segoe UI Emoji, Apple Color Emoji...), asked for by emoji presentation; null if there's none.</summary>
+    private static SKTypeface? EmojiFace()
+    {
+        lock (Gate)
+        {
+            if (!_emojiLooked)
+            {
+                _emojiLooked = true;
+                _emojiFace = SKFontManager.Default.MatchCharacter(null, SKFontStyle.Normal, ["und-Zsye"], 0x1F600);
+            }
+            return _emojiFace;
+        }
+    }
+
+    private static SKFont RunFont(SKTypeface typeface, SKFont like) =>
+        typeface == like.Typeface ? like : new SKFont(typeface, like.Size) { LinearMetrics = true, Subpixel = true };
+
+    /// <summary>The tight bounds of <paramref name="runs"/> drawn left to right from the origin - the box <see cref="DrawFallback"/> fills when called with the same origin.</summary>
+    public static SKRect MeasureFallback(IReadOnlyList<TextRun> runs, SKPaint paint)
+    {
+        var x = 0f;
+        var bounds = SKRect.Empty;
+        for (var i = 0; i < runs.Count; i++)
+        {
+            var w = runs[i].Font.MeasureText(runs[i].Text, out var runBounds, paint);
+            runBounds.Offset(x, 0);
+            bounds = i == 0 ? runBounds : SKRect.Union(bounds, runBounds);
+            x += w;
+        }
+        return bounds;
+    }
+
+    /// <summary>Draws <paramref name="runs"/> left to right from (<paramref name="x"/>, <paramref name="y"/>), each in its own font, and returns the total width drawn.</summary>
+    public static float DrawFallback(SKCanvas canvas, IReadOnlyList<TextRun> runs, float x, float y, SKPaint paint)
+    {
+        var start = x;
+        foreach (var run in runs)
+        {
+            canvas.DrawText(run.Text, x, y, SKTextAlign.Left, run.Font, paint);
+            x += run.Font.MeasureText(run.Text, paint);
+        }
+        return x - start;
     }
 
     /// <summary>Splits <paramref name="text"/> into lines no wider than <paramref name="maxWidth"/> at word breaks (a single over-long word keeps its own line); <c>\n</c> always starts a new line.</summary>

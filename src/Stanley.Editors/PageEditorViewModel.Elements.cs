@@ -233,6 +233,7 @@ public sealed partial class PageEditorViewModel
         InsertTextCommand = new RelayCommand<TextStylePreset>(preset => InsertText(preset), _ => Working.PanelOrder.Count > 0);
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
         InitializePictureCommands();
+        InitializeSpeedLinesCommands();
         SetBackgroundCommand = new RelayCommand<BackgroundChoice>(choice =>
         {
             if (choice != null && _selectedPanelId is { } panelId)
@@ -245,6 +246,7 @@ public sealed partial class PageEditorViewModel
         InsertTextCommand.NotifyCanExecuteChanged();
         SetBackgroundCommand.NotifyCanExecuteChanged();
         NotifyPictureCommands();
+        NotifySpeedLinesCommands();
     }
 
     // ---------------------------------------------------------------- ribbon
@@ -350,6 +352,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(IsShapeContext));
         OnPropertyChanged(nameof(IsTextContext));
         OnPropertyChanged(nameof(IsPictureContext));
+        OnPropertyChanged(nameof(IsSpeedLinesContext));
         RaiseElementDerivedChanged();
     }
 
@@ -363,8 +366,8 @@ public sealed partial class PageEditorViewModel
     private void RaiseElementDerivedChanged()
     {
         RaiseFontChanged();
-        var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedElement?.Layer, SelectedPanel?.Background, SelectedPanel?.Borderless,
-            _newShapeStyle, _newTextStyle, _newShapeLayer, _newTextLayer, Tool);
+        var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedSpeedLines?.Style, SelectedElement?.Layer, SelectedPanel?.Background, SelectedPanel?.Borderless,
+            _newShapeStyle, _newTextStyle, _newSpeedLinesStyle, _newShapeLayer, _newTextLayer, Tool);
         if (Equals(key, _elementDerivedKey))
             return;
         _elementDerivedKey = key;
@@ -385,6 +388,10 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(SelectedPanelBackground));
         OnPropertyChanged(nameof(BackgroundPreview));
         OnPropertyChanged(nameof(BackgroundName));
+        OnPropertyChanged(nameof(CurrentSpeedLinesStyle));
+        OnPropertyChanged(nameof(SpeedLinesColorBrush));
+        OnPropertyChanged(nameof(SpeedLinesCount));
+        OnPropertyChanged(nameof(SpeedLinesThickness));
         OnPropertyChanged(nameof(SelectedPanelHasBorder));
     }
 

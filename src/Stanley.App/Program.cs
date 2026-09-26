@@ -26,6 +26,7 @@ internal static class Program
 
         var root = new RootCommand("Stanley - a comic editor.");
         root.Add(InitCommand.Build());
+        root.Add(IssueCommand.Build());
         return root.Parse(args).Invoke();
     }
 

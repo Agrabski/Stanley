@@ -16,6 +16,9 @@ public sealed record ComicPage(PageId Id, PageTrim Trim, PageDocument Document)
     public Rect2D Bounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 }
 
+/// <summary>One of the comic's issues, in the order <see cref="ComicProject.Issues"/> lists them - enough to show and open it, not its pages/panels.</summary>
+public sealed record IssueSummary(IssueId Id, string Number, string Title, int PageCount);
+
 /// <summary>
 /// An open comic - the thing File &gt; New/Open/Save act on, the way Word acts on a
 /// document. On disk it's a Stanley project folder (see <see cref="ProjectRepository"/>);
@@ -30,6 +33,11 @@ public sealed class ComicProject
     public const double DefaultBleedMm = 3;
 
     private Issue _issue;
+    // The comic's issues in storage order, and every one besides the current issue - so
+    // Issues can be rebuilt with the current issue's live Number/Title/page count on every
+    // access without re-reading the others from disk.
+    private readonly List<IssueId> _issueOrder;
+    private readonly Dictionary<IssueId, IssueSummary> _otherIssues;
     // The template the comic was made from, if any: new pages' panels and the export width.
     private readonly ComicFormat? _format;
     // What's on disk (at Location) as of the last open/save: page records (kept so a
@@ -52,7 +60,8 @@ public sealed class ComicProject
         Dictionary<PageId, Page> pageRecords, Dictionary<PageId, HashSet<PanelId>> savedPanels,
         IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
         IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures,
-        ComicPage? titlePage = null, SavedTitlePage? savedTitlePage = null)
+        ComicPage? titlePage = null, SavedTitlePage? savedTitlePage = null,
+        IReadOnlyList<IssueId>? issueOrder = null, IReadOnlyDictionary<IssueId, IssueSummary>? otherIssues = null)
     {
         TitlePage = titlePage;
         _savedTitlePage = savedTitlePage;
@@ -66,6 +75,9 @@ public sealed class ComicProject
         Title = title;
         Trim = trim;
         _issue = issue;
+        // Without an explicit order (a brand-new or never-saved comic), the current issue is the only one.
+        _issueOrder = issueOrder is null ? [issue.Id] : [.. issueOrder];
+        _otherIssues = otherIssues is null ? [] : new Dictionary<IssueId, IssueSummary>(otherIssues);
         Pages = pages;
         _pageRecords = pageRecords;
         _savedPanels = savedPanels;
@@ -101,6 +113,9 @@ public sealed class ComicProject
     /// <summary>For a comic read on screen, the width in pixels a page is exported at as a PNG; null for print resolution.</summary>
     public int? ExportWidthPx => _format?.ExportWidthPx;
 
+    /// <summary>The open issue's id (<c>issues/&lt;id&gt;-slug/</c>); which of <see cref="Issues"/> is current.</summary>
+    public IssueId IssueId => _issue.Id;
+
     /// <summary>The issue's number as displayed ("1", "0", "1.5") - free text, editable from File › Info, shown wherever a text has <c>{issue}</c>.</summary>
     public string IssueNumber
     {
@@ -108,8 +123,27 @@ public sealed class ComicProject
         set => _issue = _issue with { Number = value };
     }
 
+    /// <summary>The issue's title, editable from File › Info alongside its number - e.g. "Annual" or "The Long Way Home". Saved with the issue, separately from the comic's own <see cref="Title"/>.</summary>
+    public string IssueTitle
+    {
+        get => _issue.Title;
+        set => _issue = _issue with { Title = value };
+    }
+
     /// <summary>What the fields in the comic's texts show: its title and issue number.</summary>
     public TextFields Fields => new(Title, IssueNumber);
+
+    /// <summary>
+    /// The comic's issues in storage order (<see cref="SeriesManifest.IssueIds"/>) - for a
+    /// comic that's never been saved, just the one issue being edited. The current issue's
+    /// entry reflects live, unsaved edits to its number/title and its opened page count; the
+    /// others are as of the last time this project was opened or a new issue was added.
+    /// </summary>
+    public IReadOnlyList<IssueSummary> Issues =>
+        _issueOrder.Select(id => id == _issue.Id
+            ? new IssueSummary(id, _issue.Number, _issue.Title, Pages.Count)
+            : _otherIssues.TryGetValue(id, out var summary) ? summary : new IssueSummary(id, "", "", 0))
+        .ToList();
 
     public Rect2D PageBounds => new(0, 0, Trim.Size.WidthMm, Trim.Size.HeightMm);
 
@@ -144,7 +178,7 @@ public sealed class ComicProject
 
     private static ComicProject CreateNew(PageTrim trim, PanelLayoutPreset? layout, PanelGrid? grid, ComicFormat? format)
     {
-        var issue = NewIssue();
+        var issue = BlankIssue();
         var page = new ComicPage(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), grid ?? PanelGrid.Default, layout));
         return new ComicProject(null, UntitledTitle, trim, format, issue, [page], [], [], [], [], NoPictures, []);
     }
@@ -159,7 +193,7 @@ public sealed class ComicProject
         var manifest = repository.LoadManifest();
         var issue = issueId is { } id ? repository.LoadIssue(id)
             : manifest.IssueIds.Count > 0 ? repository.LoadIssue(manifest.IssueIds[0])
-            : NewIssue();
+            : BlankIssue();
 
         var pages = new List<ComicPage>();
         var records = new Dictionary<PageId, Page>();
@@ -208,12 +242,49 @@ public sealed class ComicProject
             savedTitlePage = new SavedTitlePage(titleRecord, [.. titleRecord.PanelIds], titlePictures);
         }
 
+        // Every other issue's summary, for Issues - not this one's, so its live edits always win.
+        var otherIssues = manifest.IssueIds.Where(id => id != issue.Id).ToDictionary(id => id, id =>
+        {
+            var other = repository.LoadIssue(id);
+            return new IssueSummary(id, other.Number, other.Title, other.PageIds.Count);
+        });
+        var issueOrder = manifest.IssueIds.Count > 0 ? manifest.IssueIds : (IReadOnlyList<IssueId>)[issue.Id];
+
         return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, manifest.Format, issue, pages, records, saved,
-            characters, [.. characters.Select(c => c.Id)], pictures, issuePictures, titlePage, savedTitlePage);
+            characters, [.. characters.Select(c => c.Id)], pictures, issuePictures, titlePage, savedTitlePage, issueOrder, otherIssues);
     }
 
     /// <summary>A new page at the project's size: one panel filling the live area, or the format's panels.</summary>
     public ComicPage CreateBlankPage() => NewPage(Trim, _format);
+
+    /// <summary>
+    /// Adds a new issue to this (already-saved) comic: one blank page laid out like
+    /// <see cref="CreateBlankPage"/>, its own folder under <c>issues/</c>, appended to the
+    /// manifest's issue order and numbered <paramref name="number"/> - or, left null, one
+    /// past the highest numeric issue number so far (<see cref="IssueNumbering.NextNumber"/>).
+    /// Never touches another issue's files. Returns the new issue's id, to switch to with
+    /// <see cref="Open"/>; this project keeps editing the issue it already had open.
+    /// </summary>
+    public IssueId NewIssue(string? number = null, string? title = null)
+    {
+        if (Location is null)
+            throw new InvalidOperationException("This comic hasn't been saved yet - save it first.");
+
+        var repository = new ProjectRepository(Location);
+        var manifest = repository.LoadManifest();
+        var existingNumbers = manifest.IssueIds.Select(id => repository.LoadIssue(id).Number).ToList();
+
+        var page = CreateBlankPage();
+        var issue = new Issue(IssueId.New(), number ?? IssueNumbering.NextNumber(existingNumbers), title ?? "", [page.Id],
+            new SortedDictionary<CharacterId, CharacterRevisionId>());
+        repository.SaveIssue(issue);
+        repository.SavePage(issue.Id, new Page(page.Id, "Page 1", TrimOverride: null, page.Document.PanelOrder));
+        foreach (var panelId in page.Document.PanelOrder)
+            repository.SavePanel(issue.Id, page.Id, page.Document.Panels[panelId]);
+
+        repository.SaveManifest(manifest with { IssueIds = [.. manifest.IssueIds, issue.Id] });
+        return issue.Id;
+    }
 
     /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
@@ -366,8 +437,11 @@ public sealed class ComicProject
             // The same issue the snapshot is of, if it's there already (a comic's first issue is written on its first save).
             var issueId = new ProjectRepository(originalLocation).LoadManifest().IssueIds.Contains(copy._issue.Id) ? copy._issue.Id : (IssueId?)null;
             var original = Open(originalLocation, issueId);
+            // If the snapshot's issue isn't on disk yet, it still belongs in the list - tacked on the end.
+            List<IssueId> issueOrder = issueId != null ? original._issueOrder : [.. original._issueOrder, copy._issue.Id];
             return new ComicProject(original.Location, copy.Title, original.Trim, copy._format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
-                copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures, copy.TitlePage, original._savedTitlePage);
+                copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures, copy.TitlePage, original._savedTitlePage,
+                issueOrder, original._otherIssues);
         }
         return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, [], copy.TitlePage);
     }
@@ -498,7 +572,7 @@ public sealed class ComicProject
 
     private static readonly IReadOnlyDictionary<string, ArtFile> NoPictures = new Dictionary<string, ArtFile>();
 
-    private static Issue NewIssue() => new(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
+    private static Issue BlankIssue() => new(IssueId.New(), "1", "", [], new SortedDictionary<CharacterId, CharacterRevisionId>());
 
     private static ComicPage NewPage(PageTrim trim, ComicFormat? format) =>
         new(PageId.New(), trim, BlankDocument(new Rect2D(0, 0, trim.Size.WidthMm, trim.Size.HeightMm), GridOf(format), LayoutOf(format)));
