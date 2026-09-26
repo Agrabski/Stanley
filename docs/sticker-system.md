@@ -752,7 +752,8 @@ the outline (Warp) or stay fixed to the page (a printed-paper look), three-quart
 get it free once the rig does), per-part z overrides, arms behind the body, "turn
 around" as distinct from mirror, gaze (the VRM `LeftEye`/`RightEye` bones moving the
 pupils), a talking mouth when a bubble's tail points at the character (after
-character-bound tails), a user library shared across projects, flatten to editable
+character-bound tails), a user library shared across projects (for whole
+characters, designed in [`my-characters.md`](my-characters.md)), flatten to editable
 layers, and `stanley sticker import` on the CLI.
 
 ## 17. Decisions and open questions
