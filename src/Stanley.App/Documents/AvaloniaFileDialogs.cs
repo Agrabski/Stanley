@@ -85,4 +85,50 @@ public sealed class AvaloniaFileDialogs(Window owner) : IFileDialogs
     }
 
     public Task<string?> PickSvgEditorAsync(string? currentPath) => SvgEditorPicker.PickAsync(owner, currentPath);
+
+    public async Task<bool> AskInstallUpdateAsync(string version, string? notes)
+    {
+        var dialog = new Window
+        {
+            Title = "Stanley",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false
+        };
+
+        Button MakeButton(string text, bool choice, bool isDefault = false, bool isCancel = false)
+        {
+            var button = new Button { Content = text, MinWidth = 96, IsDefault = isDefault, IsCancel = isCancel, HorizontalContentAlignment = HorizontalAlignment.Center };
+            if (isDefault)
+                button.Classes.Add("accent");
+            button.Click += (_, _) => dialog.Close(choice);
+            return button;
+        }
+
+        var content = new StackPanel { Margin = new Avalonia.Thickness(24), Spacing = 18 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Version {version} of Stanley is available.",
+            FontSize = 15,
+            MaxWidth = 420,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        });
+        if (!string.IsNullOrWhiteSpace(notes))
+            content.Children.Add(new TextBlock { Text = notes, MaxWidth = 420, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8 });
+        content.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+            Children =
+            {
+                MakeButton("Update Now", true, isDefault: true),
+                MakeButton("Later", false, isCancel: true)
+            }
+        });
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<bool?>(owner) ?? false;
+    }
 }

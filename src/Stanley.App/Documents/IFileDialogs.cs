@@ -32,4 +32,7 @@ public interface IFileDialogs
 
     /// <summary>File &gt; Options &gt; SVG editor's picker (detected programs, or Browse... to any executable); null if cancelled.</summary>
     Task<string?> PickSvgEditorAsync(string? currentPath);
+
+    /// <summary>The startup update check's "a new version is available" popup. True to install and restart now; false to leave it for File &gt; Options &gt; Updates later.</summary>
+    Task<bool> AskInstallUpdateAsync(string version, string? notes);
 }

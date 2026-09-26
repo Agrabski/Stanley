@@ -34,6 +34,17 @@ public sealed class FakeFileDialogs : IFileDialogs
     }
 
     public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult(SvgEditorAnswer);
+
+    public Queue<bool> InstallUpdateAnswers { get; } = new();
+    public int InstallUpdatePrompts { get; private set; }
+    public string? LastUpdateVersionOffered { get; private set; }
+
+    public Task<bool> AskInstallUpdateAsync(string version, string? notes)
+    {
+        InstallUpdatePrompts++;
+        LastUpdateVersionOffered = version;
+        return Task.FromResult(InstallUpdateAnswers.Count > 0 ? InstallUpdateAnswers.Dequeue() : false);
+    }
 }
 
 public sealed class MainWindowViewModelTests : IDisposable

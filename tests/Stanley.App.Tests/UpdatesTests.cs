@@ -228,4 +228,63 @@ public sealed class UpdatesTests : IDisposable
 
         Assert.Equal(0, _scheduler.PendingCount);
     }
+
+    // ---------------------------------------------------------------- startup popup
+
+    [Fact]
+    public void AutoCheckForUpdates_OnStartup_FindsOne_PopsUpAnOffer_AndAcceptingInstalls()
+    {
+        var settings = new AppSettings(null) { AutoCheckForUpdates = true };
+        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
+        var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", "Notes") };
+        _dialogs.InstallUpdateAnswers.Enqueue(true);
+
+        _ = NewViewModel(updates, settings, tokenStore);
+        _scheduler.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, _dialogs.InstallUpdatePrompts);
+        Assert.Equal("0.9.0", _dialogs.LastUpdateVersionOffered);
+        Assert.Equal(1, updates.InstallCount);
+    }
+
+    [Fact]
+    public void AutoCheckForUpdates_OnStartup_FindsOne_DecliningLeavesItUninstalled()
+    {
+        var settings = new AppSettings(null) { AutoCheckForUpdates = true };
+        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
+        var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", null) };
+        _dialogs.InstallUpdateAnswers.Enqueue(false);
+
+        var vm = NewViewModel(updates, settings, tokenStore);
+        _scheduler.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, _dialogs.InstallUpdatePrompts);
+        Assert.Equal(0, updates.InstallCount);
+        Assert.True(vm.HasUpdateAvailable); // still offered from File > Options
+    }
+
+    [Fact]
+    public void AutoCheckForUpdates_OnStartup_FindsNothing_DoesNotPopUp()
+    {
+        var settings = new AppSettings(null) { AutoCheckForUpdates = true };
+        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
+        var updates = new FakeUpdateService();
+
+        _ = NewViewModel(updates, settings, tokenStore);
+        _scheduler.Advance(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(0, _dialogs.InstallUpdatePrompts);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_ManualCheck_NeverPopsUp()
+    {
+        var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", "Notes") };
+        var vm = NewViewModel(updates);
+        vm.GithubToken = "ghp_abc123";
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, _dialogs.InstallUpdatePrompts);
+    }
 }
