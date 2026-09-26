@@ -191,14 +191,14 @@ public static class Lettering
     public readonly record struct TextRun(string Text, SKFont Font);
 
     /// <summary>
-    /// Splits <paramref name="text"/> into <see cref="TextRun"/>s, each in the first font that
-    /// can draw it: <paramref name="font"/> itself where it has the glyph, and - character by
-    /// character where it doesn't - the system's best match
-    /// (<see cref="SKFontManager.MatchCharacter(int)"/>) for the emoji and symbols most
-    /// lettering fonts lack. Falls back to <paramref name="font"/> itself (its own
-    /// missing-glyph box) when nothing installed has the character either, so this never
-    /// throws. Used by prints; bubbles and free text draw in one font throughout and don't
-    /// call this.
+    /// Splits <paramref name="text"/> into <see cref="TextRun"/>s, each in a font that can draw
+    /// it, a grapheme cluster at a time (so ❤️ with its variation selector, a skin tone or a
+    /// family joined with zero-width joiners stays one piece): an emoji in the system's colour
+    /// emoji font when there is one; anything else in <paramref name="font"/> where it has the
+    /// glyph, or the system's best match (<see cref="SKFontManager.MatchCharacter(int)"/>) for
+    /// the symbols most lettering fonts lack. Falls back to <paramref name="font"/> itself (its
+    /// own missing-glyph box) when nothing installed has the character, so this never throws.
+    /// Used by prints; bubbles and free text draw in one font throughout and don't call this.
     /// </summary>
     public static IReadOnlyList<TextRun> FallbackRuns(string text, SKFont font)
     {
@@ -207,24 +207,62 @@ public static class Lettering
         var runs = new List<TextRun>();
         var start = 0;
         SKTypeface? currentFace = null;
-        var i = 0;
-        while (i < text.Length)
+        var clusters = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+        while (clusters.MoveNext())
         {
-            Rune.DecodeFromUtf16(text.AsSpan(i), out var rune, out var consumed);
-            var face = font.ContainsGlyph(rune.Value) ? font.Typeface : SKFontManager.Default.MatchCharacter(rune.Value) ?? font.Typeface;
-            if (currentFace is null)
-                currentFace = face;
-            else if (face != currentFace)
+            var cluster = (string)clusters.Current;
+            var index = clusters.ElementIndex;
+            var face = FaceFor(cluster, font);
+            if (currentFace is not null && face != currentFace)
             {
-                runs.Add(new TextRun(text[start..i], RunFont(currentFace, font)));
-                start = i;
-                currentFace = face;
+                runs.Add(new TextRun(text[start..index], RunFont(currentFace, font)));
+                start = index;
             }
-            i += consumed;
+            currentFace = face;
         }
         if (currentFace is not null)
             runs.Add(new TextRun(text[start..], RunFont(currentFace, font)));
         return runs;
+    }
+
+    private static readonly Dictionary<int, SKTypeface?> FallbackFaces = [];
+    private static SKTypeface? _emojiFace;
+    private static bool _emojiLooked;
+
+    /// <summary>The typeface one grapheme cluster draws in (see <see cref="FallbackRuns"/>).</summary>
+    private static SKTypeface FaceFor(string cluster, SKFont font)
+    {
+        Rune.DecodeFromUtf16(cluster, out var first, out _);
+        var cp = first.Value;
+        if (IsEmoji(cluster, cp) && EmojiFace() is { } emoji && emoji.ContainsGlyph(cp))
+            return emoji;
+        if (font.ContainsGlyph(cp))
+            return font.Typeface;
+        lock (Gate)
+        {
+            if (!FallbackFaces.TryGetValue(cp, out var match))
+                FallbackFaces[cp] = match = SKFontManager.Default.MatchCharacter(cp);
+            return match ?? font.Typeface;
+        }
+    }
+
+    /// <summary>A cluster that reads as an emoji: asked for as one (a variation selector, a joiner), or a pictograph that normally is one.</summary>
+    private static bool IsEmoji(string cluster, int cp) =>
+        cluster.Contains('\uFE0F') || cluster.Contains('\u200D') || cp >= 0x1F000
+        || cp is >= 0x2300 and <= 0x23FF or >= 0x2600 and <= 0x27BF or >= 0x2B00 and <= 0x2BFF;
+
+    /// <summary>The system's colour emoji font (Noto Color Emoji, Segoe UI Emoji, Apple Color Emoji...), asked for by emoji presentation; null if there's none.</summary>
+    private static SKTypeface? EmojiFace()
+    {
+        lock (Gate)
+        {
+            if (!_emojiLooked)
+            {
+                _emojiLooked = true;
+                _emojiFace = SKFontManager.Default.MatchCharacter(null, SKFontStyle.Normal, ["und-Zsye"], 0x1F600);
+            }
+            return _emojiFace;
+        }
     }
 
     private static SKFont RunFont(SKTypeface typeface, SKFont like) =>

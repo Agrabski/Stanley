@@ -489,7 +489,7 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="x:String">
-                  <Button Classes="small" Padding="2,0" Content="{Binding}" ToolTip.Tip="Add it to the text"
+                  <Button Classes="small" Padding="2,0" Content="{Binding}" FontSize="15" FontFamily="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji" ToolTip.Tip="Add it to the text"
                           Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).InsertEmojiCommand}" CommandParameter="{Binding}" />
                 </DataTemplate>
               </ItemsControl.ItemTemplate>

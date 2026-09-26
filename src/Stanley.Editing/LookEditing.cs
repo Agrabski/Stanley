@@ -322,6 +322,9 @@ public static class TextPrints
     /// <summary>Off-white, like the library's skull: it reads on most shirts, and the "print" colour slot changes it.</summary>
     public static ColorValue DefaultColor { get; } = ColorValue.FromHex("#f4f4f4");
 
+    /// <summary>Where a text print goes when the shirt already has a print on the chest: under it, like the words under a logo.</summary>
+    public static Point2D BelowAnotherPrint { get; } = new(0, 115);
+
     /// <summary>What the Prints gallery's "Text" button puts on first - there to type over.</summary>
     public const string DefaultText = "HELLO";
 
@@ -330,9 +333,10 @@ public static class TextPrints
     /// part, pinned on the chest, named after the text. It needs no art files - font
     /// fallback at draw time handles emoji and symbols the chosen font lacks.
     /// </summary>
-    public static StickerAsset New(string text)
+    /// <param name="offset">Where it sits from the chest, in template units - e.g. <see cref="BelowAnotherPrint"/>.</param>
+    public static StickerAsset New(string text, Point2D? offset = null)
     {
-        var part = new StickerPart("print", BodyRegion.Torso, Art: new PartArt(ArtMapping.Pin, KeepReadable: true), Clip: PartClip.Clothes, Text: new PartText(text));
+        var part = new StickerPart("print", BodyRegion.Torso, Art: new PartArt(ArtMapping.Pin, Offset: offset, KeepReadable: true), Clip: PartClip.Clothes, Text: new PartText(text));
         var sticker = new Sticker(StickerId.New(), text.Trim().Length == 0 ? "Text" : text.Trim(), StickerSlots.Print,
             [part], new SortedDictionary<string, ColorValue> { [ColorSlot] = DefaultColor }, [Sticker.DefaultVariant]);
         return new StickerAsset(sticker, new Dictionary<string, ArtFile>());

@@ -431,6 +431,9 @@ internal static class StickerArtPieces
     /// <summary>Template units a print's text sizes at by default - the size slider scales it from there.</summary>
     private const float PrintFontSize = 70;
 
+    /// <summary>How wide a print's text may be before it shrinks, in <see cref="StickerImport.RegionBox"/> sizes (on the torso that box is 45% of the chest, so about 70% of it).</summary>
+    private const double PrintFitWidth = 1.55;
+
     /// <summary>
     /// The text piece(s) a text part paints (docs/sticker-system.md, prints) - one per side
     /// for a part on a limb, like <see cref="Map"/>, but laid out from <paramref name="text"/>
@@ -447,14 +450,15 @@ internal static class StickerArtPieces
         var runs = Lettering.FallbackRuns(text.Text, font);
         var bounds = Lettering.MeasureFallback(runs, paint);
         var color = FigureGeometry.ToSk(look.Color(text.Color, ColorValue.FromHex("#1a1a1a")));
-        var (centreP, _) = StickerImport.RegionBox(figure.Angle, part.Region);
+        var (centreP, size) = StickerImport.RegionBox(figure.Angle, part.Region);
         var centre = new SKPoint((float)centreP.X, (float)centreP.Y);
+        // Longer text shrinks to fit across the chest (about 70% of it) before Size scales it.
+        var fit = bounds.Width > 0 ? (float)Math.Min(1, size * PrintFitWidth / bounds.Width) : 1f;
         var adjust = SKMatrix.CreateTranslation(-centre.X, -centre.Y)
             .PostConcat(SKMatrix.CreateScale((float)(art.Scale ?? 1), (float)(art.Scale ?? 1)))
             .PostConcat(SKMatrix.CreateRotationDegrees((float)(art.Rotation ?? 0)))
             .PostConcat(SKMatrix.CreateTranslation(centre.X + (float)(art.Offset?.X ?? 0), centre.Y + (float)(art.Offset?.Y ?? 0)));
         var pinned = new Point2D(centre.X + (art.Offset?.X ?? 0), centre.Y + (art.Offset?.Y ?? 0));
-        var baseline = new SKPoint(centre.X - bounds.MidX, centre.Y - bounds.MidY);
 
         IEnumerable<LimbSide> sides = part.Region is BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot
             ? part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right]
@@ -462,7 +466,10 @@ internal static class StickerArtPieces
         foreach (var side in sides)
         {
             var pinMatrix = adjust.PostConcat(RegionMapping.Pin(figure, part.Region, side, part.Side, pinned));
-            var matrix = SKMatrix.CreateTranslation(baseline.X, baseline.Y).PostConcat(pinMatrix);
+            var matrix = SKMatrix.CreateTranslation(-bounds.MidX, -bounds.MidY)
+                .PostConcat(SKMatrix.CreateScale(fit, fit))
+                .PostConcat(SKMatrix.CreateTranslation(centre.X, centre.Y))
+                .PostConcat(pinMatrix);
             var anchor = art.KeepReadable == true ? pinMatrix.MapPoint((float)pinned.X, (float)pinned.Y) : (SKPoint?)null;
             yield return (side, matrix, runs, color, bounds, anchor);
         }

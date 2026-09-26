@@ -116,7 +116,8 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>The Prints gallery's "Text" button: wears a new text print, selected so its text can be typed over at once on the Sticker tab.</summary>
     private void WearText(string text)
     {
-        var asset = TextPrints.New(text);
+        var chestTaken = Working.Stickers.TryGetValue(StickerSlots.Print, out var worn) && worn.Count > 0;
+        var asset = TextPrints.New(text, chestTaken ? TextPrints.BelowAnotherPrint : null);
         ApplyLook(c => LookEditing.Wear(c, asset));
         SelectSticker(asset.Id);
         TextPrintWorn?.Invoke(this, EventArgs.Empty);
@@ -360,7 +361,13 @@ public sealed partial class CharacterEditorViewModel
     public WornStickerItem? SelectedWorn
     {
         get => WornStickers.FirstOrDefault(w => w.Id == _selectedSticker);
-        set => SelectSticker(value?.Id);
+        // The list has no "none" to pick: a null is the list refreshing under it (a text print
+        // renamed as it's typed over), not a choice - Done and the stage let go instead.
+        set
+        {
+            if (value is not null)
+                SelectSticker(value.Id);
+        }
     }
 
     public void SelectSticker(StickerId? id)
