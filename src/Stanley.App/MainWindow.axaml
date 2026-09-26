@@ -56,13 +56,13 @@
               </ToggleSwitch.Resources>
             </ToggleSwitch>
             <Rectangle Width="1" Height="16" Fill="#50FFFFFF" Margin="6,0" VerticalAlignment="Center" />
-            <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
+            <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save" editors:Shortcut.Keys="Ctrl+S">
               <PathIcon Data="{StaticResource SaveIcon}" />
             </Button>
-            <Button Name="QuickUndoButton" Classes="qat" Command="{Binding UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
+            <Button Name="QuickUndoButton" Classes="qat" Command="{Binding UndoCommand}" ToolTip.Tip="Undo" editors:Shortcut.Keys="Ctrl+Z">
               <PathIcon Data="{StaticResource UndoIcon}" />
             </Button>
-            <Button Name="QuickRedoButton" Classes="qat" Command="{Binding RedoCommand}" ToolTip.Tip="Redo (Ctrl+Y)">
+            <Button Name="QuickRedoButton" Classes="qat" Command="{Binding RedoCommand}" ToolTip.Tip="Redo" editors:Shortcut.Keys="Ctrl+Y">
               <PathIcon Data="{StaticResource RedoIcon}" />
             </Button>
           </StackPanel>
@@ -110,12 +110,27 @@
             </ContentControl.DataTemplates>
           </ContentControl>
           <Button Name="FileButton" Classes="fileTab" Command="{Binding OpenBackstageCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"
-                  ToolTip.Tip="New, open, save, export (Alt+F)">File</Button>
+                  ToolTip.Tip="New, open, save, export" editors:Shortcut.Keys="Alt+F">File</Button>
         </Grid>
       </Border>
 
       <dock:DockControl x:Name="EditorDock" />
     </DockPanel>
+
+    <!-- After File › Export: what was written, and the two things you usually want next - open it, or find it in its folder. -->
+    <Border Name="ExportNotice" Classes="toast" IsVisible="{Binding HasExportNotice}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,40">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <PathIcon Data="{StaticResource CheckIcon}" Width="16" Height="16" Foreground="#2E8B57" VerticalAlignment="Center" />
+        <TextBlock Name="ExportNoticeText" Text="{Binding ExportNoticeText}" VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding ExportedPath}" />
+        <Button Name="OpenExportButton" Classes="accent" Content="Open" Command="{Binding OpenExportCommand}" ToolTip.Tip="Open it in the app your computer uses for this kind of file" />
+        <Button Name="ShowExportInFolderButton" Content="Show in folder" Command="{Binding ShowExportInFolderCommand}" ToolTip.Tip="See it in its folder" />
+        <Button Name="DismissExportNoticeButton" Command="{Binding DismissExportNoticeCommand}" Background="Transparent" Padding="6" VerticalAlignment="Center"
+                ToolTip.Tip="Close">
+          <PathIcon Data="{StaticResource CloseIcon}" Width="10" Height="10" />
+        </Button>
+      </StackPanel>
+    </Border>
 
     <app:Backstage Name="BackstageView" IsVisible="{Binding IsBackstageOpen}" />
   </Grid>

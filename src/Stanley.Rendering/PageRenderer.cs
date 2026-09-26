@@ -21,6 +21,9 @@ public static class PageRenderer
     public const float FontSizeMm = (float)(ProjectModel.Bubbles.Bubble.DefaultFontSizePt * ProjectModel.Issues.FontPoints.MmPerPoint);
     public const float BubbleStrokeMm = 0.35f;
     public const float PanelBorderMm = 0.7f;
+
+    /// <summary>The usual panel border's colour, black ink - a panel's <see cref="Panel.BorderStyle"/> can say otherwise.</summary>
+    public static readonly ColorValue PanelBorderColor = ColorValue.FromHex("#000000");
     public const float TailBaseHalfWidthMm = 2.5f;
     public const float CharacterStrokeMm = 0.45f;
 
@@ -104,8 +107,22 @@ public static class PageRenderer
                     SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
 
-            if (!panel.Borderless)
+            if (panel.Borderless)
+                continue;
+            if (panel.BorderStyle is { } style)
+            {
+                using var styled = new SKPaint
+                {
+                    Color = FigureGeometry.ToSk(style.Color), Style = SKPaintStyle.Stroke, StrokeWidth = (float)style.WidthMm, IsAntialias = true,
+                    StrokeJoin = SKStrokeJoin.Miter
+                };
+                using var dash = LinePatterns.Apply(styled, style.Dash);
+                canvas.DrawPath(path, styled);
+            }
+            else
+            {
                 canvas.DrawPath(path, border);
+            }
         }
     }
 

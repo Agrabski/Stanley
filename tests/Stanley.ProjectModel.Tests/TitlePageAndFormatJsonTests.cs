@@ -32,6 +32,17 @@ public sealed class TitlePageAndFormatJsonTests : IDisposable
     }
 
     [Fact]
+    public void A_panels_border_style_is_written_only_when_it_has_one_and_round_trips()
+    {
+        var plain = ProjectJson.Serialize(APanel());
+        var styled = APanel() with { BorderStyle = new PanelBorderStyle(ColorValue.FromHex("#c00000"), 1.4, LineDash.Dash) };
+
+        Assert.DoesNotContain("borderStyle", plain, StringComparison.Ordinal);
+        Assert.Null(ProjectJson.Deserialize<Panel>(plain).BorderStyle);
+        Assert.Equal(styled.BorderStyle, ProjectJson.Deserialize<Panel>(ProjectJson.Serialize(styled)).BorderStyle);
+    }
+
+    [Fact]
     public void Only_the_title_page_is_marked()
     {
         var page = new Page(PageId.New(), "Page 2", null, [PanelId.New()]);

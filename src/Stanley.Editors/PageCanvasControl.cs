@@ -62,6 +62,11 @@ public sealed class PageCanvasControl : Control
 
     private GutterHit? _hoverGutter;
     private PanelId? _hoverPanelId;
+    private Hit? _hoverHit;
+    private bool _altHeld;
+
+    /// <summary>The drag is moving a copy (Alt+drag) rather than the thing itself.</summary>
+    private bool _duplicating;
 
     private readonly Dictionary<StandardCursorType, Cursor> _cursors = new();
 
@@ -821,6 +826,7 @@ public sealed class PageCanvasControl : Control
         var pos = e.GetPosition(this);
         var page = ControlToPage(pos);
 
+        _altHeld = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
         if (_drag == DragKind.None)
         {
             UpdateHover(page);
@@ -829,15 +835,22 @@ public sealed class PageCanvasControl : Control
 
         var dx = page.X - _pressPage.X;
         var dy = page.Y - _pressPage.Y;
-        var snap = e.KeyModifiers.HasFlag(KeyModifiers.Alt) ? 0 : SnapDistancePx / _zoom;
+        var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
+        // Alt turns snapping off - except while Alt+dragging a copy, where it's busy duplicating.
+        var snap = alt && !_duplicating ? 0 : SnapDistancePx / _zoom;
         var beyondThreshold = Math.Abs(pos.X - _pressScreen.X) > DragThresholdPx || Math.Abs(pos.Y - _pressScreen.Y) > DragThresholdPx;
         _dragMoved |= beyondThreshold;
 
         switch (_drag)
         {
             case DragKind.PendingMoveBubble when beyondThreshold:
-                _viewModel.BeginMoveBubble(_dragPanelId!.Value, _dragBubbleIndex);
+                // Alt as the drag starts drags a copy away, leaving the original where it is.
+                if (alt && _viewModel.BeginDuplicateBubble(_dragPanelId!.Value, _dragBubbleIndex) is >= 0 and var bubbleCopy)
+                    (_dragBubbleIndex, _duplicating) = (bubbleCopy, true);
+                else
+                    _viewModel.BeginMoveBubble(_dragPanelId!.Value, _dragBubbleIndex);
                 _drag = DragKind.MoveBubble;
+                UpdateCursor(null);
                 goto case DragKind.MoveBubble;
 
             case DragKind.MoveBubble:
@@ -846,8 +859,12 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case DragKind.PendingMoveCharacter when beyondThreshold:
-                _viewModel.BeginMoveCharacter(_dragPanelId!.Value, _dragCharacterIndex);
+                if (alt && _viewModel.BeginDuplicateCharacter(_dragPanelId!.Value, _dragCharacterIndex) is >= 0 and var characterCopy)
+                    (_dragCharacterIndex, _duplicating) = (characterCopy, true);
+                else
+                    _viewModel.BeginMoveCharacter(_dragPanelId!.Value, _dragCharacterIndex);
                 _drag = DragKind.MoveCharacter;
+                UpdateCursor(null);
                 goto case DragKind.MoveCharacter;
 
             case DragKind.MoveCharacter:
@@ -876,8 +893,12 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case DragKind.PendingMovePanel when beyondThreshold:
-                _viewModel.BeginMovePanel(_dragPanelId!.Value);
+                if (alt && _viewModel.BeginDuplicatePanel(_dragPanelId!.Value) is { } panelCopy)
+                    (_dragPanelId, _duplicating) = (panelCopy, true);
+                else
+                    _viewModel.BeginMovePanel(_dragPanelId!.Value);
                 _drag = DragKind.MovePanel;
+                UpdateCursor(null);
                 goto case DragKind.MovePanel;
 
             case DragKind.MovePanel:
@@ -925,8 +946,12 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case DragKind.PendingMoveElement when beyondThreshold:
-                _viewModel.BeginMoveElement(_dragPanelId!.Value, _dragElementIndex);
+                if (alt && _viewModel.BeginDuplicateElement(_dragPanelId!.Value, _dragElementIndex) is >= 0 and var elementCopy)
+                    (_dragElementIndex, _duplicating) = (elementCopy, true);
+                else
+                    _viewModel.BeginMoveElement(_dragPanelId!.Value, _dragElementIndex);
                 _drag = DragKind.MoveElement;
+                UpdateCursor(null);
                 goto case DragKind.MoveElement;
 
             case DragKind.MoveElement:
@@ -1031,6 +1056,7 @@ public sealed class PageCanvasControl : Control
         }
 
         _dragPanelId = null;
+        _duplicating = false;
         _dragBubbleIndex = -1;
         _dragTailIndex = -1;
         _dragCharacterIndex = -1;
@@ -1065,6 +1091,7 @@ public sealed class PageCanvasControl : Control
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
+        _hoverHit = null;
         if (_hoverGutter != null || _hoverPanelId != null)
         {
             _hoverGutter = null;
@@ -1087,6 +1114,7 @@ public sealed class PageCanvasControl : Control
             _hoverPanelId = panel;
             InvalidateVisual();
         }
+        _hoverHit = hit;
         UpdateCursor(hit);
     }
 
@@ -1137,6 +1165,23 @@ public sealed class PageCanvasControl : Control
             case Key.Space:
                 _spaceHeld = true;
                 UpdateCursor(null);
+                break;
+            case Key.LeftAlt or Key.RightAlt:
+                // Alt over something that can be Alt+dragged shows the copy cursor straight away.
+                _altHeld = true;
+                UpdateCursor(_drag == DragKind.None ? _hoverHit : null);
+                return;
+            case Key.C when ctrl && _drag == DragKind.None:
+                vm.Copy();
+                break;
+            case Key.X when ctrl && _drag == DragKind.None:
+                vm.Cut();
+                break;
+            case Key.V when ctrl && _drag == DragKind.None:
+                vm.Paste();
+                break;
+            case Key.D when ctrl && _drag == DragKind.None:
+                vm.Duplicate();
                 break;
             case Key.D0 or Key.NumPad0 when ctrl:
                 FitPage();
@@ -1198,6 +1243,11 @@ public sealed class PageCanvasControl : Control
             UpdateCursor(null);
             e.Handled = true;
         }
+        else if (e.Key is Key.LeftAlt or Key.RightAlt)
+        {
+            _altHeld = false;
+            UpdateCursor(_drag == DragKind.None ? _hoverHit : null);
+        }
     }
 
     // ---------------------------------------------------------------- context menu
@@ -1221,6 +1271,7 @@ public sealed class PageCanvasControl : Control
         {
             var index = hit.BubbleIndex;
             vm.Select(bubblePanel, index);
+            items.AddRange(ClipboardItems(vm));
             items.Add(Item("Edit text", () => _viewModel!.RequestTextEdit(bubblePanel, index), "Enter"));
             var styles = new MenuItem { Header = "Style" };
             styles.ItemsSource = Enum.GetValues<BubbleStylePreset>()
@@ -1244,6 +1295,7 @@ public sealed class PageCanvasControl : Control
         {
             var index = hit.ElementIndex;
             vm.SelectElement(elementPanel, index);
+            items.AddRange(ClipboardItems(vm));
             var element = vm.Working.Panels[elementPanel].Elements[index];
             if (element is ProjectModel.Issues.TextElement)
             {
@@ -1302,6 +1354,7 @@ public sealed class PageCanvasControl : Control
         {
             var index = hit.CharacterIndex;
             vm.SelectCharacter(characterPanel, index);
+            items.AddRange(ClipboardItems(vm));
             if (vm.EditCharacterCommand.CanExecute(null))
                 items.Add(Item("Edit character…", () => vm.EditCharacterCommand.Execute(null)));
             var side = vm.SelectedCharacterView == ProjectModel.Geometry.ViewAngle.Profile;
@@ -1353,6 +1406,12 @@ public sealed class PageCanvasControl : Control
         else if (PanelAt(page) is { } lockedPanelId && vm.Working.LayoutLocked)
         {
             vm.ClearSelection();
+            if (vm.CanPaste)
+            {
+                // A locked layout's panels can't be selected, so paste into the one that was right-clicked.
+                items.Add(Item("Paste", () => vm.PasteInto(lockedPanelId), "Ctrl+V"));
+                items.Add(new Separator());
+            }
             var at = page;
             items.Add(Item("Add bubble here", () =>
             {
@@ -1369,6 +1428,7 @@ public sealed class PageCanvasControl : Control
         else if (PanelAt(page) is { } panelId)
         {
             vm.Select(panelId);
+            items.AddRange(ClipboardItems(vm));
             var at = page;
             items.Add(Item("Add bubble here", () =>
             {
@@ -1379,6 +1439,11 @@ public sealed class PageCanvasControl : Control
             items.Add(AddTextItem(vm, panelId, at));
             items.Add(BackgroundMenu(vm, panelId));
             items.Add(BorderItem(vm, panelId));
+            // The panel as Shape Fill and Shape Outline see it: its background colour and its border.
+            var style = vm.CurrentPanelStyle;
+            items.Add(ColorMenu("Shape Fill", new ColorMenuOptions(vm.SetPanelFillCommand, "No Fill", "More Fill Colors…", style.Fill)));
+            items.Add(ColorMenu("Shape Outline", new ColorMenuOptions(vm.SetPanelOutlineCommand, "No Outline", "More Outline Colors…", style.Stroke,
+                vm.SetPanelOutlineWeightCommand, style.StrokeWidthMm, vm.SetPanelOutlineDashCommand, style.Dash)));
             items.Add(new Separator());
             items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
             items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
@@ -1388,6 +1453,11 @@ public sealed class PageCanvasControl : Control
         else
         {
             vm.ClearSelection();
+            if (vm.CanPaste)
+            {
+                items.Add(Item("Paste", () => vm.Paste(), "Ctrl+V"));
+                items.Add(new Separator());
+            }
             var layouts = new MenuItem { Header = "Page layout" };
             layouts.ItemsSource = PanelLayoutPresets.All.Select(preset => Item(preset.Name, () => vm.ApplyLayoutPreset(preset))).ToList();
             items.Add(layouts);
@@ -1395,6 +1465,21 @@ public sealed class PageCanvasControl : Control
             items.Add(Item("Actual size", ActualSize, "Ctrl+1"));
         }
         return items;
+    }
+
+    /// <summary>Word's Cut, Copy and Paste - and Duplicate - for what the menu was opened on (already selected), then a separator.</summary>
+    private static IEnumerable<Control> ClipboardItems(PageEditorViewModel vm)
+    {
+        var paste = Item("Paste", () => vm.Paste(), "Ctrl+V");
+        paste.IsEnabled = vm.CanPaste;
+        return
+        [
+            Item("Cut", () => vm.Cut(), "Ctrl+X"),
+            Item("Copy", () => vm.Copy(), "Ctrl+C"),
+            paste,
+            Item("Duplicate", () => vm.Duplicate(), "Ctrl+D"),
+            new Separator()
+        ];
     }
 
     private static MenuItem AddTextItem(PageEditorViewModel vm, PanelId panelId, Point2D at) => Item("Add text here", () =>
@@ -1454,6 +1539,8 @@ public sealed class PageCanvasControl : Control
             type = StandardCursorType.Cross;
         else if (vm.Tool == PageEditorTool.Text)
             type = StandardCursorType.Ibeam;
+        else if (_duplicating || _drag == DragKind.None && _altHeld && hit is not null && CanDuplicate(hit))
+            type = StandardCursorType.DragCopy;
         else if (hit == null)
             type = _drag is DragKind.MoveBubble or DragKind.MovePanel or DragKind.MoveCharacter or DragKind.MoveElement ? StandardCursorType.SizeAll : StandardCursorType.Arrow;
         else
@@ -1467,6 +1554,7 @@ public sealed class PageCanvasControl : Control
                 _ => StandardCursorType.Arrow
             };
 
+        CursorType = type;
         if (!_cursors.TryGetValue(type, out var cursor))
         {
             try
@@ -1481,6 +1569,17 @@ public sealed class PageCanvasControl : Control
         }
         Cursor = cursor;
     }
+
+    /// <summary>Whether an Alt+drag on <paramref name="hit"/> would drag a copy of it away (what the copy cursor promises).</summary>
+    private bool CanDuplicate(Hit hit) => hit.Kind switch
+    {
+        HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody => true,
+        HitKind.PanelBody => !_viewModel!.Working.LayoutLocked,
+        _ => false
+    };
+
+    /// <summary>The cursor showing now, for headless UI tests (which have no real cursor to look at).</summary>
+    public StandardCursorType CursorType { get; private set; } = StandardCursorType.Arrow;
 
     private static StandardCursorType EdgeCursor(RectEdges edges) => edges switch
     {

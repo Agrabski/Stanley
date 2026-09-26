@@ -58,6 +58,11 @@
     <StreamGeometry x:Key="WhisperIcon">M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z</StreamGeometry>
     <StreamGeometry x:Key="AddBubbleIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z M11,7 V10 H8 V12 H11 V15 H13 V12 H16 V10 H13 V7 Z</StreamGeometry>
     <StreamGeometry x:Key="TextIcon">M4,3 H20 V8 H18 V5 H13 V19 H16 V21 H8 V19 H11 V5 H6 V8 H4 Z</StreamGeometry>
+    <StreamGeometry x:Key="PasteIcon">M5,4 H8 V6 H16 V4 H19 C19.6,4 20,4.4 20,5 V21 C20,21.6 19.6,22 19,22 H5 C4.4,22 4,21.6 4,21 V5 C4,4.4 4.4,4 5,4 Z M6,8 V20 H18 V8 Z M9,2 H15 V5.5 H9 Z M8,10 H16 V12 H8 Z M8,14 H14 V16 H8 Z</StreamGeometry>
+    <StreamGeometry x:Key="CutIcon">F1 M2.5,18 A3.5,3.5 0 1 1 9.5,18 A3.5,3.5 0 1 1 2.5,18 Z M4.2,18 A1.8,1.8 0 1 0 7.8,18 A1.8,1.8 0 1 0 4.2,18 Z M14.5,18 A3.5,3.5 0 1 1 21.5,18 A3.5,3.5 0 1 1 14.5,18 Z M16.2,18 A1.8,1.8 0 1 0 19.8,18 A1.8,1.8 0 1 0 16.2,18 Z M8,15.5 L17.5,2 L19,3 L10,16.5 Z M16,15.5 L14,16.5 L5,3 L6.5,2 Z</StreamGeometry>
+    <StreamGeometry x:Key="CopyIcon">M8,2 H20 V16 H18 V4 H8 Z M4,6 H16 V22 H4 Z M6,8 V20 H14 V8 Z</StreamGeometry>
+    <StreamGeometry x:Key="DuplicateIcon">M8,3 H21 V16 H19 V5 H8 Z M3,8 H16 V21 H3 Z M5,10 V19 H14 V10 Z M8.5,11.5 H10.5 V13.5 H12.5 V15.5 H10.5 V17.5 H8.5 V15.5 H6.5 V13.5 H8.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="CheckIcon">M9,16.2 L4.8,12 L3.4,13.4 L9,19 L21,7 L19.6,5.6 Z</StreamGeometry>
     <StreamGeometry x:Key="DeleteIcon">M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z</StreamGeometry>
     <StreamGeometry x:Key="ColumnsIcon">M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z</StreamGeometry>
     <StreamGeometry x:Key="RowsIcon">M3,2 H21 V11 H3 Z M3,13 H21 V22 H3 Z</StreamGeometry>
@@ -312,6 +317,15 @@
         </DockPanel>
       </DataTemplate>
     </Setter>
+  </Style>
+  <!-- The note after File › Export (and anything like it): a card over the corner of the page, above the status bar. -->
+  <Style Selector="Border.toast">
+    <Setter Property="Background" Value="{DynamicResource StanleyBackstageBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyThumbBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="BoxShadow" Value="0 4 16 0 #40000000" />
   </Style>
   <Style Selector="StackPanel.tabContent">
     <Setter Property="Orientation" Value="Horizontal" />

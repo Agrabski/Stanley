@@ -125,11 +125,11 @@ public partial class CharacterLibraryView : UserControl
 			ItemsSource = new Control[]
 			{
 				Item("Rename", () => item.IsEditingName = true),
-				Item("Edit body", () => vm.Show(item)),
+				Item("Edit body", () => vm.Show(item), gesture: "Enter"),
 				Item("Place on page", () => vm.PlaceOnPageCommand.Execute(item)),
 				new Separator(),
 				Item("Duplicate", () => vm.DuplicateCharacterCommand.Execute(item)),
-				Item(item.Usage > 0 ? "Delete (remove it from its panels first)" : "Delete", () => vm.DeleteCharacterCommand.Execute(item), item.Usage == 0),
+				Item(item.Usage > 0 ? "Delete (remove it from its panels first)" : "Delete", () => vm.DeleteCharacterCommand.Execute(item), item.Usage == 0, "Delete"),
 			}
 		};
 		menu.Open(CharacterList);
@@ -153,9 +153,9 @@ public partial class CharacterLibraryView : UserControl
 		}
 	}
 
-	private static MenuItem Item(string header, Action action, bool enabled = true)
+	private static MenuItem Item(string header, Action action, bool enabled = true, string? gesture = null)
 	{
-		var item = new MenuItem { Header = header, IsEnabled = enabled };
+		var item = new MenuItem { Header = header, IsEnabled = enabled, InputGesture = gesture is null ? null : KeyGesture.Parse(gesture) };
 		item.Click += (_, _) => action();
 		return item;
 	}

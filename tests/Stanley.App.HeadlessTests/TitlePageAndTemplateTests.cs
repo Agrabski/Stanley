@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using Stanley.Editing;
 using Stanley.Editors;
 using Stanley.ProjectModel.Geometry;
+using Stanley.ProjectModel.Issues;
 
 namespace Stanley.App.HeadlessTests;
 
@@ -86,6 +87,37 @@ public class TitlePageAndTemplateTests
         var captions = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("pageNumber")).Select(t => t.Text).ToList();
         Assert.Equal(["Title", "2"], captions);
         LookTabTests.Snapshot(window, "title-page");
+    }
+
+    /// <summary>Figma habits: click the title page's coloured band, pick Shape Fill - the band changes colour, not the pen for the next shape.</summary>
+    [Fact]
+    public void Clicking_the_title_pages_band_and_using_Shape_Fill_colours_the_band()
+    {
+        var window = Open();
+        var title = window.ViewModel.Navigator!.InsertTitlePage(TitlePageDesign.Banner).Editor;
+        Dispatcher.UIThread.RunJobs();
+        var band = title.Working.PanelOrder.First(id => title.Working.Panels[id].Background is ColorBackground);
+        var bounds = title.PanelBounds(band);
+        var canvas = window.GetVisualDescendants().OfType<PageCanvasControl>().First();
+        var at = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.Left + 5, bounds.MidY)), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(band, title.SelectedPanelId);
+        Assert.True(title.IsPanelContext);
+
+        ShowTab(window, "HomeTab");
+        var fill = Ribbon(window).GetVisualDescendants().OfType<ColorMenuButton>().Single(b => b.Name == "HomeShapeFillButton");
+        Assert.True(fill.IsEffectivelyEnabled);
+        fill.Button.RaiseEvent(new RoutedEventArgs(SplitButton.ClickEvent)); // the face: its colour
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(new ColorBackground(ColorValue.FromHex("#4472c4")), title.Working.Panels[band].Background);
+        Assert.Equal(ColorValue.FromHex("#4472c4"), fill.CurrentColor);
+
+        title.CreateBubble(band, new Point2D(bounds.MidX, bounds.MidY));
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(fill.IsEffectivelyEnabled); // a bubble has no Shape Fill
     }
 
     [Fact]
