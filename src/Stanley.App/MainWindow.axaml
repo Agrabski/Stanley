@@ -77,8 +77,12 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <Button Name="NewIssueButton" Classes="qat" Command="{Binding NewIssueCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Add a new issue">
-              <PathIcon Data="{StaticResource NewIcon}" />
+            <Button Name="NewIssueButton" Classes="qat" Command="{Binding NewIssueCommand}" IsVisible="{Binding HasDocument}" Width="NaN" Padding="6,0"
+                    ToolTip.Tip="Add a new issue to this comic - its own pages, the same characters">
+              <StackPanel Orientation="Horizontal" Spacing="5">
+                <PathIcon Data="{StaticResource NewIcon}" />
+                <TextBlock Text="New issue" Foreground="White" FontSize="12" VerticalAlignment="Center" />
+              </StackPanel>
             </Button>
           </StackPanel>
           <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right"

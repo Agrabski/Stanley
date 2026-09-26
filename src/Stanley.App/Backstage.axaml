@@ -133,7 +133,7 @@
             <TextBlock Grid.Row="1" Text="Issue" VerticalAlignment="Center" Opacity="0.7" />
             <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
               <TextBox Name="IssueNumberBox" Text="{Binding IssueNumber}" Width="80" ToolTip.Tip="The issue's number - 1, 0, 1.5 or whatever you print" />
-              <TextBox Name="IssueTitleBox" Text="{Binding IssueTitle}" Width="220" ToolTip.Tip="The issue's own title, if it has one - e.g. Annual" />
+              <TextBox Name="IssueTitleBox" Text="{Binding IssueTitle}" Width="220" PlaceholderText="Issue title (optional)" ToolTip.Tip="The issue's own title, if it has one - e.g. Annual" />
             </StackPanel>
             <TextBlock Grid.Row="2" Grid.Column="1" Text="Texts on the pages show these wherever they have {title} or {issue} - a title page does, and Text › Fields adds them to any text."
                        TextWrapping="Wrap" FontSize="12" Opacity="0.7" Margin="0,-6,0,0" />
