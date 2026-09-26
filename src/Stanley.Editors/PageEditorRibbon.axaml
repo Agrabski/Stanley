@@ -23,30 +23,56 @@
     <!-- ============================== HOME ============================== -->
     <TabItem Name="HomeTab" Header="Home">
       <StackPanel Classes="tabContent">
+        <!-- Word's Clipboard group: whatever is selected - a bubble, a character, a shape, text, a picture or a whole panel - with everything about it. -->
+        <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+            <Button Name="PasteButton" Classes="tool" Command="{Binding PasteCommand}" local:Shortcut.Keys="Ctrl+V"
+                    ToolTip.Tip="Paste what you copied - into the selected panel, stepped aside from anything in the same spot">
+              <StackPanel><PathIcon Data="{StaticResource PasteIcon}" /><TextBlock Text="Paste" /></StackPanel>
+            </Button>
+            <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="CutButton" Classes="small" Command="{Binding CutCommand}" local:Shortcut.Keys="Ctrl+X"
+                      ToolTip.Tip="Take what's selected off the page, to paste somewhere else" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource CutIcon}" /><TextBlock Text="Cut" /></StackPanel>
+              </Button>
+              <Button Name="CopyButton" Classes="small" Command="{Binding CopyCommand}" local:Shortcut.Keys="Ctrl+C"
+                      ToolTip.Tip="Copy what's selected, with its words, colours and pose - then paste it on any page" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource CopyIcon}" /><TextBlock Text="Copy" /></StackPanel>
+              </Button>
+              <Button Name="DuplicateButton" Classes="small" Command="{Binding DuplicateCommand}" local:Shortcut.Keys="Ctrl+D"
+                      ToolTip.Tip="A copy of what's selected, right beside it - or hold Alt and drag it to pull a copy away" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource DuplicateIcon}" /><TextBlock Text="Duplicate" /></StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Clipboard" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <RadioButton Name="SelectToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select, move and resize panels and bubbles (V)">
+                         IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select, move and resize panels and bubbles - hold Alt and drag to pull a copy away" local:Shortcut.Keys="V">
               <StackPanel><PathIcon Data="M5,2 L5,19 L9.5,14.5 L12.7,21.5 L15.3,20.3 L12.1,13.4 L18.5,13.4 Z" /><TextBlock Text="Select" /></StackPanel>
             </RadioButton>
             <RadioButton Name="PanelToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsPanelTool}" ToolTip.Tip="Draw a new panel by dragging on the page (P)">
+                         IsChecked="{Binding IsPanelTool}" ToolTip.Tip="Draw a new panel by dragging on the page" local:Shortcut.Keys="P">
               <StackPanel><PathIcon Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" /><TextBlock Text="Panel" /></StackPanel>
             </RadioButton>
             <RadioButton Name="BubbleToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsBubbleTool}" ToolTip.Tip="Click inside a panel to add a speech bubble (B)">
+                         IsChecked="{Binding IsBubbleTool}" ToolTip.Tip="Click inside a panel to add a speech bubble" local:Shortcut.Keys="B">
               <StackPanel><PathIcon Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z" /><TextBlock Text="Bubble" /></StackPanel>
             </RadioButton>
             <RadioButton Name="DrawToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsDrawTool}" ToolTip.Tip="Draw freehand inside a panel - end where you started to close and fill the shape (D)">
+                         IsChecked="{Binding IsDrawTool}" ToolTip.Tip="Draw freehand inside a panel - end where you started to close and fill the shape" local:Shortcut.Keys="D">
               <StackPanel><PathIcon Data="{StaticResource PenIcon}" /><TextBlock Text="Draw" /></StackPanel>
             </RadioButton>
             <RadioButton Name="TextToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsTextTool}" ToolTip.Tip="Click inside a panel to type a caption or other text there (T)">
+                         IsChecked="{Binding IsTextTool}" ToolTip.Tip="Click inside a panel to type a caption or other text there" local:Shortcut.Keys="T">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Text" /></StackPanel>
             </RadioButton>
             <RadioButton Name="PanToolButton" Classes="tool" GroupName="Tool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsPanTool}" ToolTip.Tip="Move around the page (H, or hold Space)">
+                         IsChecked="{Binding IsPanTool}" ToolTip.Tip="Move around the page - or hold Space and drag, with any tool" local:Shortcut.Keys="H">
               <StackPanel><PathIcon Data="M12,1 L15.5,4.5 H13 V11 H19.5 V8.5 L23,12 L19.5,15.5 V13 H13 V19.5 H15.5 L12,23 L8.5,19.5 H11 V13 H4.5 V15.5 L1,12 L4.5,8.5 V11 H11 V4.5 H8.5 Z" /><TextBlock Text="Pan" /></StackPanel>
             </RadioButton>
           </StackPanel>
@@ -78,13 +104,14 @@
 
         <DockPanel Classes="group">
           <StackPanel Spacing="2" Margin="0,4,0,0">
-            <local:ColorMenuButton Name="HomeShapeFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+            <!-- Like Word's and Figma's: they change what's selected - a shape, a text's box, a panel - and, with nothing selected, what you draw next. -->
+            <local:ColorMenuButton Name="HomeShapeFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4" IsEnabled="{Binding CanUseShapeStyles}"
                                    Command="{Binding SetFillColorCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentShapeStyle.Fill}"
-                                   ToolTip.Tip="Shape Fill - the colour inside the selected shape, and inside closed shapes you draw next" />
-            <local:ColorMenuButton Name="HomeShapeOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                   ToolTip.Tip="Shape Fill - the colour inside what's selected: a shape, the box behind a text, a panel (a title page's band too). With nothing selected, inside the closed shapes you draw next" />
+            <local:ColorMenuButton Name="HomeShapeOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000" IsEnabled="{Binding CanUseShapeStyles}"
                                    Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentShapeStyle.Stroke}"
                                    WeightCommand="{Binding SetStrokeWeightCommand}" CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}" DashCommand="{Binding SetStrokeDashCommand}" CurrentDash="{Binding CurrentShapeStyle.Dash}"
-                                   ToolTip.Tip="Shape Outline - the colour, weight and dashes of the selected shape's line, and of what you draw next" />
+                                   ToolTip.Tip="Shape Outline - the colour, weight and dashes of what's selected: a shape's line, a text's border, a panel's border. With nothing selected, of what you draw next" />
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Shape Styles" />
         </DockPanel>
@@ -95,10 +122,10 @@
             <Button Name="AddBubbleButton" Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to the selected panel and start typing">
               <StackPanel><PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" /></StackPanel>
             </Button>
-            <Button Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the selected bubble's or text's words (Enter, or double-click it)">
+            <Button Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the selected bubble's or text's words - or double-click it" local:Shortcut.Keys="Enter">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
             </Button>
-            <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete what's selected (Delete)">
+            <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete what's selected" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -160,7 +187,7 @@
 
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
-            <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}" ToolTip.Tip="Drag on the page to draw a new panel (P)">
+            <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}" ToolTip.Tip="Drag on the page to draw a new panel" local:Shortcut.Keys="P">
               <StackPanel><PathIcon Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" /><TextBlock Text="Panel" /></StackPanel>
             </Button>
           </StackPanel>
@@ -209,20 +236,20 @@
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <RadioButton Name="InsertDrawButton" Classes="tool" GroupName="InsertShapeTool" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsDrawTool}" ToolTip.Tip="Draw freehand inside a panel (D)">
+                         IsChecked="{Binding IsDrawTool}" ToolTip.Tip="Draw freehand inside a panel" local:Shortcut.Keys="D">
               <StackPanel><PathIcon Data="{StaticResource PenIcon}" /><TextBlock Text="Draw" /></StackPanel>
             </RadioButton>
             <StackPanel Spacing="1" VerticalAlignment="Center">
               <RadioButton Name="InsertLineButton" Classes="small" GroupName="InsertShapeTool" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsLineTool}"
-                           ToolTip.Tip="Drag to draw a straight line - Shift keeps it level or at 45° (L)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                           ToolTip.Tip="Drag to draw a straight line - Shift keeps it level or at 45°" local:Shortcut.Keys="L" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource LineIcon}" /><TextBlock Text="Line" /></StackPanel>
               </RadioButton>
               <RadioButton Name="InsertRectangleButton" Classes="small" GroupName="InsertShapeTool" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsRectangleTool}"
-                           ToolTip.Tip="Drag to draw a rectangle - Shift for a square (R)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                           ToolTip.Tip="Drag to draw a rectangle - Shift for a square" local:Shortcut.Keys="R" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource RectangleIcon}" /><TextBlock Text="Rectangle" /></StackPanel>
               </RadioButton>
               <RadioButton Name="InsertEllipseButton" Classes="small" GroupName="InsertShapeTool" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsEllipseTool}"
-                           ToolTip.Tip="Drag to draw an ellipse - Shift for a circle (E)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                           ToolTip.Tip="Drag to draw an ellipse - Shift for a circle" local:Shortcut.Keys="E" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource EllipseIcon}" /><TextBlock Text="Ellipse" /></StackPanel>
               </RadioButton>
             </StackPanel>
@@ -389,16 +416,16 @@
       <StackPanel Classes="tabContent">
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
-            <Button Classes="tool" Command="{Binding FitPageCommand}" ToolTip.Tip="Show the whole page (Ctrl+0)">
+            <Button Classes="tool" Command="{Binding FitPageCommand}" ToolTip.Tip="Show the whole page" local:Shortcut.Keys="Ctrl+0">
               <StackPanel><PathIcon Data="M3,3 H9 V5 H5 V9 H3 Z M15,3 H21 V9 H19 V5 H15 Z M3,15 H5 V19 H9 V21 H3 Z M19,15 H21 V21 H15 V19 H19 Z M8,8 H16 V16 H8 Z" /><TextBlock Text="Fit page" /></StackPanel>
             </Button>
-            <Button Classes="tool" Command="{Binding ActualSizeCommand}" ToolTip.Tip="Show the page at its printed size (Ctrl+1)">
+            <Button Classes="tool" Command="{Binding ActualSizeCommand}" ToolTip.Tip="Show the page at its printed size" local:Shortcut.Keys="Ctrl+1">
               <StackPanel><TextBlock Text="1:1" FontSize="15" FontWeight="SemiBold" Margin="0" /><TextBlock Text="Actual size" /></StackPanel>
             </Button>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-              <Button Classes="small" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out (Ctrl+−, or Ctrl+scroll)" FontSize="16">−</Button>
+              <Button Classes="small" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out - or Ctrl+scroll" local:Shortcut.Keys="Ctrl+−" FontSize="16">−</Button>
               <TextBlock Name="ZoomText" Width="52" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Text="{Binding ZoomText}" />
-              <Button Classes="small" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in (Ctrl++, or Ctrl+scroll)" FontSize="16">+</Button>
+              <Button Classes="small" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in - or Ctrl+scroll" local:Shortcut.Keys="Ctrl++" FontSize="16">+</Button>
             </StackPanel>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Zoom" />
@@ -412,6 +439,52 @@
             <CheckBox IsChecked="{Binding IsLayoutLocked}" Focusable="False" FontSize="12" Content="Lock layout" />
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Show" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+
+        <!-- Every shortcut in one place, like Figma's and Word's lists - the ones no button can show too (arrows, Space, keys held while dragging). -->
+        <DockPanel Classes="group">
+          <DropDownButton Name="ShortcutsButton" Classes="slotGallery" Width="92" local:Shortcut.Keys="F1"
+                          ToolTip.Tip="Every keyboard shortcut, on one page">
+            <StackPanel Spacing="2">
+              <PathIcon Data="{StaticResource KeyboardIcon}" Width="20" Height="20" />
+              <TextBlock Text="Shortcuts" FontSize="11" HorizontalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="wide">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="Keyboard shortcuts" FontWeight="SemiBold" />
+                  <ItemsControl Name="ShortcutGroups" ItemsSource="{x:Static local:PageShortcuts.All}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" MaxWidth="840" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:ShortcutGroup">
+                        <StackPanel Width="260" Margin="0,0,12,10" Spacing="3">
+                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+                          <ItemsControl ItemsSource="{Binding Entries}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="local:ShortcutEntry">
+                                <DockPanel Margin="0,1">
+                                  <Border Classes="shortcutKeys" DockPanel.Dock="Right" Background="#26808080" BorderBrush="#55808080" BorderThickness="1" CornerRadius="3"
+                                          Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Keys}" FontSize="11" Opacity="0.85" />
+                                  </Border>
+                                  <TextBlock Text="{Binding Does}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="Buttons and right-click menus show their shortcuts too - hover over a button to see its keys." FontSize="11" Opacity="0.7" />
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Help" />
         </DockPanel>
       </StackPanel>
     </TabItem>
@@ -444,6 +517,19 @@
         </DockPanel>
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+            <local:ColorMenuButton Name="PanelFillButton" Label="Shape Fill" Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                   Command="{Binding SetPanelFillCommand}" NoneLabel="No Fill" MoreLabel="More Fill Colors…" CurrentColor="{Binding CurrentPanelStyle.Fill}"
+                                   ToolTip.Tip="Shape Fill - this panel's background colour (No Fill: plain paper)" />
+            <local:ColorMenuButton Name="PanelOutlineButton" Label="Shape Outline" Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                   Command="{Binding SetPanelOutlineCommand}" NoneLabel="No Outline" MoreLabel="More Outline Colors…" CurrentColor="{Binding CurrentPanelStyle.Stroke}"
+                                   WeightCommand="{Binding SetPanelOutlineWeightCommand}" CurrentWeight="{Binding CurrentPanelStyle.StrokeWidthMm}" DashCommand="{Binding SetPanelOutlineDashCommand}" CurrentDash="{Binding CurrentPanelStyle.Dash}"
+                                   ToolTip.Tip="Shape Outline - this panel's border: its colour, weight and dashes (No Outline: none)" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+        </DockPanel>
+        <Rectangle Classes="divider" />
+        <DockPanel Classes="group">
           <ToggleButton Name="PanelBorderButton" Classes="tool" IsChecked="{Binding SelectedPanelHasBorder}"
                         ToolTip.Tip="Draw this panel's border - switch it off for an open panel, or a background that runs to the page edge">
             <StackPanel><PathIcon Data="{StaticResource PanelBorderIcon}" /><TextBlock Text="Border" /></StackPanel>
@@ -456,7 +542,7 @@
             <Button Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to this panel and start typing">
               <StackPanel><PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" /></StackPanel>
             </Button>
-            <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles (Delete)">
+            <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -481,11 +567,11 @@
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
             <RadioButton Name="FrontViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsSelectedCharacterFront}" ToolTip.Tip="Facing the reader (F)">
+                         IsChecked="{Binding IsSelectedCharacterFront}" ToolTip.Tip="Facing the reader" local:Shortcut.Keys="F">
               <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
             </RadioButton>
             <RadioButton Name="SideViewButton" Classes="tool" GroupName="CharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
-                         IsChecked="{Binding IsSelectedCharacterSide}" ToolTip.Tip="Seen from the side (S) - Flip to face the other way">
+                         IsChecked="{Binding IsSelectedCharacterSide}" ToolTip.Tip="Seen from the side - Flip to face the other way" local:Shortcut.Keys="S">
               <StackPanel><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
             </RadioButton>
             <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}" ToolTip.Tip="Face the other way">
@@ -714,7 +800,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of the panel's other characters (bubbles stay on top)" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind the panel's other characters" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)">
+            <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove" /></StackPanel>
             </Button>
           </StackPanel>
@@ -749,7 +835,7 @@
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
-            <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the bubble's text (Enter, or double-click the bubble)">
+            <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the bubble's text - or double-click the bubble" local:Shortcut.Keys="Enter">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
             </Button>
           </StackPanel>
@@ -770,7 +856,7 @@
               <Button Name="BringToFrontButton" Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="Draw this bubble above the others in its panel" HorizontalAlignment="Stretch">To front</Button>
               <Button Name="SendToBackButton" Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Draw this bubble below the others in its panel" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble (Delete)">
+            <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -815,7 +901,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this shape (Delete)">
+            <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this shape" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -848,7 +934,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture (Delete)">
+            <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -909,7 +995,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteSpeedLinesButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines (Delete)">
+            <Button Name="DeleteSpeedLinesButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -970,7 +1056,7 @@
         <Rectangle Classes="divider" />
         <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
-            <Button Name="EditElementTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the words (Enter, or double-click the text)">
+            <Button Name="EditElementTextButton" Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the words - or double-click the text" local:Shortcut.Keys="Enter">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
             </Button>
             <RadioButton Name="TextBehindButton" Classes="tool" GroupName="TextLayer" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsElementBehind}"
@@ -1009,7 +1095,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteTextButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this text (Delete)">
+            <Button Name="DeleteTextButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this text" local:Shortcut.Keys="Delete">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>

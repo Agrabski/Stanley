@@ -33,7 +33,8 @@ public partial class MainWindow : Window
                 recovery: new RecoveryStore(AppPaths.RecoveryDirectory),
                 scheduler: new DispatcherDelayScheduler(),
                 tokenStore: tokenStore,
-                updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel));
+                updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel),
+                launcher: new SystemFileLauncher(this));
         }
         ViewModel = viewModel;
         DataContext = ViewModel;

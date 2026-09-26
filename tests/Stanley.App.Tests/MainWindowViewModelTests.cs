@@ -36,6 +36,26 @@ public sealed class FakeFileDialogs : IFileDialogs
     public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult(SvgEditorAnswer);
 }
 
+/// <summary>Records what it was asked to open or show, and answers as told.</summary>
+public sealed class FakeFileLauncher : IFileLauncher
+{
+    public List<string> Opened { get; } = [];
+    public List<string> Shown { get; } = [];
+    public bool Succeeds { get; set; } = true;
+
+    public Task<bool> OpenAsync(string path)
+    {
+        Opened.Add(path);
+        return Task.FromResult(Succeeds);
+    }
+
+    public Task<bool> ShowInFolderAsync(string path)
+    {
+        Shown.Add(path);
+        return Task.FromResult(Succeeds);
+    }
+}
+
 public sealed class MainWindowViewModelTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "stanley-vm-tests-" + Guid.NewGuid().ToString("N"));
@@ -278,6 +298,65 @@ public sealed class MainWindowViewModelTests : IDisposable
         await vm.ExportAsync("pdf");
 
         Assert.True(File.Exists(_dialogs.ExportPath));
+    }
+
+    [Fact]
+    public async Task AfterExporting_ANoticeOffersToOpenTheFile_OrShowItInItsFolder()
+    {
+        var launcher = new FakeFileLauncher();
+        var vm = new MainWindowViewModel(_dialogs, _recent, launcher: launcher);
+        _dialogs.ExportPath = Path.Combine(_root, "Moon Pie.pdf");
+        Assert.False(vm.HasExportNotice);
+
+        await vm.ExportAsync("pdf");
+
+        Assert.True(vm.HasExportNotice);
+        Assert.Equal("Exported Moon Pie.pdf", vm.ExportNoticeText);
+        Assert.Equal(_dialogs.ExportPath, vm.ExportedPath);
+        Assert.Null(vm.Message);
+
+        await vm.OpenExportCommand.ExecuteAsync(null);
+        await vm.ShowExportInFolderCommand.ExecuteAsync(null);
+        Assert.Equal([_dialogs.ExportPath], launcher.Opened);
+        Assert.Equal([_dialogs.ExportPath], launcher.Shown);
+        Assert.True(vm.HasExportNotice); // still there for the other one
+
+        vm.DismissExportNoticeCommand.Execute(null);
+        Assert.False(vm.HasExportNotice);
+    }
+
+    [Fact]
+    public async Task TheExportNotice_GoesAwayOnItsOwn_AndACancelledExportShowsNone()
+    {
+        var scheduler = new ManualScheduler();
+        var vm = new MainWindowViewModel(_dialogs, _recent, scheduler: scheduler, launcher: new FakeFileLauncher());
+
+        await vm.ExportAsync("png"); // cancelled: no path picked
+        Assert.False(vm.HasExportNotice);
+
+        _dialogs.ExportPath = Path.Combine(_root, "page.png");
+        await vm.ExportAsync("png");
+        Assert.True(vm.HasExportNotice);
+        scheduler.Advance(MainWindowViewModel.ExportNoticeDuration);
+        Assert.False(vm.HasExportNotice);
+    }
+
+    [Fact]
+    public async Task WhenTheExportedFileCantBeOpened_TheTitleBarSaysSo()
+    {
+        var launcher = new FakeFileLauncher { Succeeds = false };
+        var vm = new MainWindowViewModel(_dialogs, _recent, launcher: launcher);
+        _dialogs.ExportPath = Path.Combine(_root, "out.pdf");
+        await vm.ExportAsync("pdf");
+
+        await vm.OpenExportCommand.ExecuteAsync(null);
+        Assert.Contains("Couldn't open \"out.pdf\"", vm.Message, StringComparison.Ordinal);
+
+        File.Delete(_dialogs.ExportPath);
+        await vm.ShowExportInFolderCommand.ExecuteAsync(null);
+        Assert.Empty(launcher.Shown); // never asked: the file's gone
+        Assert.Contains("isn't there any more", vm.Message, StringComparison.Ordinal);
+        Assert.False(vm.HasExportNotice);
     }
 
     [Fact]

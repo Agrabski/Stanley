@@ -52,7 +52,17 @@ behind or in front of the characters, over a colour, gradient or picture
 **background** — see "Panel elements and backgrounds (implemented)" below. A comic
 can start with a **title page** (Insert › Title page) and be a **comic strip or
 webcomic** rather than a comic book page (File › New templates) — see "Title pages
-and comic formats (implemented)" below.
+and comic formats (implemented)" below. Anything selected on a page (bubble,
+character, element, whole panel) can be **copied, cut, pasted and duplicated**
+(Ctrl+C/X/V/D, Home › Clipboard, right-click) through Stanley's own clipboard
+(`PageClipboard`, pictures carried along so it pastes into another comic), or
+**Alt+dragged** to pull a copy away (`Clippings` in Stanley.Editing). Home › Shape
+Fill / Shape Outline act on the **selection** — a shape, a text's box, or a panel's
+background colour and border (`Panel.BorderStyle`: colour, weight, dashes) — and set
+the pen only with nothing selected or a drawing tool on. Tooltips show shortcuts in a
+keycap (`local:Shortcut.Keys`), menus via `InputGesture`, and View › Shortcuts (F1)
+lists them all (`PageShortcuts`). After File › Export a note offers **Open** and
+**Show in folder** (`IFileLauncher`).
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; `init`, and `issue
 list`/`issue add`) instead, without touching Avalonia at all — one binary, not a

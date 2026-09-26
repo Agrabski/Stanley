@@ -63,10 +63,16 @@ public partial class PageEditorRibbon : UserControl
     {
         base.OnDataContextChanged(e);
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged -= OnViewModelPropertyChanged;
+            _subscribed.ShortcutsRequested -= ShowShortcuts;
+        }
         _subscribed = ViewModel;
         if (_subscribed != null)
+        {
             _subscribed.PropertyChanged += OnViewModelPropertyChanged;
+            _subscribed.ShortcutsRequested += ShowShortcuts;
+        }
 
         if (ViewModel is { } vm)
         {
@@ -74,6 +80,13 @@ public partial class PageEditorRibbon : UserControl
             GutterInput.Value = (decimal)vm.GutterMm;
             PageNumberStartInput.Value = vm.PageNumberStart;
         }
+    }
+
+    /// <summary>F1: View › Keyboard shortcuts, opened.</summary>
+    private void ShowShortcuts()
+    {
+        Tabs.SelectedItem = ViewTab;
+        Dispatcher.UIThread.Post(() => ShortcutsButton.Flyout?.ShowAt(ShortcutsButton));
     }
 
     /// <summary>Like Word: a contextual tab appears with its selection but isn't forced open; if the one you're on goes away (selection cleared), fall back to Home.</summary>

@@ -7,28 +7,32 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:app="using:Stanley.App"
              xmlns:documents="using:Stanley.App.Documents"
+             xmlns:editors="using:Stanley.Editors"
              x:Class="Stanley.App.Backstage"
              x:DataType="app:MainWindowViewModel">
   <Grid ColumnDefinitions="200,*" Background="{DynamicResource StanleyBackstageBrush}">
     <Border Classes="backstageRail">
       <StackPanel Margin="0,12,0,0">
-        <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page (Esc)" Padding="20,10" Margin="0,0,0,12">
+        <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page" editors:Shortcut.Keys="Esc" Padding="20,10" Margin="0,0,0,12">
           <PathIcon Data="{StaticResource BackIcon}" Width="22" Height="22" />
         </Button>
-        <RadioButton Name="NewPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsNewPage}">
+        <RadioButton Name="NewPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsNewPage}"
+                     ToolTip.Tip="Start a new comic - the shortcut starts a blank one straight away" editors:Shortcut.Keys="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource NewIcon}" /><TextBlock Text="New" /></StackPanel>
         </RadioButton>
-        <RadioButton Name="OpenPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOpenPage}">
+        <RadioButton Name="OpenPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOpenPage}"
+                     ToolTip.Tip="Open a comic" editors:Shortcut.Keys="Ctrl+O">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Open" /></StackPanel>
         </RadioButton>
         <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
         <RadioButton Name="InfoPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsInfoPage}" IsEnabled="{Binding HasDocument}">
           <TextBlock Text="Info" Margin="26,0,0,0" />
         </RadioButton>
-        <Button Name="SaveButton" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
+        <Button Name="SaveButton" Command="{Binding SaveCommand}" ToolTip.Tip="Save" editors:Shortcut.Keys="Ctrl+S">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource SaveIcon}" /><TextBlock Text="Save" /></StackPanel>
         </Button>
-        <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}">
+        <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}"
+                     ToolTip.Tip="Save the comic under another name or somewhere else" editors:Shortcut.Keys="Ctrl+Shift+S or F12">
           <TextBlock Text="Save As" Margin="26,0,0,0" />
         </RadioButton>
         <RadioButton Name="ExportPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsExportPage}" IsEnabled="{Binding HasDocument}">

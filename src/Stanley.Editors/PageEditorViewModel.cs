@@ -140,6 +140,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         InitializeTitlePageCommands();
         InitializeFieldCommands();
         InitializeFaceCommands();
+        InitializeClipboardCommands();
     }
 
     // A ribbon slider (the Speed Lines tab's "Lines" and "Thickness") is a drag gesture too,
@@ -224,6 +225,11 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         return wanted;
     }
 
+    /// <summary>Raised by F1 on the page: the ribbon shows View › Keyboard shortcuts.</summary>
+    public event Action? ShortcutsRequested;
+
+    public void ShowShortcuts() => ShortcutsRequested?.Invoke();
+
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;
 
@@ -291,6 +297,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         EditCharacterCommand.NotifyCanExecuteChanged();
         InsertFieldCommand.NotifyCanExecuteChanged();
         NotifyElementCommands();
+        if (CopyCommand != null) // null while the constructor is still setting up
+            NotifyClipboardCommands();
     }
 
     // ---------------------------------------------------------------- tool & settings
@@ -737,13 +745,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
         PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
         PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
-        _ when HasSelectedShape => "Drag to move the shape · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
+        _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
         _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
-        _ when HasSelectedText => "Drag to move the text · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
-        _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move.",
-        _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
-        _ when HasSelectedPanel => "Drag to move the panel · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Delete removes it.",
+        _ when HasSelectedText => "Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
+        _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
+        _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
+        _ when HasSelectedPanel => "Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Home › Shape Fill colours it · Delete removes it.",
         _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
         _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; D draws, T adds text; Insert › Character adds a character."
@@ -767,11 +775,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// </summary>
     public void EndGesture(bool commit)
     {
+        var duplicateCancelled = commit ? null : _duplicateCancelled;
+        _moveBase = null;
+        _duplicateCancelled = null;
         if (commit)
             CommitGesture();
         else
             CancelGesture();
         ActiveGuides = [];
+        duplicateCancelled?.Invoke();
     }
 
     // ---------------------------------------------------------------- panel layout
@@ -808,19 +820,20 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     public void UpdateMovePanel(PanelId id, double dx, double dy, double snapTolerance)
     {
-        if (!Committed.Panels.ContainsKey(id))
+        var from = MoveBase;
+        if (!from.Panels.TryGetValue(id, out var panel))
             return;
 
         if (SnapEnabled && snapTolerance > 0)
         {
-            var start = CommittedPanelBounds(id);
+            var start = Bounds(panel);
             var raw = start with { X = start.X + dx, Y = start.Y + dy };
             var snap = PanelSnapping.SnapMove(raw, PageBounds, CommittedBoundsExcept([id]), Grid, snapTolerance);
             dx = snap.Bounds.X - start.X;
             dy = snap.Bounds.Y - start.Y;
             ActiveGuides = snap.Guides;
         }
-        UpdateGesture(EditPanel(Committed, id, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
+        UpdateGesture(EditPanel(from, id, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
     }
 
     public void BeginDragBoundary(PanelBoundaryDrag boundary)
@@ -1101,7 +1114,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// at the speaker - unless <paramref name="withTails"/> (Ctrl held), which moves the whole bubble, tails and all.
     /// </summary>
     public void UpdateMoveBubble(PanelId panelId, int bubbleIndex, double dx, double dy, bool withTails = false) =>
-        UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy, withTails)));
+        UpdateGesture(EditBubbleInPanel(MoveBase, panelId, bubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy, withTails)));
 
     /// <summary>Nudges the selected bubble (or, with none, the selected panel) by a fixed amount - the arrow-key path.</summary>
     public void NudgeSelection(double dx, double dy)
@@ -1357,7 +1370,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// <summary>Moves by (<paramref name="dx"/>, <paramref name="dy"/>) from where the character stood when the drag began. Its feet snap onto the floor line of the panel's other characters.</summary>
     public void UpdateMoveCharacter(PanelId panelId, int index, double dx, double dy, double snapTolerance)
     {
-        if (!Committed.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
+        var from = MoveBase;
+        if (!from.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
             return;
 
         if (SnapEnabled && snapTolerance > 0)
@@ -1368,7 +1382,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             dy = PanelSnapping.SnapValue(ground.Y + dy, floors, snapTolerance, BoundaryOrientation.Horizontal, guides) - ground.Y;
             ActiveGuides = guides;
         }
-        UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPlacementEditing.Move(c, dx, dy)));
+        UpdateGesture(EditCharacterInPanel(from, panelId, index, c => CharacterPlacementEditing.Move(c, dx, dy)));
     }
 
     public void BeginResizeCharacter(PanelId panelId, int index) => BeginGesture();
