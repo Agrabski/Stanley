@@ -17,6 +17,7 @@ public static class StickerSlots
     public const string Bottom = "bottom";
     public const string Shoes = "shoes";
     public const string Top = "top";
+    public const string Print = "print";
     public const string Outer = "outer";
     public const string Eyes = "eyes";
     public const string Nose = "nose";
@@ -33,6 +34,7 @@ public static class StickerSlots
         new(Bottom, "Bottom", BodyRegion.Torso, 10, false, "bottom"),
         new(Shoes, "Shoes", BodyRegion.Foot, 15, false, "shoes"),
         new(Top, "Top", BodyRegion.Torso, 20, false, "top"),
+        new(Print, "Prints", BodyRegion.Torso, 25, true, "print"),
         new(Outer, "Outer", BodyRegion.Torso, 30, false, "outer"),
         new(Eyes, "Eyes", BodyRegion.Head, 40, false, "eyes", IsFace: true),
         new(Nose, "Nose", BodyRegion.Head, 42, false, CharacterDefinition.SkinSlot, IsFace: true),

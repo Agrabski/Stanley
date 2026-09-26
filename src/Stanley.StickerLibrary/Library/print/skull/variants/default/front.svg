@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="120" height="120" viewBox="-60 -780 120 120" data-stanley-view="front" data-stanley-slot="print">
+  <g id="print" inkscape:groupmode="layer" inkscape:label="print">
+    <!-- Eyes, nose and teeth are holes, so the shirt shows through whatever colour the print is. -->
+    <path class="slot-print" fill-rule="evenodd" d="M0,-769.59 C24.2,-769.59 44,-749.79 44,-723.39 C44,-703.59 33,-690.39 17.6,-682.69 L17.6,-674.99 C17.6,-670.59 13.2,-668.39 8.8,-668.39 L-8.8,-668.39 C-13.2,-668.39 -17.6,-670.59 -17.6,-674.99 L-17.6,-682.69 C-33,-690.39 -44,-703.59 -44,-723.39 C-44,-749.79 -24.2,-769.59 0,-769.59 Z M-27.5,-723.39 A9.9,13.2 0 1,0 -7.7,-723.39 A9.9,13.2 0 1,0 -27.5,-723.39 Z M7.7,-723.39 A9.9,13.2 0 1,0 27.5,-723.39 A9.9,13.2 0 1,0 7.7,-723.39 Z M0,-707.99 L-6.6,-694.79 L6.6,-694.79 Z M-4.4,-682.69 L-2.2,-682.69 L-2.2,-671.69 L-4.4,-671.69 Z M2.2,-682.69 L4.4,-682.69 L4.4,-671.69 L2.2,-671.69 Z" fill="#f4f4f4"/>
+  </g>
+</svg>

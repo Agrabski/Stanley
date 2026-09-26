@@ -22,6 +22,20 @@ public partial class CharacterEditorRibbon : UserControl
             slider.AddHandler(PointerCaptureLostEvent, (_, _) => ViewModel?.EndSliderDrag(), RoutingStrategies.Bubble, handledEventsToo: true);
         }
 
+        PrintTextBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && ViewModel is { } vm)
+            {
+                vm.SelectedText = PrintTextBox.Text ?? "";
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && ViewModel is { } current)
+            {
+                PrintTextBox.Text = current.SelectedText;
+                e.Handled = true;
+            }
+        };
+
         NameBox.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter && ViewModel is { } vm)
@@ -50,6 +64,7 @@ public partial class CharacterEditorRibbon : UserControl
             _subscribed.TileImportRequested -= OnTileImportRequested;
             _subscribed.ArtImportRequested -= OnArtImportRequested;
             _subscribed.SvgEditorConfigurationRequested -= OnSvgEditorConfigurationRequested;
+            _subscribed.TextPrintWorn -= OnTextPrintWorn;
         }
         _subscribed = ViewModel;
         if (_subscribed != null)
@@ -58,6 +73,7 @@ public partial class CharacterEditorRibbon : UserControl
             _subscribed.TileImportRequested += OnTileImportRequested;
             _subscribed.ArtImportRequested += OnArtImportRequested;
             _subscribed.SvgEditorConfigurationRequested += OnSvgEditorConfigurationRequested;
+            _subscribed.TextPrintWorn += OnTextPrintWorn;
         }
     }
 
@@ -66,6 +82,18 @@ public partial class CharacterEditorRibbon : UserControl
     {
         if (e.PropertyName == nameof(CharacterEditorViewModel.HasSelectedSticker) && ViewModel is { HasSelectedSticker: false } && Tabs.SelectedItem == StickerTab)
             Tabs.SelectedItem = LookTab;
+
+    }
+
+    /// <summary>A text print was just put on: straight to its text box on the Sticker tab, to type over.</summary>
+    private void OnTextPrintWorn(object? sender, EventArgs e)
+    {
+        Tabs.SelectedItem = StickerTab;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            PrintTextBox.Focus();
+            PrintTextBox.SelectAll();
+        });
     }
 
     /// <summary>"Custom..." in a pattern or texture gallery: pick an SVG or PNG and hand it to the editor.</summary>

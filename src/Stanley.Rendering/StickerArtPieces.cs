@@ -294,7 +294,42 @@ internal sealed class ArtItem(IReadOnlyList<ArtStroke> elements, SKPath area, St
         canvas.Restore();
     }
 
-    private static bool Mirrored(SKMatrix m) => m.ScaleX * m.ScaleY - m.SkewX * m.SkewY < 0;
+    internal static bool Mirrored(SKMatrix m) => m.ScaleX * m.ScaleY - m.SkewX * m.SkewY < 0;
+}
+
+/// <summary>
+/// A typed text part on the figure (docs/sticker-system.md, prints): drawn with per-character
+/// font fallback (<see cref="Lettering.DrawFallback"/>) so emoji and symbols the chosen font
+/// lacks still show, in colour where the system has a colour emoji font. Vector text
+/// throughout, so PDF export stays vector wherever the font itself is one. Its area, for
+/// hit-testing and the selection outline, is its bounds rectangle mapped through its
+/// placement rather than its glyphs' own shape - cheaper, and close enough to click and
+/// highlight (docs/sticker-system.md).
+/// </summary>
+internal sealed class TextItem(IReadOnlyList<Lettering.TextRun> runs, SKColor color, SKMatrix matrix, SKPath area, StickerId owner, SKPoint? readableAnchor, SKPath? keep, SKPath? cut) : FigureItem
+{
+    public override SKPath Area { get; } = area;
+
+    public override StickerId? Owner { get; } = owner;
+
+    public override void Draw(SKCanvas canvas, SKPaint ink)
+    {
+        canvas.Save();
+        if (keep != null)
+            canvas.ClipPath(keep, antialias: true);
+        if (cut is { IsEmpty: false })
+            canvas.ClipPath(cut, SKClipOperation.Difference, antialias: true);
+        if (readableAnchor is { } anchor && ArtItem.Mirrored(canvas.TotalMatrix))
+        {
+            canvas.Translate(anchor.X, anchor.Y);
+            canvas.Scale(-1, 1);
+            canvas.Translate(-anchor.X, -anchor.Y);
+        }
+        canvas.Concat(in matrix);
+        using var paint = new SKPaint { IsAntialias = true, Color = color };
+        Lettering.DrawFallback(canvas, runs, 0, 0, paint);
+        canvas.Restore();
+    }
 }
 
 /// <summary>Turns a worn sticker's drawn parts into figure-space art (docs/sticker-system.md §6).</summary>
@@ -390,6 +425,46 @@ internal static class StickerArtPieces
                     e.Cap, e.Join, e.Dash, fabric, e.EvenOdd, e.Image, matrix));
             }
             yield return (side, mapped, anchor);
+        }
+    }
+
+    /// <summary>Template units a print's text sizes at by default - the size slider scales it from there.</summary>
+    private const float PrintFontSize = 70;
+
+    /// <summary>
+    /// The text piece(s) a text part paints (docs/sticker-system.md, prints) - one per side
+    /// for a part on a limb, like <see cref="Map"/>, but laid out from <paramref name="text"/>
+    /// instead of an SVG layer, so a text print needs no art files. Measured once, with
+    /// <see cref="Lettering.FallbackRuns"/> (so emoji and symbols the chosen font lacks still
+    /// draw), then pinned to the region the same way drawn art is - <paramref name="art"/>'s
+    /// offset, scale and rotation apply the same way too.
+    /// </summary>
+    public static IEnumerable<(LimbSide Side, SKMatrix Matrix, IReadOnlyList<Lettering.TextRun> Runs, SKColor Color, SKRect Bounds, SKPoint? Anchor)> MapText(
+        BodyFigure figure, StickerPart part, PartArt art, PartText text, CharacterLook look)
+    {
+        var font = Lettering.Font(PrintFontSize, text.Bold, false, text.FontFamily);
+        using var paint = new SKPaint();
+        var runs = Lettering.FallbackRuns(text.Text, font);
+        var bounds = Lettering.MeasureFallback(runs, paint);
+        var color = FigureGeometry.ToSk(look.Color(text.Color, ColorValue.FromHex("#1a1a1a")));
+        var (centreP, _) = StickerImport.RegionBox(figure.Angle, part.Region);
+        var centre = new SKPoint((float)centreP.X, (float)centreP.Y);
+        var adjust = SKMatrix.CreateTranslation(-centre.X, -centre.Y)
+            .PostConcat(SKMatrix.CreateScale((float)(art.Scale ?? 1), (float)(art.Scale ?? 1)))
+            .PostConcat(SKMatrix.CreateRotationDegrees((float)(art.Rotation ?? 0)))
+            .PostConcat(SKMatrix.CreateTranslation(centre.X + (float)(art.Offset?.X ?? 0), centre.Y + (float)(art.Offset?.Y ?? 0)));
+        var pinned = new Point2D(centre.X + (art.Offset?.X ?? 0), centre.Y + (art.Offset?.Y ?? 0));
+        var baseline = new SKPoint(centre.X - bounds.MidX, centre.Y - bounds.MidY);
+
+        IEnumerable<LimbSide> sides = part.Region is BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot
+            ? part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right]
+            : [LimbSide.Left];
+        foreach (var side in sides)
+        {
+            var pinMatrix = adjust.PostConcat(RegionMapping.Pin(figure, part.Region, side, part.Side, pinned));
+            var matrix = SKMatrix.CreateTranslation(baseline.X, baseline.Y).PostConcat(pinMatrix);
+            var anchor = art.KeepReadable == true ? pinMatrix.MapPoint((float)pinned.X, (float)pinned.Y) : (SKPoint?)null;
+            yield return (side, matrix, runs, color, bounds, anchor);
         }
     }
 

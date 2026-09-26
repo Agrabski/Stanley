@@ -1,3 +1,4 @@
+using System.Text;
 using SkiaSharp;
 
 namespace Stanley.Rendering;
@@ -181,6 +182,79 @@ public static class Lettering
             .OrderBy(f => (f.FontStyle.Slant != SKFontStyleSlant.Upright) == italic ? 0 : 1)
             .ThenBy(f => Math.Abs(f.FontStyle.Weight - weight))
             .First();
+    }
+
+    /// <summary>
+    /// One run of <see cref="Text"/> that draws in one <see cref="Font"/> (docs/sticker-system.md,
+    /// prints): see <see cref="FallbackRuns"/>.
+    /// </summary>
+    public readonly record struct TextRun(string Text, SKFont Font);
+
+    /// <summary>
+    /// Splits <paramref name="text"/> into <see cref="TextRun"/>s, each in the first font that
+    /// can draw it: <paramref name="font"/> itself where it has the glyph, and - character by
+    /// character where it doesn't - the system's best match
+    /// (<see cref="SKFontManager.MatchCharacter(int)"/>) for the emoji and symbols most
+    /// lettering fonts lack. Falls back to <paramref name="font"/> itself (its own
+    /// missing-glyph box) when nothing installed has the character either, so this never
+    /// throws. Used by prints; bubbles and free text draw in one font throughout and don't
+    /// call this.
+    /// </summary>
+    public static IReadOnlyList<TextRun> FallbackRuns(string text, SKFont font)
+    {
+        if (string.IsNullOrEmpty(text))
+            return [];
+        var runs = new List<TextRun>();
+        var start = 0;
+        SKTypeface? currentFace = null;
+        var i = 0;
+        while (i < text.Length)
+        {
+            Rune.DecodeFromUtf16(text.AsSpan(i), out var rune, out var consumed);
+            var face = font.ContainsGlyph(rune.Value) ? font.Typeface : SKFontManager.Default.MatchCharacter(rune.Value) ?? font.Typeface;
+            if (currentFace is null)
+                currentFace = face;
+            else if (face != currentFace)
+            {
+                runs.Add(new TextRun(text[start..i], RunFont(currentFace, font)));
+                start = i;
+                currentFace = face;
+            }
+            i += consumed;
+        }
+        if (currentFace is not null)
+            runs.Add(new TextRun(text[start..], RunFont(currentFace, font)));
+        return runs;
+    }
+
+    private static SKFont RunFont(SKTypeface typeface, SKFont like) =>
+        typeface == like.Typeface ? like : new SKFont(typeface, like.Size) { LinearMetrics = true, Subpixel = true };
+
+    /// <summary>The tight bounds of <paramref name="runs"/> drawn left to right from the origin - the box <see cref="DrawFallback"/> fills when called with the same origin.</summary>
+    public static SKRect MeasureFallback(IReadOnlyList<TextRun> runs, SKPaint paint)
+    {
+        var x = 0f;
+        var bounds = SKRect.Empty;
+        for (var i = 0; i < runs.Count; i++)
+        {
+            var w = runs[i].Font.MeasureText(runs[i].Text, out var runBounds, paint);
+            runBounds.Offset(x, 0);
+            bounds = i == 0 ? runBounds : SKRect.Union(bounds, runBounds);
+            x += w;
+        }
+        return bounds;
+    }
+
+    /// <summary>Draws <paramref name="runs"/> left to right from (<paramref name="x"/>, <paramref name="y"/>), each in its own font, and returns the total width drawn.</summary>
+    public static float DrawFallback(SKCanvas canvas, IReadOnlyList<TextRun> runs, float x, float y, SKPaint paint)
+    {
+        var start = x;
+        foreach (var run in runs)
+        {
+            canvas.DrawText(run.Text, x, y, SKTextAlign.Left, run.Font, paint);
+            x += run.Font.MeasureText(run.Text, paint);
+        }
+        return x - start;
     }
 
     /// <summary>Splits <paramref name="text"/> into lines no wider than <paramref name="maxWidth"/> at word breaks (a single over-long word keeps its own line); <c>\n</c> always starts a new line.</summary>

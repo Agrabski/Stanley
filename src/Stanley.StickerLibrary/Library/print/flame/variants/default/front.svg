@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="120" height="120" viewBox="-60 -780 120 120" data-stanley-view="front" data-stanley-slot="print">
+  <g id="print" inkscape:groupmode="layer" inkscape:label="print">
+    <path class="slot-print" d="M0,-668.39 C-22,-685.99 -30.8,-707.99 -24.2,-729.99 C-19.8,-745.39 -8.8,-756.39 -6.6,-769.59 C2.2,-756.39 28.6,-734.39 28.6,-707.99 C28.6,-690.39 15.4,-674.99 0,-668.39 Z" fill="#e67e22"/>
+  </g>
+</svg>

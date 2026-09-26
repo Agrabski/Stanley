@@ -18,6 +18,8 @@ public sealed partial class CharacterEditorViewModel
     public IRelayCommand MoveSelectedUpCommand { get; private set; } = null!;
     public IRelayCommand MoveSelectedDownCommand { get; private set; } = null!;
     public IRelayCommand DeselectStickerCommand { get; private set; } = null!;
+    public IRelayCommand<string> WearTextCommand { get; private set; } = null!;
+    public IRelayCommand<string> InsertEmojiCommand { get; private set; } = null!;
 
     private void InitializeLook()
     {
@@ -43,6 +45,16 @@ public sealed partial class CharacterEditorViewModel
         MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, +1)), () => SelectedStickerIsWorn);
         MoveSelectedDownCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, -1)), () => SelectedStickerIsWorn);
         DeselectStickerCommand = new RelayCommand(() => SelectSticker(null));
+        WearTextCommand = new RelayCommand<string>(text =>
+        {
+            if (!string.IsNullOrWhiteSpace(text))
+                WearText(text);
+        });
+        InsertEmojiCommand = new RelayCommand<string>(emoji =>
+        {
+            if (emoji != null)
+                SelectedText += emoji;
+        });
         PreviewExpressionCommand = new RelayCommand<ExpressionPresetChoice>(choice =>
         {
             if (choice != null)
@@ -58,8 +70,8 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>The face's galleries (Eyes, Brows, Mouth, Nose).</summary>
     public IReadOnlyList<SlotGallery> FaceGalleries => Galleries(StickerSlots.Eyes, StickerSlots.Brows, StickerSlots.Mouth, StickerSlots.Nose);
 
-    /// <summary>The clothes slots' galleries (Top, Outer, Bottom, Shoes).</summary>
-    public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
+    /// <summary>The clothes slots' galleries (Top, Prints, Outer, Bottom, Shoes).</summary>
+    public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Print, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
 
     /// <summary>Hats, glasses and everything else.</summary>
     public IReadOnlyList<SlotGallery> AccessoryGalleries => Galleries(StickerSlots.Headwear, StickerSlots.Glasses, StickerSlots.Accessory);
@@ -85,7 +97,7 @@ public sealed partial class CharacterEditorViewModel
         foreach (var item in Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
             choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
         var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?"));
-        return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand);
+        return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand, slot == StickerSlots.Print ? WearTextCommand : null);
     }
 
     private void Wear(StickerChoice choice)
@@ -100,6 +112,18 @@ public sealed partial class CharacterEditorViewModel
             ApplyLook(c => LookEditing.Wear(c, copy));
         }
     }
+
+    /// <summary>The Prints gallery's "Text" button: wears a new text print, selected so its text can be typed over at once on the Sticker tab.</summary>
+    private void WearText(string text)
+    {
+        var asset = TextPrints.New(text);
+        ApplyLook(c => LookEditing.Wear(c, asset));
+        SelectSticker(asset.Id);
+        TextPrintWorn?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Raised when the "Text" button has put on a new text print, for the view to open its text box.</summary>
+    public event EventHandler? TextPrintWorn;
 
     // ---------------------------------------------------------------- preview expression
 
@@ -352,12 +376,45 @@ public sealed partial class CharacterEditorViewModel
 
     public string SelectedStickerName => SelectedSticker?.Sticker.Name ?? "";
 
+    // ---------------------------------------------------------------- text prints
+
+    /// <summary>Whether the selected sticker is typed text (a text print): the Sticker tab shows its text box, and hides what only drawn art has.</summary>
+    public bool SelectedIsTextPrint => SelectedSticker?.HasText == true;
+
+    /// <summary>Drawn art only: "Hug the shape" and "Edit drawing..." - text is always pinned, and has no drawing to open.</summary>
+    public bool HasDrawnArt => HasArtParts && !SelectedIsTextPrint;
+
+    /// <summary>The selected text print's typed text - two-way, one undo step per commit (the view binds it to update on losing focus, like the name box).</summary>
+    public string SelectedText
+    {
+        get => SelectedSticker is { } a && TextPrints.Part(a.Sticker) is { Text: { } t } ? t.Text : "";
+        set
+        {
+            if (value == SelectedText)
+                return;
+            EditSelectedSticker(s => TextPrints.WithText(s, value));
+        }
+    }
+
+    public bool SelectedTextBold
+    {
+        get => SelectedSticker is { } a && TextPrints.Part(a.Sticker) is { Text: { } t } ? t.Bold : true;
+        set
+        {
+            if (value != SelectedTextBold)
+                EditSelectedSticker(s => TextPrints.WithBold(s, value));
+        }
+    }
+
+    /// <summary>A row of common emoji the Sticker tab offers to insert into the selected text print.</summary>
+    public IReadOnlyList<string> CommonEmoji { get; } = ["\U0001F480", "❤️", "⭐", "⚡", "\U0001F525", "\U0001F600"];
+
     /// <summary>Gaps in the selected sticker's art, said inline: "No side view", "No wink, sad (shows neutral)" - or null.</summary>
     public string? SelectedStickerWarning
     {
         get
         {
-            if (SelectedSticker is not { HasArt: true } asset)
+            if (SelectedSticker is not { HasArt: true, HasText: false } asset)
                 return null;
             var notes = new List<string>();
             var variant = asset.Sticker.Variants[0];
@@ -441,6 +498,10 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(SelectedLength));
         OnPropertyChanged(nameof(SelectedSleeves));
         OnPropertyChanged(nameof(SelectedFit));
+        OnPropertyChanged(nameof(SelectedIsTextPrint));
+        OnPropertyChanged(nameof(HasDrawnArt));
+        OnPropertyChanged(nameof(SelectedText));
+        OnPropertyChanged(nameof(SelectedTextBold));
         RaiseArtChanged();
         TakeOffSelectedCommand.NotifyCanExecuteChanged();
         RemoveSelectedCommand.NotifyCanExecuteChanged();

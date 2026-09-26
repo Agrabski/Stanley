@@ -46,6 +46,9 @@ public sealed record StickerAsset(Sticker Sticker, IReadOnlyDictionary<string, A
         Enum.GetValues<ViewAngle>().Where(v => ArtFor(variant, v) is not null);
 
     public bool HasArt => Sticker.Parts.Any(p => p.Art is not null);
+
+    /// <summary>Whether any part is typed text (docs/sticker-system.md, prints) rather than drawn art or a cover - it needs no art files and isn't opened in the SVG editor.</summary>
+    public bool HasText => Sticker.Parts.Any(p => p.Text is not null);
 }
 
 /// <summary>
