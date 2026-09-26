@@ -403,6 +403,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         var secondIssueId = vm.Project!.IssueId;
         Assert.NotEqual(firstIssueId, secondIssueId);
 
+        vm.AutoSaveEnabled = false; // with AutoSave on there'd be nothing to ask (see below)
         MakeAnEdit(vm);
         Assert.True(vm.IsDirty);
 
@@ -415,6 +416,28 @@ public sealed class MainWindowViewModelTests : IDisposable
         await vm.SwitchIssueAsync(firstIssueId);
         Assert.Equal(firstIssueId, vm.Project!.IssueId);
         Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task SwitchingIssue_WithAutoSaveOn_SavesTheEditsAndAsksNothing()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Multi"));
+        await vm.SaveAsync();
+        var firstIssueId = vm.Project!.IssueId;
+        await vm.NewIssueAsync();
+        Assert.True(vm.AutoSaveEnabled);
+        MakeAnEdit(vm);
+        var edited = vm.Project!.IssueId;
+
+        await vm.SwitchIssueAsync(firstIssueId);
+
+        Assert.Equal(firstIssueId, vm.Project!.IssueId);
+        Assert.Equal(0, _dialogs.SaveChangesPrompts);
+        Assert.False(vm.IsDirty);
+        // The bubble was saved with the issue it was added to.
+        var reopened = Stanley.Editors.ComicProject.Open(vm.Project.Location!, edited);
+        Assert.Single(reopened.Pages[0].Document.Panels.Values.SelectMany(panel => panel.Bubbles));
     }
 
     [Fact]

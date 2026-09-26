@@ -410,16 +410,14 @@ public sealed class FabricEditingTests
         var customColor = ColorValue.FromHex("#0000ff");
         var top = editor.ColorEditors.Single(e => e.Slot == "top");
         top.SetPattern.Execute(top.PatternChoices.Single(c => c.Label == "Stripes"));
-        var originalPatternColor = top.Fabric?.Pattern?.Colors[0] ?? ColorValue.FromHex("#000000");
+        var before = top.Fabric?.Pattern?.Colors ?? []; // a fresh pattern has no colours of its own yet
 
         var choice = new ColorSwatchChoice("top", "Custom", customColor);
         top.SetPatternColor.Execute(choice);
 
         Assert.Equal(customColor, top.Fabric?.Pattern?.Colors[0]);
-        Assert.NotEqual(originalPatternColor, top.Fabric?.Pattern?.Colors[0]);
-        Assert.True(session.Workspace.History.CanUndo);
-
         session.Workspace.History.Undo();
-        Assert.Equal(originalPatternColor, top.Fabric?.Pattern?.Colors[0]);
+        Assert.Equal(before, top.Fabric?.Pattern?.Colors ?? []);
+        Assert.Equal(PatternKind.Stripes, top.Fabric?.Pattern?.Kind); // only the colour came off
     }
 }

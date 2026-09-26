@@ -303,7 +303,10 @@ public class SpeedLinesRendererTests
     {
         using var bitmap = Render(Burst(count: 0));
 
-        Assert.False(HasInkOnBorder(bitmap));
+        // Everything inside the panel's own border stays paper.
+        for (var y = 3; y < bitmap.Height - 3; y++)
+            for (var x = 3; x < bitmap.Width - 3; x++)
+                Assert.Equal(SKColors.White, bitmap.GetPixel(x, y));
     }
 
     [Fact]
