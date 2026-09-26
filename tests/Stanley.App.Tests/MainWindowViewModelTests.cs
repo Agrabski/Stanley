@@ -34,6 +34,17 @@ public sealed class FakeFileDialogs : IFileDialogs
     }
 
     public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult(SvgEditorAnswer);
+
+    public Queue<bool> InstallUpdateAnswers { get; } = new();
+    public int InstallUpdatePrompts { get; private set; }
+    public string? LastUpdateVersionOffered { get; private set; }
+
+    public Task<bool> AskInstallUpdateAsync(string version, string? notes)
+    {
+        InstallUpdatePrompts++;
+        LastUpdateVersionOffered = version;
+        return Task.FromResult(InstallUpdateAnswers.Count > 0 ? InstallUpdateAnswers.Dequeue() : false);
+    }
 }
 
 /// <summary>Records what it was asked to open or show, and answers as told.</summary>

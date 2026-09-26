@@ -149,7 +149,7 @@ public sealed class MainWindowViewModel : ObservableObject
         }
 
         if (_scheduler is not null && AutoCheckForUpdates && CanCheckForUpdates)
-            _pendingUpdateCheck = _scheduler.Schedule(TimeSpan.FromSeconds(5), () => _ = CheckForUpdatesCommand.ExecuteAsync(null));
+            _pendingUpdateCheck = _scheduler.Schedule(TimeSpan.FromSeconds(5), () => _ = CheckForUpdatesOnStartupAsync());
     }
 
     // ---------------------------------------------------------------- document state
@@ -456,6 +456,18 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             IsCheckingForUpdates = false;
         }
+    }
+
+    /// <summary>
+    /// The startup check, unlike a manual one from File &gt; Options: finding an update pops
+    /// up an offer to install right away, rather than leaving it for the user to notice on
+    /// the Options page. Declining leaves it available there for later.
+    /// </summary>
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        await CheckForUpdatesAsync();
+        if (_availableUpdate is { } update && await _dialogs.AskInstallUpdateAsync(update.Version, update.Notes))
+            await InstallUpdateAsync();
     }
 
     /// <summary>Goes through the same Save / Don't Save / Cancel gate as Close - never restarts out from under unsaved work.</summary>
