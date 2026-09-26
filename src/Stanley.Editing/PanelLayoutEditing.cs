@@ -57,8 +57,8 @@ public static class PanelLayoutEditing
     /// between them. Each bubble goes to whichever half its centre lies in (clamped inside
     /// it), each character to the half its feet are in and each element to the half its
     /// centre is in (both staying where they were on the page). A colour or gradient
-    /// background fills both halves; any other stays with the first, which keeps the
-    /// original id.
+    /// background fills both halves, as does the border (or its absence); any other background
+    /// stays with the first, which keeps the original id.
     /// </summary>
     public static EditResult<(Panel First, Panel Second)> Split(Panel panel, BoundaryOrientation orientation, double fraction, double gutter = 0)
     {
@@ -115,7 +115,9 @@ public static class PanelLayoutEditing
             Background: panel.Background is ColorBackground or GradientBackground ? panel.Background : null,
             CharacterInstances: panel.CharacterInstances.Where(CharacterInSecond).ToList(),
             Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList(),
-            Elements: panel.Elements.Where(ElementInSecond).Select(e => ElementEditing.KeepReachable(e, secondBounds)).ToList());
+            Elements: panel.Elements.Where(ElementInSecond).Select(e => ElementEditing.KeepReachable(e, secondBounds)).ToList(),
+            Borderless: panel.Borderless,
+            BorderStyle: panel.BorderStyle);
         return EditResult<(Panel, Panel)>.Success((first, second));
     }
 

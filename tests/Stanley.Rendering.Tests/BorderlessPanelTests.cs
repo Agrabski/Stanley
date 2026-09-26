@@ -34,6 +34,16 @@ public class BorderlessPanelTests
     }
 
     [Fact]
+    public void A_panel_with_a_border_style_draws_its_border_in_that_colour()
+    {
+        var red = APanel(borderless: false) with { BorderStyle = new PanelBorderStyle(ColorValue.FromHex("#ff0000"), 1.5) };
+
+        var edge = TopEdge(red);
+
+        Assert.True(edge.Red > 200 && edge.Green < 64 && edge.Blue < 64, $"the border is red, not {edge}");
+    }
+
+    [Fact]
     public void ExportPngAtWidth_comes_out_exactly_that_wide_with_its_height_in_proportion()
     {
         using var stream = new MemoryStream();

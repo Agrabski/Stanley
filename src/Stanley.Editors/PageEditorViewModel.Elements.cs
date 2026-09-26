@@ -234,6 +234,7 @@ public sealed partial class PageEditorViewModel
         UseToolCommand = new RelayCommand<PageEditorTool>(tool => Tool = tool);
         InitializePictureCommands();
         InitializeSpeedLinesCommands();
+        InitializePanelStyleCommands();
         SetBackgroundCommand = new RelayCommand<BackgroundChoice>(choice =>
         {
             if (choice != null && _selectedPanelId is { } panelId)
@@ -367,11 +368,13 @@ public sealed partial class PageEditorViewModel
     {
         RaiseFontChanged();
         var key = (_selectedPanelId, SelectedShape?.Style, SelectedText?.Style, SelectedSpeedLines?.Style, SelectedElement?.Layer, SelectedPanel?.Background, SelectedPanel?.Borderless,
-            _newShapeStyle, _newTextStyle, _newSpeedLinesStyle, _newShapeLayer, _newTextLayer, Tool);
+            _newShapeStyle, _newTextStyle, _newSpeedLinesStyle, _newShapeLayer, _newTextLayer, Tool, SelectedPanel?.BorderStyle, StyleTarget);
         if (Equals(key, _elementDerivedKey))
             return;
         _elementDerivedKey = key;
         OnPropertyChanged(nameof(CurrentShapeStyle));
+        OnPropertyChanged(nameof(CurrentPanelStyle));
+        OnPropertyChanged(nameof(CanUseShapeStyles));
         OnPropertyChanged(nameof(StrokeBrush));
         OnPropertyChanged(nameof(FillBrush));
         OnPropertyChanged(nameof(StrokeName));
@@ -591,7 +594,7 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>Moves by (<paramref name="dx"/>, <paramref name="dy"/>) from where the element was when the drag began.</summary>
     public void UpdateMoveElement(PanelId panelId, int index, double dx, double dy) =>
-        UpdateGesture(EditElementInPanel(Committed, panelId, index, e => EditResult<PanelElement>.Success(ElementEditing.Move(e, dx, dy))));
+        UpdateGesture(EditElementInPanel(MoveBase, panelId, index, e => EditResult<PanelElement>.Success(ElementEditing.Move(e, dx, dy))));
 
     public void BeginResizeElement(PanelId panelId, int index) => BeginGesture();
 
@@ -638,16 +641,128 @@ public sealed partial class PageEditorViewModel
 
     // ---------------------------------------------------------------- style: the selection's, and the next new one's
 
-    /// <summary>Like the bubble style: shows the selected shape's style, and changing it restyles the selection and becomes the pen for new shapes.</summary>
-    public ShapeStyle CurrentShapeStyle => SelectedShape?.Style ?? _newShapeStyle;
+    /// <summary>What Shape Fill and Shape Outline change (<see cref="CurrentShapeStyle"/>).</summary>
+    private enum ShapeStyleTarget
+    {
+        /// <summary>The pen: what's drawn next. With a tool that makes things, or nothing selected.</summary>
+        Pen,
+        Shape,
+
+        /// <summary>A text's box, as the Text tab's Shape Fill and Shape Outline do.</summary>
+        TextBox,
+
+        /// <summary>A panel's background colour and its border - a title page's coloured band is one.</summary>
+        Panel,
+
+        /// <summary>Something they don't apply to (a bubble, a character, a picture, speed lines).</summary>
+        None
+    }
+
+    // Picking a drawing tool lets go of a selected element, so with one on only a panel can
+    // still be selected - and then the tool's next shape is what the colours are for.
+    private ShapeStyleTarget StyleTarget =>
+        HasSelectedShape ? ShapeStyleTarget.Shape
+        : HasSelectedText ? ShapeStyleTarget.TextBox
+        : Tool != PageEditorTool.Select ? ShapeStyleTarget.Pen
+        : IsPanelContext ? ShapeStyleTarget.Panel
+        : HasSelectedBubble || HasSelectedCharacter || HasSelectedElement ? ShapeStyleTarget.None
+        : ShapeStyleTarget.Pen;
+
+    /// <summary>Whether Shape Fill and Shape Outline apply to what's selected - not to a bubble, character, picture or speed lines.</summary>
+    public bool CanUseShapeStyles => StyleTarget != ShapeStyleTarget.None;
+
+    /// <summary>
+    /// What Shape Fill and Shape Outline show and change, as in Word and Figma: whatever is
+    /// selected - a shape, a text's box, a panel's background and border - and with nothing
+    /// selected (or a drawing tool on) the pen, the style new shapes are drawn in. Restyling a
+    /// shape makes that the pen too, like the bubble style.
+    /// </summary>
+    public ShapeStyle CurrentShapeStyle => StyleTarget switch
+    {
+        ShapeStyleTarget.Shape => SelectedShape!.Style,
+        ShapeStyleTarget.TextBox when SelectedText is { Style: var text } => new ShapeStyle(text.BoxStroke, text.BoxFill, text.BoxStrokeWidthMm, text.BoxDash),
+        ShapeStyleTarget.Panel when SelectedPanel is { } panel => PanelStyle(panel),
+        _ => _newShapeStyle
+    };
 
     private void SetCurrentShapeStyle(ShapeStyle style)
     {
-        _newShapeStyle = style;
-        if (SelectedShape is { } shape && shape.Style != style)
-            SetShapeStyle(_selectedPanelId!.Value, _selectedElementIndex, style);
+        switch (StyleTarget)
+        {
+            case ShapeStyleTarget.TextBox:
+                SetCurrentTextStyle(CurrentTextStyle with { BoxFill = style.Fill, BoxStroke = style.Stroke, BoxStrokeWidthMm = style.StrokeWidthMm, BoxDash = style.Dash });
+                return;
+            case ShapeStyleTarget.Panel:
+                EditSelectedPanelStyle(_ => style);
+                return;
+            case ShapeStyleTarget.Shape:
+                _newShapeStyle = style;
+                if (SelectedShape!.Style != style)
+                    SetShapeStyle(_selectedPanelId!.Value, _selectedElementIndex, style);
+                break;
+            case ShapeStyleTarget.Pen:
+                _newShapeStyle = style;
+                break;
+        }
         RaiseElementDerivedChanged();
     }
+
+    /// <summary>The selected panel as the Panel tab's Shape Fill and Shape Outline see it - which, unlike the Home tab's, always mean the panel.</summary>
+    public ShapeStyle CurrentPanelStyle => SelectedPanel is { } panel ? PanelStyle(panel) : new ShapeStyle(null, null, PageRenderer.PanelBorderMm);
+
+    /// <summary>Panel tab › Shape Fill: the selected panel's background colour (No Fill: plain paper).</summary>
+    public IRelayCommand<PaletteColor> SetPanelFillCommand { get; private set; } = null!;
+
+    /// <summary>Panel tab › Shape Outline: the selected panel's border colour (No Outline: no border), weight and dashes.</summary>
+    public IRelayCommand<PaletteColor> SetPanelOutlineCommand { get; private set; } = null!;
+    public IRelayCommand<ShapeWeightChoice> SetPanelOutlineWeightCommand { get; private set; } = null!;
+    public IRelayCommand<LineDash> SetPanelOutlineDashCommand { get; private set; } = null!;
+
+    private void InitializePanelStyleCommands()
+    {
+        SetPanelFillCommand = new RelayCommand<PaletteColor>(c => { if (c != null) EditSelectedPanelStyle(s => s with { Fill = c.Color }); });
+        SetPanelOutlineCommand = new RelayCommand<PaletteColor>(c => { if (c != null) EditSelectedPanelStyle(s => s with { Stroke = c.Color }); });
+        // Like Word: a weight or a dash for "No Outline" turns the border back on.
+        SetPanelOutlineWeightCommand = new RelayCommand<ShapeWeightChoice>(w =>
+        {
+            if (w != null)
+                EditSelectedPanelStyle(s => s with { StrokeWidthMm = w.Mm, Stroke = s.Stroke ?? PageRenderer.PanelBorderColor });
+        });
+        SetPanelOutlineDashCommand = new RelayCommand<LineDash>(dash =>
+            EditSelectedPanelStyle(s => s with { Dash = dash, Stroke = s.Stroke ?? PageRenderer.PanelBorderColor }));
+    }
+
+    private void EditSelectedPanelStyle(Func<ShapeStyle, ShapeStyle> change)
+    {
+        if (_selectedPanelId is not { } panelId || SelectedPanel is not { } panel)
+            return;
+        var before = PanelStyle(panel);
+        SetPanelStyle(panelId, before, change(before));
+        RaiseElementDerivedChanged();
+    }
+
+    /// <summary>A panel as Shape Fill and Shape Outline see it: its background colour (none for paper, a gradient or a picture) and its border (none when borderless).</summary>
+    private static ShapeStyle PanelStyle(Panel panel) => new(
+        panel.Borderless ? null : panel.BorderStyle?.Color ?? PageRenderer.PanelBorderColor,
+        (panel.Background as ColorBackground)?.Color,
+        panel.BorderStyle?.WidthMm ?? PageRenderer.PanelBorderMm,
+        panel.BorderStyle?.Dash ?? LineDash.Solid);
+
+    /// <summary>Shape Fill on a panel fills its background with the colour (No Fill: back to paper); Shape Outline sets its border (No Outline: none). Only what changed, in one undo step.</summary>
+    private void SetPanelStyle(PanelId panelId, ShapeStyle before, ShapeStyle after) =>
+        Apply(EditPanel(Working, panelId, p =>
+        {
+            if (after.Fill != before.Fill)
+                p = p with { Background = after.Fill is { } fill ? new ColorBackground(fill) : null };
+            if (after.Stroke != before.Stroke || Math.Abs(after.StrokeWidthMm - before.StrokeWidthMm) > 1e-9 || after.Dash != before.Dash)
+            {
+                var usual = after.Stroke == PageRenderer.PanelBorderColor && Math.Abs(after.StrokeWidthMm - PageRenderer.PanelBorderMm) < 1e-6 && after.Dash == LineDash.Solid;
+                p = after.Stroke is not { } stroke
+                    ? p with { Borderless = true }
+                    : p with { Borderless = false, BorderStyle = usual ? null : new PanelBorderStyle(stroke, after.StrokeWidthMm, after.Dash) };
+            }
+            return EditResult<Panel>.Success(p);
+        }));
 
     public IBrush StrokeBrush => DrawingPalette.BrushOf(CurrentShapeStyle.Stroke);
     public IBrush FillBrush => DrawingPalette.BrushOf(CurrentShapeStyle.Fill);

@@ -33,7 +33,8 @@ public partial class MainWindow : Window
                 recovery: new RecoveryStore(AppPaths.RecoveryDirectory),
                 scheduler: new DispatcherDelayScheduler(),
                 tokenStore: tokenStore,
-                updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel));
+                updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel),
+                launcher: new SystemFileLauncher(this));
         }
         ViewModel = viewModel;
         DataContext = ViewModel;
@@ -62,6 +63,7 @@ public partial class MainWindow : Window
         Bind(Key.O, KeyModifiers.Control, ViewModel.OpenBackstageCommand, BackstagePage.Open);
         Bind(Key.F, KeyModifiers.Alt, ViewModel.OpenBackstageCommand);
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        Shortcut.RevealWhileCtrlHeld(this); // hold Ctrl: every button shows its shortcut
     }
 
     public MainWindowViewModel ViewModel { get; }

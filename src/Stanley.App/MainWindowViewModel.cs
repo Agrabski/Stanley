@@ -48,6 +48,9 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <summary>At most this long between a change and its crash-recovery snapshot.</summary>
     public static readonly TimeSpan RecoveryDelay = TimeSpan.FromSeconds(5);
 
+    /// <summary>How long the notice after File › Export stays up, offering to open what was exported.</summary>
+    public static readonly TimeSpan ExportNoticeDuration = TimeSpan.FromSeconds(30);
+
     private readonly IFileDialogs _dialogs;
     private readonly RecentProjects _recent;
     private readonly AppSettings _settings;
@@ -55,7 +58,9 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IDelayScheduler? _scheduler;
     private readonly GithubTokenStore _tokenStore;
     private readonly IUpdateService? _updates;
+    private readonly IFileLauncher? _launcher;
     private IDisposable? _pendingAutoSave;
+    private IDisposable? _pendingNoticeHide;
     private IDisposable? _pendingRecovery;
     private IDisposable? _pendingUpdateCheck;
     private bool _recoveredUnsaved;
@@ -75,6 +80,7 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <param name="scheduler">Runs AutoSave, recovery snapshots and the startup update check after a delay; without one, none of them run on their own (tests drive them directly).</param>
     /// <param name="tokenStore">The user's GitHub token for update checks; in-memory-only default if null.</param>
     /// <param name="updates">Checks for/applies app updates; update controls are hidden entirely if null.</param>
+    /// <param name="launcher">Opens exported files and shows them in their folder; the export notice offers neither if null.</param>
     public MainWindowViewModel(
         IFileDialogs dialogs,
         RecentProjects recent,
@@ -83,9 +89,11 @@ public sealed class MainWindowViewModel : ObservableObject
         RecoveryStore? recovery = null,
         IDelayScheduler? scheduler = null,
         GithubTokenStore? tokenStore = null,
-        IUpdateService? updates = null)
+        IUpdateService? updates = null,
+        IFileLauncher? launcher = null)
     {
         _dialogs = dialogs;
+        _launcher = launcher;
         _recent = recent;
         _settings = settings ?? new AppSettings(null);
         _recovery = recovery;
@@ -107,6 +115,9 @@ public sealed class MainWindowViewModel : ObservableObject
         NewIssueCommand = new AsyncRelayCommand(NewIssueAsync, () => HasDocument);
         ExportPdfCommand = new AsyncRelayCommand(() => ExportAsync("pdf"), () => HasDocument);
         ExportPngCommand = new AsyncRelayCommand(() => ExportAsync("png"), () => HasDocument);
+        OpenExportCommand = new AsyncRelayCommand(() => LaunchExportAsync(open: true), () => CanLaunchExport);
+        ShowExportInFolderCommand = new AsyncRelayCommand(() => LaunchExportAsync(open: false), () => CanLaunchExport);
+        DismissExportNoticeCommand = new RelayCommand(DismissExportNotice);
         UndoCommand = new RelayCommand(() => _workspace?.History.Undo(), () => _workspace?.History.CanUndo ?? false);
         RedoCommand = new RelayCommand(() => _workspace?.History.Redo(), () => _workspace?.History.CanRedo ?? false);
         OpenRecoveredCommand = new AsyncRelayCommand<RecoveredComic>(comic => comic is null ? Task.CompletedTask : OpenRecoveredAsync(comic));
@@ -760,6 +771,14 @@ public sealed class MainWindowViewModel : ObservableObject
     public IAsyncRelayCommand CloseDocumentCommand { get; }
     public IAsyncRelayCommand ExportPdfCommand { get; }
     public IAsyncRelayCommand ExportPngCommand { get; }
+
+    /// <summary>The export notice's Open: the exported file, in whatever the computer opens that kind of file with.</summary>
+    public IAsyncRelayCommand OpenExportCommand { get; }
+
+    /// <summary>The export notice's Show in folder: the file manager, on the folder it went to.</summary>
+    public IAsyncRelayCommand ShowExportInFolderCommand { get; }
+
+    public IRelayCommand DismissExportNoticeCommand { get; }
     public IRelayCommand UndoCommand { get; }
     public IRelayCommand RedoCommand { get; }
 
@@ -919,15 +938,75 @@ public sealed class MainWindowViewModel : ObservableObject
             else
                 ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(),
                     issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files, widthPx: _project.ExportWidthPx, fields: _project.Fields);
-            Message = $"Exported to {path}";
+            Message = null;
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
+            ShowExportNotice(path);
         }
         catch (Exception e) when (IsFileProblem(e))
         {
             AppLog.Error($"Export to {path} failed.", e);
             ShowError($"Couldn't export: {e.Message}");
         }
+    }
+
+    // ---------------------------------------------------------------- after exporting
+
+    /// <summary>
+    /// The file File › Export just wrote, while the notice about it is up - "Exported
+    /// comic.pdf" with Open and Show in folder, as a browser or Office offers after saving
+    /// something - or null. It goes after <see cref="ExportNoticeDuration"/>, or when closed.
+    /// </summary>
+    public string? ExportedPath
+    {
+        get;
+        private set
+        {
+            if (!SetProperty(ref field, value))
+                return;
+            OnPropertyChanged(nameof(HasExportNotice));
+            OnPropertyChanged(nameof(ExportNoticeText));
+            OpenExportCommand.NotifyCanExecuteChanged();
+            ShowExportInFolderCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool HasExportNotice => ExportedPath is not null;
+
+    public string ExportNoticeText => ExportedPath is { } path ? $"Exported {Path.GetFileName(path)}" : "";
+
+    /// <summary>Whether the notice can offer Open and Show in folder - not without a way to launch things (tests).</summary>
+    public bool CanLaunchExport => ExportedPath is not null && _launcher is not null;
+
+    private void ShowExportNotice(string path)
+    {
+        _pendingNoticeHide?.Dispose();
+        ExportedPath = path;
+        _pendingNoticeHide = _scheduler?.Schedule(ExportNoticeDuration, DismissExportNotice);
+    }
+
+    public void DismissExportNotice()
+    {
+        _pendingNoticeHide?.Dispose();
+        _pendingNoticeHide = null;
+        ExportedPath = null;
+    }
+
+    private async Task LaunchExportAsync(bool open)
+    {
+        if (ExportedPath is not { } path || _launcher is null)
+            return;
+        if (!File.Exists(path))
+        {
+            Message = $"\"{Path.GetFileName(path)}\" isn't there any more - it may have been moved or deleted.";
+            DismissExportNotice();
+            return;
+        }
+        var launched = open ? await _launcher.OpenAsync(path) : await _launcher.ShowInFolderAsync(path);
+        if (!launched)
+            Message = open
+                ? $"Couldn't open \"{Path.GetFileName(path)}\" - there may be no app set up to open {Path.GetExtension(path).TrimStart('.').ToUpperInvariant()} files."
+                : $"Couldn't show the folder \"{Path.GetFileName(path)}\" is in.";
     }
 
     /// <summary>Before discarding the open comic: nothing to ask if it's clean; otherwise Save / Don't Save / Cancel. Returns whether it's OK to go ahead.</summary>
@@ -1002,6 +1081,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _pendingAutoSave = null;
         _pendingRecovery?.Dispose();
         _pendingRecovery = null;
+        DismissExportNotice();
         _recovery?.Clear(); // the comic is being put down on purpose - saved or deliberately discarded
         RaiseDocumentChanged();
         OnPropertyChanged(nameof(Workspace));

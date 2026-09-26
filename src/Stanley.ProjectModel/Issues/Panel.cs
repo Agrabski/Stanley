@@ -22,6 +22,8 @@ namespace Stanley.ProjectModel.Issues;
 /// </param>
 /// <param name="Borderless">No border drawn around the panel - an open panel, or a title page's
 /// background. Written only when set, so older panel files read unchanged.</param>
+/// <param name="BorderStyle">How the border is drawn when there is one - its colour, thickness and
+/// dashes (Shape Outline); null is the usual black ink line. Written only when set.</param>
 public sealed record Panel(
     PanelId Id,
     PanelShape Shape,
@@ -29,7 +31,11 @@ public sealed record Panel(
     IReadOnlyList<CharacterInstance> CharacterInstances,
     IReadOnlyList<Bubble> Bubbles,
     IReadOnlyList<PanelElement> Elements = null!,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Borderless = false)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Borderless = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PanelBorderStyle? BorderStyle = null)
 {
     public IReadOnlyList<PanelElement> Elements { get; init; } = Elements ?? [];
 }
+
+/// <summary>A panel border drawn other than in the usual black ink line: in <paramref name="Color"/>, <paramref name="WidthMm"/> thick, in <paramref name="Dash"/>'s pattern (a flashback's dashed frame).</summary>
+public sealed record PanelBorderStyle(ColorValue Color, double WidthMm, LineDash Dash = LineDash.Solid);
