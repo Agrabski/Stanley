@@ -28,8 +28,15 @@ public enum PartClip
     /// <summary>The body's skin (tattoos, face paint).</summary>
     Body,
 
-    /// <summary>The sticker's own cover parts (stripes and prints that must never spill past the shirt).</summary>
-    Sticker
+    /// <summary>The sticker's own cover parts (stripes that must never spill past the shirt).</summary>
+    Sticker,
+
+    /// <summary>
+    /// Other worn stickers' cover parts in the same layer - the garment underneath (a print
+    /// stays on the shirt, not the skin past its edge). Shows unclipped if nothing is worn
+    /// there, so a print on bare skin (a tattoo-style use) still draws.
+    /// </summary>
+    Clothes
 }
 
 /// <summary>How drawn art is mapped from its template onto the character's region.</summary>
@@ -67,11 +74,22 @@ public sealed record PartCover(string Color, double From, double To, double? Eas
 public sealed record PartArt(ArtMapping Mapping, Point2D? Offset = null, double? Scale = null, double? Rotation = null, bool? KeepReadable = null);
 
 /// <summary>
+/// A part drawn as typed text instead of art (docs/sticker-system.md, prints): what the user
+/// typed, in the colour slot <paramref name="Color"/>. It needs no art files - the part's
+/// <see cref="PartArt"/> still carries its Pin placement (<c>offset</c>, <c>scale</c>,
+/// <c>rotation</c>, <c>keepReadable</c>), so it drags, resizes and turns the same way drawn
+/// art does.
+/// </summary>
+/// <param name="FontFamily">null: Stanley's default lettering font. Emoji and symbols it lacks fall back to whatever installed font has them, character by character.</param>
+public sealed record PartText(string Text, string Color = "print", string? FontFamily = null, bool Bold = true);
+
+/// <summary>
 /// One piece of a sticker, on one body region: exactly one of <paramref name="Cover"/>
-/// (generated from the body) or <paramref name="Art"/> (drawn). The rest are optional and
-/// absent by default, so files stay sparse.
+/// (generated from the body) or <paramref name="Art"/> (drawn, or - with <paramref name="Text"/>
+/// too - typed). The rest are optional and absent by default, so files stay sparse.
 /// </summary>
 /// <param name="Side">Limb regions only: just this side; absent means both.</param>
+/// <param name="Text">Only with <paramref name="Art"/>: typed instead of drawn (a print).</param>
 public sealed record StickerPart(
     string Name,
     BodyRegion Region,
@@ -80,7 +98,8 @@ public sealed record StickerPart(
     LimbSide? Side = null,
     PartDepth? Depth = null,
     PartBlend? Blend = null,
-    PartClip? Clip = null);
+    PartClip? Clip = null,
+    PartText? Text = null);
 
 /// <summary>
 /// <c>characters/&lt;characterId&gt;-slug/stickers/&lt;id&gt;-slug/sticker.json</c> - something a

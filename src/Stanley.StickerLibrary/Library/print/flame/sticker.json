@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "print": "#e67e22"
+  },
+  "id": "library",
+  "name": "Flame",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "clip": "clothes",
+      "name": "print",
+      "region": "torso"
+    }
+  ],
+  "slot": "print",
+  "variants": [
+    "default"
+  ]
+}

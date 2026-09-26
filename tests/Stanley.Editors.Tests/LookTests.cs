@@ -1,3 +1,4 @@
+using Stanley.Editing;
 using Stanley.EditorFramework;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
@@ -25,6 +26,65 @@ public sealed class LookTests : IDisposable
 
     private static StickerChoice Choice(CharacterEditorViewModel editor, string slot, string name) =>
         editor.Gallery(slot).Choices.Single(c => c.Label == name);
+
+    [Fact]
+    public void The_Text_button_wears_a_text_print_and_selects_it_to_type_over()
+    {
+        var (_, editor) = NewCharacter();
+        var raised = false;
+        editor.TextPrintWorn += (_, _) => raised = true;
+
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        var print = editor.SelectedSticker!;
+        Assert.True(print.HasText);
+        Assert.Equal(StickerSlots.Print, print.Sticker.Slot);
+        Assert.Contains(print.Id, editor.Working.Stickers[StickerSlots.Print]);
+        Assert.True(editor.SelectedIsTextPrint);
+        Assert.False(editor.HasDrawnArt);
+        Assert.Equal("HELLO", editor.SelectedText);
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Typing_over_a_text_print_renames_it_and_is_one_undo_step()
+    {
+        var (session, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        editor.SelectedText = "SKATE \U0001F6F9";
+
+        Assert.Equal("SKATE \U0001F6F9", editor.SelectedText);
+        Assert.Equal("SKATE \U0001F6F9", editor.SelectedStickerName);
+        session.Workspace.History.Undo();
+        Assert.Equal("HELLO", editor.SelectedText);
+    }
+
+    [Fact]
+    public void An_emoji_button_adds_to_the_text_and_bold_toggles()
+    {
+        var (_, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        editor.InsertEmojiCommand.Execute("\U0001F480");
+        editor.SelectedTextBold = false;
+
+        Assert.Equal("HELLO\U0001F480", editor.SelectedText);
+        Assert.False(TextPrints.Part(editor.SelectedSticker!.Sticker)!.Text!.Bold);
+    }
+
+    [Fact]
+    public void A_symbol_and_a_text_print_stack_on_the_same_shirt()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "Skull"));
+        editor.Gallery(StickerSlots.Print).WearText!.Execute(TextPrints.DefaultText);
+
+        Assert.Equal(2, editor.Working.Stickers[StickerSlots.Print].Count);
+        Assert.Contains(editor.ClothesGalleries, g => g.Info.Name == StickerSlots.Print);
+        Assert.Null(editor.Gallery(StickerSlots.Top).WearText); // only prints offer typed text
+    }
 
     [Fact]
     public void The_starter_library_is_all_valid_stickers_in_known_slots()

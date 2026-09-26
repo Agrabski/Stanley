@@ -21,6 +21,9 @@
                 ToolTip.Tip="Draw one in your own SVG editor (Inkscape...), on a template of this body - every save updates it here">Draw your own...</Button>
         <Button Name="ImportArtButton" Classes="small" Command="{Binding Import}" CommandParameter="{Binding Info.Name}"
                 ToolTip.Tip="An SVG or PNG: a file drawn on a template goes where it was drawn; anything else is placed here to move and size">Import...</Button>
+        <!-- Prints only: your own words (emoji too) on the clothes - put on as HELLO, then typed over on the Sticker tab. -->
+        <Button Name="WearTextButton" Classes="small" Command="{Binding WearText}" CommandParameter="HELLO" IsVisible="{Binding WearText, Converter={x:Static ObjectConverters.IsNotNull}}"
+                ToolTip.Tip="Put your own words on the clothes - emoji too; type them on the Sticker tab">Text</Button>
       </StackPanel>
       <ItemsControl ItemsSource="{Binding Choices}">
         <ItemsControl.ItemsPanel>
@@ -461,7 +464,7 @@
                       ToolTip.Tip="Turn it" />
               <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding SelectedArtRotation, StringFormat='{}{0:0}°'}" FontSize="12" VerticalAlignment="Center" />
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasDrawnArt}">
               <CheckBox Name="HugShapeBox" IsChecked="{Binding SelectedHugsShape}" FontSize="12"
                         ToolTip.Tip="Bend with the body (hair, prints) instead of keeping its own shape (eyes, logos)">Hug the shape</CheckBox>
               <Button Name="EditArtButton" Classes="small" Command="{Binding EditSelectedArtCommand}"
@@ -471,6 +474,30 @@
           <TextBlock Classes="groupLabel" Text="Art" ToolTip.Tip="Drag it on the character to move it" />
         </DockPanel>
         <Rectangle Classes="divider" IsVisible="{Binding HasArtParts}" />
+
+        <!-- A text print: what it says (Enter or leaving the box applies it), bold or not, and a few emoji a click away. -->
+        <DockPanel Classes="group" IsVisible="{Binding SelectedIsTextPrint}">
+          <StackPanel Spacing="4" Margin="0,2,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <TextBox Name="PrintTextBox" Width="170" FontSize="12" Text="{Binding SelectedText, UpdateSourceTrigger=LostFocus}"
+                       ToolTip.Tip="What it says - emoji too (Enter to apply)" />
+              <ToggleButton Name="PrintBoldButton" Classes="small" IsChecked="{Binding SelectedTextBold}" FontWeight="Bold" ToolTip.Tip="Bold">B</ToggleButton>
+            </StackPanel>
+            <ItemsControl Name="PrintEmoji" ItemsSource="{Binding CommonEmoji}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Button Classes="small" Padding="2,0" Content="{Binding}" ToolTip.Tip="Add it to the text"
+                          Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).InsertEmojiCommand}" CommandParameter="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding SelectedIsTextPrint}" />
         <DockPanel Classes="group" IsVisible="{Binding HasFit}">
           <Grid ColumnDefinitions="Auto,Auto,34" RowDefinitions="24,24,24" ColumnSpacing="6">
             <TextBlock Text="Length" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLength}" />

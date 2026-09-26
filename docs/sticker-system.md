@@ -206,15 +206,15 @@ side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foo
 }
 ```
 
-A part has exactly one of `cover` or `art`, and these optional settings (null means
-the default, so files stay sparse):
+A part has exactly one of `cover` or `art` (an `art` part may also carry `text`, see
+§19), and these optional settings (null means the default, so files stay sparse):
 
 | Field | Values | Default | Meaning |
 |---|---|---|---|
 | `side` | `left`, `right` | both | Limb regions only. |
 | `depth` | `back`, `front` | the region's group | Pull a part out of its region's group (hair back, cape). |
 | `blend` | `cut` | paint | Subtract from this sticker's other parts in the same group, so what's underneath shows through: a V-neck (a Warp art triangle at the neck), an open jacket. |
-| `clip` | `body`, `sticker` | none | Clip to the body (tattoos, face paint) or to this sticker's cover parts (stripes and prints that must never spill past the shirt). |
+| `clip` | `body`, `sticker`, `clothes` | none | Clip to the body (tattoos, face paint), to this sticker's cover parts (stripes that must never spill past the shirt), or to the covers of everything *else* worn in the same group - the garment underneath, for prints (§19). |
 
 **`cover`**: `from`, `to`, `ease`, `flare` (skirt only), `color` (a colour slot name).
 
@@ -839,3 +839,34 @@ open:
   panel or the issue uses can't be deleted. Proportion overrides and build on a look
   (`ProportionOverride`, `Build`) stay unused: body edits always change the
   character.
+
+## 19. Prints on clothes
+
+**Status: implemented.** Symbols and your own words on clothes (a skull on a T-shirt,
+a band name, emoji), beyond patterns and textures.
+- **A `print` slot** ("Prints" on the Look tab, among the clothes): torso, z-order 25 -
+  over the top (20), under outerwear (30), so an open jacket covers a T-shirt's print -
+  and it **stacks**, so a shirt can carry several. Its colour slot is `print`.
+- **Symbol prints in the starter library** (`Library/print/`): skull, heart, star,
+  lightning bolt, flame, smiley and a music note - original CC0 art, one Pin art part
+  each, recoloured through `class="slot-print"`. The skull's eyes, nose and teeth are
+  holes, so it reads in any colour. They drag, size and turn like any drawn art.
+- **`clip: clothes`** keeps a print on the fabric: it's clipped to the union of the
+  other worn stickers' cover pieces in its group (not cut or clipped ones themselves),
+  so one dragged past the shirt's edge doesn't spill onto skin. With nothing worn
+  underneath it isn't clipped at all, so a print on bare skin still shows (a quick
+  tattoo).
+- **Text prints**: a part with `text` (`text`, `color` - a colour slot, `print` by
+  default - `fontFamily`, `bold`) alongside its `art`, which carries the Pin placement
+  (`offset`, `scale`, `rotation`, `keepReadable`), so it moves, sizes and turns exactly
+  like drawn art and never reads backwards on a mirrored character. It needs no art
+  files. It's drawn as vector text with per-character font fallback
+  (`Lettering.FallbackRuns`): emoji and symbols the lettering font lacks come from
+  whatever installed font has them (a colour emoji font draws in colour). Its
+  clickable area and selection outline are its text box, mapped.
+- **UX**: the Prints gallery's **Text** button puts on "HELLO" and opens the Sticker
+  tab's text box to type over (Enter or leaving the box applies it, one undo step),
+  with a Bold toggle and a row of common emoji to add with a click. Size, Turn and
+  dragging work as for drawn art; "Hug the shape" and "Edit drawing..." are hidden for
+  text. "Draw your own..." and "Import..." work in the Prints gallery like anywhere
+  else, for a print of your own.

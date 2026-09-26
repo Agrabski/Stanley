@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "print": "#2c3e50"
+  },
+  "id": "library",
+  "name": "Music note",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "clip": "clothes",
+      "name": "print",
+      "region": "torso"
+    }
+  ],
+  "slot": "print",
+  "variants": [
+    "default"
+  ]
+}

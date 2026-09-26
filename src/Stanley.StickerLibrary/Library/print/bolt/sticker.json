@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "print": "#f4d03f"
+  },
+  "id": "library",
+  "name": "Lightning bolt",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "clip": "clothes",
+      "name": "print",
+      "region": "torso"
+    }
+  ],
+  "slot": "print",
+  "variants": [
+    "default"
+  ]
+}
