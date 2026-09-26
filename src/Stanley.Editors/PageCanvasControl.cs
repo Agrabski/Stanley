@@ -1171,9 +1171,6 @@ public sealed class PageCanvasControl : Control
                 _altHeld = true;
                 UpdateCursor(_drag == DragKind.None ? _hoverHit : null);
                 return;
-            case Key.F1:
-                vm.ShowShortcuts();
-                break;
             case Key.C when ctrl && _drag == DragKind.None:
                 vm.Copy();
                 break;

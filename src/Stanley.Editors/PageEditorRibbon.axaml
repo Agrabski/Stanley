@@ -125,7 +125,7 @@
             <Button Classes="tool" Command="{Binding EditTextCommand}" ToolTip.Tip="Edit the selected bubble's or text's words - or double-click it" local:Shortcut.Keys="Enter">
               <StackPanel><PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" /></StackPanel>
             </Button>
-            <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete what's selected" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete what's selected" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -440,52 +440,7 @@
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Show" />
         </DockPanel>
-        <Rectangle Classes="divider" />
 
-        <!-- Every shortcut in one place, like Figma's and Word's lists - the ones no button can show too (arrows, Space, keys held while dragging). -->
-        <DockPanel Classes="group">
-          <DropDownButton Name="ShortcutsButton" Classes="slotGallery" Width="92" local:Shortcut.Keys="F1"
-                          ToolTip.Tip="Every keyboard shortcut, on one page">
-            <StackPanel Spacing="2">
-              <PathIcon Data="{StaticResource KeyboardIcon}" Width="20" Height="20" />
-              <TextBlock Text="Shortcuts" FontSize="11" HorizontalAlignment="Center" />
-            </StackPanel>
-            <DropDownButton.Flyout>
-              <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="wide">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="Keyboard shortcuts" FontWeight="SemiBold" />
-                  <ItemsControl Name="ShortcutGroups" ItemsSource="{x:Static local:PageShortcuts.All}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" MaxWidth="840" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="local:ShortcutGroup">
-                        <StackPanel Width="260" Margin="0,0,12,10" Spacing="3">
-                          <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
-                          <ItemsControl ItemsSource="{Binding Entries}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="local:ShortcutEntry">
-                                <DockPanel Margin="0,1">
-                                  <Border Classes="shortcutKeys" DockPanel.Dock="Right" Background="#26808080" BorderBrush="#55808080" BorderThickness="1" CornerRadius="3"
-                                          Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Keys}" FontSize="11" Opacity="0.85" />
-                                  </Border>
-                                  <TextBlock Text="{Binding Does}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
-                                </DockPanel>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                  <TextBlock Text="Buttons and right-click menus show their shortcuts too - hover over a button to see its keys." FontSize="11" Opacity="0.7" />
-                </StackPanel>
-              </Flyout>
-            </DropDownButton.Flyout>
-          </DropDownButton>
-          <TextBlock Classes="groupLabel" Text="Help" />
-        </DockPanel>
       </StackPanel>
     </TabItem>
 
@@ -542,7 +497,7 @@
             <Button Classes="tool" Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to this panel and start typing">
               <StackPanel><PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" /></StackPanel>
             </Button>
-            <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles" local:Shortcut.Keys="Delete">
+            <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -800,7 +755,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of the panel's other characters (bubbles stay on top)" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind the panel's other characters" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove" /></StackPanel>
             </Button>
           </StackPanel>
@@ -856,7 +811,7 @@
               <Button Name="BringToFrontButton" Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="Draw this bubble above the others in its panel" HorizontalAlignment="Stretch">To front</Button>
               <Button Name="SendToBackButton" Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Draw this bubble below the others in its panel" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this bubble" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -901,7 +856,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this shape" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this shape" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -934,7 +889,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture" local:Shortcut.Keys="Delete">
+            <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -995,7 +950,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteSpeedLinesButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteSpeedLinesButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>
@@ -1095,7 +1050,7 @@
               <Button Classes="small" Command="{Binding BringToFrontCommand}" ToolTip.Tip="In front of everything else in its layer" HorizontalAlignment="Stretch">To front</Button>
               <Button Classes="small" Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">To back</Button>
             </StackPanel>
-            <Button Name="DeleteTextButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this text" local:Shortcut.Keys="Delete">
+            <Button Name="DeleteTextButton" Classes="tool" Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this text" local:Shortcut.Keys="Del">
               <StackPanel><PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" /></StackPanel>
             </Button>
           </StackPanel>

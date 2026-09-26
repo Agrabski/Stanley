@@ -225,11 +225,6 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         return wanted;
     }
 
-    /// <summary>Raised by F1 on the page: the ribbon shows View › Keyboard shortcuts.</summary>
-    public event Action? ShortcutsRequested;
-
-    public void ShowShortcuts() => ShortcutsRequested?.Invoke();
-
     /// <summary>Raised when something (the ribbon, a double-click, Enter) wants the inline text editor opened over a bubble.</summary>
     public event Action<PanelId, int>? TextEditRequested;
 
@@ -754,7 +749,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when HasSelectedPanel => "Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Home › Shape Fill colours it · Delete removes it.",
         _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
         _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
-        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; D draws, T adds text; Insert › Character adds a character."
+        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character. Hold Ctrl to see every button's shortcut."
     };
 
     public Rect2D PanelBounds(PanelId id) => AnchorRing.BoundingBox(Working.Panels[id].Shape.Anchors);

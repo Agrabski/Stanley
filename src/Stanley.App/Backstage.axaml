@@ -32,7 +32,7 @@
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource SaveIcon}" /><TextBlock Text="Save" /></StackPanel>
         </Button>
         <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}"
-                     ToolTip.Tip="Save the comic under another name or somewhere else" editors:Shortcut.Keys="Ctrl+Shift+S or F12">
+                     ToolTip.Tip="Save the comic under another name or somewhere else" editors:Shortcut.Keys="Ctrl+Shift+S">
           <TextBlock Text="Save As" Margin="26,0,0,0" />
         </RadioButton>
         <RadioButton Name="ExportPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsExportPage}" IsEnabled="{Binding HasDocument}">

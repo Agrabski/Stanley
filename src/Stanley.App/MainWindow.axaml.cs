@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         Bind(Key.O, KeyModifiers.Control, ViewModel.OpenBackstageCommand, BackstagePage.Open);
         Bind(Key.F, KeyModifiers.Alt, ViewModel.OpenBackstageCommand);
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        Shortcut.RevealWhileCtrlHeld(this); // hold Ctrl: every button shows its shortcut
     }
 
     public MainWindowViewModel ViewModel { get; }

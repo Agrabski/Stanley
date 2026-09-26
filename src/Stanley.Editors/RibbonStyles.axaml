@@ -62,7 +62,6 @@
     <StreamGeometry x:Key="CutIcon">F1 M2.5,18 A3.5,3.5 0 1 1 9.5,18 A3.5,3.5 0 1 1 2.5,18 Z M4.2,18 A1.8,1.8 0 1 0 7.8,18 A1.8,1.8 0 1 0 4.2,18 Z M14.5,18 A3.5,3.5 0 1 1 21.5,18 A3.5,3.5 0 1 1 14.5,18 Z M16.2,18 A1.8,1.8 0 1 0 19.8,18 A1.8,1.8 0 1 0 16.2,18 Z M8,15.5 L17.5,2 L19,3 L10,16.5 Z M16,15.5 L14,16.5 L5,3 L6.5,2 Z</StreamGeometry>
     <StreamGeometry x:Key="CopyIcon">M8,2 H20 V16 H18 V4 H8 Z M4,6 H16 V22 H4 Z M6,8 V20 H14 V8 Z</StreamGeometry>
     <StreamGeometry x:Key="DuplicateIcon">M8,3 H21 V16 H19 V5 H8 Z M3,8 H16 V21 H3 Z M5,10 V19 H14 V10 Z M8.5,11.5 H10.5 V13.5 H12.5 V15.5 H10.5 V17.5 H8.5 V15.5 H6.5 V13.5 H8.5 Z</StreamGeometry>
-    <StreamGeometry x:Key="KeyboardIcon">M3,6 H21 C21.6,6 22,6.4 22,7 V17 C22,17.6 21.6,18 21,18 H3 C2.4,18 2,17.6 2,17 V7 C2,6.4 2.4,6 3,6 Z M4,8 V16 H20 V8 Z M5,9 H7 V11 H5 Z M8,9 H10 V11 H8 Z M11,9 H13 V11 H11 Z M14,9 H16 V11 H14 Z M17,9 H19 V11 H17 Z M5,12 H7 V14 H5 Z M17,12 H19 V14 H17 Z M8,12 H16 V14 H8 Z</StreamGeometry>
     <StreamGeometry x:Key="CheckIcon">M9,16.2 L4.8,12 L3.4,13.4 L9,19 L21,7 L19.6,5.6 Z</StreamGeometry>
     <StreamGeometry x:Key="DeleteIcon">M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z</StreamGeometry>
     <StreamGeometry x:Key="ColumnsIcon">M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z</StreamGeometry>
@@ -327,10 +326,6 @@
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="14,10" />
     <Setter Property="BoxShadow" Value="0 4 16 0 #40000000" />
-  </Style>
-  <!-- A flyout with room for columns (View › Keyboard shortcuts); Fluent caps a flyout at 456 px otherwise. -->
-  <Style Selector="FlyoutPresenter.wide">
-    <Setter Property="MaxWidth" Value="900" />
   </Style>
   <Style Selector="StackPanel.tabContent">
     <Setter Property="Orientation" Value="Horizontal" />

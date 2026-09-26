@@ -59,9 +59,10 @@ character, element, whole panel) can be **copied, cut, pasted and duplicated**
 **Alt+dragged** to pull a copy away (`Clippings` in Stanley.Editing). Home › Shape
 Fill / Shape Outline act on the **selection** — a shape, a text's box, or a panel's
 background colour and border (`Panel.BorderStyle`: colour, weight, dashes) — and set
-the pen only with nothing selected or a drawing tool on. Tooltips show shortcuts in a
-keycap (`local:Shortcut.Keys`), menus via `InputGesture`, and View › Shortcuts (F1)
-lists them all (`PageShortcuts`). After File › Export a note offers **Open** and
+the pen only with nothing selected or a drawing tool on. **Holding Ctrl** shows every
+on-screen button's shortcut in a keycap right by it, like Office's KeyTips
+(`local:Shortcut.Keys`, drawn in the adorner layer so nothing moves); menus show theirs
+all the time via `InputGesture`. After File › Export a note offers **Open** and
 **Show in folder** (`IFileLauncher`).
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; `init`, and `issue

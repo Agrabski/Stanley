@@ -120,7 +120,7 @@ public class ClipboardAndShortcutTests
     }
 
     [Fact]
-    public void The_home_tabs_clipboard_buttons_copy_and_paste_and_say_their_keys()
+    public void The_home_tabs_clipboard_buttons_copy_and_paste()
     {
         var (window, _, panelId, bounds) = Open();
         window.Editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
@@ -136,12 +136,7 @@ public class ClipboardAndShortcutTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(2, window.Editor.Working.Panels[panelId].Bubbles.Count);
-        var tip = Assert.IsType<ShortcutTip>(ToolTip.GetTip(Named("PasteButton")));
-        Assert.Equal("Ctrl+V", tip.Keys);
-        ToolTip.SetIsOpen(Named("CopyButton"), true);
-        Dispatcher.UIThread.RunJobs();
         LookTabTests.Snapshot(window, "home-clipboard-group");
-        ToolTip.SetIsOpen(Named("CopyButton"), false);
     }
 
     private sealed class ExportDialogs(string exportPath) : Stanley.App.Documents.IFileDialogs
@@ -199,47 +194,121 @@ public class ClipboardAndShortcutTests
         }
     }
 
+    private static void CtrlDown(MainWindow window) =>
+        window.KeyPress(Key.LeftCtrl, RawInputModifiers.Control, PhysicalKey.ControlLeft, null);
+
+    private static void CtrlUp(MainWindow window) =>
+        window.KeyRelease(Key.LeftCtrl, RawInputModifiers.None, PhysicalKey.ControlLeft, null);
+
+    /// <summary>Like Office's KeyTips: hold Ctrl and every button on screen shows its shortcut right by it; let go and they're gone - and nothing on the ribbon moves.</summary>
     [Fact]
-    public void F1_on_the_page_opens_the_list_of_every_shortcut()
+    public void Holding_Ctrl_shows_every_buttons_shortcut_beside_it_and_letting_go_hides_them()
     {
-        var (window, canvas, _, _) = Open();
-        canvas.Focus();
+        var delay = Shortcut.RevealDelay;
+        Shortcut.RevealDelay = TimeSpan.Zero;
+        try
+        {
+            var (window, _, _, _) = Open();
+            var ribbon = Ribbon(window);
+            var select = ribbon.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SelectToolButton");
+            var selectBounds = select.Bounds;
+            Assert.Empty(Shortcut.Showing(window));
 
-        window.KeyPress(Key.F1, RawInputModifiers.None, PhysicalKey.F1, null);
-        Dispatcher.UIThread.RunJobs();
+            CtrlDown(window);
+            Dispatcher.UIThread.RunJobs();
 
-        var ribbon = Ribbon(window);
-        Assert.Equal("ViewTab", ((TabItem)ribbon.TabControl.SelectedItem!).Name);
-        var button = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "ShortcutsButton");
-        Assert.True(button.Flyout!.IsOpen);
-        var list = ((Control)((Flyout)button.Flyout).Content!).GetVisualDescendants().OfType<ItemsControl>().First(i => i.Name == "ShortcutGroups");
-        Assert.Equal(PageShortcuts.All.Count, list.ItemCount);
-        var keys = ((Control)((Flyout)button.Flyout).Content!).GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        Assert.Contains("Alt+drag", keys);
-        Assert.Contains("Space+drag", keys);
-        LookTabTests.Snapshot(TopLevel.GetTopLevel((Control)((Flyout)button.Flyout).Content!) ?? window, "keyboard-shortcuts");
-        button.Flyout.Hide();
+            var showing = Shortcut.Showing(window);
+            string KeysOn(string name) => showing.Single(s => s.Host.Name == name).Cap.Keys;
+            Assert.Equal("V", KeysOn("SelectToolButton"));
+            Assert.Equal("Ctrl+V", KeysOn("PasteButton"));
+            Assert.Equal("Ctrl+C", KeysOn("CopyButton"));
+            Assert.Equal("Del", KeysOn("DeleteButton"));
+            Assert.Equal("Ctrl+Z", KeysOn("QuickUndoButton"));
+            Assert.Equal("Alt+F", KeysOn("FileButton"));
+            Assert.DoesNotContain(showing, s => s.Host.Name == "SaveButton"); // the File view is closed: nothing of it shows
+            Assert.Equal(selectBounds, select.Bounds);
+
+            // A big button's keys sit centred under it; a small one's just past its end.
+            var cap = showing.Single(s => s.Host.Name == "SelectToolButton").Cap;
+            var capCentre = cap.TranslatePoint(new Point(cap.Bounds.Width / 2, cap.Bounds.Height / 2), window)!.Value;
+            var selectBottom = select.TranslatePoint(new Point(select.Bounds.Width / 2, select.Bounds.Height), window)!.Value;
+            Assert.InRange(capCentre.X - selectBottom.X, -1.5, 1.5);
+            Assert.InRange(capCentre.Y - selectBottom.Y, -1.5, 1.5);
+            var copy = ribbon.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "CopyButton");
+            var copyCap = showing.Single(s => s.Host.Name == "CopyButton").Cap;
+            Assert.True(copyCap.TranslatePoint(default, window)!.Value.X >= copy.TranslatePoint(new Point(copy.Bounds.Width, 0), window)!.Value.X);
+
+            // Keycaps wider than their buttons (the title bar's Save, Undo, Redo) step aside rather than cover each other.
+            var boxes = showing.Select(s => new Rect(s.Cap.TranslatePoint(default, window)!.Value, s.Cap.Bounds.Size)).ToList();
+            for (var i = 0; i < boxes.Count; i++)
+            for (var j = i + 1; j < boxes.Count; j++)
+                Assert.False(boxes[i].Intersects(boxes[j]), $"{showing[i].Cap.Keys} and {showing[j].Cap.Keys} overlap");
+            LookTabTests.Snapshot(window, "ctrl-held");
+
+            CtrlUp(window);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Shortcut.Showing(window));
+
+            // The File view's commands show theirs too, while it's open.
+            window.ViewModel.ShowBackstage(BackstagePage.Info);
+            Dispatcher.UIThread.RunJobs();
+            CtrlDown(window);
+            Dispatcher.UIThread.RunJobs();
+            showing = Shortcut.Showing(window);
+            Assert.Equal("Ctrl+S", KeysOn("SaveButton"));
+            Assert.Equal("Esc", KeysOn("BackButton"));
+            Assert.DoesNotContain(showing, s => s.Host.Name is "SelectToolButton" or "QuickUndoButton"); // under the File view
+            var save = window.BackstageControl.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "SaveButton");
+            var saveCap = showing.Single(s => s.Host.Name == "SaveButton").Cap;
+            Assert.True(saveCap.TranslatePoint(new Point(saveCap.Bounds.Width, 0), window)!.Value.X <= save.TranslatePoint(new Point(save.Bounds.Width, 0), window)!.Value.X);
+            var saveAs = window.BackstageControl.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SaveAsPageButton");
+            var saveAsCap = showing.Single(s => s.Host.Name == "SaveAsPageButton").Cap;
+            Assert.True(saveAsCap.TranslatePoint(new Point(saveAsCap.Bounds.Width, 0), window)!.Value.X <= saveAs.TranslatePoint(new Point(saveAs.Bounds.Width, 0), window)!.Value.X);
+            LookTabTests.Snapshot(window, "ctrl-held-backstage");
+            CtrlUp(window);
+            Dispatcher.UIThread.RunJobs();
+        }
+        finally
+        {
+            Shortcut.RevealDelay = delay;
+        }
     }
 
+    /// <summary>Using a shortcut isn't looking for one: a quick Ctrl+C never shows the keycaps, and pressing a key while they show puts them away.</summary>
     [Fact]
-    public void Tooltips_show_the_shortcut_apart_from_the_words()
+    public void Using_a_Ctrl_shortcut_doesnt_leave_the_keycaps_up()
     {
-        var (window, _, _, _) = Open();
-        var ribbon = Ribbon(window);
+        var (window, canvas, panelId, bounds) = Open();
+        window.Editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
+        canvas.Focus();
 
-        var select = ribbon.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "SelectToolButton");
-        var tip = Assert.IsType<ShortcutTip>(ToolTip.GetTip(select));
-        Assert.Equal("V", tip.Keys);
-        Assert.DoesNotContain("(V)", tip.Text, StringComparison.Ordinal);
-        var keycap = tip.Children.OfType<Border>().Single(b => b.Classes.Contains("shortcutKeys"));
-        Assert.Equal("V", ((TextBlock)keycap.Child!).Text);
+        CtrlDown(window); // with the usual delay, nothing yet
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(Shortcut.Showing(window));
+        window.KeyPress(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
+        window.KeyRelease(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
+        CtrlUp(window);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(Shortcut.Showing(window));
+        Assert.True(window.Editor.CanPaste); // the Ctrl+C itself went through
 
-        var undo = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "QuickUndoButton");
-        Assert.Equal(("Undo", "Ctrl+Z"), (((ShortcutTip)ToolTip.GetTip(undo)!).Text, ((ShortcutTip)ToolTip.GetTip(undo)!).Keys));
-
-        // A tip changed later keeps its keys.
-        ToolTip.SetTip(select, "Pick things");
-        tip = Assert.IsType<ShortcutTip>(ToolTip.GetTip(select));
-        Assert.Equal(("Pick things", "V"), (tip.Text, tip.Keys));
+        var delay = Shortcut.RevealDelay;
+        Shortcut.RevealDelay = TimeSpan.Zero;
+        try
+        {
+            CtrlDown(window);
+            Dispatcher.UIThread.RunJobs();
+            Assert.NotEmpty(Shortcut.Showing(window));
+            window.KeyPress(Key.V, RawInputModifiers.Control, PhysicalKey.V, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Shortcut.Showing(window));
+            Assert.Equal(2, window.Editor.Working.Panels[panelId].Bubbles.Count);
+            window.KeyRelease(Key.V, RawInputModifiers.Control, PhysicalKey.V, null);
+            CtrlUp(window);
+        }
+        finally
+        {
+            Shortcut.RevealDelay = delay;
+        }
     }
 }
