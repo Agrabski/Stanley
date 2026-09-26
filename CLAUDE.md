@@ -36,21 +36,26 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
-snapping, page navigator) all exist. The GUI opens/saves real project folders (the
-pages of one issue for now — see "Documents" below). Characters exist as a
+snapping, page navigator) all exist. The GUI opens/saves real project folders, one
+issue at a time: a comic can have **several issues**, added and switched from File ›
+Info or the title bar's issue switcher (saving the one you leave, as opening another
+comic does) — see "Documents" below. Characters exist as a
 **POC** (sliders + a generated flat mannequin, front or side view, placed on
 panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery —
 see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
-faces, clothes, accessories — see "Stickers (implemented)" below); no
-three-quarter view yet. Panels also hold **drawn shapes, free text and pictures**
+faces, clothes, prints — symbols and your own text, emoji too — and accessories;
+see "Stickers (implemented)" below and docs/sticker-system.md §19), in any colour
+("More Colors…"); in the character editor, clicking a compared (faded) character
+switches to it. No three-quarter view yet. Panels also hold **drawn shapes, free
+text, pictures and speed lines** (focus lines radiating from a point you drag)
 behind or in front of the characters, over a colour, gradient or picture
 **background** — see "Panel elements and backgrounds (implemented)" below. A comic
 can start with a **title page** (Insert › Title page) and be a **comic strip or
 webcomic** rather than a comic book page (File › New templates) — see "Title pages
 and comic formats (implemented)" below.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
-GUI, any args dispatch through a CLI (System.CommandLine; currently just
-`init`) instead, without touching Avalonia at all — one binary, not a
+GUI, any args dispatch through a CLI (System.CommandLine; `init`, and `issue
+list`/`issue add`) instead, without touching Avalonia at all — one binary, not a
 separate GUI exe plus a separate CLI exe (see "Command-line interface" below
 for why).
 
@@ -83,6 +88,7 @@ dotnet test --project tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Test
 dotnet test --project tests/Stanley.Rendering.Tests/Stanley.Rendering.Tests.csproj
 dotnet run --project src/Stanley.App
 dotnet run --project src/Stanley.App -- init ./MyComic --title "My Comic"
+dotnet run --project src/Stanley.App -- issue add ./MyComic --title "The Long Way Home"
 ```
 All tests use xunit v3 (4.0.1), Microsoft.NET.Test.Sdk (18.10.1), and
 coverlet.collector (10.0.1). No linter is configured yet.
