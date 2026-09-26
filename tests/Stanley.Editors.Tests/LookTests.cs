@@ -87,6 +87,56 @@ public sealed class LookTests : IDisposable
     }
 
     [Fact]
+    public void Each_click_on_a_print_puts_on_another_copy_a_step_clear_of_the_last()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+
+        for (var i = 0; i < 3; i++)
+            editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "Skull"));
+
+        var skulls = editor.Working.Stickers[StickerSlots.Print].Select(id => editor.Working.Wardrobe.Find(id)!.Sticker).ToList();
+        Assert.Equal(3, skulls.Count);
+        Assert.Equal(3, skulls.Select(s => s.Id).Distinct().Count());
+        Assert.Equal(3, skulls.Select(s => s.Parts[0].Art!.Offset ?? default).Distinct().Count());
+        Assert.Equal(skulls[^1].Id, editor.SelectedStickerId); // the new one, ready to drag
+        var entry = Assert.Single(editor.Gallery(StickerSlots.Print).Choices, c => c.Label == "Skull"); // offered once, however many are worn
+        Assert.True(entry.IsWorn);
+    }
+
+    [Fact]
+    public void A_worn_text_print_clicked_in_the_gallery_or_duplicated_adds_another()
+    {
+        var (_, editor) = NewCharacter();
+        editor.Gallery(StickerSlots.Print).WearText!.Execute("HELLO");
+        var first = editor.SelectedStickerId;
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "HELLO"));
+        Assert.True(editor.CanDuplicateSelected);
+        editor.DuplicateSelectedCommand.Execute(null);
+
+        var worn = editor.Working.Stickers[StickerSlots.Print];
+        Assert.Equal(3, worn.Count);
+        Assert.Contains(first!.Value, worn);
+        Assert.All(worn, id => Assert.Equal("HELLO", editor.Working.Wardrobe.Find(id)!.Sticker.Name));
+        Assert.Equal(worn[^1], editor.SelectedStickerId);
+    }
+
+    [Fact]
+    public void Gloves_still_come_off_with_a_second_click_and_a_T_shirt_has_no_Duplicate()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Accessory, "Gloves"));
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Accessory, "Gloves"));
+        Assert.True(!editor.Working.Stickers.TryGetValue(StickerSlots.Accessory, out var accessories) || accessories.Count == 0);
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.SelectSticker(editor.Working.Stickers[StickerSlots.Top][0]);
+        Assert.False(editor.CanDuplicateSelected);
+        Assert.False(editor.DuplicateSelectedCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void The_starter_library_is_all_valid_stickers_in_known_slots()
     {
         Assert.NotEmpty(StickerLibrary.StickerLibrary.All);

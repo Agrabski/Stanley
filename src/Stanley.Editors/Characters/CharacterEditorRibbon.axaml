@@ -531,6 +531,9 @@
               <Button Name="RemoveStickerButton" Classes="small" Command="{Binding RemoveSelectedCommand}" HorizontalAlignment="Stretch"
                       ToolTip.Tip="Out of the wardrobe altogether">Remove</Button>
             </StackPanel>
+            <!-- Prints and badges only: as many of the same one as you like. -->
+            <Button Name="DuplicateStickerButton" Classes="small" Command="{Binding DuplicateSelectedCommand}" IsVisible="{Binding CanDuplicateSelected}"
+                    VerticalAlignment="Center" Margin="6,0,0,0" ToolTip.Tip="Another one just like it, a step aside - drag it where it goes">Duplicate</Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Wear" />
         </DockPanel>

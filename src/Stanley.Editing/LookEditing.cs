@@ -310,6 +310,59 @@ public static class LookEditing
 }
 
 /// <summary>
+/// Wearing the same design more than once (docs/sticker-system.md §19): in a slot that
+/// stacks, each click on a placeable design - drawn art or text, a print or a badge - puts
+/// on another copy, with its own id and placement (<see cref="Spot"/>), so ten skulls are ten
+/// stickers to move one by one. Pure functions, like <see cref="LookEditing"/>.
+/// </summary>
+public static class StickerCopies
+{
+    /// <summary>Where the Sticker tab's Duplicate puts the copy, from the one it copies, in template units: a small step down and to the right.</summary>
+    public static Point2D DuplicateStep { get; } = new(35, 35);
+
+    /// <summary>The spacing of <see cref="Spot"/>'s grid, in template units - a little more than a library print is wide.</summary>
+    public const double SpotSpacing = 70;
+
+    /// <summary>Whether a sticker is placed rather than generated from the body: it has drawn or typed parts. Only these are worth wearing twice - two identical pairs of gloves would sit exactly on top of each other.</summary>
+    public static bool IsPlaceable(Sticker sticker) => sticker.Parts.Any(p => p.Art is not null);
+
+    /// <summary>
+    /// Where the <paramref name="copy"/>th extra copy of a design goes, from where the design
+    /// itself sits: across the chest and down - centre, right, left, then the next row - so a
+    /// dozen stay on the shirt before any lands on another (the next dozen sit a little aside).
+    /// </summary>
+    public static Point2D Spot(int copy)
+    {
+        if (copy <= 0)
+            return default;
+        var (index, round) = (copy % 12, copy / 12);
+        var column = (index % 3) switch { 0 => 0, 1 => SpotSpacing, _ => -SpotSpacing };
+        return new Point2D(column + round * 10, index / 3 * SpotSpacing + round * 10);
+    }
+
+    /// <summary>
+    /// A copy of <paramref name="asset"/> under a fresh id, its placed parts moved by
+    /// <paramref name="shift"/> (template units). The art files come along unchanged. A
+    /// moved copy is the user's own (no longer an unmodified library copy).
+    /// </summary>
+    public static StickerAsset Copy(StickerAsset asset, Point2D shift)
+    {
+        var sticker = asset.Sticker;
+        var moved = shift != default;
+        var parts = !moved ? sticker.Parts : sticker.Parts.Select(p => p.Art is { } art
+            ? p with { Art = art with { Offset = new Point2D((art.Offset?.X ?? 0) + shift.X, (art.Offset?.Y ?? 0) + shift.Y) } }
+            : p).ToList();
+        return asset with { Sticker = sticker with { Id = StickerId.New(), Parts = parts, Source = moved ? null : sticker.Source } };
+    }
+
+    /// <summary>How many of <paramref name="slot"/>'s worn stickers are the design named <paramref name="name"/> - how many nudges the next copy needs.</summary>
+    public static int WornCopies(CharacterDefinition character, string slot, string name) =>
+        character.Stickers.TryGetValue(slot, out var worn)
+            ? worn.Count(id => character.Wardrobe.Find(id) is { } a && string.Equals(a.Sticker.Name, name, StringComparison.CurrentCultureIgnoreCase))
+            : 0;
+}
+
+/// <summary>
 /// Text prints (docs/sticker-system.md): typed text worn on the clothes instead of a drawn
 /// symbol. Pure functions, like <see cref="LookEditing"/>; the character editor turns each
 /// into one undo step.

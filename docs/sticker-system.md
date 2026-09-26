@@ -864,6 +864,14 @@ a band name, emoji), beyond patterns and textures.
   (`Lettering.FallbackRuns`): emoji and symbols the lettering font lacks come from
   whatever installed font has them (a colour emoji font draws in colour). Its
   clickable area and selection outline are its text box, mapped.
+- **As many of the same as you like**: in a slot that stacks (Prints, Other), each
+  click on a placed design - drawn art or text, a library symbol or your own - puts on
+  another copy (`StickerCopies`), with its own id and placement, a step down and to the
+  right of the last one and selected, so it can be dragged straight into place; the
+  Sticker tab's **Duplicate** does the same for the selected print. The gallery offers
+  each design once however many copies are worn. Copies come off one at a time from
+  the Sticker tab (Take off / Remove) or all at once with None. Stickers made only of
+  covers (gloves, a scarf) aren't copied - a second click takes them off, as before.
 - **UX**: the Prints gallery's **Text** button puts on "HELLO" and opens the Sticker
   tab's text box to type over (Enter or leaving the box applies it, one undo step),
   with a Bold toggle and a row of common emoji to add with a click. Size, Turn and

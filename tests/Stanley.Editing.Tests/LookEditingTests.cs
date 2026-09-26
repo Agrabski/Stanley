@@ -27,6 +27,49 @@ public class LookEditingTests
     }
 
     [Fact]
+    public void A_copy_is_its_own_sticker_moved_only_if_asked()
+    {
+        var art = new StickerPart("print", BodyRegion.Torso, Art: new PartArt(ArtMapping.Pin, Offset: new Point2D(10, 20)));
+        var skull = Asset(StickerSlots.Print, "Skull", "library:print/skull", art) with { Files = new Dictionary<string, ArtFile> { ["variants/default/front.svg"] = ArtFile.Svg("<svg/>") } };
+
+        var same = StickerCopies.Copy(skull, default);
+        var moved = StickerCopies.Copy(skull, new Point2D(70, 35));
+
+        Assert.NotEqual(skull.Id, same.Id);
+        Assert.Equal(skull.Sticker.Parts, same.Sticker.Parts);
+        Assert.Equal("library:print/skull", same.Sticker.Source); // still an unmodified library copy
+        Assert.NotEqual(skull.Id, moved.Id);
+        Assert.Equal(new Point2D(80, 55), moved.Sticker.Parts[0].Art!.Offset);
+        Assert.Null(moved.Sticker.Source); // moved, so it's the user's own now
+        Assert.Same(skull.Files, moved.Files);
+    }
+
+    [Fact]
+    public void Copies_fill_the_chest_a_row_at_a_time_before_any_two_share_a_spot()
+    {
+        var spots = Enumerable.Range(0, 12).Select(StickerCopies.Spot).ToList();
+
+        Assert.Equal(default, spots[0]);
+        Assert.Equal(12, spots.Distinct().Count());
+        Assert.All(spots, s => Assert.InRange(s.X, -StickerCopies.SpotSpacing, StickerCopies.SpotSpacing));
+        Assert.Equal(0, spots[3].X); // centre, right, left, then the next row
+        Assert.NotEqual(spots[0], StickerCopies.Spot(12)); // the next dozen sit a little aside
+    }
+
+    [Fact]
+    public void Only_placed_designs_are_worth_copying_and_copies_are_counted_by_name()
+    {
+        var gloves = Asset(StickerSlots.Accessory, "Gloves");
+        var badge = Asset(StickerSlots.Accessory, "Badge", null, new StickerPart("badge", BodyRegion.Torso, Art: new PartArt(ArtMapping.Pin)));
+        var c = LookEditing.Wear(LookEditing.Wear(CharacterDefinition.Create("A"), badge), StickerCopies.Copy(badge, StickerCopies.DuplicateStep));
+
+        Assert.False(StickerCopies.IsPlaceable(gloves.Sticker));
+        Assert.True(StickerCopies.IsPlaceable(badge.Sticker));
+        Assert.Equal(2, StickerCopies.WornCopies(c, StickerSlots.Accessory, "badge"));
+        Assert.Equal(0, StickerCopies.WornCopies(c, StickerSlots.Accessory, "Gloves"));
+    }
+
+    [Fact]
     public void Accessories_stack_and_any_slot_stacks_on_request()
     {
         var (watch, ring) = (Asset(StickerSlots.Accessory, "Watch"), Asset(StickerSlots.Accessory, "Ring"));
