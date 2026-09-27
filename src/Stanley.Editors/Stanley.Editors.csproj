@@ -40,6 +40,18 @@
       <DependentUpon>CharacterLibraryView.axaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Page\PageEditorRibbon.axaml.cs">
+      <DependentUpon>PageEditorRibbon.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Page\PageEditorView.axaml.cs">
+      <DependentUpon>PageEditorView.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Page\PageNavigatorView.axaml.cs">
+      <DependentUpon>PageNavigatorView.axaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 
 </Project>
