@@ -122,6 +122,39 @@ public sealed class ComicProjectTests : IDisposable
         Assert.Single(ComicProject.Open(folder).Pages);
     }
 
+    /// <summary>#65: an issue can end up owning no pages at all, the comic's title page standing in as its only page - saving, reopening and switching to it must all still work.</summary>
+    [Fact]
+    public void AnIssueWhoseOnlyPageIsTheComicsTitlePage_SavesReopensAndSwitchesCorrectly()
+    {
+        var project = ComicProject.CreateNew();
+        var navigator = PageEditorHost.CreateWorkspace(project).Navigator;
+        var titlePage = navigator.InsertTitlePage(TitlePageDesign.Cover);
+        navigator.DeletePage(navigator.Pages[1]); // just the comic's title page is left
+        var folder = Path.Combine(_root, "title-page-only");
+
+        var saved = project.SaveAs(folder, navigator.Snapshot());
+        var secondId = project.NewIssue(); // a second issue, to switch away from and back to this one
+
+        var repository = new ProjectRepository(saved);
+        Assert.Empty(repository.LoadIssue(project.IssueId).PageIds); // zero pages of its own on disk
+        Assert.True(File.Exists(Path.Combine(saved, "title-page", "page.json")));
+
+        var reopened = ComicProject.Open(saved, project.IssueId);
+        Assert.Empty(reopened.Pages); // no blank page silently added
+        Assert.Equal(titlePage.Id, reopened.TitlePage?.Id);
+        Assert.Equal(0, reopened.Issues.Single(i => i.Id == project.IssueId).PageCount);
+
+        // Switching to it (as the title bar's issue switcher does) shows the comic's title page and nothing else.
+        var shown = PageEditorHost.CreateWorkspace(reopened).Navigator;
+        var onlyPage = Assert.Single(shown.Pages);
+        Assert.Same(shown.ComicTitlePage, onlyPage);
+        Assert.Same(onlyPage, shown.CurrentPage);
+
+        // And switching back to the second issue and this one again keeps working.
+        Assert.Single(ComicProject.Open(saved, secondId).Pages);
+        Assert.Empty(ComicProject.Open(saved, project.IssueId).Pages);
+    }
+
     [Fact]
     public void Open_AFolderThatIsntAProject_Throws()
     {
