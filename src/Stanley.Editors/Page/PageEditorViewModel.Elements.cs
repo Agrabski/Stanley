@@ -611,12 +611,14 @@ public sealed partial class PageEditorViewModel
             Select(panelId);
     }
 
-    /// <summary>To the front or back of its layer.</summary>
+    /// <summary>To the very front - in front of the characters - or the very back; nothing to undo when it's already there.</summary>
     public void ReorderElement(PanelId panelId, int index, bool toFront)
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.Elements.Count)
             return;
         var (list, newIndex) = ElementEditing.Reorder(panel.Elements, index, toFront);
+        if (ReferenceEquals(list, panel.Elements))
+            return;
         Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Elements = list })));
         if (Equals(_selectedPanelId, panelId) && _selectedElementIndex == index)
             SelectElement(panelId, newIndex);
