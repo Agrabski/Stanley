@@ -90,6 +90,7 @@ public sealed record PartText(string Text, string Color = "print", string? FontF
 /// </summary>
 /// <param name="Side">Limb regions only: just this side; absent means both.</param>
 /// <param name="Text">Only with <paramref name="Art"/>: typed instead of drawn (a print).</param>
+/// <param name="Variants">Only in these of the sticker's variants (a hood's "up" pieces, a cap's brim behind the head); absent means all of them.</param>
 public sealed record StickerPart(
     string Name,
     BodyRegion Region,
@@ -99,7 +100,12 @@ public sealed record StickerPart(
     PartDepth? Depth = null,
     PartBlend? Blend = null,
     PartClip? Clip = null,
-    PartText? Text = null);
+    PartText? Text = null,
+    IReadOnlyList<string>? Variants = null)
+{
+    /// <summary>Whether the part is drawn when its sticker shows <paramref name="variant"/>.</summary>
+    public bool AppliesTo(string variant) => Variants is not { Count: > 0 } only || only.Contains(variant);
+}
 
 /// <summary>
 /// <c>characters/&lt;characterId&gt;-slug/stickers/&lt;id&gt;-slug/sticker.json</c> - something a

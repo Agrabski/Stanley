@@ -160,6 +160,8 @@ public sealed class LookTests : IDisposable
         {
             foreach (var variant in item.Asset.Sticker.Variants)
             {
+                var parts = item.Asset.Sticker.Parts.Where(p => p.Art is not null && p.AppliesTo(variant)).ToList();
+                var drawnSomewhere = new HashSet<string>();
                 foreach (var view in new[] { ViewAngle.Front, ViewAngle.Profile })
                 {
                     var file = item.Asset.ArtFor(variant, view);
@@ -168,9 +170,18 @@ public sealed class LookTests : IDisposable
                     Assert.True(art is not null, $"{item.Key}: {variant} {view} parses");
                     Assert.Empty(art!.Report);
                     Assert.Equal(StickerSlots.Get(item.Slot).Name, art.Slot);
-                    foreach (var part in item.Asset.Sticker.Parts.Where(p => p.Art is not null))
-                        Assert.True(art.Part(part.Name).Count > 0 || part.Depth == PartDepth.Back && view == ViewAngle.Front, $"{item.Key}: {variant} {view} draws {part.Name}");
+                    foreach (var part in parts)
+                    {
+                        if (art.Part(part.Name).Count > 0)
+                            drawnSomewhere.Add(part.Name);
+                        // A part in every variant is drawn in both views (the back of the hair may be hidden from the front);
+                        // one in only some (a cap's brim behind the head) may be drawn in just the view that shows it.
+                        else if (part.Variants is null)
+                            Assert.True(part.Depth == PartDepth.Back && view == ViewAngle.Front, $"{item.Key}: {variant} {view} draws {part.Name}");
+                    }
                 }
+                foreach (var part in parts)
+                    Assert.True(drawnSomewhere.Contains(part.Name), $"{item.Key}: {variant} draws {part.Name} in some view");
             }
         }
     }

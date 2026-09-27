@@ -252,6 +252,23 @@ public class CoverStickerRenderingTests
     }
 
     [Fact]
+    public void A_part_for_some_variants_only_is_drawn_just_in_those()
+    {
+        var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1), Variants: ["up"]));
+        var id = character.Stickers[StickerSlots.Top][0];
+        var asset = character.Wardrobe.Find(id)!;
+        character = character with { Wardrobe = character.Wardrobe.With(asset with { Sticker = asset.Sticker with { Variants = ["down", "up"] } }) };
+        var figure = BodyRig.Build(character.Body);
+        var chest = figure.Regions.Torso.ToFigure(new Point2D(0, figure.Regions.Torso.Top + 0.1));
+
+        using var down = Render(character, new PoseData(ViewAngle.Front, [], []));
+        using var up = Render(character, new PoseData(ViewAngle.Front, [], new SortedDictionary<string, string> { [StickerSlots.Top] = "up" }));
+
+        Assert.Equal(FigureGeometry.ToSk(character.Skin), At(down, chest));
+        Assert.Equal(new SKColor(0, 0, 255), At(up, chest));
+    }
+
+    [Fact]
     public void The_characters_own_colour_wins_over_the_stickers_default()
     {
         var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));

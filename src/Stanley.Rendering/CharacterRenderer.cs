@@ -387,23 +387,25 @@ public sealed class FigureRenderer : ICharacterRenderer
         public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
         {
             var sticker = worn.Asset.Sticker;
+            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression);
+            var parts = sticker.Parts.Where(p => p.AppliesTo(variant)).ToList();
             var covers = new List<(StickerPart, PartPiece)>();
-            foreach (var part in sticker.Parts)
+            foreach (var part in parts)
             {
                 if (part.Cover is { } cover)
                     covers.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
             }
 
             var text = new List<TextPiece>();
-            foreach (var part in sticker.Parts.Where(p => p is { Art: not null, Text: not null }))
+            foreach (var part in parts.Where(p => p is { Art: not null, Text: not null }))
             {
                 foreach (var (side, matrix, runs, color, bounds, anchor) in StickerArtPieces.MapText(figure, part, part.Art!, part.Text!, look))
                     text.Add(new TextPiece(part, LayerOf(figure, part, side), matrix, runs, color, BoundsArea(bounds, matrix), anchor));
             }
 
             var art = new List<ArtPiece>();
-            var drawn = sticker.Parts.Where(p => p is { Art: not null, Cover: null, Text: null }).ToList();
-            if (drawn.Count > 0 && StickerArtPieces.ArtFor(worn.Asset, StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression), figure.Angle) is { } parsed)
+            var drawn = parts.Where(p => p is { Art: not null, Cover: null, Text: null }).ToList();
+            if (drawn.Count > 0 && StickerArtPieces.ArtFor(worn.Asset, variant, figure.Angle) is { } parsed)
             {
                 foreach (var part in drawn)
                 {
