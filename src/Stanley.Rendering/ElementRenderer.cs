@@ -139,7 +139,9 @@ public static class ElementRenderer
         var maxWidth = (float)area.Width;
         var lines = Lettering.Wrap(text.Text, font, paint, maxWidth);
 
-        // Shrink to fit rather than spill out of the box, the way bubble lettering does.
+        // Shrink to fit rather than spill out of the box: typing normally grows the box first
+        // (TextEditing.GrowToFit), so this only bites when a box was dragged smaller than its
+        // text by hand. A bubble, by contrast, never shrinks its lettering - see BubbleEditing.GrowToFit.
         var totalHeight = font.Spacing * lines.Count;
         if (totalHeight > area.Height && lines.Count > 0)
         {

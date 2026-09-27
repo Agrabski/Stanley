@@ -1038,7 +1038,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return;
         }
 
-        var bubble = bubbleResult.Value;
+        var bubble = GrowBubbleToFit(bubbleResult.Value);
         Apply(EditPanel(Working, panelId, p =>
             EditResult<Panel>.Success(p with { Bubbles = [.. p.Bubbles, BubbleEditing.KeepInside(bubble, Bounds(p))] })));
     }
@@ -1068,7 +1068,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return -1;
         }
 
-        var bubble = BubbleEditing.KeepInside(_newBubbleLettering.ApplyTo(created.Value), panelBounds);
+        var bubble = BubbleEditing.KeepInside(GrowBubbleToFit(_newBubbleLettering.ApplyTo(created.Value)), panelBounds);
         if (bounds is null)
         {
             // Not on top of one already there: adding two in a row would hide the first.
@@ -1127,8 +1127,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             Apply(EditPanel(Working, panelId, p => PanelLayoutEditing.Move(p, dx, dy, PageBounds)));
     }
 
+    /// <summary>Restyles the bubble; it grows if the new outline leaves less room for its text than the old one did.</summary>
     public void SetBubbleStyle(PanelId panelId, int bubbleIndex, BubbleStylePreset style) =>
-        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) => BubbleEditing.SetStyle(b, style)));
+        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
+            EditResult<Bubble>.Success(GrowBubbleToFit(BubbleEditing.SetStyle(b, style).Value))));
 
     public void AddBubbleTail(PanelId panelId, int bubbleIndex, Point2D target) =>
         Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, panelBounds) =>
@@ -1163,8 +1165,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, _) =>
             BubbleEditing.SlideTailAttachment(b, tailIndex, pointer)));
 
+    /// <summary>Sets a bubble's words (one undo step), growing it to fit them.</summary>
     public void SetBubbleText(PanelId panelId, int bubbleIndex, string text) =>
-        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) => BubbleEditing.SetText(b, text)));
+        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
+        {
+            var set = BubbleEditing.SetText(b, text);
+            return set.IsValid ? GrownBubbleEdit(set.Value) : set;
+        }));
 
     public void DeleteBubble(PanelId panelId, int bubbleIndex)
     {
@@ -1796,6 +1803,17 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     // ---------------------------------------------------------------- helpers
 
     private static Rect2D Bounds(Panel panel) => AnchorRing.BoundingBox(panel.Shape.Anchors);
+
+    /// <summary>
+    /// Grows a bubble to fit its own text at its own lettering (never shrinks it) - the same
+    /// measurement <see cref="Stanley.Rendering.PageRenderer"/> draws with, so nothing on
+    /// screen, in export or in the in-place text editor ever has to shrink to fit (issue #66).
+    /// Callers that need it wrapped back up as a successful edit use <see cref="GrownBubbleEdit"/>.
+    /// </summary>
+    private static Bubble GrowBubbleToFit(Bubble bubble) =>
+        BubbleEditing.GrowToFit(bubble, BubbleTextRenderer.NeededScale(bubble, PageRenderer.FontSizeMm));
+
+    private static EditResult<Bubble> GrownBubbleEdit(Bubble bubble) => EditResult<Bubble>.Success(GrowBubbleToFit(bubble));
 
     private static EditResult<PageDocument> EditPanel(PageDocument document, PanelId id, Func<Panel, EditResult<Panel>> edit)
     {

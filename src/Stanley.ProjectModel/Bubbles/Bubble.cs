@@ -16,7 +16,9 @@ namespace Stanley.ProjectModel.Bubbles;
 /// The lettering's font is the same set of choices free text has (see <c>TextStyle</c>),
 /// every one optional: a bubble that leaves them alone letters in the default font at
 /// <see cref="DefaultFontSizePt"/>, upright and centred, and its file says nothing about
-/// them. The letters shrink to fit a bubble too small for them.
+/// them. The size is absolute - it never shrinks to fit; a bubble too small for its text
+/// grows instead (<c>Stanley.Editing.BubbleEditing.GrowToFit</c>), and one a user then
+/// resizes smaller by hand just spills its text past the outline.
 /// </para>
 /// </summary>
 /// <param name="FontFamily">The typeface family (see <c>TextStyle.FontFamily</c>); null is the default lettering font.</param>

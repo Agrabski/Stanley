@@ -185,6 +185,30 @@ public static class BubbleEditing
         Math.Clamp(point.X, container.Left, container.Right),
         Math.Clamp(point.Y, container.Top, container.Bottom));
 
+    /// <summary>
+    /// Grows the shape around its own centre by <paramref name="scale"/> (from the renderer's
+    /// measurement - see <c>Stanley.Rendering.BubbleTextRenderer.NeededScale</c>), keeping its
+    /// aspect ratio so an oval stays an oval, so typed text never has to shrink to fit; never
+    /// shrinks a bubble the user made bigger, the same rule <c>TextEditing.GrowToFit</c> follows
+    /// for free text. Tails keep their targets - resizing a bubble shouldn't drag whatever it
+    /// points at - and their attachment stays the same fraction along the outline, so it slides
+    /// out to the bigger shape rather than jumping.
+    /// </summary>
+    public static Bubble GrowToFit(Bubble bubble, double scale)
+    {
+        if (scale <= 1 + 1e-9)
+            return bubble;
+
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var grown = new Rect2D(
+            bounds.MidX - bounds.Width * scale / 2,
+            bounds.MidY - bounds.Height * scale / 2,
+            bounds.Width * scale,
+            bounds.Height * scale);
+        var rescaled = AnchorRing.Rescale(bubble.Shape.Anchors, bounds, grown);
+        return bubble with { Shape = new BubbleShape(rescaled) };
+    }
+
     public static EditResult<Bubble> SetText(Bubble bubble, string text)
     {
         if (text.Length > MaxTextLength)
