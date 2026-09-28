@@ -337,10 +337,11 @@ internal static class StickerArtPieces
 {
     /// <summary>
     /// The variant a sticker shows: the pose's expression for its slot if it has that one,
-    /// else "neutral" if it has one, else its first.
+    /// else the style it's worn in (<paramref name="chosen"/>) if it has that one, else
+    /// "neutral" if it has one, else its first.
     /// </summary>
-    public static string VariantFor(Sticker sticker, string slot, IReadOnlyDictionary<string, string>? expression) =>
-        sticker.VariantFor(slot, expression);
+    public static string VariantFor(Sticker sticker, string slot, IReadOnlyDictionary<string, string>? expression, string? chosen = null) =>
+        sticker.VariantFor(slot, expression, chosen);
 
     /// <summary>The views to try, nearest first (§6.3): a missing view falls back to the nearest drawn one.</summary>
     public static IEnumerable<ViewAngle> ViewFallback(ViewAngle view) => view switch

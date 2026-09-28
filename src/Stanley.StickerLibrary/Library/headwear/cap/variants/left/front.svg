@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="headwear">
+  <g id="seams" inkscape:groupmode="layer" inkscape:label="seams">
+    <path class="slot-hat" d="M4.2,-1011.4 C7,-1009.9 9.9,-1009 12.6,-1006.7 C15.2,-1004.4 17.9,-1001.2 20.2,-997.5 C22.5,-993.7 24.7,-989.2 26.6,-984.2 C28.4,-979.3 29.7,-973.3 31.3,-967.9" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M-4.2,-1011.4 C-7,-1009.9 -9.9,-1009 -12.6,-1006.7 C-15.2,-1004.4 -17.9,-1001.2 -20.2,-997.5 C-22.5,-993.7 -24.7,-989.2 -26.6,-984.2 C-28.4,-979.3 -29.7,-973.3 -31.3,-967.9" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M-7,-1011 C-7,-1016 7,-1016 7,-1011 Z" fill="#2f8a57" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g id="brim" inkscape:groupmode="layer" inkscape:label="brim">
+    <path class="slot-hat" d="M52,-972 C62,-972 72.3,-972.5 82,-972 C91.7,-971.5 103,-970.7 110,-969 C117,-967.3 123,-964.2 124,-962 C125,-959.8 123,-956.3 116,-956 C109,-955.7 92.7,-959 82,-960 C71.3,-961 62,-961.3 52,-962 L52,-972 Z" fill="#2f8a57" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g id="brim-back" inkscape:groupmode="layer" inkscape:label="brim-back"/>
+  <g id="strap" inkscape:groupmode="layer" inkscape:label="strap"/>
+  <g id="gap" inkscape:groupmode="layer" inkscape:label="gap"/>
+</svg>

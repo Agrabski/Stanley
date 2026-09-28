@@ -15,15 +15,31 @@ public class LookEditingTests
     private static IReadOnlyList<StickerId> Worn(CharacterDefinition c, string slot) => c.Stickers.TryGetValue(slot, out var ids) ? ids : [];
 
     [Fact]
-    public void Wearing_replaces_what_the_slot_held_and_keeps_both_in_the_wardrobe()
+    public void Wearing_goes_on_top_of_what_the_slot_holds_and_wearing_it_again_changes_nothing()
     {
         var (tee, sweater) = (Asset(StickerSlots.Top, "Tee"), Asset(StickerSlots.Top, "Sweater"));
         var c = LookEditing.Wear(CharacterDefinition.Create("A"), tee);
         c = LookEditing.Wear(c, sweater);
 
-        Assert.Equal([sweater.Id], Worn(c, StickerSlots.Top));
+        Assert.Equal([tee.Id, sweater.Id], Worn(c, StickerSlots.Top));
         Assert.NotNull(c.Wardrobe.Find(tee.Id));
         Assert.Same(c, LookEditing.Wear(c, sweater));
+        Assert.Same(c, LookEditing.Wear(c, tee)); // not moved to the top either
+    }
+
+    [Theory]
+    [InlineData(StickerSlots.Headwear)]
+    [InlineData(StickerSlots.Eyes)]
+    [InlineData(StickerSlots.Mouth)]
+    [InlineData(StickerSlots.Hair)]
+    public void Every_slot_face_ones_included_holds_layers_bottom_to_top(string slot)
+    {
+        var (under, over) = (Asset(slot, "Under"), Asset(slot, "Over"));
+
+        var c = LookEditing.Wear(LookEditing.Wear(CharacterDefinition.Create("A"), under), over);
+
+        Assert.Equal([under.Id, over.Id], Worn(c, slot));
+        Assert.Equal(["Under", "Over"], CharacterLooks.Resolve(c).Stickers.Where(w => w.Slot == slot).Select(w => w.Asset.Sticker.Name));
     }
 
     [Fact]
@@ -70,14 +86,14 @@ public class LookEditingTests
     }
 
     [Fact]
-    public void Accessories_stack_and_any_slot_stacks_on_request()
+    public void Layers_move_forward_and_back_within_their_slot()
     {
         var (watch, ring) = (Asset(StickerSlots.Accessory, "Watch"), Asset(StickerSlots.Accessory, "Ring"));
         var c = LookEditing.Wear(LookEditing.Wear(CharacterDefinition.Create("A"), watch), ring);
         Assert.Equal([watch.Id, ring.Id], Worn(c, StickerSlots.Accessory));
 
         var (tee, vest) = (Asset(StickerSlots.Top, "Tee"), Asset(StickerSlots.Top, "Vest"));
-        c = LookEditing.Wear(LookEditing.Wear(c, tee), vest, stack: true);
+        c = LookEditing.Wear(LookEditing.Wear(c, tee), vest);
         Assert.Equal([tee.Id, vest.Id], Worn(c, StickerSlots.Top));
 
         c = LookEditing.MoveInStack(c, tee.Id, +1);
@@ -123,7 +139,7 @@ public class LookEditingTests
     {
         var (tee, sweater) = (Asset(StickerSlots.Top, "Tee"), Asset(StickerSlots.Top, "Sweater"));
         var c = LookEditing.SetColor(LookEditing.Wear(CharacterDefinition.Create("A"), tee), "top", ColorValue.FromHex("#ff0000"));
-        c = LookEditing.Wear(c, sweater);
+        c = LookEditing.Wear(LookEditing.TakeOff(c, tee.Id), sweater);
 
         Assert.Equal(ColorValue.FromHex("#ff0000"), CharacterLooks.Resolve(c).Colors["top"]);
         Assert.Equal(["skin", "top"], LookEditing.ColorSlotsInUse(c));

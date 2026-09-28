@@ -20,6 +20,22 @@ internal static class StickerCovers
 {
     private const float Far = 10; // "past the end" for clipping bands, in figure units
 
+    /// <summary>How much looser than the loosest layer under it a layer in the same slot goes on (a fraction of the character's height): enough to hide that layer's edge.</summary>
+    public const double LayerMargin = PartCover.DefaultEase / 2;
+
+    /// <summary>
+    /// Automatic layer fit (docs/sticker-system.md §8), at draw time only - never saved: a
+    /// cover worn over others in the same slot goes on at least <see cref="LayerMargin"/>
+    /// looser than the loosest cover on its region among them (<paramref name="under"/>,
+    /// region to ease), so a tight shirt over a loose T-shirt hides it instead of showing a
+    /// sliver of it round its edge. The cover itself when nothing is under it, or when it's
+    /// loose enough already.
+    /// </summary>
+    public static PartCover FittedOver(PartCover cover, BodyRegion region, IReadOnlyDictionary<BodyRegion, double>? under) =>
+        under is not null && under.TryGetValue(region, out var below) && cover.EaseOrDefault < below + LayerMargin
+            ? cover with { Ease = below + LayerMargin }
+            : cover;
+
     /// <summary>The pieces of one cover part on <paramref name="figure"/>; <paramref name="height"/> is the character's height (ease is a fraction of it).</summary>
     public static IEnumerable<PartPiece> Pieces(BodyFigure figure, StickerPart part, PartCover cover, double height)
     {

@@ -4,7 +4,7 @@
   tab - what the character wears (a gallery per slot - hair and face, clothes,
   accessories - previewed on the character) and
   the colours of the slots in use; and the contextual Sticker tab for the worn sticker
-  picked on the stage. Shown in the window's ribbon bar whenever a character editor is
+  picked on the stage (with its styles, when it has some). Shown in the window's ribbon bar whenever a character editor is
   the active pane.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -451,6 +451,30 @@
           <TextBlock Classes="groupLabel" Text="{Binding SelectedStickerName}" />
         </DockPanel>
         <Rectangle Classes="divider" />
+
+        <!-- Ways to wear it - a hood up or down, a cap's brim forward, back or to a side - each previewed on the character (not for faces: their variants are expressions). -->
+        <DockPanel Classes="group" IsVisible="{Binding HasSelectedStickerStyles}">
+          <ItemsControl Name="StyleGallery" ItemsSource="{Binding SelectedStickerStyles}" Height="72">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:StickerStyleChoice">
+                <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="56" Height="72" Padding="2"
+                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetStyleCommand}"
+                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Angle="{Binding Angle}" Closeup="{Binding Closeup}" />
+                  </DockPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Worn" ToolTip.Tip="How it's worn - kept with the look you're editing; right-click it on a page for one panel only" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasSelectedStickerStyles}" />
 
         <DockPanel Classes="group" IsVisible="{Binding HasArtParts}">
           <StackPanel Spacing="2">

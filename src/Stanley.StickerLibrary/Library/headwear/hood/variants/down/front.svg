@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="headwear">
+  <g id="down" inkscape:groupmode="layer" inkscape:label="down">
+    <path class="slot-top" d="M0,-886 C13.3,-886 28.7,-888.7 40,-888 C51.3,-887.3 59,-886 68,-882 C77,-878 87.3,-872 94,-864 C100.7,-856 105.7,-844 108,-834 C110.3,-824 108,-814 108,-804 C92,-800 78,-794.3 60,-792 C42,-789.7 20,-790 0,-790 C-20,-790 -42,-789.7 -60,-792 C-78,-794.3 -92,-800 -108,-804 C-108,-814 -110.3,-824 -108,-834 C-105.7,-844 -100.7,-856 -94,-864 C-87.3,-872 -77,-878 -68,-882 C-59,-886 -51.3,-887.3 -40,-888 C-28.7,-888.7 -13.3,-886 0,-886 Z" fill="#7a8b99" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-top" d="M50,-877 C60,-873.3 71.7,-872.5 80,-866 C88.3,-859.5 93.3,-847.3 100,-838" fill="none" stroke="#5b6a77" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-top" d="M-50,-877 C-60,-873.3 -71.7,-872.5 -80,-866 C-88.3,-859.5 -93.3,-847.3 -100,-838" fill="none" stroke="#5b6a77" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

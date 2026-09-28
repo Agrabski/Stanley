@@ -1,3 +1,4 @@
+using Stanley.Editing;
 using Stanley.ProjectModel.Characters;
 using Stanley.StickerLibrary;
 namespace Stanley.Editors;
@@ -12,5 +13,12 @@ public sealed record StickerChoice(string Label, string Slot, CharacterDefinitio
 	/// <summary>Worn on the head (hair, face, hats, glasses): previewed as a close-up.</summary>
 	public bool Closeup => StickerSlots.Get(Slot).Region == BodyRegion.Head;
 
-	public string Tip => IsNone ? "Nothing in this slot" : Library is not null ? $"{Label} - from the starter library" : IsWorn ? $"{Label} - wearing it" : Label;
+	/// <summary>A click puts on another copy (a print or a badge, in a slot that stamps copies) rather than taking a worn one off.</summary>
+	public bool StampsCopy => !IsNone && StickerSlots.Get(Slot).StampsCopies && StickerCopies.IsPlaceable((Asset ?? Library!.Asset).Sticker);
+
+	public string Tip =>
+		IsNone ? "Take off everything in this slot"
+		: IsWorn ? (StampsCopy ? $"{Label} - wearing it; click for another" : $"{Label} - wearing it; click to take it off")
+		: Library is not null ? $"{Label} - from the starter library"
+		: Label;
 }
