@@ -87,16 +87,25 @@ the "Panel elements" from `CLAUDE.md`, not bubbles or characters, which have
 their own placement model and stay out of groups in v1) and choosing **Group**
 (ribbon, right-click, `Ctrl+G`) replaces them with one new panel element:
 
-- **`GroupElement`**: an ordered list of child `PanelElement`s with their own
-  relative offsets, plus one transform (position, rotation, scale) applied to
-  the group as a whole — the same shape `PageEditorViewModel`'s multi-selection
-  drag already uses for "drags as one, nudges as one, deletes as one undo
-  step" (`CLAUDE.md`, Shift+click), just made persistent instead of transient.
+- **`GroupElement`**: an ordered list of child `PanelElement`s, each still
+  holding its own absolute geometry — no separate position/rotation/scale
+  field on the group itself, because no `PanelElement` stores one today
+  (`TextElement`/`PictureElement` keep an absolute `Rect2D`, `ShapeElement`
+  absolute anchors). A group is exactly today's transient multi-selection
+  (`PageEditorViewModel`'s "drags as one, nudges as one, deletes as one undo
+  step", `CLAUDE.md` Shift+click) made persistent: **Move** translates every
+  child by the same delta (recursing for nested groups); **Resize** rescales
+  every child from the group's old bounding box to the new one, the same
+  rect-to-rect remap `ElementEditing.Refit` already does when a panel itself
+  is resized. **Rotation is out of scope for v1** — nothing in Stanley
+  rotates an element today, and inventing that primitive is a separate,
+  larger piece of work this issue doesn't need to unblock #99.
 - **Ungroup** (`Ctrl+Shift+G`) dissolves it back into loose elements at their
-  current absolute positions/rotations — a lossless round trip.
-- A group is one selectable, draggable, resizable, rotatable object; double
-  click (or a ribbon button) enters it to select/edit a child without
-  ungrouping, the way entering a group works in vector editors.
+  current absolute positions — already true by construction, so this is
+  just removing the wrapper, a lossless round trip.
+- A group is one selectable, draggable and resizable object; double click
+  (or a ribbon button) enters it to select/edit a child without ungrouping,
+  the way entering a group works in vector editors.
 - **To front / To back**, copy/cut/paste/duplicate, Alt-drag, and undo/redo
   all treat a group as one `PanelElement` — no special-casing needed beyond
   `GroupElement` itself implementing the same interfaces existing elements do.
