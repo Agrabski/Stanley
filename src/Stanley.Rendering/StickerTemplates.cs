@@ -7,10 +7,10 @@ using Stanley.ProjectModel.Geometry;
 namespace Stanley.Rendering;
 
 /// <summary>A layer a template offers for a slot: the part it becomes, where it goes, and how it's mapped.</summary>
-public sealed record TemplatePart(string Name, BodyRegion Region, ArtMapping Mapping, PartDepth? Depth = null)
+public sealed record TemplatePart(string Name, BodyRegion Region, ArtMapping Mapping, PartDepth? Depth = null, PartClip? Clip = null)
 {
     /// <summary>The sticker part this layer becomes.</summary>
-    public StickerPart ToPart() => new(Name, Region, Art: new PartArt(Mapping), Depth: Depth);
+    public StickerPart ToPart() => new(Name, Region, Art: new PartArt(Mapping), Depth: Depth, Clip: Clip);
 }
 
 /// <summary>
@@ -25,11 +25,15 @@ public static class StickerTemplates
     /// <summary>The parts a new drawn sticker for <paramref name="slot"/> starts with - one template layer each.</summary>
     public static IReadOnlyList<TemplatePart> PartsFor(string slot) => slot switch
     {
-        StickerSlots.Hair or StickerSlots.Headwear =>
+        StickerSlots.Hair or StickerSlots.Headwear or StickerSlots.HairExtras =>
         [
             new("back", BodyRegion.Head, ArtMapping.Warp, PartDepth.Back),
             new("front", BodyRegion.Head, ArtMapping.Warp),
         ],
+        // Hair pieces (docs: modular hair): the back hangs behind everything, the rest over the face.
+        StickerSlots.HairTop or StickerSlots.HairFringe or StickerSlots.HairSides => [new("front", BodyRegion.Head, ArtMapping.Warp)],
+        StickerSlots.HairBack => [new("back", BodyRegion.Head, ArtMapping.Warp, PartDepth.Back)],
+        StickerSlots.HairStreaks => [new("streak", BodyRegion.Head, ArtMapping.Warp, Clip: PartClip.Hair)],
         StickerSlots.Eyes or StickerSlots.Brows or StickerSlots.Mouth or StickerSlots.Nose or StickerSlots.Glasses =>
             [new(slot, BodyRegion.Head, ArtMapping.Pin)],
         StickerSlots.FacialHair => [new("beard", BodyRegion.Head, ArtMapping.Warp)],
@@ -69,6 +73,17 @@ public static class StickerTemplates
             svg.Append($"    <path d=\"{scaled.ToSvgPathData()}\" fill=\"#{skin.Red:x2}{skin.Green:x2}{skin.Blue:x2}\" stroke=\"#000000\" stroke-width=\"3\" stroke-linejoin=\"round\"/>\n");
         }
         svg.Append("  </g>\n");
+        if (StickerSlots.IsHair(slot))
+        {
+            // Where hair pieces meet: draw to these and any piece fits any other.
+            svg.Append("  <g id=\"joins\" inkscape:groupmode=\"layer\" inkscape:label=\"joins\" sodipodi:insensitive=\"true\" data-stanley-guide=\"true\" opacity=\"0.6\">\n");
+            foreach (var join in HairJoins.For(view))
+            {
+                var points = string.Join(" ", join.Points.Select(p => $"{N((float)p.X)},{N((float)p.Y)}"));
+                svg.Append($"    <polyline id=\"join-{join.Name}\" points=\"{points}\" fill=\"none\" stroke=\"#d0308a\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/>\n");
+            }
+            svg.Append("  </g>\n");
+        }
         foreach (var part in PartsFor(slot))
             svg.Append($"  <g id=\"{part.Name}\" inkscape:groupmode=\"layer\" inkscape:label=\"{part.Name}\"/>\n");
         svg.Append("</svg>\n");

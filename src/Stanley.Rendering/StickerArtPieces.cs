@@ -417,13 +417,17 @@ internal static class StickerArtPieces
                 // A split eye's own elements still say "slot-eyes" (§21) - drawn from the
                 // shared "eyes" colour slot, split into "eyesLeft"/"eyesRight" only once a
                 // side is chosen for this worn copy, so splitting never repaints on its own.
-                var colorSlot = e.Slot == StickerSlots.Eyes && worn.Side is { } eyeSide ? StickerSlots.SidedSlot(e.Slot, eyeSide) : e.Slot;
+                // A hair piece's "slot-hair" is drawn from the piece's own key ("hairFringe",
+                // which follows "hair" until it's given its own), a streak's from its own.
+                var colorSlot = e.Slot == StickerSlots.Eyes && worn.Side is { } eyeSide
+                    ? StickerSlots.SidedSlot(e.Slot, eyeSide)
+                    : StickerSlots.ColorKey(worn.Slot, worn.Asset.Id, e.Slot);
                 var path = place(e.Path);
                 var clip = e.Clip is { } c ? place(c) : null;
-                var fill = e.Fill is { } f ? Recolor(f.Color, colorSlot, worn, look) : (SKColor?)null;
-                var stroke = e.Stroke is { } s ? Recolor(s.Color, colorSlot, worn, look) : (SKColor?)null;
-                var fillShader = e.Fill?.Gradient is { } fg ? Gradient(fg, colorSlot, worn, look, place) : null;
-                var strokeShader = e.Stroke?.Gradient is { } sg ? Gradient(sg, colorSlot, worn, look, place) : null;
+                var fill = e.Fill is { } f ? Recolor(f.Color, e.Slot, colorSlot, worn, look) : (SKColor?)null;
+                var stroke = e.Stroke is { } s ? Recolor(s.Color, e.Slot, colorSlot, worn, look) : (SKColor?)null;
+                var fillShader = e.Fill?.Gradient is { } fg ? Gradient(fg, e.Slot, colorSlot, worn, look, place) : null;
+                var strokeShader = e.Stroke?.Gradient is { } sg ? Gradient(sg, e.Slot, colorSlot, worn, look, place) : null;
                 FabricFill? fabric = null;
                 if (fill is { } ground && colorSlot is { } slot && !e.Solid && look.FabricOf(slot) is { } f2)
                 {
@@ -522,15 +526,23 @@ internal static class StickerArtPieces
     /// <summary>About the body's ink width in figure units for a character one unit tall - the template's 3 units in 1000.</summary>
     private const double NominalInk = ArtItem.TemplateInk / RegionMapping.TemplateUnits;
 
-    private static SKColor Recolor(SKColor color, string? slot, WornSticker worn, CharacterLook look)
+    /// <summary>
+    /// <paramref name="color"/>, drawn tagged <paramref name="tagged"/> (its <c>slot-*</c> class),
+    /// in the colour the look gives <paramref name="key"/> - the tag itself, or the key it's
+    /// coloured under (a split eye's side, a hair piece's own). The artist's shading is kept:
+    /// each shade moves by its offset from the sticker's default for the tag.
+    /// </summary>
+    private static SKColor Recolor(SKColor color, string? tagged, string? key, WornSticker worn, CharacterLook look)
     {
-        if (slot is null || !worn.Asset.Sticker.Colors.TryGetValue(slot, out var original))
-            return slot is not null && look.Colors.TryGetValue(slot, out var only) ? FigureGeometry.ToSk(only).WithAlpha(color.Alpha) : color;
-        var now = look.Color(slot, original);
+        if (key is null)
+            return color;
+        if (tagged is null || !worn.Asset.Sticker.Colors.TryGetValue(tagged, out var original))
+            return look.Colors.TryGetValue(key, out var only) ? FigureGeometry.ToSk(only).WithAlpha(color.Alpha) : color;
+        var now = look.Color(key, original);
         return now == original ? color : ColorMath.Recolor(color, FigureGeometry.ToSk(original), FigureGeometry.ToSk(now));
     }
 
-    private static SKShader Gradient(ArtGradient gradient, string? slot, WornSticker worn, CharacterLook look, Func<SKPath, SKPath> place)
+    private static SKShader Gradient(ArtGradient gradient, string? tagged, string? slot, WornSticker worn, CharacterLook look, Func<SKPath, SKPath> place)
     {
         // Map the gradient's defining points by mapping a tiny path through them.
         using var builder = new SKPathBuilder();
@@ -541,7 +553,7 @@ internal static class StickerArtPieces
         using var raw = builder.Detach();
         using var mapped = place(raw);
         var points = mapped.Points;
-        var colors = gradient.Stops.Select(s => Recolor(s.Color, slot, worn, look)).ToArray();
+        var colors = gradient.Stops.Select(s => Recolor(s.Color, tagged, slot, worn, look)).ToArray();
         var offsets = gradient.Stops.Select(s => s.Offset).ToArray();
         if (gradient.Radius is not null && points.Length >= 3)
             return SKShader.CreateRadialGradient(points[0], SKPoint.Distance(points[0], points[^1]), colors, offsets, SKShaderTileMode.Clamp);
