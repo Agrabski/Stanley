@@ -65,6 +65,44 @@ public class ThoughtCloudTests
         Assert.Equal(cloudId, window.Editor.SelectedPanelId);
     }
 
+    /// <summary>Dragging the trail's tip (the small dot at its end) moves it, as one undo step, and doesn't disturb the cloud itself.</summary>
+    [Fact]
+    public void DraggingTheTrailTip_MovesItAsOneUndoStep()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var panelId = window.Editor.Working.PanelOrder[0];
+        window.Editor.Select(panelId);
+
+        window.Editor.InsertThoughtCloudCommand.Execute(null);
+        var cloudId = window.Editor.SelectedPanelId!.Value;
+        var cloudBoundsBefore = window.Editor.PanelBounds(cloudId);
+        var tipBefore = window.Editor.Working.Panels[cloudId].Trail!.Target;
+
+        var tipWindowPoint = canvas.TranslatePoint(canvas.PageToControl(tipBefore), window)!.Value;
+        var newTipWindowPoint = new Point(tipWindowPoint.X + 30, tipWindowPoint.Y + 20);
+
+        window.MouseDown(tipWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        window.MouseMove(newTipWindowPoint);
+        Dispatcher.UIThread.RunJobs();
+        window.MouseUp(newTipWindowPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var tipAfter = window.Editor.Working.Panels[cloudId].Trail!.Target;
+        var expected = canvas.ControlToPage(window.TranslatePoint(newTipWindowPoint, canvas)!.Value);
+        Assert.Equal(expected.X, tipAfter.X, 1);
+        Assert.Equal(expected.Y, tipAfter.Y, 1);
+        Assert.NotEqual(tipBefore, tipAfter);
+
+        // The drag only moved the trail's tip - the cloud panel itself stayed put.
+        Assert.Equal(cloudBoundsBefore, window.Editor.PanelBounds(cloudId));
+        Assert.Equal(window.Editor.Working, window.Editor.Committed); // gesture committed
+        window.History.Undo();
+        Assert.Equal(tipBefore, window.Editor.Working.Panels[cloudId].Trail!.Target);
+    }
+
     private static PageCanvasControl? GetPageCanvasControl(MainWindow window)
     {
         Dispatcher.UIThread.RunJobs();

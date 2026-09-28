@@ -35,6 +35,8 @@ public class ThoughtCloudViewModelTests
         Assert.NotEqual(panelId, cloudId);
         var cloud = vm.Working.Panels[cloudId!.Value];
         Assert.Equal(PanelKind.Cloud, cloud.Kind);
+        // A cloud with nothing leading out of it doesn't read as one - it gets a default trail.
+        Assert.NotNull(cloud.Trail);
         // Last in PanelOrder: draws, and hit-tests, on top of the panel it overlaps.
         Assert.Equal(cloudId, vm.Working.PanelOrder[^1]);
 
@@ -199,5 +201,106 @@ public class ThoughtCloudViewModelTests
 
         history.Undo();
         Assert.Contains(cloudId, vm.Working.Panels.Keys);
+    }
+
+    // ---------------------------------------------------------------- reaching the trail from the UI
+
+    [Fact]
+    public void InsertThoughtCloud_AimsTheDefaultTrailAtTheLowerPartOfTheReferencePanel()
+    {
+        var reference = new Rect2D(20, 20, 150, 90);
+        var (_, vm, panelId) = NewEditor(reference);
+        vm.Select(panelId);
+
+        vm.InsertThoughtCloud();
+
+        var trail = vm.Working.Panels[vm.SelectedPanelId!.Value].Trail;
+        Assert.NotNull(trail);
+        Assert.True(trail!.Target.Y > reference.Top + reference.Height / 2, "should aim towards the lower part of the reference panel, not its middle or top");
+        Assert.True(trail.Target.X >= reference.Left && trail.Target.X <= reference.Right);
+    }
+
+    [Fact]
+    public void InsertThoughtCloud_WithNoSelection_AimsTheDefaultTrailStraightDown()
+    {
+        var (_, vm, _) = NewEditor();
+        vm.ClearSelection();
+
+        vm.InsertThoughtCloud();
+
+        var cloudId = vm.SelectedPanelId!.Value;
+        var cloudBounds = vm.PanelBounds(cloudId);
+        var trail = vm.Working.Panels[cloudId].Trail;
+        Assert.NotNull(trail);
+        Assert.Equal(cloudBounds.MidX, trail!.Target.X, 3);
+        Assert.True(trail.Target.Y > cloudBounds.Bottom, "should point straight down, below the cloud itself");
+    }
+
+    [Fact]
+    public void MoveTrailTarget_ThroughTheViewModel_DragsOnlyTheTipAsOneUndoStep()
+    {
+        var (history, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        vm.InsertThoughtCloud();
+        var cloudId = vm.SelectedPanelId!.Value;
+        var attachmentBefore = vm.Working.Panels[cloudId].Trail!.AttachmentT;
+
+        vm.BeginMoveTrailTarget(cloudId);
+        vm.UpdateMoveTrailTarget(cloudId, new Point2D(15, 15));
+        vm.EndGesture(commit: true);
+
+        var trail = vm.Working.Panels[cloudId].Trail;
+        Assert.Equal(new Point2D(15, 15), trail!.Target);
+        Assert.Equal(attachmentBefore, trail.AttachmentT, 6); // the base didn't move
+
+        // Undoing the drag alone (not the insert too) proves it was its own, separate step.
+        history.Undo();
+        Assert.NotEqual(new Point2D(15, 15), vm.Working.Panels[cloudId].Trail!.Target);
+        Assert.Contains(cloudId, vm.Working.Panels.Keys); // the cloud itself is still there
+    }
+
+    [Fact]
+    public void SlideTrailAttachment_ThroughTheViewModel_MovesOnlyTheBase()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        vm.InsertThoughtCloud();
+        var cloudId = vm.SelectedPanelId!.Value;
+        var trailBefore = vm.Working.Panels[cloudId].Trail!;
+        var cloudBounds = vm.PanelBounds(cloudId);
+
+        vm.BeginSlideTrailAttachment(cloudId);
+        vm.UpdateSlideTrailAttachment(cloudId, new Point2D(cloudBounds.Left, cloudBounds.MidY));
+        vm.EndGesture(commit: true);
+
+        var trail = vm.Working.Panels[cloudId].Trail;
+        Assert.Equal(trailBefore.Target, trail!.Target); // the tip stayed put
+        Assert.NotEqual(trailBefore.AttachmentT, trail.AttachmentT); // only the base slid
+    }
+
+    [Fact]
+    public void RemoveThoughtTrail_ThenAddThoughtTrail_EachOneUndoStep()
+    {
+        var (history, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        vm.InsertThoughtCloud();
+        var cloudId = vm.SelectedPanelId!.Value;
+
+        vm.RemoveThoughtTrail(cloudId);
+        Assert.Null(vm.Working.Panels[cloudId].Trail);
+
+        history.Undo();
+        Assert.NotNull(vm.Working.Panels[cloudId].Trail);
+
+        vm.RemoveThoughtTrail(cloudId);
+        Assert.Null(vm.Working.Panels[cloudId].Trail);
+
+        vm.AddThoughtTrail(cloudId);
+        Assert.NotNull(vm.Working.Panels[cloudId].Trail);
+
+        history.Undo(); // undoes the add
+        Assert.Null(vm.Working.Panels[cloudId].Trail);
+        history.Undo(); // undoes the remove
+        Assert.NotNull(vm.Working.Panels[cloudId].Trail);
     }
 }

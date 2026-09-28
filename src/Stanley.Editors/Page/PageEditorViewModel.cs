@@ -971,6 +971,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel && Working.LayoutLocked => "Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock on the Layout tab.",
+        _ when IsSelectedPanelCloud => "Thought cloud - drag the last dot to point at whoever's thinking · drag a corner to resize · it floats over the layout, so re-tiling leaves it be.",
         _ when HasSelectedPanel => "Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Home › Shape Fill colours it · Delete removes it.",
         _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
         _ when Working.LayoutLocked => "Layout is locked - click a panel to select it (or a bubble or character to edit it). Double-click inside a panel to add a bubble. Unlock on the Layout tab.",
@@ -1297,13 +1298,47 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return;
         }
 
-        var cloud = created.Value;
+        // A cloud with nothing leading out of it doesn't read as a thought cloud - give it a
+        // trail towards wherever the thinker is likely to be, same undo step as the cloud itself.
+        var cloud = ThoughtCloudEditing.SetTrail(created.Value, DefaultTrailTarget(bounds, reference));
         var panels = new Dictionary<PanelId, Panel>(Working.Panels) { [cloud.Id] = cloud };
         Apply(EditResult<PageDocument>.Success(Working with { Panels = panels, PanelOrder = [.. Working.PanelOrder, cloud.Id] }));
         if (!Working.Panels.ContainsKey(cloud.Id))
             return;
         Select(cloud.Id);
     }
+
+    /// <summary>
+    /// Where a fresh trail should point: towards the lower part of <paramref name="reference"/>
+    /// (the panel the cloud was sized off, where the thinker most likely is) - or, with no
+    /// reference, straight down from the cloud, clamped onto the page.
+    /// </summary>
+    private Point2D DefaultTrailTarget(Rect2D cloudBounds, Rect2D? reference)
+    {
+        if (reference is { } r)
+            return new Point2D(Math.Clamp(cloudBounds.MidX, r.Left, r.Right), r.Top + r.Height * 0.8);
+        return new Point2D(cloudBounds.MidX, Math.Min(cloudBounds.Bottom + cloudBounds.Height, PageBounds.Bottom));
+    }
+
+    /// <summary>Right-click › Add thought trail: a fresh trail aimed straight down from the cloud.</summary>
+    public void AddThoughtTrail(PanelId panelId) =>
+        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(ThoughtCloudEditing.SetTrail(p, DefaultTrailTarget(Bounds(p), null)))));
+
+    /// <summary>Right-click › Remove thought trail. Insert › Thought cloud, or Add thought trail, brings one back.</summary>
+    public void RemoveThoughtTrail(PanelId panelId) =>
+        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(ThoughtCloudEditing.RemoveTrail(p))));
+
+    public void BeginMoveTrailTarget(PanelId panelId) => BeginGesture();
+
+    /// <summary>Drags the trail's tip - where it points, towards the thinker.</summary>
+    public void UpdateMoveTrailTarget(PanelId panelId, Point2D target) =>
+        UpdateGesture(EditPanel(Committed, panelId, p => EditResult<Panel>.Success(ThoughtCloudEditing.MoveTrailTarget(p, target))));
+
+    public void BeginSlideTrailAttachment(PanelId panelId) => BeginGesture();
+
+    /// <summary>Slides the trail's base to wherever on the cloud's outline is nearest the pointer.</summary>
+    public void UpdateSlideTrailAttachment(PanelId panelId, Point2D pointer) =>
+        UpdateGesture(EditPanel(Committed, panelId, p => EditResult<Panel>.Success(ThoughtCloudEditing.SlideTrailAttachment(p, pointer))));
 
     // ---------------------------------------------------------------- bubbles
 

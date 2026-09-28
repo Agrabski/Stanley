@@ -299,6 +299,8 @@ public sealed class PageCanvasControl : Control
         None,
         TailTarget,
         TailBase,
+        TrailTarget,
+        TrailBase,
         BubbleHandle,
         LimbHandle,
         BendHandle,
@@ -391,6 +393,16 @@ public sealed class PageCanvasControl : Control
             // (the usual place for one), so dragging there always moves where the lines radiate from.
             if (element is ProjectModel.Issues.SpeedLinesElement speedLines && InEllipse(speedLines.Focus, p))
                 return new Hit(HitKind.ElementBody, elementPanel, ElementIndex: vm.SelectedElementIndex);
+        }
+
+        // A selected cloud's own trail - nothing more specific (bubble/character/element) is
+        // selected in it by this point, or one of the blocks above would already have matched.
+        if (vm.IsPanelContext && vm.SelectedPanel is { Kind: PanelKind.Cloud, Trail: { } trail } cloud && vm.SelectedPanelId is { } trailPanel)
+        {
+            if (Dist(trail.Target, p) <= tol)
+                return new Hit(HitKind.TrailTarget, trailPanel);
+            if (Dist(AnchorRing.PointAt(cloud.Shape.Anchors, trail.AttachmentT), p) <= tol)
+                return new Hit(HitKind.TrailBase, trailPanel);
         }
 
         // A locked layout offers no panel handles, edges or gutters to grab.
@@ -743,6 +755,16 @@ public sealed class PageCanvasControl : Control
                 StartDrag(e, DragKind.SlideTailAttachment);
                 break;
 
+            case HitKind.TrailTarget:
+                vm.BeginMoveTrailTarget(hit.PanelId!.Value);
+                StartDrag(e, DragKind.MoveTrailTarget);
+                break;
+
+            case HitKind.TrailBase:
+                vm.BeginSlideTrailAttachment(hit.PanelId!.Value);
+                StartDrag(e, DragKind.SlideTrailAttachment);
+                break;
+
             case HitKind.BubbleHandle:
                 _dragStartBounds = AnchorRing.BoundingBox(vm.Working.Panels[hit.PanelId!.Value].Bubbles[hit.BubbleIndex].Shape.Anchors);
                 vm.BeginResizeBubble(hit.PanelId.Value, hit.BubbleIndex);
@@ -951,6 +973,14 @@ public sealed class PageCanvasControl : Control
                 _viewModel.UpdateSlideBubbleTailAttachment(_dragPanelId!.Value, _dragBubbleIndex, _dragTailIndex, page);
                 break;
 
+            case DragKind.MoveTrailTarget:
+                _viewModel.UpdateMoveTrailTarget(_dragPanelId!.Value, page);
+                break;
+
+            case DragKind.SlideTrailAttachment:
+                _viewModel.UpdateSlideTrailAttachment(_dragPanelId!.Value, page);
+                break;
+
             case DragKind.DragGutter:
                 var along = _dragGutter!.Drag.Orientation == BoundaryOrientation.Vertical ? dx : dy;
                 _viewModel.UpdateDragBoundary(_dragGutter.Drag, _dragGutter.Position + along, snap);
@@ -1062,7 +1092,7 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
-                or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
+                or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.MoveTrailTarget or DragKind.SlideTrailAttachment or DragKind.DragGutter
                 or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk
                 or DragKind.MoveElement or DragKind.ResizeElement or DragKind.MoveGroup:
                 vm.EndGesture(commit);
@@ -1495,7 +1525,15 @@ public sealed class PageCanvasControl : Control
             items.Add(new Separator());
             // A thought cloud was never part of the grid, so it can't be split - same rule
             // SplitColumnsCommand/SplitRowsCommand enforce for the ribbon (IsSelectedPanelCloud).
-            if (!vm.IsSelectedPanelCloud)
+            // It gets its trail here instead, on or off.
+            if (vm.IsSelectedPanelCloud)
+            {
+                items.Add(vm.SelectedPanel!.Trail is not null
+                    ? Item("Remove thought trail", () => vm.RemoveThoughtTrail(panelId))
+                    : Item("Add thought trail", () => vm.AddThoughtTrail(panelId)));
+                items.Add(new Separator());
+            }
+            else
             {
                 items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
                 items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
@@ -1599,7 +1637,8 @@ public sealed class PageCanvasControl : Control
         else
             type = hit.Kind switch
             {
-                HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
+                HitKind.TailTarget or HitKind.TailBase or HitKind.TrailTarget or HitKind.TrailBase
+                    or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
                 HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle or HitKind.ElementHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.PanelBody when vm.Working.LayoutLocked => StandardCursorType.Arrow,
@@ -1700,6 +1739,8 @@ public sealed class PageCanvasControl : Control
         ResizeBubble,
         MoveTailTarget,
         SlideTailAttachment,
+        MoveTrailTarget,
+        SlideTrailAttachment,
         DragGutter,
         CreatePanel,
         CreateBubble,
