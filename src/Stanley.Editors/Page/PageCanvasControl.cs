@@ -233,7 +233,8 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio)
             or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
             or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex)
-            or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields))
+            or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields)
+            or nameof(PageEditorViewModel.SelectionCount))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -274,7 +275,8 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedElementIndex,
             _editingText,
             _viewModel.PictureSnapshot,
-            _viewModel.Fields)));
+            _viewModel.Fields,
+            _viewModel.ExtraSelectionBounds)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
@@ -297,6 +299,8 @@ public sealed class PageCanvasControl : Control
         None,
         TailTarget,
         TailBase,
+        TrailTarget,
+        TrailBase,
         BubbleHandle,
         LimbHandle,
         BendHandle,
@@ -389,6 +393,16 @@ public sealed class PageCanvasControl : Control
             // (the usual place for one), so dragging there always moves where the lines radiate from.
             if (element is ProjectModel.Issues.SpeedLinesElement speedLines && InEllipse(speedLines.Focus, p))
                 return new Hit(HitKind.ElementBody, elementPanel, ElementIndex: vm.SelectedElementIndex);
+        }
+
+        // A selected cloud's own trail - nothing more specific (bubble/character/element) is
+        // selected in it by this point, or one of the blocks above would already have matched.
+        if (vm.IsPanelContext && vm.SelectedPanel is { Kind: PanelKind.Cloud, Trail: { } trail } cloud && vm.SelectedPanelId is { } trailPanel)
+        {
+            if (Dist(trail.Target, p) <= tol)
+                return new Hit(HitKind.TrailTarget, trailPanel);
+            if (Dist(AnchorRing.PointAt(cloud.Shape.Anchors, trail.AttachmentT), p) <= tol)
+                return new Hit(HitKind.TrailBase, trailPanel);
         }
 
         // A locked layout offers no panel handles, edges or gutters to grab.
@@ -715,12 +729,32 @@ public sealed class PageCanvasControl : Control
             }
         }
 
+        // Shift+click on a bubble, character or element toggles it in or out of the selection,
+        // instead of the usual press-to-select-and-drag: adding to a selection is the point,
+        // and a drag straight from here would just move the one thing Shift was held over.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && hit.PanelId is { } shiftPanel
+            && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody)
+        {
+            vm.ToggleSelect(shiftPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
+            return;
+        }
+
         _dragPanelId = hit.PanelId;
         _dragBubbleIndex = hit.BubbleIndex;
         _dragTailIndex = hit.TailIndex;
         _dragCharacterIndex = hit.CharacterIndex;
         _dragElementIndex = hit.ElementIndex;
         _dragEdges = hit.Edges;
+
+        // A plain press on something already part of a multi-selection drags the whole group
+        // without collapsing it first; released without moving, it falls back to a plain click
+        // (see the DragKind.PendingMoveGroup case in FinishDrag).
+        if (hit.PanelId is { } groupPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody
+            && vm.IsPartOfSelection(groupPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex) && vm.HasMultiSelection)
+        {
+            StartDrag(e, DragKind.PendingMoveGroup);
+            return;
+        }
 
         switch (hit.Kind)
         {
@@ -732,6 +766,16 @@ public sealed class PageCanvasControl : Control
             case HitKind.TailBase:
                 vm.BeginSlideBubbleTailAttachment(hit.PanelId!.Value, hit.BubbleIndex, hit.TailIndex);
                 StartDrag(e, DragKind.SlideTailAttachment);
+                break;
+
+            case HitKind.TrailTarget:
+                vm.BeginMoveTrailTarget(hit.PanelId!.Value);
+                StartDrag(e, DragKind.MoveTrailTarget);
+                break;
+
+            case HitKind.TrailBase:
+                vm.BeginSlideTrailAttachment(hit.PanelId!.Value);
+                StartDrag(e, DragKind.SlideTrailAttachment);
                 break;
 
             case HitKind.BubbleHandle:
@@ -802,8 +846,10 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case HitKind.PanelBody when vm.Working.LayoutLocked:
-                // Locked panels can't be selected: behave like the pasteboard.
-                vm.ClearSelection();
+                // Its layout can't be changed, but it can still be selected (issue #67) - so a
+                // double-click character or Insert > Character has somewhere to go. Dragging
+                // from it does nothing but pan the view, like the pasteboard.
+                vm.Select(hit.PanelId);
                 StartDrag(e, DragKind.Pan);
                 break;
 
@@ -940,6 +986,14 @@ public sealed class PageCanvasControl : Control
                 _viewModel.UpdateSlideBubbleTailAttachment(_dragPanelId!.Value, _dragBubbleIndex, _dragTailIndex, page);
                 break;
 
+            case DragKind.MoveTrailTarget:
+                _viewModel.UpdateMoveTrailTarget(_dragPanelId!.Value, page);
+                break;
+
+            case DragKind.SlideTrailAttachment:
+                _viewModel.UpdateSlideTrailAttachment(_dragPanelId!.Value, page);
+                break;
+
             case DragKind.DragGutter:
                 var along = _dragGutter!.Drag.Orientation == BoundaryOrientation.Vertical ? dx : dy;
                 _viewModel.UpdateDragBoundary(_dragGutter.Drag, _dragGutter.Position + along, snap);
@@ -973,6 +1027,19 @@ public sealed class PageCanvasControl : Control
 
             case DragKind.ResizeElement:
                 _viewModel.UpdateResizeElement(_dragPanelId!.Value, _dragElementIndex, MoveEdges(_dragStartBounds, _dragEdges, dx, dy));
+                break;
+
+            case DragKind.PendingMoveGroup when beyondThreshold:
+                if (alt && _viewModel.BeginDuplicateSelection(_dragPanelId!.Value))
+                    _duplicating = true;
+                else
+                    _viewModel.BeginMoveSelection(_dragPanelId!.Value);
+                _drag = DragKind.MoveGroup;
+                UpdateCursor(null);
+                goto case DragKind.MoveGroup;
+
+            case DragKind.MoveGroup:
+                _viewModel.UpdateMoveSelection(_dragPanelId!.Value, dx, dy);
                 break;
 
             case DragKind.DrawShape when _viewModel.Tool == PageEditorTool.Draw:
@@ -1038,10 +1105,21 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
-                or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
+                or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.MoveTrailTarget or DragKind.SlideTrailAttachment or DragKind.DragGutter
                 or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk
-                or DragKind.MoveElement or DragKind.ResizeElement:
+                or DragKind.MoveElement or DragKind.ResizeElement or DragKind.MoveGroup:
                 vm.EndGesture(commit);
+                break;
+
+            // Never dragged (no BeginMoveSelection call was ever made, so there's no gesture to
+            // end): a plain click on a multi-selected item collapses the selection to just it.
+            case DragKind.PendingMoveGroup when commit && _dragPanelId is { } collapsePanel:
+                if (_dragBubbleIndex >= 0)
+                    vm.Select(collapsePanel, _dragBubbleIndex);
+                else if (_dragCharacterIndex >= 0)
+                    vm.SelectCharacter(collapsePanel, _dragCharacterIndex);
+                else if (_dragElementIndex >= 0)
+                    vm.SelectElement(collapsePanel, _dragElementIndex);
                 break;
 
             case DragKind.DrawShape when commit:
@@ -1118,9 +1196,9 @@ public sealed class PageCanvasControl : Control
         var vm = _viewModel!;
         Hit? hit = vm.Tool == PageEditorTool.Select && !_spaceHeld ? HitTest(page) : null;
         var gutter = hit?.Gutter;
-        // No "you could select this" highlight on a locked layout; the Bubble tool still
-        // shows which panel a new bubble would land in.
-        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text || vm.IsShapeTool || vm.Tool == PageEditorTool.Select && !vm.Working.LayoutLocked ? PanelAt(page) : null;
+        // The "you could select/land this here" highlight shows for the Select tool even on a
+        // locked layout, since a locked panel can still be selected (issue #67).
+        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text or PageEditorTool.Select || vm.IsShapeTool ? PanelAt(page) : null;
         if (!Equals(gutter, _hoverGutter) || !Equals(panel, _hoverPanelId))
         {
             _hoverGutter = gutter;
@@ -1418,10 +1496,10 @@ public sealed class PageCanvasControl : Control
         }
         else if (PanelAt(page) is { } lockedPanelId && vm.Working.LayoutLocked)
         {
-            vm.ClearSelection();
+            vm.Select(lockedPanelId);
             if (vm.CanPaste)
             {
-                // A locked layout's panels can't be selected, so paste into the one that was right-clicked.
+                // Paste explicitly targets the panel that was right-clicked, regardless of what's selected.
                 items.Add(Item("Paste", () => vm.PasteInto(lockedPanelId), "Ctrl+V"));
                 items.Add(new Separator());
             }
@@ -1458,9 +1536,22 @@ public sealed class PageCanvasControl : Control
             items.Add(ColorMenu("Shape Outline", new ColorMenuOptions(vm.SetPanelOutlineCommand, "No Outline", "More Outline Colors…", style.Stroke,
                 vm.SetPanelOutlineWeightCommand, style.StrokeWidthMm, vm.SetPanelOutlineDashCommand, style.Dash)));
             items.Add(new Separator());
-            items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
-            items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
-            items.Add(new Separator());
+            // A thought cloud was never part of the grid, so it can't be split - same rule
+            // SplitColumnsCommand/SplitRowsCommand enforce for the ribbon (IsSelectedPanelCloud).
+            // It gets its trail here instead, on or off.
+            if (vm.IsSelectedPanelCloud)
+            {
+                items.Add(vm.SelectedPanel!.Trail is not null
+                    ? Item("Remove thought trail", () => vm.RemoveThoughtTrail(panelId))
+                    : Item("Add thought trail", () => vm.AddThoughtTrail(panelId)));
+                items.Add(new Separator());
+            }
+            else
+            {
+                items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
+                items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
+                items.Add(new Separator());
+            }
             items.Add(Item("Delete panel", () => vm.DeletePanel(panelId), "Del"));
         }
         else
@@ -1559,7 +1650,8 @@ public sealed class PageCanvasControl : Control
         else
             type = hit.Kind switch
             {
-                HitKind.TailTarget or HitKind.TailBase or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
+                HitKind.TailTarget or HitKind.TailBase or HitKind.TrailTarget or HitKind.TrailBase
+                    or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
                 HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle or HitKind.ElementHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.PanelBody when vm.Working.LayoutLocked => StandardCursorType.Arrow,
@@ -1660,6 +1752,8 @@ public sealed class PageCanvasControl : Control
         ResizeBubble,
         MoveTailTarget,
         SlideTailAttachment,
+        MoveTrailTarget,
+        SlideTrailAttachment,
         DragGutter,
         CreatePanel,
         CreateBubble,
@@ -1673,6 +1767,8 @@ public sealed class PageCanvasControl : Control
         MoveElement,
         ResizeElement,
         DrawShape,
-        CreateText
+        CreateText,
+        PendingMoveGroup,
+        MoveGroup
     }
 }

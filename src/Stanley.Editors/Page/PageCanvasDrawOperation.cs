@@ -41,7 +41,9 @@ public sealed record PageCanvasScene(
     int SelectedElementIndex = -1,
     ElementId? EditingText = null,
     IReadOnlyDictionary<string, ArtFile>? Pictures = null,
-    TextFields? Fields = null);
+    TextFields? Fields = null,
+    /// <summary>The page-space bounding box of every extra item a Shift+click multi-selection added, beyond the primary selection drawn above - a plain outline, no handles (those stay on the primary).</summary>
+    IReadOnlyList<Rect2D>? ExtraSelectionBounds = null);
 
 /// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
 public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
@@ -167,6 +169,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
         DrawBorderlessPanelOutlines(canvas);
         DrawEmptyTextOutlines(canvas);
+        DrawExtraSelectionOutlines(canvas);
 
         if (_scene.SelectedPanelId is { } selectedId && doc.Panels.TryGetValue(selectedId, out var selectedPanel))
         {
@@ -176,13 +179,10 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
                 && _scene.SelectedCharacterIndex < selectedPanel.CharacterInstances.Count && _scene.SelectedCharacterBounds is not null;
             var hasElement = !hasBubble && !hasCharacter && _scene.SelectedElementIndex >= 0 && _scene.SelectedElementIndex < selectedPanel.Elements.Count;
 
-            // A locked layout never shows a panel as selected, not even as the faint
-            // "this bubble's panel" outline.
-            if (!doc.LayoutLocked)
-            {
-                using var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter || hasElement ? (byte)120 : (byte)255), 2f);
+            // The outline shows whether or not the layout is locked - a locked panel can
+            // still be selected, only its resize handles below are hidden.
+            using (var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter || hasElement ? (byte)120 : (byte)255), 2f))
                 canvas.DrawRect(panelRect, outline);
-            }
             var isEditing = hasBubble && _scene.EditingBubble is { } editing && editing.Panel.Equals(selectedId)
                 && editing.Bubble.Equals(selectedPanel.Bubbles[_scene.SelectedBubbleIndex].Id);
             if (isEditing)
@@ -208,6 +208,8 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             {
                 foreach (var corner in Corners(panelRect))
                     DrawSquareHandle(canvas, corner, Accent);
+                if (selectedPanel.Trail is { } trail)
+                    DrawTrailHandles(canvas, trail, selectedPanel.Shape);
             }
         }
 
@@ -272,6 +274,23 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         }
     }
 
+    /// <summary>A thought cloud's trail handles, the same two dots a bubble tail's base and tip get.</summary>
+    private void DrawTrailHandles(SKCanvas canvas, ProjectModel.Geometry.ThoughtTrail trail, ProjectModel.Geometry.PanelShape shape)
+    {
+        using var fill = new SKPaint { Color = TailHandle, IsAntialias = true };
+        using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        using var ring = Stroke(TailHandle, 2f);
+        using var outline = Stroke(SKColors.White, 1.5f);
+
+        var baseScreen = Screen(AnchorRing.PointAt(shape.Anchors, trail.AttachmentT));
+        canvas.DrawCircle(baseScreen, 4.5f, white);
+        canvas.DrawCircle(baseScreen, 4.5f, ring);
+
+        var tip = Screen(trail.Target);
+        canvas.DrawCircle(tip, 6f, fill);
+        canvas.DrawCircle(tip, 6f, outline);
+    }
+
     /// <summary>
     /// A dashed outline around the element with eight resize handles, like a bubble's - an
     /// ellipse with a centre marker for speed lines (its focus is round, not boxy; the
@@ -310,6 +329,17 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             if (panel.Borderless)
                 canvas.DrawRect(Screen(AnchorRing.BoundingBox(panel.Shape.Anchors)), faint);
         }
+    }
+
+    /// <summary>Every item a Shift+click multi-selection added beyond the primary: a plain dashed outline, matching the primary's own box but with no handles - those stay on the primary.</summary>
+    private void DrawExtraSelectionOutlines(SKCanvas canvas)
+    {
+        if (_scene.ExtraSelectionBounds is not { Count: > 0 } extras)
+            return;
+        using var box = Stroke(Accent, 1f);
+        box.PathEffect = SKPathEffect.CreateDash([4, 3], 0);
+        foreach (var bounds in extras)
+            canvas.DrawRect(Screen(bounds), box);
     }
 
     /// <summary>Bare text with nothing typed in it draws nothing on the page; a faint outline shows where it is, so it can still be found, filled in or deleted. Not printed.</summary>

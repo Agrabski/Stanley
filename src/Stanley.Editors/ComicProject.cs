@@ -208,9 +208,6 @@ public sealed class ComicProject
             saved[page.Id] = [.. page.PanelIds];
         }
 
-        if (pages.Count == 0)
-            pages.Add(NewPage(manifest.DefaultPageTrim, manifest.Format));
-
         var characters = repository.ListCharacters();
         var pictures = new Dictionary<string, ArtFile>(StringComparer.Ordinal);
         if (manifest.IssueIds.Contains(issue.Id))
@@ -241,6 +238,11 @@ public sealed class ComicProject
             }
             savedTitlePage = new SavedTitlePage(titleRecord, [.. titleRecord.PanelIds], titlePictures);
         }
+
+        // An issue with no pages of its own still needs one to open on - unless the comic's
+        // title page will stand in for it (an issue can be just its title page - #65).
+        if (pages.Count == 0 && titlePage is null)
+            pages.Add(NewPage(manifest.DefaultPageTrim, manifest.Format));
 
         // Every other issue's summary, for Issues - not this one's, so its live edits always win.
         var otherIssues = manifest.IssueIds.Where(id => id != issue.Id).ToDictionary(id => id, id =>

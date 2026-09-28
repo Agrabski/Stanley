@@ -299,6 +299,13 @@
                                 <TextBlock Text="Panel" />
                             </StackPanel>
                         </Button>
+                        <Button Name="InsertThoughtCloudButton" Classes="tool" Command="{Binding InsertThoughtCloudCommand}"
+                                ToolTip.Tip="A cloud-shaped panel for what a character imagines - floats over the layout, and works like any other panel">
+                            <StackPanel>
+                                <PathIcon Data="{StaticResource ThoughtCloudIcon}" />
+                                <TextBlock Text="Thought cloud" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <TextBlock Classes="groupLabel" Text="Panels" />
                 </DockPanel>
@@ -1278,12 +1285,12 @@
                     <StackPanel Orientation="Horizontal">
                         <StackPanel VerticalAlignment="Center" Spacing="1">
                             <Button Classes="small" Command="{Binding BringToFrontCommand}"
-                                    ToolTip.Tip="In front of everything else in its layer"
+                                    ToolTip.Tip="In front of everything in the panel except bubbles"
                                     HorizontalAlignment="Stretch">
                                 To front
                             </Button>
                             <Button Classes="small" Command="{Binding SendToBackCommand}"
-                                    ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">
+                                    ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
                                 To back
                             </Button>
                         </StackPanel>
@@ -1331,12 +1338,12 @@
                     <StackPanel Orientation="Horizontal">
                         <StackPanel VerticalAlignment="Center" Spacing="1">
                             <Button Classes="small" Command="{Binding BringToFrontCommand}"
-                                    ToolTip.Tip="In front of everything else in its layer"
+                                    ToolTip.Tip="In front of everything in the panel except bubbles"
                                     HorizontalAlignment="Stretch">
                                 To front
                             </Button>
                             <Button Classes="small" Command="{Binding SendToBackCommand}"
-                                    ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">
+                                    ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
                                 To back
                             </Button>
                         </StackPanel>
@@ -1424,12 +1431,12 @@
                     <StackPanel Orientation="Horizontal">
                         <StackPanel VerticalAlignment="Center" Spacing="1">
                             <Button Classes="small" Command="{Binding BringToFrontCommand}"
-                                    ToolTip.Tip="In front of everything else in its layer"
+                                    ToolTip.Tip="In front of everything in the panel except bubbles"
                                     HorizontalAlignment="Stretch">
                                 To front
                             </Button>
                             <Button Classes="small" Command="{Binding SendToBackCommand}"
-                                    ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">
+                                    ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
                                 To back
                             </Button>
                         </StackPanel>
@@ -1579,12 +1586,12 @@
                     <StackPanel Orientation="Horizontal">
                         <StackPanel VerticalAlignment="Center" Spacing="1">
                             <Button Classes="small" Command="{Binding BringToFrontCommand}"
-                                    ToolTip.Tip="In front of everything else in its layer"
+                                    ToolTip.Tip="In front of everything in the panel except bubbles"
                                     HorizontalAlignment="Stretch">
                                 To front
                             </Button>
                             <Button Classes="small" Command="{Binding SendToBackCommand}"
-                                    ToolTip.Tip="Behind everything else in its layer" HorizontalAlignment="Stretch">
+                                    ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
                                 To back
                             </Button>
                         </StackPanel>

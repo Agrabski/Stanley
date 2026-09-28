@@ -35,10 +35,14 @@ public static class PanelLayoutEditing
         var oldBounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
         return EditResult<Panel>.Success(panel with
         {
-            Shape = PanelShapes.Rectangle(newBounds),
+            // A thought cloud regenerates its scallops at the new bounds instead of stretching
+            // them into ovals (PanelShapes.Cloud is deterministic, so this is exactly what
+            // drawing a fresh cloud at newBounds would give).
+            Shape = panel.Kind == PanelKind.Cloud ? PanelShapes.Cloud(newBounds) : PanelShapes.Rectangle(newBounds),
             CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Refit(c, oldBounds, newBounds)).ToList(),
             Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList(),
-            Elements = panel.Elements.Select(e => ElementEditing.Refit(e, oldBounds, newBounds)).ToList()
+            Elements = panel.Elements.Select(e => ElementEditing.Refit(e, oldBounds, newBounds)).ToList(),
+            Trail = ThoughtCloudEditing.RefitTrail(panel.Trail, oldBounds, newBounds)
         });
     }
 
@@ -62,6 +66,9 @@ public static class PanelLayoutEditing
     /// </summary>
     public static EditResult<(Panel First, Panel Second)> Split(Panel panel, BoundaryOrientation orientation, double fraction, double gutter = 0)
     {
+        if (panel.Kind == PanelKind.Cloud)
+            return EditResult<(Panel, Panel)>.Failure("A thought cloud can't be split.");
+
         if (fraction <= 0 || fraction >= 1)
             return EditResult<(Panel, Panel)>.Failure("Split fraction must be strictly between 0 and 1.");
 

@@ -251,27 +251,44 @@ public sealed class TitlePageTests : IDisposable
         Assert.Equal(1, session.Characters.UsageCounter(character.Id)); // still on the comic's, which other issues show
     }
 
+    /// <summary>
+    /// #65: a page can be deleted as long as some page - of any kind, title pages included -
+    /// is left; an issue can end up as just its title page. The navigator itself is never
+    /// left with none.
+    /// </summary>
     [Fact]
-    public void AnIssueNeverLosesItsLastPage_TheTitlePageAside()
+    public void APageBesidesTheTitlePage_CanBeDeleted_SoAnIssueCanBeJustItsTitlePage()
     {
-        var navigator = PageEditorHost.CreateWorkspace(ComicProject.CreateNew()).Navigator;
+        var session = PageEditorHost.CreateWorkspace(ComicProject.CreateNew());
+        var navigator = session.Navigator;
         var page = navigator.CurrentPage;
         var comic = navigator.InsertTitlePage(TitlePageDesign.Cover);
 
-        Assert.False(navigator.DeletePageCommand.CanExecute(page));
+        Assert.True(navigator.DeletePageCommand.CanExecute(page)); // title page + one page: can delete the page
         navigator.DeletePage(page);
-        Assert.Equal([comic, page], navigator.Pages);
+        Assert.Equal([comic], navigator.Pages);
+
+        // Just the comic's title page is left - deleting it would empty the navigator.
+        Assert.False(navigator.DeletePageCommand.CanExecute(comic));
+        Assert.False(navigator.CanRemoveTitlePage);
 
         navigator.SetOwnTitlePage(true);
         var own = navigator.Pages[0];
-        navigator.DeletePage(page); // the issue's own title page is one of its pages
-        Assert.Equal([own], navigator.Pages);
 
-        // Taking it away would bring back the comic's in its place, leaving the issue no page.
-        Assert.False(navigator.CanRemoveTitlePage);
-        Assert.False(navigator.DeletePageCommand.CanExecute(own));
-        own.Editor.IsOwnTitlePage = false;
+        // The issue's own title page is now its only page, but the comic's (kept, hidden)
+        // stands in for it if it goes - so removing it never actually leaves the issue
+        // without a page, and is always allowed.
+        Assert.True(navigator.CanDeletePage(own));
+        Assert.True(navigator.CanRemoveTitlePage);
+        navigator.RemoveTitlePage();
+        Assert.Equal([comic], navigator.Pages);
+
+        session.Workspace.History.Undo(); // "Use the comic's title page"
         Assert.Equal([own], navigator.Pages);
+        session.Workspace.History.Undo(); // "Title page for this issue only"
+        Assert.Equal([comic], navigator.Pages);
+        session.Workspace.History.Undo(); // "Delete page" - the page comes back
+        Assert.Equal([comic, page], navigator.Pages);
     }
 
     [Fact]

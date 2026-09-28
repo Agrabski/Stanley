@@ -58,19 +58,26 @@ public static class ElementEditing
     }
 
     /// <summary>
-    /// Moves element <paramref name="index"/> to the front (the end of the list) or the back
-    /// (the start) - which, since each layer draws in list order, is the front or back of its
-    /// own layer. Returns its new index.
+    /// Moves element <paramref name="index"/> as far forward or back as an element goes: to the
+    /// front brings it into the <see cref="ElementLayer.Foreground"/> (in front of the
+    /// characters), at the end of the list; to the back sends it into the
+    /// <see cref="ElementLayer.Background"/>, at the start. Returns its new index - and
+    /// <paramref name="elements"/> itself when it's already there, so a caller can skip the edit.
     /// </summary>
     public static (IReadOnlyList<PanelElement> Elements, int NewIndex) Reorder(IReadOnlyList<PanelElement> elements, int index, bool toFront)
     {
         if (index < 0 || index >= elements.Count)
             return (elements, index);
+        var item = elements[index];
+        var layer = toFront ? ElementLayer.Foreground : ElementLayer.Background;
+        var others = toFront ? elements.Skip(index + 1) : elements.Take(index);
+        if (item.Layer == layer && !others.Any(e => e.Layer == layer))
+            return (elements, index);
+
         var list = elements.ToList();
-        var item = list[index];
         list.RemoveAt(index);
         var newIndex = toFront ? list.Count : 0;
-        list.Insert(newIndex, item);
+        list.Insert(newIndex, item.Layer == layer ? item : item with { Layer = layer });
         return (list, newIndex);
     }
 

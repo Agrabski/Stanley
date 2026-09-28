@@ -5,6 +5,7 @@ using Stanley.ProjectModel.Storage;
 
 namespace Stanley.App.Tests;
 
+[Collection(ConsoleOutput.Name)]
 public class IssueCommandTests : IDisposable
 {
     private readonly string _root = Directory.CreateTempSubdirectory("stanley-issue-command-tests").FullName;

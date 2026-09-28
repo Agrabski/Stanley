@@ -123,11 +123,21 @@ public sealed partial class PageEditorViewModel
         }
     }
 
+    /// <summary>Changes the bubble's typeface (one undo step); it grows if the new font needs more room than the old one did.</summary>
     public void SetBubbleFont(PanelId panelId, int bubbleIndex, string? family) =>
-        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) => BubbleEditing.SetFont(b, family)));
+        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
+        {
+            var set = BubbleEditing.SetFont(b, family);
+            return set.IsValid ? GrownBubbleEdit(set.Value) : set;
+        }));
 
+    /// <summary>Changes the bubble's lettering - typeface, size, bold, italic, alignment - as one undo step; it grows if the new lettering needs more room than the old one did.</summary>
     public void SetBubbleLettering(PanelId panelId, int bubbleIndex, LetteringFont font) =>
-        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) => BubbleEditing.SetLettering(b, font)));
+        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
+        {
+            var set = BubbleEditing.SetLettering(b, font);
+            return set.IsValid ? GrownBubbleEdit(set.Value) : set;
+        }));
 
     /// <summary>Changes the lettering of whatever the Font group is showing (see <see cref="CurrentLettering"/>): the selected bubble or text, else what the next bubble and text get.</summary>
     private void SetLettering(Func<LetteringFont, LetteringFont> change)
