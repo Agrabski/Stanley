@@ -252,6 +252,23 @@ public class CoverStickerRenderingTests
     }
 
     [Fact]
+    public void A_part_for_some_variants_only_is_drawn_just_in_those()
+    {
+        var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1), Variants: ["up"]));
+        var id = character.Stickers[StickerSlots.Top][0];
+        var asset = character.Wardrobe.Find(id)!;
+        character = character with { Wardrobe = character.Wardrobe.With(asset with { Sticker = asset.Sticker with { Variants = ["down", "up"] } }) };
+        var figure = BodyRig.Build(character.Body);
+        var chest = figure.Regions.Torso.ToFigure(new Point2D(0, figure.Regions.Torso.Top + 0.1));
+
+        using var down = Render(character, new PoseData(ViewAngle.Front, [], []));
+        using var up = Render(character, new PoseData(ViewAngle.Front, [], new SortedDictionary<string, string> { [StickerSlots.Top] = "up" }));
+
+        Assert.Equal(FigureGeometry.ToSk(character.Skin), At(down, chest));
+        Assert.Equal(new SKColor(0, 0, 255), At(up, chest));
+    }
+
+    [Fact]
     public void The_characters_own_colour_wins_over_the_stickers_default()
     {
         var character = Wearing(new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
@@ -280,6 +297,99 @@ public class CoverStickerRenderingTests
 
         Assert.Equal(new SKColor(0, 0, 255), At(bitmap, between));
         Assert.True(outline.TightBounds.Width >= placement.ToPage(widest).Width - 0.5);
+    }
+}
+
+/// <summary>Automatic layer fit: layers worn in one slot, each fitted over the ones under it - at draw time only.</summary>
+public class LayerFitRenderingTests
+{
+    private static readonly ColorValue Red = ColorValue.FromHex("#ff0000");
+    private static readonly ColorValue Blue = ColorValue.FromHex("#0000ff");
+
+    /// <summary>A garment covering the whole torso and arms, <paramref name="ease"/> loose, in its own colour slot.</summary>
+    private static StickerAsset Garment(string name, string slot, string colorSlot, ColorValue color, double ease) =>
+        new(new Sticker(StickerId.New(), name, slot,
+            [
+                new StickerPart("body", BodyRegion.Torso, Cover: new PartCover(colorSlot, 0, 1, ease)),
+                new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover(colorSlot, 0, 1, ease)),
+            ],
+            new SortedDictionary<string, ColorValue> { [colorSlot] = color }, ["default"]), new Dictionary<string, ArtFile>());
+
+    /// <summary>A character wearing <paramref name="assets"/>, each in its own sticker's slot, in order (bottom to top within a slot).</summary>
+    private static CharacterDefinition Wearing(params StickerAsset[] assets)
+    {
+        var character = CharacterDefinition.Create("A");
+        var wardrobe = character.Wardrobe;
+        foreach (var asset in assets)
+            wardrobe = wardrobe.With(asset);
+        var stickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(StringComparer.Ordinal);
+        foreach (var slot in assets.GroupBy(a => a.Sticker.Slot))
+            stickers[slot.Key] = slot.Select(a => a.Id).ToList();
+        return character with { Stickers = stickers, Wardrobe = wardrobe };
+    }
+
+    private static readonly CharacterPlacement Placement = new(new Point2D(200, 420), 400, false);
+
+    private static SKBitmap Render(CharacterDefinition character)
+    {
+        var bitmap = new SKBitmap(400, 440);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        CharacterRenderers.Default.Draw(canvas, character, Placement, 2f);
+        return bitmap;
+    }
+
+    private static int RedPixels(SKBitmap bitmap) =>
+        bitmap.Pixels.Count(c => c.Red > 200 && c.Green < 80 && c.Blue < 80);
+
+    private static SKRect OutlineOf(CharacterDefinition character, StickerAsset asset)
+    {
+        using var outline = CharacterRenderers.Default.BuildStickerOutline(character, Placement, asset.Id);
+        return outline.TightBounds;
+    }
+
+    [Fact]
+    public void A_looser_layer_under_a_tighter_one_in_the_same_slot_does_not_show_past_its_edge()
+    {
+        // A loose T-shirt under a tight shirt: drawn as made, the T-shirt would show a band all round the shirt.
+        var tee = Garment("T-shirt", StickerSlots.Top, "under", Red, 0.03);
+        var shirt = Garment("Shirt", StickerSlots.Top, "over", Blue, 0.005);
+        var layered = Wearing(tee, shirt);
+
+        using var bitmap = Render(layered);
+
+        Assert.Equal(0, RedPixels(bitmap));
+        var (under, over) = (OutlineOf(layered, tee), OutlineOf(layered, shirt));
+        Assert.True(over.Left < under.Left && over.Right > under.Right, $"the shirt ({over}) goes on over the T-shirt ({under})");
+    }
+
+    [Fact]
+    public void One_item_per_slot_is_drawn_exactly_as_it_is_made()
+    {
+        // The same two garments in different slots: nothing is fitted, so the T-shirt shows round the vest.
+        var tee = Garment("T-shirt", StickerSlots.Top, "under", Red, 0.03);
+        var vest = Garment("Vest", StickerSlots.Outer, "over", Blue, 0.005);
+        var character = Wearing(tee, vest);
+
+        using var bitmap = Render(character);
+
+        Assert.True(RedPixels(bitmap) > 100);
+        Assert.Equal(OutlineOf(Wearing(vest), vest), OutlineOf(character, vest));
+        Assert.Equal(OutlineOf(Wearing(tee), tee), OutlineOf(character, tee));
+    }
+
+    [Fact]
+    public void Fitting_only_ever_loosens_on_the_same_region_and_leaves_a_bottom_layer_alone()
+    {
+        var tight = new PartCover("top", 0, 1, 0.01);
+        var loose = new PartCover("top", 0, 1, 0.05);
+        var under = new Dictionary<BodyRegion, double> { [BodyRegion.Torso] = 0.014 };
+
+        Assert.Equal(0.014 + StickerCovers.LayerMargin, StickerCovers.FittedOver(tight, BodyRegion.Torso, under).EaseOrDefault, 9);
+        Assert.Same(loose, StickerCovers.FittedOver(loose, BodyRegion.Torso, under));
+        Assert.Same(tight, StickerCovers.FittedOver(tight, BodyRegion.Arm, under));
+        Assert.Same(tight, StickerCovers.FittedOver(tight, BodyRegion.Torso, null));
+        Assert.Equal(PartCover.DefaultEase / 2, StickerCovers.LayerMargin);
     }
 }
 

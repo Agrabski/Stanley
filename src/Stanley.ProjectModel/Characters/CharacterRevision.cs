@@ -15,6 +15,7 @@ namespace Stanley.ProjectModel.Characters;
 /// <param name="ProportionOverride">Sparse skeleton proportion override (aging up, redesigns, build-driven width) - only moved bones present.</param>
 /// <param name="Build">Continuous 0 (slim) - 1 (heavy) body-type parameter.</param>
 /// <param name="FabricValues">Colour slot -&gt; fabric, overriding the definition's for that slot.</param>
+/// <param name="StickerVariantValues">Sticker id -&gt; the style it's worn in, overriding the definition's for that sticker.</param>
 public sealed record CharacterRevision(
     CharacterRevisionId Id,
     CharacterId CharacterId,
@@ -23,4 +24,5 @@ public sealed record CharacterRevision(
     SortedDictionary<string, ColorValue> ColorSlotValues,
     Skeleton? ProportionOverride,
     double? Build,
-    SortedDictionary<string, Fabric>? FabricValues = null);
+    SortedDictionary<string, Fabric>? FabricValues = null,
+    SortedDictionary<StickerId, string>? StickerVariantValues = null);
