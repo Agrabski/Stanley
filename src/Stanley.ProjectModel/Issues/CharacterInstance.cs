@@ -7,16 +7,19 @@ namespace Stanley.ProjectModel.Issues;
 
 /// <summary>
 /// Sparse per-panel overrides on top of a character instance's revision (e.g. sunglasses
-/// for one shot): each map replaces only the slots it names.
+/// for one shot): each map replaces only the slots (for styles, the stickers) it names.
 /// </summary>
+/// <param name="StickerVariantOverrides">Sticker id -&gt; the style it's worn in for this panel only (the hood up for one shot).</param>
 public sealed record CharacterInstanceOverrides(
     SortedDictionary<string, IReadOnlyList<StickerId>>? ActiveStickerOverrides,
     SortedDictionary<string, ColorValue>? ColorSlotOverrides,
-    SortedDictionary<string, Fabric>? FabricOverrides = null)
+    SortedDictionary<string, Fabric>? FabricOverrides = null,
+    SortedDictionary<StickerId, string>? StickerVariantOverrides = null)
 {
     public bool IsEmpty => (ActiveStickerOverrides is null || ActiveStickerOverrides.Count == 0)
         && (ColorSlotOverrides is null || ColorSlotOverrides.Count == 0)
-        && (FabricOverrides is null || FabricOverrides.Count == 0);
+        && (FabricOverrides is null || FabricOverrides.Count == 0)
+        && (StickerVariantOverrides is null || StickerVariantOverrides.Count == 0);
 }
 
 /// <summary>

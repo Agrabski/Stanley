@@ -6,7 +6,8 @@ using Stanley.ProjectModel.Serialization;
 namespace Stanley.ProjectModel.Characters;
 
 /// <summary>A sticker being worn: which slot, and where in that slot's stack (0 = bottom).</summary>
-public sealed record WornSticker(StickerAsset Asset, string Slot, int StackIndex);
+/// <param name="Variant">The style it's worn in (docs/sticker-system.md §20) after definition → named look → panel, or null for its default way - see <see cref="Sticker.VariantFor"/>.</param>
+public sealed record WornSticker(StickerAsset Asset, string Slot, int StackIndex, string? Variant = null);
 
 /// <summary>
 /// What a character wears, in which colours and fabrics, after the chain definition →
@@ -43,7 +44,8 @@ public static class CharacterLooks
     /// <summary>
     /// Resolves what <paramref name="character"/> wears: its own default stickers per slot,
     /// replaced slot by slot by <paramref name="revision"/>, then by <paramref name="overrides"/>
-    /// (one panel). Colours and fabrics go stickers' defaults → character → revision → panel.
+    /// (one panel). Colours and fabrics go stickers' defaults → character → revision → panel,
+    /// and so does each sticker's style (<see cref="WornSticker.Variant"/>).
     /// Ids missing from the wardrobe (a hand-edited file) are skipped.
     /// </summary>
     public static CharacterLook Resolve(CharacterDefinition character, CharacterRevision? revision = null, CharacterInstanceOverrides? overrides = null)
@@ -53,10 +55,16 @@ public static class CharacterLooks
             slots[slot] = ids;
         foreach (var (slot, ids) in overrides?.ActiveStickerOverrides ?? [])
             slots[slot] = ids;
+        var styles = new Dictionary<StickerId, string>();
+        foreach (var chosen in new[] { character.StickerVariants, revision?.StickerVariantValues, overrides?.StickerVariantOverrides })
+        {
+            foreach (var (id, variant) in chosen ?? [])
+                styles[id] = variant;
+        }
 
         var worn = slots
             .SelectMany(kv => kv.Value.Select((id, i) => (Slot: kv.Key, Id: id, Index: i)))
-            .Select(w => character.Wardrobe.Find(w.Id) is { } asset ? new WornSticker(asset, w.Slot, w.Index) : null)
+            .Select(w => character.Wardrobe.Find(w.Id) is { } asset ? new WornSticker(asset, w.Slot, w.Index, styles.GetValueOrDefault(w.Id)) : null)
             .OfType<WornSticker>()
             .OrderBy(w => StickerSlots.ZOrder(w.Slot))
             .ThenBy(w => w.Slot, StringComparer.Ordinal)

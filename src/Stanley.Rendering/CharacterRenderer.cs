@@ -387,7 +387,7 @@ public sealed class FigureRenderer : ICharacterRenderer
         public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
         {
             var sticker = worn.Asset.Sticker;
-            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression);
+            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression, worn.Variant);
             var parts = sticker.Parts.Where(p => p.AppliesTo(variant)).ToList();
             var covers = new List<(StickerPart, PartPiece)>();
             foreach (var part in parts)

@@ -16,6 +16,7 @@ namespace Stanley.ProjectModel.Characters;
 /// <param name="Stickers">Slot -&gt; the stickers worn by default, bottom to top (ids in <see cref="Wardrobe"/>).</param>
 /// <param name="Fabrics">Colour slot -&gt; pattern/texture on top of its colour; absent when there are none.</param>
 /// <param name="Expressions">Faces saved to use again in any panel, in the order they were saved; absent when there are none.</param>
+/// <param name="StickerVariants">Sticker id -&gt; the style it's worn in: one of its variants (a hood up, a cap's brim back). A sticker worn its default way has no entry, and the map is absent when none has.</param>
 public sealed record CharacterDefinition(
     CharacterId Id,
     string Name,
@@ -24,7 +25,8 @@ public sealed record CharacterDefinition(
     SortedDictionary<string, ColorValue> ColorSlots,
     SortedDictionary<string, IReadOnlyList<StickerId>> Stickers,
     SortedDictionary<string, Fabric>? Fabrics = null,
-    IReadOnlyList<SavedExpression>? Expressions = null)
+    IReadOnlyList<SavedExpression>? Expressions = null,
+    SortedDictionary<StickerId, string>? StickerVariants = null)
 {
     /// <summary>
     /// The character's stickers (worn or not) and pattern tiles, loaded from its folder -

@@ -115,7 +115,7 @@ public sealed record StickerPart(
 /// </summary>
 /// <param name="Slot">What it is (<see cref="StickerSlots"/>): decides z-order and whether several stack. Any other name behaves like <c>accessory</c>.</param>
 /// <param name="Colors">The colour slots the sticker uses, each with its default colour - a fallback under the character's own choice.</param>
-/// <param name="Variants">The variant folders; the first is the fallback. Picked per slot by the pose's expression.</param>
+/// <param name="Variants">The variant folders; the first is the fallback. Picked per slot by the pose's expression, else per sticker by the style the character wears it in.</param>
 /// <param name="Source">"library:&lt;key&gt;" while this is an unmodified copy of a library sticker (tidied away on save when nothing wears it); absent once it's the user's own.</param>
 /// <param name="Fabrics">Default pattern/texture per colour slot (the library's jeans come in denim).</param>
 public sealed record Sticker(
@@ -145,12 +145,16 @@ public sealed record Sticker(
 
     /// <summary>
     /// The variant it shows worn in <paramref name="slot"/>: the expression's for that slot if
-    /// it has that one, else "neutral" if it has one, else its first.
+    /// it has that one (a face), else the style the character wears it in
+    /// (<paramref name="chosen"/>, docs/sticker-system.md §20) if it has that one, else
+    /// "neutral" if it has one, else its first.
     /// </summary>
-    public string VariantFor(string slot, IReadOnlyDictionary<string, string>? expression)
+    public string VariantFor(string slot, IReadOnlyDictionary<string, string>? expression, string? chosen = null)
     {
         if (expression is not null && expression.TryGetValue(slot, out var wanted) && Variants.Contains(wanted))
             return wanted;
+        if (chosen is not null && Variants.Contains(chosen))
+            return chosen;
         return Variants.Contains("neutral") ? "neutral" : Variants.Count > 0 ? Variants[0] : DefaultVariant;
     }
 }

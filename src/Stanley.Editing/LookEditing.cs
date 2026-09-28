@@ -46,16 +46,87 @@ public static class LookEditing
         return character with { Stickers = slots };
     }
 
-    /// <summary>Removes a sticker from the wardrobe altogether - and so from everything that wore it here, named looks included.</summary>
+    /// <summary>Removes a sticker from the wardrobe altogether - and so from everything that wore it here, named looks included, and the styles it was worn in.</summary>
     public static CharacterDefinition RemoveFromWardrobe(CharacterDefinition character, StickerId id)
     {
-        var result = TakeOff(character, id) with { Wardrobe = character.Wardrobe.Without(id) };
+        var result = TakeOff(character, id) with
+        {
+            Wardrobe = character.Wardrobe.Without(id),
+            StickerVariants = WithoutStyles(character.StickerVariants, i => i == id)
+        };
         var revisions = character.Revisions.ToDictionary(r => r.Key, r => r.Value with
         {
             ActiveStickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(
-                r.Value.ActiveStickers.ToDictionary(s => s.Key, s => (IReadOnlyList<StickerId>)s.Value.Where(i => i != id).ToList()), StringComparer.Ordinal)
+                r.Value.ActiveStickers.ToDictionary(s => s.Key, s => (IReadOnlyList<StickerId>)s.Value.Where(i => i != id).ToList()), StringComparer.Ordinal),
+            StickerVariantValues = WithoutStyles(r.Value.StickerVariantValues, i => i == id)
         });
         return result with { Revisions = revisions };
+    }
+
+    // ---------------------------------------------------------------- styles (docs/sticker-system.md §20)
+
+    /// <summary>
+    /// Wears sticker <paramref name="id"/> in the style <paramref name="variant"/> - one of its
+    /// variants: a hood up or down, a cap's brim forward or back. Its default style (what it
+    /// shows with none chosen, <see cref="DefaultStyle"/>) leaves no entry, so files stay
+    /// sparse. A sticker that isn't in the wardrobe, or a variant it doesn't have, changes nothing.
+    /// </summary>
+    public static CharacterDefinition SetVariant(CharacterDefinition character, StickerId id, string variant)
+    {
+        if (character.Wardrobe.Find(id) is not { } asset || !asset.Sticker.Variants.Contains(variant))
+            return character;
+        var styles = new SortedDictionary<StickerId, string>(character.StickerVariants ?? new SortedDictionary<StickerId, string>());
+        if (variant == DefaultStyle(asset.Sticker))
+        {
+            if (!styles.Remove(id))
+                return character;
+        }
+        else
+        {
+            if (styles.TryGetValue(id, out var current) && current == variant)
+                return character;
+            styles[id] = variant;
+        }
+        return character with { StickerVariants = styles.Count == 0 ? null : styles };
+    }
+
+    /// <summary>The style a sticker shows when none is chosen: its first variant ("neutral" instead, if it has one).</summary>
+    public static string DefaultStyle(Sticker sticker) => sticker.VariantFor(sticker.Slot, null);
+
+    /// <summary>
+    /// Whether a sticker worn in <paramref name="slot"/> has styles to choose from: more than
+    /// one variant, outside the face - a face's variants are its expressions, set per panel.
+    /// </summary>
+    public static bool HasStyles(Sticker sticker, string slot) => !StickerSlots.Get(slot).IsFace && sticker.Variants.Count > 1;
+
+    /// <summary>A style's name for people: "up" is "Up", "brim-back" (or "brimBack") "Brim back".</summary>
+    public static string StyleName(string variant)
+    {
+        var words = new System.Text.StringBuilder();
+        for (var i = 0; i < variant.Length; i++)
+        {
+            var c = variant[i];
+            if (c is '-' or '_' or ' ')
+            {
+                if (words.Length > 0 && words[words.Length - 1] != ' ')
+                    words.Append(' ');
+                continue;
+            }
+            if (i > 0 && char.IsUpper(c) && char.IsLower(variant[i - 1]))
+                words.Append(' ');
+            words.Append(words.Length == 0 ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
+        }
+        var name = words.ToString().TrimEnd();
+        return name.Length == 0 ? variant : name;
+    }
+
+    /// <summary><paramref name="styles"/> without the entries of stickers that are <paramref name="gone"/>: the same map if none is, null if nothing's left (files stay sparse).</summary>
+    private static SortedDictionary<StickerId, string>? WithoutStyles(SortedDictionary<StickerId, string>? styles, Func<StickerId, bool> gone)
+    {
+        if (styles is null || !styles.Keys.Any(gone))
+            return styles;
+        var kept = new SortedDictionary<StickerId, string>(styles.Where(s => !gone(s.Key)).ToDictionary(s => s.Key, s => s.Value));
+        return kept.Count == 0 ? null : kept;
     }
 
     /// <summary>Moves a worn sticker up (+1) or down (-1) its slot's stack.</summary>
@@ -141,7 +212,8 @@ public static class LookEditing
     /// <summary>
     /// The wardrobe without unmodified library copies that nothing wears - not the
     /// character, not a named look, not a panel (<paramref name="wornElsewhere"/>). Trying
-    /// things on leaves no files behind; anything edited or imported stays.
+    /// things on leaves no files behind; anything edited or imported stays. The styles of
+    /// stickers no longer in the wardrobe go too, the named looks' included.
     /// </summary>
     public static CharacterDefinition TidyWardrobe(CharacterDefinition character, IReadOnlySet<StickerId> wornElsewhere)
     {
@@ -150,12 +222,17 @@ public static class LookEditing
             .Where(a => a.Sticker.IsFromLibrary && !worn.Contains(a.Id) && !wornElsewhere.Contains(a.Id))
             .Select(a => a.Id)
             .ToList();
-        if (unused.Count == 0)
-            return character;
         var wardrobe = character.Wardrobe;
         foreach (var id in unused)
             wardrobe = wardrobe.Without(id);
-        return character with { Wardrobe = wardrobe };
+        bool Gone(StickerId id) => wardrobe.Find(id) is null;
+        var styles = WithoutStyles(character.StickerVariants, Gone);
+        var lookStylesGone = character.Revisions.Values.Any(r => r.StickerVariantValues?.Keys.Any(Gone) == true);
+        if (unused.Count == 0 && ReferenceEquals(styles, character.StickerVariants) && !lookStylesGone)
+            return character;
+        var revisions = !lookStylesGone ? character.Revisions : character.Revisions.ToDictionary(r => r.Key,
+            r => WithoutStyles(r.Value.StickerVariantValues, Gone) is var kept && ReferenceEquals(kept, r.Value.StickerVariantValues) ? r.Value : r.Value with { StickerVariantValues = kept });
+        return character with { Wardrobe = wardrobe, StickerVariants = styles, Revisions = revisions };
     }
 
     /// <summary>The tiles some fabric draws from: the character's, a named look's, a panel's (<paramref name="instances"/>) or a sticker's default.</summary>
@@ -193,7 +270,7 @@ public static class LookEditing
     /// <summary>
     /// The character as <paramref name="revision"/> (a named look) and then
     /// <paramref name="overrides"/> (one panel) dress it, flattened into a plain
-    /// definition: what's worn per slot, colours and fabrics. Every edit above works on
+    /// definition: what's worn per slot, colours, fabrics and styles. Every edit above works on
     /// it; <see cref="StoreLook"/> and <see cref="StorePanel"/> write the result back as
     /// the sparse changes a look or a panel keeps.
     /// </summary>
@@ -204,13 +281,19 @@ public static class LookEditing
         var stickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(character.Stickers, StringComparer.Ordinal);
         var colors = new SortedDictionary<string, ColorValue>(character.ColorSlots, StringComparer.Ordinal);
         var fabrics = new SortedDictionary<string, Fabric>(character.Fabrics ?? new SortedDictionary<string, Fabric>(), StringComparer.Ordinal);
+        var styles = new SortedDictionary<StickerId, string>(character.StickerVariants ?? new SortedDictionary<StickerId, string>());
         Overlay(stickers, revision?.ActiveStickers);
         Overlay(colors, revision?.ColorSlotValues);
         Overlay(fabrics, revision?.FabricValues);
+        Overlay(styles, revision?.StickerVariantValues);
         Overlay(stickers, overrides?.ActiveStickerOverrides);
         Overlay(colors, overrides?.ColorSlotOverrides);
         Overlay(fabrics, overrides?.FabricOverrides);
-        return character with { Stickers = stickers, ColorSlots = colors, Fabrics = fabrics.Count == 0 ? null : fabrics };
+        Overlay(styles, overrides?.StickerVariantOverrides);
+        return character with
+        {
+            Stickers = stickers, ColorSlots = colors, Fabrics = fabrics.Count == 0 ? null : fabrics, StickerVariants = styles.Count == 0 ? null : styles
+        };
     }
 
     /// <summary>
@@ -222,8 +305,12 @@ public static class LookEditing
     {
         if (!character.Revisions.TryGetValue(look, out var revision))
             return character with { Wardrobe = edited.Wardrobe };
-        var (stickers, colors, fabrics) = Differences(character, edited);
-        var updated = revision with { ActiveStickers = stickers, ColorSlotValues = colors, FabricValues = fabrics.Count == 0 ? null : fabrics };
+        var (stickers, colors, fabrics, styles) = Differences(character, edited);
+        var updated = revision with
+        {
+            ActiveStickers = stickers, ColorSlotValues = colors, FabricValues = fabrics.Count == 0 ? null : fabrics,
+            StickerVariantValues = styles.Count == 0 ? null : styles
+        };
         var revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions) { [look] = updated };
         return character with { Revisions = revisions, Wardrobe = edited.Wardrobe };
     }
@@ -235,8 +322,9 @@ public static class LookEditing
     /// </summary>
     public static CharacterInstance StorePanel(CharacterDefinition character, CharacterRevision? revision, CharacterInstance instance, CharacterDefinition edited)
     {
-        var (stickers, colors, fabrics) = Differences(Project(character, revision), edited);
-        var overrides = new CharacterInstanceOverrides(stickers.Count == 0 ? null : stickers, colors.Count == 0 ? null : colors, fabrics.Count == 0 ? null : fabrics);
+        var (stickers, colors, fabrics, styles) = Differences(Project(character, revision), edited);
+        var overrides = new CharacterInstanceOverrides(stickers.Count == 0 ? null : stickers, colors.Count == 0 ? null : colors, fabrics.Count == 0 ? null : fabrics,
+            styles.Count == 0 ? null : styles);
         return instance with { Overrides = overrides.IsEmpty ? null : overrides };
     }
 
@@ -249,7 +337,8 @@ public static class LookEditing
             new SortedDictionary<string, IReadOnlyList<StickerId>>(source?.ActiveStickers ?? new SortedDictionary<string, IReadOnlyList<StickerId>>(), StringComparer.Ordinal),
             new SortedDictionary<string, ColorValue>(source?.ColorSlotValues ?? new SortedDictionary<string, ColorValue>(), StringComparer.Ordinal),
             null, null,
-            source?.FabricValues is { } fabrics ? new SortedDictionary<string, Fabric>(fabrics, StringComparer.Ordinal) : null);
+            source?.FabricValues is { } fabrics ? new SortedDictionary<string, Fabric>(fabrics, StringComparer.Ordinal) : null,
+            source?.StickerVariantValues is { } styles ? new SortedDictionary<StickerId, string>(styles) : null);
         var revisions = new Dictionary<CharacterRevisionId, CharacterRevision>(character.Revisions) { [id] = look };
         return (character with { Revisions = revisions }, id);
     }
@@ -268,9 +357,13 @@ public static class LookEditing
         return character with { Revisions = revisions };
     }
 
-    /// <summary>Where <paramref name="edited"/> dresses differently from <paramref name="baseline"/>: slots, colours, fabrics (a fabric taken off is a plain one, so it wins over what's underneath).</summary>
-    private static (SortedDictionary<string, IReadOnlyList<StickerId>> Stickers, SortedDictionary<string, ColorValue> Colors, SortedDictionary<string, Fabric> Fabrics) Differences(
-        CharacterDefinition baseline, CharacterDefinition edited)
+    /// <summary>
+    /// Where <paramref name="edited"/> dresses differently from <paramref name="baseline"/>: slots,
+    /// colours, fabrics (a fabric taken off is a plain one, so it wins over what's underneath)
+    /// and styles (a sticker back to its default style says so, for the same reason).
+    /// </summary>
+    private static (SortedDictionary<string, IReadOnlyList<StickerId>> Stickers, SortedDictionary<string, ColorValue> Colors, SortedDictionary<string, Fabric> Fabrics,
+        SortedDictionary<StickerId, string> Styles) Differences(CharacterDefinition baseline, CharacterDefinition edited)
     {
         var stickers = new SortedDictionary<string, IReadOnlyList<StickerId>>(StringComparer.Ordinal);
         foreach (var slot in baseline.Stickers.Keys.Union(edited.Stickers.Keys))
@@ -296,12 +389,24 @@ public static class LookEditing
             if (!Equals(before, after))
                 fabrics[slot] = after;
         }
-        return (stickers, colors, fabrics);
+        var styles = new SortedDictionary<StickerId, string>();
+        var baseStyles = baseline.StickerVariants ?? new SortedDictionary<StickerId, string>();
+        var editedStyles = edited.StickerVariants ?? new SortedDictionary<StickerId, string>();
+        foreach (var id in baseStyles.Keys.Union(editedStyles.Keys))
+        {
+            var before = baseStyles.GetValueOrDefault(id);
+            var after = editedStyles.GetValueOrDefault(id);
+            if (after is null && (edited.Wardrobe.Find(id) ?? baseline.Wardrobe.Find(id)) is { } asset)
+                after = DefaultStyle(asset.Sticker);
+            if (after is not null && after != before)
+                styles[id] = after;
+        }
+        return (stickers, colors, fabrics, styles);
     }
 
-    private static void Overlay<T>(SortedDictionary<string, T> into, IReadOnlyDictionary<string, T>? values)
+    private static void Overlay<TKey, T>(SortedDictionary<TKey, T> into, IReadOnlyDictionary<TKey, T>? values) where TKey : notnull
     {
-        foreach (var (key, value) in values ?? new Dictionary<string, T>())
+        foreach (var (key, value) in values ?? new Dictionary<TKey, T>())
             into[key] = value;
     }
 
