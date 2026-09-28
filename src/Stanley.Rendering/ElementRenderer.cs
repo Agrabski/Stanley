@@ -36,6 +36,10 @@ public static class ElementRenderer
             case SpeedLinesElement speedLines:
                 DrawSpeedLines(canvas, speedLines, panelBounds);
                 break;
+            case GroupElement group:
+                foreach (var child in group.Children)
+                    Draw(canvas, child, drawText, pictures, panelBounds);
+                break;
         }
     }
 
@@ -304,6 +308,9 @@ public static class ElementRenderer
             case TextElement or PictureElement:
                 var b = PanelElements.Bounds(element);
                 return point.X >= b.Left - tolerance && point.X <= b.Right + tolerance && point.Y >= b.Top - tolerance && point.Y <= b.Bottom + tolerance;
+            case GroupElement:
+                var gb = PanelElements.Bounds(element);
+                return point.X >= gb.Left - tolerance && point.X <= gb.Right + tolerance && point.Y >= gb.Top - tolerance && point.Y <= gb.Bottom + tolerance;
             case SpeedLinesElement speedLines:
                 // Only the clear ellipse in the middle is clickable - the lines themselves cover
                 // the whole panel, and would otherwise swallow clicks meant for what's under them.

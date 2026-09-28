@@ -133,6 +133,72 @@ public class ElementRendererTests
     }
 
     [Fact]
+    public void A_group_draws_every_child_at_its_own_absolute_position()
+    {
+        var first = Box(new Rect2D(20, 20, 10, 10), Red, ElementLayer.Background);
+        var second = Box(new Rect2D(60, 40, 10, 10), Blue, ElementLayer.Background);
+        var group = new GroupElement(ElementId.New(), ElementLayer.Background, [first, second]);
+
+        using var bitmap = Render(PanelWith(null, [], group));
+
+        Assert.Equal(new SKColor(255, 0, 0), bitmap.GetPixel(25, 25));
+        Assert.Equal(new SKColor(0, 0, 255), bitmap.GetPixel(65, 45));
+    }
+
+    [Fact]
+    public void A_nested_group_draws_all_the_way_down()
+    {
+        var innermost = Box(new Rect2D(20, 20, 10, 10), Red, ElementLayer.Background);
+        var inner = new GroupElement(ElementId.New(), ElementLayer.Background, [innermost]);
+        var sibling = Box(new Rect2D(60, 40, 10, 10), Blue, ElementLayer.Background);
+        var outer = new GroupElement(ElementId.New(), ElementLayer.Background, [inner, sibling]);
+
+        using var bitmap = Render(PanelWith(null, [], outer));
+
+        Assert.Equal(new SKColor(255, 0, 0), bitmap.GetPixel(25, 25));
+        Assert.Equal(new SKColor(0, 0, 255), bitmap.GetPixel(65, 45));
+    }
+
+    [Fact]
+    public void A_group_leaves_off_lettering_for_every_child_while_their_boxes_still_draw()
+    {
+        var caption = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(15, 15, 40, 20), "WHAM",
+            new TextStyle(23, Black, BoxFill: ColorValue.FromHex("#ffff00")));
+        var group = new GroupElement(ElementId.New(), ElementLayer.Foreground, [caption]);
+        var panel = PanelWith(null, [], group);
+
+        using var bitmap = new SKBitmap(100, 100);
+        using (var canvas = new SKCanvas(bitmap))
+            PageRenderer.DrawPanels(canvas, [panel], hideText: group.Id);
+
+        for (var y = 16; y < 35; y++)
+            for (var x = 16; x < 55; x++)
+                Assert.Equal(new SKColor(255, 255, 0), bitmap.GetPixel(x, y));
+    }
+
+    [Fact]
+    public void Hit_testing_a_group_uses_the_union_box_of_its_children_even_in_a_gap_between_them()
+    {
+        var first = Box(new Rect2D(20, 20, 10, 10), Red, ElementLayer.Background);
+        var second = Box(new Rect2D(60, 40, 10, 10), Blue, ElementLayer.Background);
+        var group = new GroupElement(ElementId.New(), ElementLayer.Background, [first, second]);
+
+        Assert.True(ElementRenderer.Hits(group, new Point2D(25, 25), 0)); // inside the first child
+        Assert.True(ElementRenderer.Hits(group, new Point2D(40, 30), 0)); // the empty gap between the two, still inside the union box
+        Assert.False(ElementRenderer.Hits(group, new Point2D(5, 5), 0)); // clearly outside the union box
+    }
+
+    [Fact]
+    public void Hit_testing_a_group_respects_tolerance_past_its_union_box()
+    {
+        var only = Box(new Rect2D(20, 20, 10, 10), Red, ElementLayer.Background);
+        var group = new GroupElement(ElementId.New(), ElementLayer.Background, [only]);
+
+        Assert.False(ElementRenderer.Hits(group, new Point2D(31, 25), 0)); // just outside, no tolerance
+        Assert.True(ElementRenderer.Hits(group, new Point2D(31, 25), 2)); // same point, within tolerance
+    }
+
+    [Fact]
     public void Text_wraps_inside_its_box_and_a_caption_box_is_drawn_behind_it()
     {
         var caption = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(15, 15, 40, 20), "Meanwhile, back at the lab",
