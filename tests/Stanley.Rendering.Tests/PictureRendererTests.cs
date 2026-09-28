@@ -91,4 +91,19 @@ public class PictureRendererTests
 
         Assert.Equal(new SKColor(0, 255, 0), bitmap.GetPixel(40, 40));
     }
+
+    [Fact]
+    public void An_svg_picture_with_currentColor_fill_draws_black_instead_of_nothing()
+    {
+        // A downloaded icon SVG (svgrepo.com and similar) commonly fills with
+        // "currentColor", which means nothing outside a page's CSS: it used to draw
+        // completely invisible (issue #112).
+        var svg = ArtFile.Svg("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\"><path d=\"M0,0 H10 V10 H0 Z\" fill=\"currentColor\"/></svg>");
+        var picture = new PictureElement(ElementId.New(), ElementLayer.Background, new Rect2D(20, 20, 40, 40), "icon.svg");
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 80, 80)), null, [], [], [picture]);
+
+        using var bitmap = Render(panel, new Dictionary<string, ArtFile> { ["icon.svg"] = svg });
+
+        Assert.Equal(SKColors.Black, bitmap.GetPixel(40, 40));
+    }
 }

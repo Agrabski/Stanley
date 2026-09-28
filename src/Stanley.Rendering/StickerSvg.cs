@@ -210,11 +210,15 @@ public static class StickerSvg
     /// <summary>
     /// Rewrites what VectSharp reads differently from the SVG spec into what it reads
     /// right: an ellipse becomes a path (VectSharp draws it scaled, so its stroke would
-    /// be scaled too), and a clip path becomes one path (VectSharp only takes a single
-    /// path or rectangle there).
+    /// be scaled too), a clip path becomes one path (VectSharp only takes a single path
+    /// or rectangle there), and <c>currentColor</c> (common in downloaded icon SVGs,
+    /// meaningless outside a page's CSS) becomes black - VectSharp doesn't recognise it
+    /// as a colour, so a fill or stroke left as <c>currentColor</c> silently draws
+    /// nothing at all rather than the black a browser would show.
     /// </summary>
     private static void Normalize(XElement root, List<string> report)
     {
+        ResolveCurrentColor(root, report);
         foreach (var ellipse in root.Descendants().Where(e => e.Name.LocalName == "ellipse").ToList())
         {
             if (ShapeData(ellipse) is { } d)
@@ -240,6 +244,51 @@ public static class StickerSvg
                 shape.Remove();
             clip.Add(new XElement(Svg + "path", new XAttribute("d", string.Join(" ", data))));
         }
+    }
+
+    /// <summary>Replaces <c>currentColor</c> in every <c>fill</c>, <c>stroke</c>, <c>stop-color</c> and <c>style</c> attribute with black, the CSS default for a standalone file.</summary>
+    private static void ResolveCurrentColor(XElement root, List<string> report)
+    {
+        const string black = "#000000";
+        var found = false;
+        foreach (var element in root.DescendantsAndSelf())
+        {
+            foreach (var name in new[] { "fill", "stroke", "stop-color" })
+                if (element.Attribute(name) is { } attribute && ReplaceCurrentColor(attribute.Value, black) is { } replaced)
+                {
+                    attribute.Value = replaced;
+                    found = true;
+                }
+            if (element.Attribute("style") is { } style && ReplaceCurrentColor(style.Value, black) is { } replacedStyle)
+            {
+                style.Value = replacedStyle;
+                found = true;
+            }
+            // A <style> block's CSS text, not a presentation attribute - e.g. ".icon { fill: currentColor; }".
+            if (element.Name.LocalName == "style" && ReplaceCurrentColor(element.Value, black) is { } replacedCss)
+            {
+                element.Value = replacedCss;
+                found = true;
+            }
+        }
+        if (found)
+            report.Add("currentColor drawn as black");
+    }
+
+    /// <summary>Case-insensitively replaces every <c>currentColor</c> token in <paramref name="value"/> with <paramref name="replacement"/>; null if there's none to replace.</summary>
+    private static string? ReplaceCurrentColor(string value, string replacement)
+    {
+        const string token = "currentcolor";
+        var index = value.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+            return null;
+        var result = value;
+        while (index >= 0)
+        {
+            result = result.Remove(index, token.Length).Insert(index, replacement);
+            index = result.IndexOf(token, index + replacement.Length, StringComparison.OrdinalIgnoreCase);
+        }
+        return result;
     }
 
     private static XElement AsPath(XElement shape, string d, params string[] geometry)
