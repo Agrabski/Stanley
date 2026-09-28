@@ -87,14 +87,14 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         CanFloat = false;
 
         Pages = new ObservableCollection<PageItem>(pages.Select(p => new PageItem(p.Id, CreateEditor(p.Id, p.Bounds, p.Document, null))));
-        if (Pages.Count == 0)
-            throw new ArgumentException("A comic needs at least one page.", nameof(pages));
         if (titlePage != null)
         {
             _comicTitlePage = new PageItem(titlePage.Id, CreateEditor(titlePage.Id, titlePage.Bounds, titlePage.Document with { TitlePage = TitlePageScope.Comic }, null));
             if (OwnTitlePage is null)
                 Pages.Insert(0, _comicTitlePage);
         }
+        if (Pages.Count == 0)
+            throw new ArgumentException("A comic needs at least one page.", nameof(pages));
         SyncPages();
         _currentPage = Pages[0];
 
@@ -291,9 +291,11 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
     }
 
     /// <summary>
-    /// Removes a page - never the issue's last one besides the comic's title page. The next
-    /// page - or the previous, at the end - becomes current. Deleting the comic's title page
-    /// takes it away from every issue; deleting this issue's own brings the comic's back.
+    /// Removes a page - never the navigator's last one, of any kind, so an issue can end up
+    /// with only its title page (#65) but never with none at all. The next page - or the
+    /// previous, at the end - becomes current. Deleting the comic's title page takes it away
+    /// from every issue; deleting this issue's own swaps the comic's back in its place, which
+    /// never loses a page and so is always allowed.
     /// </summary>
     public void DeletePage(PageItem page)
     {
@@ -305,25 +307,26 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         if (page.Editor.Committed.TitlePage == TitlePageScope.Issue && _comicTitlePage is { } comic && !order.Contains(comic))
         {
             order[index] = comic;
-            if (IssuePageCount(order) > 0)
-                ChangePages("Use the comic's title page", order, ReferenceEquals(page, CurrentPage) ? comic : CurrentPage);
+            ChangePages("Use the comic's title page", order, ReferenceEquals(page, CurrentPage) ? comic : CurrentPage);
             return;
         }
 
-        order.RemoveAt(index);
-        if (IssuePageCount(order) == 0)
+        if (Pages.Count <= 1)
             return;
+        order.RemoveAt(index);
         var current = ReferenceEquals(page, CurrentPage) ? order[Math.Min(index, order.Count - 1)] : CurrentPage;
         var comicTitlePage = ReferenceEquals(page, _comicTitlePage) ? null : _comicTitlePage;
         ChangePages(comicTitlePage == _comicTitlePage ? "Delete page" : "Remove the title page", order, current, comicTitlePage);
     }
 
-    /// <summary>Whether <see cref="DeletePage"/> would do anything: the comic's title page can always go, the issue's pages while another is left.</summary>
+    /// <summary>
+    /// Whether <see cref="DeletePage"/> would do anything: swapping the issue's own title page
+    /// for the comic's (hidden while the issue has its own) never loses a page, so that's
+    /// always allowed; otherwise only while another page is left.
+    /// </summary>
     public bool CanDeletePage(PageItem page) =>
-        Pages.Contains(page) && (ReferenceEquals(page, _comicTitlePage) || IssuePageCount(Pages) > 1);
-
-    /// <summary>How many of <paramref name="order"/> are the issue's own pages: all but the comic's title page. An issue never goes without one.</summary>
-    private int IssuePageCount(IEnumerable<PageItem> order) => order.Count(p => !ReferenceEquals(p, _comicTitlePage));
+        Pages.Contains(page) &&
+        ((page.Editor.Committed.TitlePage == TitlePageScope.Issue && _comicTitlePage is { } comic && !Pages.Contains(comic)) || Pages.Count > 1);
 
     /// <summary>The first index a page can be moved to or from: a title page stays first.</summary>
     private int FirstMovable => Pages[0].Editor.Committed.IsTitlePage ? 1 : 0;
@@ -370,8 +373,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
 
     public bool HasOwnTitlePage => OwnTitlePage is not null;
 
-    /// <summary>Whether Remove title page can do anything: never take away the issue's last page.</summary>
-    public bool CanRemoveTitlePage => HasTitlePage && IssuePageCount(Pages) >= (HasOwnTitlePage ? 2 : 1);
+    /// <summary>Whether Remove title page can do anything: the same rule as deleting the title page it shows (<see cref="CanDeletePage"/>) - never the navigator's last page.</summary>
+    public bool CanRemoveTitlePage => TitlePage is { } shown && CanDeletePage(shown);
 
     public event Action? TitlePageChanged;
 
@@ -434,7 +437,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         ChangePages("Title page for every issue", [promoted, .. pages], promoted, promoted);
     }
 
-    /// <summary>Removes the title page this issue opens with: its own (then the comic's shows, if it has one), else the comic's - from every issue. Never the issue's last page.</summary>
+    /// <summary>Removes the title page this issue opens with: its own (then the comic's shows, if it has one), else the comic's - from every issue. Never the navigator's last page.</summary>
     public void RemoveTitlePage()
     {
         if (!CanRemoveTitlePage)

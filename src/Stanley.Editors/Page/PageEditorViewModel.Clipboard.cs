@@ -314,6 +314,64 @@ public sealed partial class PageEditorViewModel
         return copy.Id;
     }
 
+    /// <summary>
+    /// Alt+drag on a multi-selection: a copy of every selected bubble, character and element,
+    /// added in front of the rest and selected as the new group, leaving the originals where
+    /// they were. Move the copies with <see cref="UpdateMoveSelection"/>; the copies and the
+    /// move are one undo step, and cancelling (Esc) puts the original selection back. False if
+    /// nothing in the selection still exists to copy.
+    /// </summary>
+    public bool BeginDuplicateSelection(PanelId panelId)
+    {
+        if (!Committed.Panels.TryGetValue(panelId, out var panel))
+            return false;
+
+        var bubbles = panel.Bubbles.ToList();
+        var characters = panel.CharacterInstances.ToList();
+        var elements = panel.Elements.ToList();
+        var copies = new List<SelectedItem>();
+        foreach (var item in AllSelected())
+        {
+            switch (item.Kind)
+            {
+                case SelectionKind.Bubble when item.Index >= 0 && item.Index < bubbles.Count:
+                    bubbles.Add(Clippings.Copy(bubbles[item.Index]));
+                    copies.Add(new SelectedItem(SelectionKind.Bubble, bubbles.Count - 1));
+                    break;
+                case SelectionKind.Character when item.Index >= 0 && item.Index < characters.Count:
+                    characters.Add(characters[item.Index]);
+                    copies.Add(new SelectedItem(SelectionKind.Character, characters.Count - 1));
+                    break;
+                case SelectionKind.Element when item.Index >= 0 && item.Index < elements.Count:
+                    elements.Add(Clippings.Copy(elements[item.Index]));
+                    copies.Add(new SelectedItem(SelectionKind.Element, elements.Count - 1));
+                    break;
+            }
+        }
+        if (copies.Count == 0)
+            return false;
+
+        var originalPrimary = PrimaryItem;
+        var originalExtras = _extraSelection.ToList();
+        var withCopies = panel with { Bubbles = bubbles, CharacterInstances = characters, Elements = elements };
+        StartDuplicate(Committed with { Panels = new Dictionary<PanelId, Panel>(Committed.Panels) { [panelId] = withCopies } },
+            () => RestoreSelection(originalPrimary, originalExtras));
+
+        _extraSelection.Clear();
+        _extraSelection.AddRange(copies.Skip(1));
+        SetPrimaryIndex(copies[0]);
+        return true;
+    }
+
+    /// <summary>Puts the pre-duplicate selection back - what an Alt+drag's cancel restores.</summary>
+    private void RestoreSelection(SelectedItem? primary, List<SelectedItem> extras)
+    {
+        _extraSelection.Clear();
+        _extraSelection.AddRange(extras);
+        if (primary is { } item)
+            SetPrimaryIndex(item);
+    }
+
     private int BeginDuplicate(PanelId panelId, int index, Func<Panel, Panel?> addCopy, Func<Panel, int> copyIndex, Action<int> select, Action reselectOriginal)
     {
         if (index < 0 || !Committed.Panels.TryGetValue(panelId, out var panel) || addCopy(panel) is not { } withCopy)

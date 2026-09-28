@@ -346,19 +346,71 @@ public class ElementEditingTests
     }
 
     [Fact]
-    public void Reordering_moves_to_either_end_of_the_list()
+    public void Bring_to_front_moves_to_foreground_layer_at_the_end()
     {
         var a = Blob(new Rect2D(0, 0, 5, 5));
         var b = Blob(new Rect2D(0, 0, 5, 5));
         var c = Blob(new Rect2D(0, 0, 5, 5));
 
         var (front, index) = ElementEditing.Reorder([a, b, c], 0, toFront: true);
-        Assert.Equal([b, c, a], front);
         Assert.Equal(2, index);
+        Assert.Equal(ElementLayer.Background, front[0].Layer);
+        Assert.Equal(ElementLayer.Background, front[1].Layer);
+        Assert.Equal(ElementLayer.Foreground, front[2].Layer);
+    }
+
+    [Fact]
+    public void Send_to_back_moves_to_background_layer_at_the_start()
+    {
+        var a = Blob(new Rect2D(0, 0, 5, 5));
+        var b = Blob(new Rect2D(0, 0, 5, 5));
+        var c = Blob(new Rect2D(0, 0, 5, 5));
 
         var (back, backIndex) = ElementEditing.Reorder([a, b, c], 2, toFront: false);
-        Assert.Equal([c, a, b], back);
         Assert.Equal(0, backIndex);
+        Assert.Equal(ElementLayer.Background, back[0].Layer);
+        Assert.Equal(ElementLayer.Background, back[1].Layer);
+        Assert.Equal(ElementLayer.Background, back[2].Layer);
+    }
+
+    [Fact]
+    public void Bring_to_front_on_already_frontmost_foreground_element_is_a_no_op()
+    {
+        var bg = Blob(new Rect2D(0, 0, 5, 5));
+        var fg1 = Blob(new Rect2D(0, 0, 5, 5)) with { Layer = ElementLayer.Foreground };
+        var fg2 = Blob(new Rect2D(0, 0, 5, 5)) with { Layer = ElementLayer.Foreground };
+
+        var original = new[] { bg, (PanelElement)fg1, fg2 };
+        var (result, index) = ElementEditing.Reorder(original, 2, toFront: true);
+
+        Assert.Same(original, result);  // No change
+        Assert.Equal(2, index);
+    }
+
+    [Fact]
+    public void Send_to_back_on_already_backmost_background_element_is_a_no_op()
+    {
+        var bg1 = Blob(new Rect2D(0, 0, 5, 5));
+        var bg2 = Blob(new Rect2D(0, 0, 5, 5));
+        var fg = Blob(new Rect2D(0, 0, 5, 5)) with { Layer = ElementLayer.Foreground };
+
+        var original = new[] { bg1, (PanelElement)bg2, fg };
+        var (result, index) = ElementEditing.Reorder(original, 0, toFront: false);
+
+        Assert.Same(original, result);  // No change
+        Assert.Equal(0, index);
+    }
+
+    [Fact]
+    public void The_front_of_each_layer_is_its_last_element_even_with_the_layers_interleaved()
+    {
+        var fg = Blob(new Rect2D(0, 0, 5, 5)) with { Layer = ElementLayer.Foreground };
+        var bg = Blob(new Rect2D(0, 0, 5, 5));
+        var original = new[] { (PanelElement)fg, bg };
+
+        Assert.Same(original, ElementEditing.Reorder(original, 0, toFront: true).Elements);
+        Assert.Same(original, ElementEditing.Reorder(original, 1, toFront: false).Elements);
+        Assert.Equal(original, ElementEditing.Reorder(original, 5, toFront: true).Elements);
     }
 
     [Fact]

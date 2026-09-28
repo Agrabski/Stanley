@@ -443,4 +443,111 @@ public class PageElementsTests
 
         Assert.Equal(new Rect2D(50, 40, 20, 20), PanelElements.Bounds(editor.Working.Panels[panel].Elements[0]));
     }
+
+    [Fact]
+    public void Bring_to_front_moves_background_element_to_foreground_layer()
+    {
+        var (editor, history, panel) = NewEditor();
+        var shape = DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        Assert.Equal(ElementLayer.Background, shape.Layer);
+        editor.SelectElement(panel, 0);
+
+        editor.ReorderElement(panel, 0, toFront: true);
+
+        var reordered = Assert.IsType<ShapeElement>(editor.Working.Panels[panel].Elements[0]);
+        Assert.Equal(ElementLayer.Foreground, reordered.Layer);
+        Assert.Equal(0, editor.SelectedElementIndex);
+
+        history.Undo();
+        var reverted = Assert.IsType<ShapeElement>(editor.Working.Panels[panel].Elements[0]);
+        Assert.Equal(ElementLayer.Background, reverted.Layer);
+    }
+
+    [Fact]
+    public void Bring_to_front_places_element_at_the_end_of_the_list()
+    {
+        var (editor, _, panel) = NewEditor();
+        DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        DrawRectangle(editor, panel, new Rect2D(30, 30, 20, 20));
+        DrawRectangle(editor, panel, new Rect2D(40, 40, 20, 20));
+        Assert.Equal(3, editor.Working.Panels[panel].Elements.Count);
+        editor.SelectElement(panel, 0);
+
+        editor.ReorderElement(panel, 0, toFront: true);
+
+        // Element should be at the end after bring to front
+        Assert.Equal(2, editor.SelectedElementIndex);
+        var movedElement = editor.Working.Panels[panel].Elements[2];
+        Assert.Equal(ElementLayer.Foreground, movedElement.Layer);
+    }
+
+    [Fact]
+    public void Send_to_back_moves_foreground_element_to_background_layer()
+    {
+        var (editor, history, panel) = NewEditor();
+        var shape = DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        editor.SelectElement(panel, 0);
+        editor.ReorderElement(panel, 0, toFront: true);
+        Assert.Equal(ElementLayer.Foreground, editor.SelectedElement!.Layer);
+
+        editor.ReorderElement(panel, editor.SelectedElementIndex, toFront: false);
+
+        var reordered = Assert.IsType<ShapeElement>(editor.Working.Panels[panel].Elements[0]);
+        Assert.Equal(ElementLayer.Background, reordered.Layer);
+
+        history.Undo();
+        var reverted = Assert.IsType<ShapeElement>(editor.Working.Panels[panel].Elements[0]);
+        Assert.Equal(ElementLayer.Foreground, reverted.Layer);
+    }
+
+    [Fact]
+    public void Send_to_back_places_element_at_the_start_of_the_list()
+    {
+        var (editor, _, panel) = NewEditor();
+        DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        DrawRectangle(editor, panel, new Rect2D(30, 30, 20, 20));
+        DrawRectangle(editor, panel, new Rect2D(40, 40, 20, 20));
+        editor.SelectElement(panel, 2);
+
+        editor.ReorderElement(panel, 2, toFront: false);
+
+        // Element should be at the start after send to back
+        Assert.Equal(0, editor.SelectedElementIndex);
+        var movedElement = editor.Working.Panels[panel].Elements[0];
+        Assert.Equal(ElementLayer.Background, movedElement.Layer);
+    }
+
+    [Fact]
+    public void Bring_to_front_on_the_front_element_adds_nothing_to_undo()
+    {
+        var (editor, history, panel) = NewEditor();
+        DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        DrawRectangle(editor, panel, new Rect2D(30, 30, 20, 20));
+        editor.SelectElement(panel, 0);
+        editor.ReorderElement(panel, 0, toFront: true);
+        var before = editor.Working;
+
+        editor.ReorderElement(panel, editor.SelectedElementIndex, toFront: true);
+
+        Assert.Same(before, editor.Working);
+        history.Undo(); // the first To front, not the second
+        Assert.All(editor.Working.Panels[panel].Elements, e => Assert.Equal(ElementLayer.Background, e.Layer));
+    }
+
+    [Fact]
+    public void Send_to_back_on_the_back_element_adds_nothing_to_undo()
+    {
+        var (editor, history, panel) = NewEditor();
+        DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
+        var second = DrawRectangle(editor, panel, new Rect2D(30, 30, 20, 20));
+        editor.SelectElement(panel, 1);
+        editor.ReorderElement(panel, 1, toFront: false);
+        var before = editor.Working;
+
+        editor.ReorderElement(panel, editor.SelectedElementIndex, toFront: false);
+
+        Assert.Same(before, editor.Working);
+        history.Undo(); // the first To back, not the second
+        Assert.Equal(second.Id, editor.Working.Panels[panel].Elements[1].Id);
+    }
 }

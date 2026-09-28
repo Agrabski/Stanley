@@ -233,7 +233,8 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.ShowMarginGuides) or nameof(PageEditorViewModel.Folio)
             or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
             or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex)
-            or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields))
+            or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields)
+            or nameof(PageEditorViewModel.SelectionCount))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
             UpdateCursor(null);
@@ -274,7 +275,8 @@ public sealed class PageCanvasControl : Control
             _viewModel.SelectedElementIndex,
             _editingText,
             _viewModel.PictureSnapshot,
-            _viewModel.Fields)));
+            _viewModel.Fields,
+            _viewModel.ExtraSelectionBounds)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
@@ -702,12 +704,32 @@ public sealed class PageCanvasControl : Control
             }
         }
 
+        // Shift+click on a bubble, character or element toggles it in or out of the selection,
+        // instead of the usual press-to-select-and-drag: adding to a selection is the point,
+        // and a drag straight from here would just move the one thing Shift was held over.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && hit.PanelId is { } shiftPanel
+            && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody)
+        {
+            vm.ToggleSelect(shiftPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
+            return;
+        }
+
         _dragPanelId = hit.PanelId;
         _dragBubbleIndex = hit.BubbleIndex;
         _dragTailIndex = hit.TailIndex;
         _dragCharacterIndex = hit.CharacterIndex;
         _dragElementIndex = hit.ElementIndex;
         _dragEdges = hit.Edges;
+
+        // A plain press on something already part of a multi-selection drags the whole group
+        // without collapsing it first; released without moving, it falls back to a plain click
+        // (see the DragKind.PendingMoveGroup case in FinishDrag).
+        if (hit.PanelId is { } groupPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody
+            && vm.IsPartOfSelection(groupPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex) && vm.HasMultiSelection)
+        {
+            StartDrag(e, DragKind.PendingMoveGroup);
+            return;
+        }
 
         switch (hit.Kind)
         {
@@ -789,8 +811,10 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case HitKind.PanelBody when vm.Working.LayoutLocked:
-                // Locked panels can't be selected: behave like the pasteboard.
-                vm.ClearSelection();
+                // Its layout can't be changed, but it can still be selected (issue #67) - so a
+                // double-click character or Insert > Character has somewhere to go. Dragging
+                // from it does nothing but pan the view, like the pasteboard.
+                vm.Select(hit.PanelId);
                 StartDrag(e, DragKind.Pan);
                 break;
 
@@ -962,6 +986,19 @@ public sealed class PageCanvasControl : Control
                 _viewModel.UpdateResizeElement(_dragPanelId!.Value, _dragElementIndex, MoveEdges(_dragStartBounds, _dragEdges, dx, dy));
                 break;
 
+            case DragKind.PendingMoveGroup when beyondThreshold:
+                if (alt && _viewModel.BeginDuplicateSelection(_dragPanelId!.Value))
+                    _duplicating = true;
+                else
+                    _viewModel.BeginMoveSelection(_dragPanelId!.Value);
+                _drag = DragKind.MoveGroup;
+                UpdateCursor(null);
+                goto case DragKind.MoveGroup;
+
+            case DragKind.MoveGroup:
+                _viewModel.UpdateMoveSelection(_dragPanelId!.Value, dx, dy);
+                break;
+
             case DragKind.DrawShape when _viewModel.Tool == PageEditorTool.Draw:
                 // Pointer events come faster than the pen needs; skip ones under half a pixel apart.
                 if (Dist(_trail[^1], page) * _zoom >= 0.5)
@@ -1027,8 +1064,19 @@ public sealed class PageCanvasControl : Control
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
                 or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.DragGutter
                 or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk
-                or DragKind.MoveElement or DragKind.ResizeElement:
+                or DragKind.MoveElement or DragKind.ResizeElement or DragKind.MoveGroup:
                 vm.EndGesture(commit);
+                break;
+
+            // Never dragged (no BeginMoveSelection call was ever made, so there's no gesture to
+            // end): a plain click on a multi-selected item collapses the selection to just it.
+            case DragKind.PendingMoveGroup when commit && _dragPanelId is { } collapsePanel:
+                if (_dragBubbleIndex >= 0)
+                    vm.Select(collapsePanel, _dragBubbleIndex);
+                else if (_dragCharacterIndex >= 0)
+                    vm.SelectCharacter(collapsePanel, _dragCharacterIndex);
+                else if (_dragElementIndex >= 0)
+                    vm.SelectElement(collapsePanel, _dragElementIndex);
                 break;
 
             case DragKind.DrawShape when commit:
@@ -1105,9 +1153,9 @@ public sealed class PageCanvasControl : Control
         var vm = _viewModel!;
         Hit? hit = vm.Tool == PageEditorTool.Select && !_spaceHeld ? HitTest(page) : null;
         var gutter = hit?.Gutter;
-        // No "you could select this" highlight on a locked layout; the Bubble tool still
-        // shows which panel a new bubble would land in.
-        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text || vm.IsShapeTool || vm.Tool == PageEditorTool.Select && !vm.Working.LayoutLocked ? PanelAt(page) : null;
+        // The "you could select/land this here" highlight shows for the Select tool even on a
+        // locked layout, since a locked panel can still be selected (issue #67).
+        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text or PageEditorTool.Select || vm.IsShapeTool ? PanelAt(page) : null;
         if (!Equals(gutter, _hoverGutter) || !Equals(panel, _hoverPanelId))
         {
             _hoverGutter = gutter;
@@ -1405,10 +1453,10 @@ public sealed class PageCanvasControl : Control
         }
         else if (PanelAt(page) is { } lockedPanelId && vm.Working.LayoutLocked)
         {
-            vm.ClearSelection();
+            vm.Select(lockedPanelId);
             if (vm.CanPaste)
             {
-                // A locked layout's panels can't be selected, so paste into the one that was right-clicked.
+                // Paste explicitly targets the panel that was right-clicked, regardless of what's selected.
                 items.Add(Item("Paste", () => vm.PasteInto(lockedPanelId), "Ctrl+V"));
                 items.Add(new Separator());
             }
@@ -1660,6 +1708,8 @@ public sealed class PageCanvasControl : Control
         MoveElement,
         ResizeElement,
         DrawShape,
-        CreateText
+        CreateText,
+        PendingMoveGroup,
+        MoveGroup
     }
 }

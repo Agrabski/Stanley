@@ -594,36 +594,101 @@ public class PageEditorViewModelTests
     }
 
     [Fact]
-    public void SelectPanel_WhileLocked_SelectsNothing()
+    public void SelectPanel_WhileLocked_SelectsIt()
     {
         var (_, vm, panelId) = NewEditor();
         vm.IsLayoutLocked = true;
 
         vm.Select(panelId);
 
-        Assert.Null(vm.SelectedPanelId);
-        Assert.False(vm.HasSelectedPanel);
-        Assert.False(vm.IsPanelContext);
+        Assert.Equal(panelId, vm.SelectedPanelId);
+        Assert.True(vm.HasSelectedPanel);
+        Assert.True(vm.IsPanelContext);
     }
 
     [Fact]
-    public void LockingLayout_ClearsAPanelSelectionButKeepsABubbleSelection()
+    public void LockingLayout_KeepsBothAPanelSelectionAndABubbleSelection()
     {
         var (history, vm, panelId) = NewEditor();
         var bubbleIndex = vm.CreateBubble(panelId, new Point2D(60, 60));
 
         vm.Select(panelId);
         vm.IsLayoutLocked = true;
-        Assert.Null(vm.SelectedPanelId);
+        Assert.Equal(panelId, vm.SelectedPanelId);
+        Assert.True(vm.IsPanelContext);
 
         vm.Select(panelId, bubbleIndex);
         Assert.True(vm.IsBubbleContext);
         Assert.Equal(panelId, vm.SelectedPanelId);
 
-        // Unlocking (via undo) makes panels selectable again.
+        // Unlocking (via undo) leaves the panel selectable exactly as before.
         history.Undo();
         Assert.False(vm.IsLayoutLocked);
         vm.Select(panelId);
         Assert.True(vm.IsPanelContext);
+    }
+
+    [Fact]
+    public void SelectingALockedPanel_ThenInsertingACharacter_PutsItInThatPanel()
+    {
+        var (_, vm, firstId) = NewEditor();
+        vm.Select(firstId);
+        vm.SplitPanel(firstId, BoundaryOrientation.Vertical, 0.5); // selects the first half automatically
+        var secondId = vm.Working.PanelOrder[1];
+        vm.IsLayoutLocked = true;
+        vm.Select(secondId);
+
+        var index = vm.InsertCharacter(CharacterId.New());
+
+        Assert.True(index >= 0);
+        Assert.Single(vm.Working.Panels[secondId].CharacterInstances);
+        Assert.Empty(vm.Working.Panels[vm.Working.PanelOrder[0]].CharacterInstances);
+    }
+
+    [Fact]
+    public void MoveResizeSplitDeleteAndRetile_AreNoOpsOnASelectedLockedPanel()
+    {
+        var (history, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        vm.IsLayoutLocked = true; // the one undo entry everything below must not add to
+        var bounds = vm.PanelBounds(panelId);
+
+        vm.BeginMovePanel(panelId);
+        vm.UpdateMovePanel(panelId, 20, 20, snapTolerance: 0);
+        vm.EndGesture(commit: true);
+        Assert.Equal(bounds, vm.PanelBounds(panelId));
+
+        vm.BeginResizePanel(panelId);
+        vm.UpdateResizePanel(panelId, new Rect2D(5, 5, 80, 80));
+        vm.EndGesture(commit: true);
+        Assert.Equal(bounds, vm.PanelBounds(panelId));
+
+        vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5);
+        Assert.Single(vm.Working.Panels);
+
+        vm.NudgeSelection(5, 5);
+        Assert.Equal(bounds, vm.PanelBounds(panelId));
+
+        vm.DeleteSelection();
+        Assert.True(vm.Working.Panels.ContainsKey(panelId));
+
+        vm.ApplyLayoutPreset(PanelLayoutPresets.All.First(p => p.ColumnsPerRow.Sum() == 6));
+        Assert.Single(vm.Working.Panels);
+
+        // None of the above pushed an undo entry: undoing once undoes exactly the lock.
+        history.Undo();
+        Assert.False(vm.IsLayoutLocked);
+    }
+
+    [Fact]
+    public void PanelBackground_CanStillBeSetWhileSelectedAndLocked()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.Select(panelId);
+        vm.IsLayoutLocked = true;
+
+        vm.SetPanelBackground(panelId, DrawingPalette.Backgrounds.Single(b => b.Name == "Night").Background);
+
+        Assert.IsType<GradientBackground>(vm.Working.Panels[panelId].Background);
     }
 }

@@ -63,7 +63,17 @@ the pen only with nothing selected or a drawing tool on. **Holding Ctrl** shows 
 on-screen button's shortcut in a keycap right by it, like Office's KeyTips
 (`local:Shortcut.Keys`, drawn in the adorner layer so nothing moves); menus show theirs
 all the time via `InputGesture`. After File › Export a note offers **Open** and
-**Show in folder** (`IFileLauncher`).
+**Show in folder** (`IFileLauncher`). **Shift+click** adds a bubble, character or
+element to the selection, or drops it: a multi-selection stays in one panel and drags
+(tails along), nudges, Alt+drags and deletes as one undo step; the last one clicked
+drives the ribbon. **Lock layout** protects a page's panel geometry (move, resize,
+split, delete, re-tile) but leaves panels selectable, so a double-clicked character
+still lands in the selected one. **To front / To back** on a drawn element cross the
+character layer: the top of the foreground, the bottom of the background. A bubble's
+**font size is absolute** - a bubble too small for its text grows to fit
+(`BubbleTextRenderer.NeededScale` → `BubbleEditing.GrowToFit`) instead of the letters
+shrinking; one dragged smaller by hand lets its text spill. An issue can be deleted
+down to just its title page; only the navigator's last page can't go.
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; `init`, and `issue
 list`/`issue add`) instead, without touching Avalonia at all — one binary, not a

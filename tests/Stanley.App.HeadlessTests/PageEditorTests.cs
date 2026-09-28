@@ -512,9 +512,9 @@ public class PageEditorTests
         public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
     }
 
-    /// <summary>Clicking a panel on a locked layout selects nothing - no Panel tab, nothing to drag - while double-click still adds a bubble.</summary>
+    /// <summary>Clicking a panel on a locked layout selects it (issue #67) without moving it - a drag from it only pans the view, like the pasteboard - while double-click still adds a bubble.</summary>
     [Fact]
-    public void ClickingAPanel_WhileLayoutIsLocked_DoesNotSelectIt()
+    public void ClickingAPanel_WhileLayoutIsLocked_SelectsItWithoutMovingIt()
     {
         var window = new MainWindow();
         window.Show();
@@ -532,9 +532,9 @@ public class PageEditorTests
             window.MouseUp(new Point(point.X + 30, point.Y + 30), MouseButton.Left);
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Null(window.Editor.SelectedPanelId);
-            Assert.False(window.Editor.IsPanelContext);
-            Assert.Equal(bounds, window.Editor.PanelBounds(panelId));
+            Assert.Equal(panelId, window.Editor.SelectedPanelId);
+            Assert.True(window.Editor.IsPanelContext);
+            Assert.Equal(bounds, window.Editor.PanelBounds(panelId)); // the drag panned the view, not the panel
         }
 
         var centre = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
