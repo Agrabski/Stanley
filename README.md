@@ -3,8 +3,7 @@
 Stanley is a comic editor built on .NET. It aims to be easy to use and quick to
 learn, with escape hatches for advanced users.
 
-> **Status:** early design stage. There is no code yet; this repository
-> currently holds the licence and design notes.
+> **Status:** very early stage
 
 ## Goals
 
