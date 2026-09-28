@@ -2,10 +2,12 @@ namespace Stanley.ProjectModel.Characters;
 
 /// <summary>
 /// A standard sticker slot: where a new sticker for it goes by default, its z-order
-/// within its layer, whether a click in its gallery adds a layer instead of replacing,
-/// and the colour slot its stickers usually use.
+/// within its layer, whether a click on a placed design already worn there stamps
+/// another copy of it (<paramref name="StampsCopies"/>: prints and badges) instead of
+/// taking it off, and the colour slot its stickers usually use. Every slot holds as many
+/// stickers as you like, bottom to top: a gallery click always adds.
 /// </summary>
-public sealed record StickerSlotInfo(string Name, string Label, BodyRegion Region, int ZOrder, bool Stacks, string? ColorSlot, bool IsFace = false);
+public sealed record StickerSlotInfo(string Name, string Label, BodyRegion Region, int ZOrder, bool StampsCopies, string? ColorSlot, bool IsFace = false);
 
 /// <summary>
 /// The standard slots (docs/sticker-system.md §8) - the same static-lookup shape as

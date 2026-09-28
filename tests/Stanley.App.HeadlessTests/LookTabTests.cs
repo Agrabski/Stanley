@@ -155,8 +155,13 @@ public class LookTabTests
         // The face galleries sit beside it, half height.
         var eyes = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Eyes" });
         Assert.Contains("compact", eyes.Classes);
+        // A click on what's worn takes it off, and a click on another puts that on.
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Eyes).Choices.First(c => c.Label == "Dots"));
         editor.WearCommand.Execute(editor.Gallery(StickerSlots.Eyes).Choices.First(c => c.Label == "Round"));
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Mouth).Choices.First(c => c.Label == "Simple"));
         editor.WearCommand.Execute(editor.Gallery(StickerSlots.Mouth).Choices.First(c => c.Label == "Lips"));
+        Assert.Equal("Round", editor.Gallery(StickerSlots.Eyes).Current);
+        Assert.Equal("Lips", editor.Gallery(StickerSlots.Mouth).Current);
         Dispatcher.UIThread.RunJobs();
         hair.Flyout!.Hide();
         Dispatcher.UIThread.RunJobs();

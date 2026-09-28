@@ -13,19 +13,18 @@ namespace Stanley.Editing;
 public static class LookEditing
 {
     /// <summary>
-    /// Wears <paramref name="asset"/> in its slot, adding it to the wardrobe if it's new:
-    /// replacing what the slot held, or - <paramref name="stack"/>, or a slot that stacks -
-    /// on top of it. Wearing what's already worn changes nothing.
+    /// Wears <paramref name="asset"/> in its slot, on top of whatever the slot already
+    /// holds (a cap over a hood, a shirt over a T-shirt), adding it to the wardrobe if it's
+    /// new. Nothing is ever replaced; wearing what's already worn changes nothing.
     /// </summary>
-    public static CharacterDefinition Wear(CharacterDefinition character, StickerAsset asset, bool stack = false)
+    public static CharacterDefinition Wear(CharacterDefinition character, StickerAsset asset)
     {
         var slot = asset.Sticker.Slot;
         var wardrobe = character.Wardrobe.Find(asset.Id) is null ? character.Wardrobe.With(asset) : character.Wardrobe;
         var current = character.Stickers.TryGetValue(slot, out var worn) ? worn : [];
         if (current.Contains(asset.Id))
             return wardrobe == character.Wardrobe ? character : character with { Wardrobe = wardrobe };
-        var next = stack || StickerSlots.Get(slot).Stacks ? current.Append(asset.Id).ToList() : [asset.Id];
-        return character with { Stickers = WithSlot(character.Stickers, slot, next), Wardrobe = wardrobe };
+        return character with { Stickers = WithSlot(character.Stickers, slot, current.Append(asset.Id).ToList()), Wardrobe = wardrobe };
     }
 
     /// <summary>Nothing in <paramref name="slot"/> (the gallery's "None").</summary>
@@ -311,9 +310,10 @@ public static class LookEditing
 
 /// <summary>
 /// Wearing the same design more than once (docs/sticker-system.md §19): in a slot that
-/// stacks, each click on a placeable design - drawn art or text, a print or a badge - puts
-/// on another copy, with its own id and placement (<see cref="Spot"/>), so ten skulls are ten
-/// stickers to move one by one. Pure functions, like <see cref="LookEditing"/>.
+/// stamps copies (<see cref="StickerSlotInfo.StampsCopies"/>), each click on a placeable
+/// design - drawn art or text, a print or a badge - puts on another copy, with its own id
+/// and placement (<see cref="Spot"/>), so ten skulls are ten stickers to move one by one.
+/// Pure functions, like <see cref="LookEditing"/>.
 /// </summary>
 public static class StickerCopies
 {

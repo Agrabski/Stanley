@@ -87,6 +87,21 @@ public sealed class DrawYourOwnTests
     }
 
     [Fact]
+    public void Draw_your_own_and_Import_put_theirs_on_over_what_the_slot_holds()
+    {
+        var (_, editor, _) = NewCharacter();
+        editor.WearCommand.Execute(editor.Gallery(StickerSlots.Top).Choices.Single(c => c.Label == "T-shirt"));
+        var tee = editor.Working.Stickers[StickerSlots.Top].Single();
+
+        editor.Gallery(StickerSlots.Top).Draw!.Execute(StickerSlots.Top);
+        var drawn = editor.SelectedStickerId!.Value;
+        const string logo = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#ff9900"/></svg>""";
+        Assert.True(editor.ImportArt(StickerSlots.Top, "Logo.svg", ArtFile.Svg(logo)));
+
+        Assert.Equal([tee, drawn, editor.SelectedStickerId!.Value], editor.Working.Stickers[StickerSlots.Top]);
+    }
+
+    [Fact]
     public void An_imported_picture_is_worn_selected_and_placed_by_dragging_and_the_sticker_tab()
     {
         var (session, editor, _) = NewCharacter();

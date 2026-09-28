@@ -220,6 +220,86 @@ public sealed class LookTests : IDisposable
     }
 
     [Fact]
+    public void A_click_puts_it_on_over_what_the_slot_holds_selected_to_reorder_in_one_undo_step()
+    {
+        var (session, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        var tee = editor.Working.Stickers[StickerSlots.Top].Single();
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Shirt"));
+
+        var top = editor.Working.Stickers[StickerSlots.Top];
+        Assert.Equal(2, top.Count);
+        Assert.Equal(tee, top[0]); // still on, underneath
+        Assert.Equal("Shirt", editor.Working.Wardrobe.Find(top[1])!.Sticker.Name);
+        Assert.Equal(top[1], editor.SelectedStickerId); // the new one, for the Sticker tab's Forward and Back
+        Assert.True(editor.MoveSelectedDownCommand.CanExecute(null));
+        Assert.Equal("T-shirt, Shirt", editor.Gallery(StickerSlots.Top).Current);
+        Assert.All(editor.Gallery(StickerSlots.Top).Choices.Where(c => c.Label is "T-shirt" or "Shirt"), c => Assert.True(c.IsWorn));
+
+        editor.MoveSelectedDownCommand.Execute(null);
+        Assert.Equal([top[1], tee], editor.Working.Stickers[StickerSlots.Top]);
+
+        session.Workspace.History.Undo();
+        session.Workspace.History.Undo();
+        Assert.Equal([tee], editor.Working.Stickers[StickerSlots.Top]);
+    }
+
+    [Fact]
+    public void A_click_on_a_worn_item_takes_just_that_one_off_in_one_undo_step()
+    {
+        var (session, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Shirt"));
+        var (tee, shirt) = (editor.Working.Stickers[StickerSlots.Top][0], editor.Working.Stickers[StickerSlots.Top][1]);
+        Assert.Contains("take it off", Choice(editor, StickerSlots.Top, "Shirt").Tip);
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Shirt"));
+
+        Assert.Equal([tee], editor.Working.Stickers[StickerSlots.Top]);
+        Assert.NotNull(editor.Working.Wardrobe.Find(shirt)); // off, not thrown away
+        Assert.Null(editor.SelectedStickerId);
+        Assert.False(Choice(editor, StickerSlots.Top, "Shirt").IsWorn);
+
+        session.Workspace.History.Undo();
+        Assert.Equal([tee, shirt], editor.Working.Stickers[StickerSlots.Top]);
+    }
+
+    [Fact]
+    public void Face_slots_add_too_and_None_takes_everything_in_the_slot_off()
+    {
+        var (session, editor) = NewCharacter();
+        var dots = editor.Working.Stickers[StickerSlots.Eyes].Single();
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Eyes, "Round"));
+
+        var eyes = editor.Working.Stickers[StickerSlots.Eyes];
+        Assert.Equal(2, eyes.Count);
+        Assert.Equal(dots, eyes[0]);
+        Assert.Equal(eyes[1], editor.SelectedStickerId);
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Eyes, "None"));
+        Assert.Empty(editor.Working.Stickers[StickerSlots.Eyes]);
+        Assert.Equal("None", editor.Gallery(StickerSlots.Eyes).Current);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(2, editor.Working.Stickers[StickerSlots.Eyes].Count);
+    }
+
+    [Fact]
+    public void In_a_named_look_a_click_adds_to_what_the_look_wears()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        editor.NewLookCommand.Execute(null);
+
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Hoodie"));
+
+        Assert.Equal(["T-shirt", "Hoodie"], editor.LookWorking.Stickers[StickerSlots.Top].Select(id => editor.Working.Wardrobe.Find(id)!.Sticker.Name));
+        Assert.Single(editor.Working.Stickers[StickerSlots.Top]); // the default look is as it was
+    }
+
+    [Fact]
     public void A_new_character_starts_with_the_default_face_on()
     {
         var (_, editor) = NewCharacter();
@@ -284,7 +364,8 @@ public sealed class LookTests : IDisposable
     {
         var (session, editor) = NewCharacter();
         editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
-        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Hoodie")); // the T-shirt is only tried on now
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt")); // off again: only tried on
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Hoodie"));
         editor.WearCommand.Execute(Choice(editor, StickerSlots.Bottom, "Jeans"));
 
         var folder = ComicProject.CreateNew().SaveAs(_root, session.Navigator.Snapshot(), null, session.Characters.Snapshot());

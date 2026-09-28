@@ -39,11 +39,12 @@ public class PrintJsonTests
     }
 
     [Fact]
-    public void Prints_stack_between_the_top_and_the_outer_layer()
+    public void Prints_stamp_copies_between_the_top_and_the_outer_layer()
     {
         var print = StickerSlots.Get(StickerSlots.Print);
 
-        Assert.True(print.Stacks);
+        Assert.True(print.StampsCopies);
+        Assert.False(StickerSlots.Get(StickerSlots.Top).StampsCopies);
         Assert.InRange(print.ZOrder, StickerSlots.ZOrder(StickerSlots.Top) + 1, StickerSlots.ZOrder(StickerSlots.Outer) - 1);
     }
 }

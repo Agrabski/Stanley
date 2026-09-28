@@ -83,7 +83,7 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>
     /// A slot's choices: None, then this character's wardrobe for the slot, then the
     /// library's stickers it doesn't already have a copy of - each previewed on this
-    /// character wearing it.
+    /// character wearing it, on top of what the slot already holds.
     /// </summary>
     public SlotGallery Gallery(string slot)
     {
@@ -94,7 +94,7 @@ public sealed partial class CharacterEditorViewModel
         var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0, pose) };
         var owned = character.Wardrobe.Stickers.Values.Where(a => a.Sticker.Slot == slot).OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var library = Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).ToList();
-        if (info.Stacks)
+        if (info.StampsCopies)
         {
             // A design is offered once however many copies are worn (a click stamps another):
             // the character's own designs, each by the first copy put on (the one further copies
@@ -123,28 +123,44 @@ public sealed partial class CharacterEditorViewModel
         return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand, slot == StickerSlots.Print ? WearTextCommand : null);
     }
 
+    /// <summary>
+    /// A gallery click, one undo step. It only ever adds: what isn't worn goes on over
+    /// whatever the slot already holds, selected so the Sticker tab's Forward and Back are
+    /// right there; what is worn comes off again. None takes everything in the slot off. In
+    /// a slot that stamps copies (Prints, Other), a placed design - drawn art or text - puts
+    /// on another copy each click instead.
+    /// </summary>
     private void Wear(StickerChoice choice)
     {
-        var stacks = StickerSlots.Get(choice.Slot).Stacks;
         if (choice.IsNone)
+        {
             ApplyLook(c => LookEditing.ClearSlot(c, choice.Slot));
-        else if (stacks && (choice.Asset?.Sticker ?? choice.Library!.Asset.Sticker) is { } design && StickerCopies.IsPlaceable(design))
+            return;
+        }
+        var character = LookWorking;
+        var worn = character.Stickers.TryGetValue(choice.Slot, out var ids) ? ids : [];
+        if (choice.StampsCopy)
         {
             // A print or a badge: every click puts on another copy, in the next free spot across the chest.
-            var character = LookWorking;
+            var design = choice.Asset?.Sticker ?? choice.Library!.Asset.Sticker;
             var spot = StickerCopies.Spot(StickerCopies.WornCopies(character, choice.Slot, design.Name));
-            var wearing = choice.Asset is { } own
-                ? (character.Stickers.TryGetValue(choice.Slot, out var worn) && worn.Contains(own.Id) ? StickerCopies.Copy(own, spot) : own)
+            var copy = choice.Asset is { } own
+                ? (worn.Contains(own.Id) ? StickerCopies.Copy(own, spot) : own)
                 : StickerCopies.Copy(choice.Library!.Instantiate(), spot);
-            ApplyLook(c => LookEditing.Wear(c, wearing));
-            SelectSticker(wearing.Sticker.Id);
+            ApplyLook(c => LookEditing.Wear(c, copy));
+            SelectSticker(copy.Id);
         }
-        else if (choice.Asset is { } asset)
-            ApplyLook(c => choice.IsWorn && stacks ? LookEditing.TakeOff(c, asset.Id) : LookEditing.Wear(c, asset));
+        else if (choice.Asset is { } asset && worn.Contains(asset.Id))
+        {
+            ApplyLook(c => LookEditing.TakeOff(c, asset.Id));
+            if (_selectedSticker == asset.Id)
+                SelectSticker(null);
+        }
         else
         {
-            var copy = choice.Library!.Instantiate();
-            ApplyLook(c => LookEditing.Wear(c, copy));
+            var wearing = choice.Asset ?? choice.Library!.Instantiate();
+            ApplyLook(c => LookEditing.Wear(c, wearing));
+            SelectSticker(wearing.Id);
         }
     }
 
@@ -161,9 +177,9 @@ public sealed partial class CharacterEditorViewModel
         SelectSticker(copy.Sticker.Id);
     }
 
-    /// <summary>Whether the selected sticker is worn in a slot that stacks and is placed (art or text), so another copy of it makes sense.</summary>
+    /// <summary>Whether the selected sticker is worn in a slot that stamps copies and is placed (art or text), so another copy of it makes sense.</summary>
     public bool CanDuplicateSelected =>
-        SelectedStickerIsWorn && SelectedSticker is { } asset && StickerSlots.Get(asset.Sticker.Slot).Stacks && StickerCopies.IsPlaceable(asset.Sticker);
+        SelectedStickerIsWorn && SelectedSticker is { } asset && StickerSlots.Get(asset.Sticker.Slot).StampsCopies && StickerCopies.IsPlaceable(asset.Sticker);
 
     /// <summary>The Prints gallery's "Text" button: wears a new text print, selected so its text can be typed over at once on the Sticker tab.</summary>
     private void WearText(string text)
