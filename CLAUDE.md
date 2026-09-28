@@ -45,7 +45,10 @@ panels, posed by dragging hands/feet/hips/chest/head or from a preset gallery �
 see "Characters (POC, implemented)" below) and dressed with **stickers** (hair,
 faces, clothes, prints — symbols and your own text, emoji too — and accessories;
 see "Stickers (implemented)" below and docs/sticker-system.md §19), in any colour
-("More Colors…"); in the character editor, clicking a compared (faded) character
+("More Colors…"), **in layers** (a gallery click puts an item on over what the slot
+already holds — a cap under a hood, a shirt over a T-shirt — and a click on a worn one
+takes it off) and **in styles** (a hood up or down, a cap's brim any way; picked on the
+Sticker tab or for one panel — docs/sticker-system.md §8, §20); in the character editor, clicking a compared (faded) character
 switches to it. No three-quarter view yet. Panels also hold **drawn shapes, free
 text, pictures and speed lines** (focus lines radiating from a point you drag)
 behind or in front of the characters, over a colour, gradient or picture

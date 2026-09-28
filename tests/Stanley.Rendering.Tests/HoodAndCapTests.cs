@@ -205,4 +205,21 @@ public class HoodAndCapTests
         Assert.Equal(Hood, AtHead(facing, character, front, cx, cy)); // the crown, under the hood
         Assert.Equal(Cap, AtHead(profile, character, side, 100, -965));
     }
+
+    [Fact]
+    public void A_cap_and_a_hood_worn_together_each_keep_their_own_style()
+    {
+        var character = Wearing("hair/bob", "headwear/cap", "headwear/hood");
+        var (cap, hood) = (character.Stickers[StickerSlots.Headwear][0], character.Stickers[StickerSlots.Headwear][1]);
+        character = character with { StickerVariants = new SortedDictionary<StickerId, string> { [cap] = "backward", [hood] = "down" } };
+        var pose = Pose(ViewAngle.Profile); // no expression: the styles come from the character
+
+        using var bitmap = Render(character, pose);
+
+        var (cx, cy) = CrownOf(ViewAngle.Profile);
+        Assert.Equal(Cap, AtHead(bitmap, character, pose, -85, -965)); // the brim, behind the head
+        Assert.Equal(White, AtHead(bitmap, character, pose, 100, -965)); // nothing ahead of the face
+        Assert.NotEqual(Hood, AtHead(bitmap, character, pose, cx, cy)); // the hood isn't up
+        Assert.Equal(Hood, At(bitmap, character, pose, BodyRegion.Torso, -95, -800)); // it lies on the back
+    }
 }

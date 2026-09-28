@@ -870,7 +870,7 @@ open:
 a band name, emoji), beyond patterns and textures.
 - **A `print` slot** ("Prints" on the Look tab, among the clothes): torso, z-order 25 -
   over the top (20), under outerwear (30), so an open jacket covers a T-shirt's print -
-  and it **stacks**, so a shirt can carry several. Its colour slot is `print`.
+  and it **stamps copies** (§8), so a shirt can carry several. Its colour slot is `print`.
 - **Symbol prints in the starter library** (`Library/print/`): skull, heart, star,
   lightning bolt, flame, smiley and a music note - original CC0 art, one Pin art part
   each, recoloured through `class="slot-print"`. The skull's eyes, nose and teeth are
@@ -888,7 +888,7 @@ a band name, emoji), beyond patterns and textures.
   (`Lettering.FallbackRuns`): emoji and symbols the lettering font lacks come from
   whatever installed font has them (a colour emoji font draws in colour). Its
   clickable area and selection outline are its text box, mapped.
-- **As many of the same as you like**: in a slot that stacks (Prints, Other), each
+- **As many of the same as you like**: in a slot that stamps copies (Prints, Other), each
   click on a placed design - drawn art or text, a library symbol or your own - puts on
   another copy (`StickerCopies`), with its own id and placement, a step down and to the
   right of the last one and selected, so it can be dragged straight into place; the
