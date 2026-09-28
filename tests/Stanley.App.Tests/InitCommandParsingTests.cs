@@ -9,6 +9,7 @@ namespace Stanley.App.Tests;
 /// <c>Invoke()</c> actually does on disk. These never call <c>Invoke()</c>, so they
 /// never touch the filesystem.
 /// </summary>
+[Collection(ConsoleOutput.Name)]
 public class InitCommandParsingTests
 {
     [Fact]
