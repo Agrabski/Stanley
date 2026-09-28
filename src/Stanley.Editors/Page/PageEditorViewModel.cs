@@ -1787,9 +1787,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public void FlipCharacter(PanelId panelId, int index) =>
         Apply(EditCharacterInPanel(Working, panelId, index, CharacterPlacementEditing.Flip));
 
-    /// <summary>Front or side view (<see cref="ViewAngle.Profile"/>); the character keeps standing where it was. Flip then turns a side view to face the other way.</summary>
+    /// <summary>
+    /// Front or side view (<see cref="ViewAngle.Profile"/>); the character keeps standing where it was, and a posed
+    /// one keeps its pose as the new view draws it (<see cref="CharacterPosing.Turn"/>). Flip then turns a side view
+    /// to face the other way.
+    /// </summary>
     public void SetCharacterView(PanelId panelId, int index, ViewAngle angle) =>
-        Apply(EditCharacterInPanel(Working, panelId, index, c => CharacterPlacementEditing.Turn(c, angle)));
+        Apply(EditCharacterInPanel(Working, panelId, index, c => CharacterSnapshot.TryGetValue(c.CharacterId, out var character)
+            ? CharacterPosing.Turn(character, c, angle)
+            : CharacterPlacementEditing.Turn(c, angle)));
 
     // ---------------------------------------------------------------- posing (drag a hand or foot)
 
