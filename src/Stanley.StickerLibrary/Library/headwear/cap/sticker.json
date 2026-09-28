@@ -1,0 +1,80 @@
+{
+  "colors": {
+    "hat": "#2f8a57"
+  },
+  "id": "library",
+  "name": "Cap",
+  "parts": [
+    {
+      "cover": {
+        "color": "hat",
+        "ease": 0.012,
+        "from": 0,
+        "to": 0.28
+      },
+      "name": "crown",
+      "region": "head"
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "seams",
+      "region": "head"
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "brim",
+      "region": "head",
+      "variants": [
+        "forward",
+        "right",
+        "left"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "depth": "back",
+      "name": "brim-back",
+      "region": "head",
+      "variants": [
+        "backward",
+        "left"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "strap",
+      "region": "head",
+      "variants": [
+        "backward",
+        "left"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "blend": "cut",
+      "name": "gap",
+      "region": "head",
+      "variants": [
+        "backward",
+        "left"
+      ]
+    }
+  ],
+  "slot": "headwear",
+  "variants": [
+    "forward",
+    "backward",
+    "right",
+    "left"
+  ]
+}
