@@ -378,11 +378,12 @@ the nearest one. Build it only when a real garment fails with Warp.
 A static table (`StickerSlots`, the same enum + lookup shape as `BodyPresets`). Any
 other slot name is allowed and behaves like `accessory`.
 
-| Slot | Default region | z (in its group) | Stacks | Colour slot |
+| Slot | Default region | z (in its group) | Stamps copies | Colour slot |
 |---|---|---|---|---|
 | `bottom` | torso + leg | 10 | – | `bottom` |
 | `shoes` | foot | 15 | – | `shoes` |
 | `top` | torso + arm | 20 | – | `top` |
+| `print` | torso | 25 | yes | `print` |
 | `outer` | torso + arm | 30 | – | `outer` |
 | `eyes` | head | 40 | – | `eyes` |
 | `nose` | head | 42 | – | `skin` |
@@ -394,9 +395,21 @@ other slot name is allowed and behaves like `accessory`.
 | `headwear` | head | 70 | – | `hat` |
 | `accessory` | any | 80 | yes | `accent` |
 
-- "Stacks" controls what a gallery click does. It replaces the worn item in the slot,
-  or adds a layer (Ctrl+click adds in any slot). Data-wise every slot is a stacked
-  list, as the plan says.
+- Every slot holds as many stickers as you like, bottom to top (layered clothes: a cap
+  over a hood, a shirt over a T-shirt). Data-wise every slot is a stacked list, as the
+  plan says. A gallery click only ever adds: an item that isn't worn goes on top of
+  what the slot already holds, in every slot, the face ones included, and is selected
+  so the Sticker tab's *Forward*/*Back* can reorder it. A click on an item that is
+  worn takes it off. *None* takes everything in the slot off. Nothing is ever replaced.
+- "Stamps copies" (`StickerSlotInfo.StampsCopies`) is the one exception to that
+  toggle: in Prints and Other, a click on a placed design (drawn art or text) that is
+  already worn puts on another copy instead of taking it off (§19).
+- **Automatic layer fit**: when a sticker is worn over others in the same slot, each
+  of its cover parts is drawn at least a little looser (half of the default ease,
+  0.004) than the loosest cover (as drawn) on the same region among the stickers
+  under it in that slot, so a tighter shirt over a looser T-shirt hides it instead of
+  showing a sliver of it round the edge. It happens at draw time only and is never
+  saved; one sticker per slot draws exactly as made.
 - A dress is a `top` whose parts reach into `skirt`. Wearing one alongside trousers
   is allowed and looks like leggings, and the Look tab's "None" removes the trousers.
 - A per-part z override stays deferred, as in the plan.
@@ -649,7 +662,9 @@ Ribbon groups, left to right:
 
 - Each gallery starts with **None**, then this character's wardrobe, then the
   library. Every item is **previewed on this character**, the way the Pose gallery
-  previews on the selected character. Clicking wears the item, as one undo step.
+  previews on the selected character. Clicking an item puts it on over what the slot
+  already holds and selects it; clicking a worn item takes it off. Each click is one
+  undo step (§8).
 - **Colours** shows only the colour slots the worn stickers use. Each is a swatch
   dropdown like Skin. For a clothing slot, the same dropdown continues below the
   colours:

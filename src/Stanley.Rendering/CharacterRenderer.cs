@@ -318,7 +318,7 @@ public sealed class FigureRenderer : ICharacterRenderer
         var height = character.Body.Normalized().Height;
         var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
         var tiles = TileLookup(character);
-        var stickers = look.Stickers.Select(w => StickerGeometry.Of(figure, w, look, pose, height, tiles)).ToList();
+        var stickers = Geometry(figure, look, pose, height, tiles);
         var bodySkin = FigureGeometry.Empty();
         foreach (var layer in figure.Layers.Where(l => l.HasBody))
             bodySkin = FigureGeometry.Union(bodySkin, FigureGeometry.LayerSkin(layer));
@@ -360,6 +360,30 @@ public sealed class FigureRenderer : ICharacterRenderer
     }
 
     /// <summary>
+    /// Every worn sticker on the figure, in the look's order. Layers in one slot are fitted
+    /// as they go on (<see cref="StickerCovers.FittedOver"/>): each cover a little looser
+    /// than the loosest one on its region under it in that slot, so nothing underneath
+    /// shows round its edge. One sticker per slot is drawn exactly as it's made.
+    /// </summary>
+    private static List<StickerGeometry> Geometry(BodyFigure figure, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
+    {
+        var result = new List<StickerGeometry>(look.Stickers.Count);
+        var under = new Dictionary<string, Dictionary<BodyRegion, double>>(StringComparer.Ordinal);
+        foreach (var worn in look.Stickers)
+        {
+            var below = under.TryGetValue(worn.Slot, out var slot) ? slot : null;
+            var geometry = StickerGeometry.Of(figure, worn, look, pose, height, tiles, below);
+            result.Add(geometry);
+            if (geometry.Eases.Count == 0)
+                continue;
+            below ??= under[worn.Slot] = [];
+            foreach (var (region, ease) in geometry.Eases)
+                below[region] = Math.Max(below.GetValueOrDefault(region), ease);
+        }
+        return result;
+    }
+
+    /// <summary>
     /// What's worn under sticker <paramref name="exclude"/> in <paramref name="layer"/>: every
     /// other sticker's own cover pieces there (<see cref="PartClip.Clothes"/>) - what a print
     /// clips to, so it stays on the garment underneath instead of spilling past its edge. The
@@ -381,19 +405,30 @@ public sealed class FigureRenderer : ICharacterRenderer
         return result;
     }
 
-    /// <summary>A worn sticker on the figure: its cover pieces, its drawn parts and its typed text parts, each mapped into figure space.</summary>
-    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art, List<TextPiece> Text)
+    /// <summary>
+    /// A worn sticker on the figure: its cover pieces, its drawn parts and its typed text
+    /// parts, each mapped into figure space - and <see cref="Eases"/>, how loose its own
+    /// covers went on per region (not cut or clipped ones), for the layers over it in its slot.
+    /// </summary>
+    private sealed record StickerGeometry(List<(StickerPart Part, PartPiece Piece)> Covers, List<ArtPiece> Art, List<TextPiece> Text, IReadOnlyDictionary<BodyRegion, double> Eases)
     {
-        public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles)
+        /// <param name="under">The loosest cover per region among the layers under this one in its slot, or null for the bottom layer.</param>
+        public static StickerGeometry Of(BodyFigure figure, WornSticker worn, CharacterLook look, PoseData? pose, double height, Func<string, ArtFile?> tiles,
+            IReadOnlyDictionary<BodyRegion, double>? under = null)
         {
             var sticker = worn.Asset.Sticker;
             var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression);
             var parts = sticker.Parts.Where(p => p.AppliesTo(variant)).ToList();
             var covers = new List<(StickerPart, PartPiece)>();
+            var eases = new Dictionary<BodyRegion, double>();
             foreach (var part in parts)
             {
-                if (part.Cover is { } cover)
-                    covers.AddRange(StickerCovers.Pieces(figure, part, cover, height).Select(p => (part, p)));
+                if (part.Cover is not { } cover)
+                    continue;
+                var fitted = StickerCovers.FittedOver(cover, part.Region, under);
+                covers.AddRange(StickerCovers.Pieces(figure, part, fitted, height).Select(p => (part, p)));
+                if (part.Blend != PartBlend.Cut && part.Clip is null)
+                    eases[part.Region] = Math.Max(eases.GetValueOrDefault(part.Region), fitted.EaseOrDefault);
             }
 
             var text = new List<TextPiece>();
@@ -413,7 +448,7 @@ public sealed class FigureRenderer : ICharacterRenderer
                         art.Add(new ArtPiece(part, LayerOf(figure, part, side), elements, anchor, StickerArtPieces.Area(elements, height)));
                 }
             }
-            return new StickerGeometry(covers, art, text);
+            return new StickerGeometry(covers, art, text, eases);
         }
 
         private static FigureLayerKind LayerOf(BodyFigure figure, StickerPart part, LimbSide side) => part.Depth switch
