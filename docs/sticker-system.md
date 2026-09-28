@@ -814,9 +814,12 @@ open:
 - **Starter library as built**: 23 cover garments; hair (short, bob, long,
   ponytail, curly, bun); eyes (dots, round, lashes), brows (thin, medium, thick),
   mouth (simple, wide, lips) with the full expression vocabulary as variants, and
-  two noses; five SVG pattern tiles (floral, stars, hearts, camo, leopard); all
-  front and profile. New characters start wearing the default face (dot eyes, thin
-  brows, simple mouth).
+  two noses; two drawn hats, their styles as variants - a Hood, up or down (in the
+  `top` colour, so it matches the top it's worn with, fabric included; worn after a
+  cap it goes over it, the brim showing in its opening) and a Cap with its brim
+  forward, backward, right or left (the character's own sides); five SVG pattern
+  tiles (floral, stars, hearts, camo, leopard); all front and profile. New
+  characters start wearing the default face (dot eyes, thin brows, simple mouth).
 - **Trunk posing is inverse kinematics** (asked for alongside slice 4): dragging
   the chest or head bends the spine or neck joint by joint, and the upper body's
   outline bends with it (`TrunkBend`), instead of turning the trunk as one board.
