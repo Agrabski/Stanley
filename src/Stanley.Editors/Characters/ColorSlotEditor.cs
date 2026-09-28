@@ -63,8 +63,8 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
 	public string Label { get; }
 
-	/// <summary>Clothes get fabrics; skin and eyes are just colours.</summary>
-	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or "eyes");
+	/// <summary>Clothes get fabrics; skin and eyes (split left/right or not) are just colours.</summary>
+	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight);
 
 	public IReadOnlyList<ColorSwatchChoice> Swatches { get; }
 

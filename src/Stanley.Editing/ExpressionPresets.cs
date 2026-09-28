@@ -77,23 +77,33 @@ public static class ExpressionPresets
     /// <summary>
     /// <paramref name="pose"/> with the face slots set to <paramref name="preset"/>'s variants;
     /// other slots' variants (a hat tipped) are kept. Neutral leaves the face slots out
-    /// altogether, so a neutral pose stores nothing.
+    /// altogether, so a neutral pose stores nothing. <paramref name="splitEyes"/> (the
+    /// character's eyes are split left/right, docs/sticker-system.md §21) also sets
+    /// "eyesLeft"/"eyesRight" to the preset's eyes, so a whole-face preset still sets both.
     /// </summary>
-    public static PoseData Apply(PoseData pose, ExpressionPresetDefinition preset)
+    public static PoseData Apply(PoseData pose, ExpressionPresetDefinition preset, bool splitEyes = false)
     {
         var expression = new SortedDictionary<string, string>(pose.Expression ?? [], StringComparer.Ordinal);
         foreach (var (slot, variant) in preset.Variants)
+            SetOrRemove(expression, slot, variant);
+        if (splitEyes)
         {
-            if (variant == Neutral)
-                expression.Remove(slot);
-            else
-                expression[slot] = variant;
+            SetOrRemove(expression, StickerSlots.EyesLeft, preset.Eyes);
+            SetOrRemove(expression, StickerSlots.EyesRight, preset.Eyes);
         }
         return pose with { Expression = expression };
     }
 
-    public static CharacterInstance Apply(CharacterInstance instance, ExpressionPresetDefinition preset) =>
-        instance with { Pose = Apply(instance.Pose, preset) };
+    public static CharacterInstance Apply(CharacterInstance instance, ExpressionPresetDefinition preset, bool splitEyes = false) =>
+        instance with { Pose = Apply(instance.Pose, preset, splitEyes) };
+
+    private static void SetOrRemove(SortedDictionary<string, string> expression, string slot, string variant)
+    {
+        if (variant == Neutral)
+            expression.Remove(slot);
+        else
+            expression[slot] = variant;
+    }
 
     /// <summary>The variant <paramref name="slot"/> shows in <paramref name="pose"/> (a slot left out is neutral).</summary>
     public static string VariantOf(PoseData pose, string slot) => pose.Expression?.GetValueOrDefault(slot) ?? Neutral;

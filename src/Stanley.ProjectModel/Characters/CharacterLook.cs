@@ -7,7 +7,8 @@ namespace Stanley.ProjectModel.Characters;
 
 /// <summary>A sticker being worn: which slot, and where in that slot's stack (0 = bottom).</summary>
 /// <param name="Variant">The style it's worn in (docs/sticker-system.md §20) after definition → named look → panel, or null for its default way - see <see cref="Sticker.VariantFor"/>.</param>
-public sealed record WornSticker(StickerAsset Asset, string Slot, int StackIndex, string? Variant = null);
+/// <param name="Side">The one side it's restricted to (docs/sticker-system.md §21: split eyes), from <see cref="CharacterDefinition.StickerSides"/>; null draws both, as every sticker did before this existed.</param>
+public sealed record WornSticker(StickerAsset Asset, string Slot, int StackIndex, string? Variant = null, LimbSide? Side = null);
 
 /// <summary>
 /// What a character wears, in which colours and fabrics, after the chain definition →
@@ -62,9 +63,12 @@ public static class CharacterLooks
                 styles[id] = variant;
         }
 
+        var sides = character.StickerSides ?? new SortedDictionary<StickerId, LimbSide>();
         var worn = slots
             .SelectMany(kv => kv.Value.Select((id, i) => (Slot: kv.Key, Id: id, Index: i)))
-            .Select(w => character.Wardrobe.Find(w.Id) is { } asset ? new WornSticker(asset, w.Slot, w.Index, styles.GetValueOrDefault(w.Id)) : null)
+            .Select(w => character.Wardrobe.Find(w.Id) is { } asset
+                ? new WornSticker(asset, w.Slot, w.Index, styles.GetValueOrDefault(w.Id), sides.TryGetValue(w.Id, out var side) ? side : null)
+                : null)
             .OfType<WornSticker>()
             .OrderBy(w => StickerSlots.ZOrder(w.Slot))
             .ThenBy(w => w.Slot, StringComparer.Ordinal)
@@ -86,6 +90,13 @@ public static class CharacterLooks
         Overlay(fabrics, character.Fabrics);
         Overlay(fabrics, revision?.FabricValues);
         Overlay(fabrics, overrides?.FabricOverrides);
+        // A split eye (docs/sticker-system.md §21) with no colour of its own yet takes the
+        // shared "eyes" colour, so splitting never changes how a character already looks.
+        if (colors.TryGetValue(StickerSlots.Eyes, out var eyes))
+        {
+            colors.TryAdd(StickerSlots.EyesLeft, eyes);
+            colors.TryAdd(StickerSlots.EyesRight, eyes);
+        }
         return new CharacterLook(worn, colors, fabrics);
     }
 

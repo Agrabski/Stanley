@@ -370,6 +370,11 @@ internal static class StickerArtPieces
         ParsedArt parsed, CharacterLook look, double height, Func<string, ArtFile?> tiles)
     {
         var elements = parsed.Part(part.Name);
+        // Split eyes (docs/sticker-system.md §21): worn restricted to one side, an element
+        // tagged for the other side (class="side-left"/"side-right") doesn't draw at all -
+        // worn unrestricted, every element draws regardless of its own side tag, as before.
+        if (worn.Side is { } wornSide)
+            elements = elements.Where(e => e.Side is null || e.Side == wornSide).ToList();
         if (elements.Count == 0)
             yield break;
         var bounds = parsed.Bounds(elements);
@@ -409,14 +414,18 @@ internal static class StickerArtPieces
             var mapped = new List<ArtStroke>();
             foreach (var e in elements)
             {
+                // A split eye's own elements still say "slot-eyes" (§21) - drawn from the
+                // shared "eyes" colour slot, split into "eyesLeft"/"eyesRight" only once a
+                // side is chosen for this worn copy, so splitting never repaints on its own.
+                var colorSlot = e.Slot == StickerSlots.Eyes && worn.Side is { } eyeSide ? StickerSlots.SidedSlot(e.Slot, eyeSide) : e.Slot;
                 var path = place(e.Path);
                 var clip = e.Clip is { } c ? place(c) : null;
-                var fill = e.Fill is { } f ? Recolor(f.Color, e.Slot, worn, look) : (SKColor?)null;
-                var stroke = e.Stroke is { } s ? Recolor(s.Color, e.Slot, worn, look) : (SKColor?)null;
-                var fillShader = e.Fill?.Gradient is { } fg ? Gradient(fg, e.Slot, worn, look, place) : null;
-                var strokeShader = e.Stroke?.Gradient is { } sg ? Gradient(sg, e.Slot, worn, look, place) : null;
+                var fill = e.Fill is { } f ? Recolor(f.Color, colorSlot, worn, look) : (SKColor?)null;
+                var stroke = e.Stroke is { } s ? Recolor(s.Color, colorSlot, worn, look) : (SKColor?)null;
+                var fillShader = e.Fill?.Gradient is { } fg ? Gradient(fg, colorSlot, worn, look, place) : null;
+                var strokeShader = e.Stroke?.Gradient is { } sg ? Gradient(sg, colorSlot, worn, look, place) : null;
                 FabricFill? fabric = null;
-                if (fill is { } ground && e.Slot is { } slot && !e.Solid && look.FabricOf(slot) is { } f2)
+                if (fill is { } ground && colorSlot is { } slot && !e.Solid && look.FabricOf(slot) is { } f2)
                 {
                     var b = path.TightBounds;
                     var frame = RegionMapping.FabricFrame(figure, part.Region, side, new Point2D(b.MidX, b.MidY));

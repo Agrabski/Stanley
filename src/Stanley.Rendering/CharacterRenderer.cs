@@ -417,7 +417,10 @@ public sealed class FigureRenderer : ICharacterRenderer
             IReadOnlyDictionary<BodyRegion, double>? under = null)
         {
             var sticker = worn.Asset.Sticker;
-            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression, worn.Variant);
+            // A split eye (docs/sticker-system.md §21) picks its expression from "eyesLeft"/
+            // "eyesRight" instead of the shared "eyes" key, once it's worn on one side.
+            var expressionSlot = worn.Side is { } wornSide ? StickerSlots.SidedSlot(worn.Slot, wornSide) : worn.Slot;
+            var variant = StickerArtPieces.VariantFor(sticker, expressionSlot, pose?.Expression, worn.Variant);
             var parts = sticker.Parts.Where(p => p.AppliesTo(variant)).ToList();
             var covers = new List<(StickerPart, PartPiece)>();
             var eases = new Dictionary<BodyRegion, double>();

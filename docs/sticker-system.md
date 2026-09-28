@@ -300,7 +300,8 @@ Conventions that hold whichever reader is behind the adapter:
   the file is the sticker's default for the slot. Other shades of it tagged with the
   same class keep their lightness and saturation offset (OKLCH) and take the new
   hue. An artist paints with ordinary colours and tags them, with no extra syntax,
-  and the file looks right in any viewer.
+  and the file looks right in any viewer. `class="side-left"`/`"side-right"` tags an
+  element for split eyes the same way (§21) - unrelated to a limb part's own `side` (§5).
 - **Line weight is relative**: the template's body outline is 3 units wide. A 3-unit
   stroke in any sticker draws at the character's ink width
   (`PageRenderer.CharacterStrokeMm`), whatever size the character is on the page,
@@ -939,3 +940,51 @@ in `headwear` each keep their own.
 - **Page editor**: right-click › *This panel only* › **Style** lists each worn sticker
   that has styles, with its styles (the current one ticked); picking one keeps it as the
   panel's override, and *Back to the look* clears it with the panel's other changes.
+
+## 21. Split eyes
+
+**Status: implemented** (GitHub issues #100-#102). By default both eyes are one sticker,
+drawn, coloured and expressed as one - unchanged from §7-§9. **Different left/right eyes**
+(the Look tab's Face group) turns that off for one character: the eyes' shape, colour and
+expression can then differ side to side, the way a cap's brim already can (§20), without
+turning every other symmetric part (brows, hands, shoes) into a per-side thing too - only
+eyes need this, per the issues, so only eyes get it.
+
+- **Art**: a sticker's art elements can carry `class="side-left"`/`"side-right"` (any
+  element `slot-*` already can, §6.1) - the character's own left/right, as `side` on a limb
+  part already means (§5). An element with neither class draws whichever side(s) the
+  sticker is worn on, as before; this is inert until a sticker is actually restricted to one
+  side (below), so an ordinary two-eyed sticker with no such classes keeps working exactly
+  as it always has. The starter library's three eye stickers (dots, round, lashes) tag
+  their left and right eye's elements this way, in every expression variant and in profile
+  (which shows only the near eye - the character's right, by the rig's own convention).
+- **Wearing**: no new slot. A split character simply wears *two* stickers in `eyes` (still
+  one stacked list, §8) - by default two copies of whatever was worn before, one per side,
+  so splitting never changes how the character looks until you change one. Which side a
+  worn sticker is restricted to is `CharacterDefinition.StickerSides` (sticker id → `left`/
+  `right`), sparse and character-level only (not per look or per panel - unlike a style,
+  picking one eye's shape isn't something one panel needs its own answer to). Absent for a
+  sticker, as every sticker was before this existed, it draws on both sides.
+  `LookEditing.SplitEyes`/`UnsplitEyes` turn it on and off; `WearOnSide` swaps one side's
+  sticker for another, making its own copy first if that design is already worn on the
+  other side (the same id can never be on both).
+- **Colour and expression**: no new storage shape either - both already resolve by a plain
+  string key (§9.1, §7), so a split eye simply resolves under `"eyesLeft"`/`"eyesRight"`
+  instead of `"eyes"` once it's worn on a side (`StickerSlots.SidedSlot`). Colour falls back
+  to the shared `"eyes"` slot when a side has no colour of its own (`CharacterLooks.Resolve`
+  bakes this in), so an existing character's eye colour still reaches both sides right after
+  splitting. Expression has no such fallback to bake in - it's already panel-scoped
+  (`PoseData.Expression`), so `ExpressionPresets.Apply`'s `splitEyes` parameter simply also
+  writes the preset's eyes to `"eyesLeft"`/`"eyesRight"` when asked, and a panel can mix its
+  own beyond that with `SetVariant(pose, "eyesLeft", …)` exactly as any slot already can.
+- **Rendering**: `StickerArtPieces.Map` drops elements tagged for the other side once a
+  worn sticker has a side (`WornSticker.Side`, from `StickerSides`), and recolours a
+  `slot-eyes` element from the sided slot instead of the shared one. `CharacterRenderer`
+  picks the sided key for the expression too. Both are no-ops when nothing is split.
+- **Character editor**: **Different left/right eyes** (a checkbox by the Face group,
+  disabled with nothing worn in `eyes`) replaces the single Eyes gallery and swatch with
+  **Left eye**/**Right eye** ones - each the same kind of gallery any slot has (own
+  wardrobe, deduplicated by name since splitting can leave two identical copies, then the
+  library), so no new gallery UI was needed. *Preview expression* still sets the whole
+  face's mood in one click (both eyes, split or not); two small dropdowns next to it, shown
+  only once split, preview either eye's expression on its own.
