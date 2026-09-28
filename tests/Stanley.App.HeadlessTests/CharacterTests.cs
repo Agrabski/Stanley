@@ -163,6 +163,70 @@ public class CharacterTests
     }
 
     [Fact]
+    public void Clicking_or_dragging_inside_a_renaming_boxs_text_only_edits_it_and_never_opens_or_drags_the_character()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        var page = window.Editor;
+        var (pane, _) = ShowPane(window, characters);
+        var item = characters.Items[0];
+
+        item.IsEditingName = true;
+        Dispatcher.UIThread.RunJobs();
+        var nameBox = pane.GetVisualDescendants().OfType<TextBox>().Single(t => t.DataContext == item);
+        var boxPoint = nameBox.TranslatePoint(new Point(nameBox.Bounds.Width / 2, nameBox.Bounds.Height / 2), window)!.Value;
+
+        // A click to place the caret must stay inside the text box - it must not also be read as
+        // the list's own click, which opens the character's editor.
+        window.MouseDown(boxPoint, MouseButton.Left);
+        window.MouseUp(boxPoint, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(page, window.Workspace.ActiveEditor);
+        Assert.True(item.IsEditingName);
+
+        // Dragging across the box to select text must not be hijacked into the list's drag, which
+        // would otherwise place the character on the page.
+        window.MouseDown(boxPoint, MouseButton.Left);
+        window.MouseMove(new Point(boxPoint.X + 30, boxPoint.Y));
+        window.MouseUp(new Point(boxPoint.X + 30, boxPoint.Y), MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(page, window.Workspace.ActiveEditor);
+        Assert.Empty(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+        Assert.True(item.IsEditingName);
+    }
+
+    [Fact]
+    public void Renaming_a_character_commits_on_Enter_and_cancels_on_Escape_even_as_the_only_character()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var (pane, _) = ShowPane(window, characters);
+        var item = characters.Items[0];
+
+        item.IsEditingName = true;
+        Dispatcher.UIThread.RunJobs();
+        var nameBox = pane.GetVisualDescendants().OfType<TextBox>().Single(t => t.DataContext == item);
+
+        // Enter used to move focus to the next character to close the box - with only one
+        // character (no "next"), that silently did nothing and left it stuck open.
+        nameBox.Text = "Pip";
+        nameBox.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(item.IsEditingName);
+        Assert.Equal("Pip", item.Name);
+
+        // Escape backs out without applying whatever was typed.
+        item.IsEditingName = true;
+        Dispatcher.UIThread.RunJobs();
+        nameBox.Text = "Not this";
+        nameBox.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(item.IsEditingName);
+        Assert.Equal("Pip", item.Name);
+        Assert.NotEqual(created.Name, item.Name); // sanity: the rename above did take effect
+    }
+
+    [Fact]
     public void Dropping_a_character_from_the_pane_onto_a_panel_places_it_standing_where_it_was_dropped()
     {
         var (window, characters) = Open();
