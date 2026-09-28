@@ -41,7 +41,9 @@ public sealed record PageCanvasScene(
     int SelectedElementIndex = -1,
     ElementId? EditingText = null,
     IReadOnlyDictionary<string, ArtFile>? Pictures = null,
-    TextFields? Fields = null);
+    TextFields? Fields = null,
+    /// <summary>The page-space bounding box of every extra item a Shift+click multi-selection added, beyond the primary selection drawn above - a plain outline, no handles (those stay on the primary).</summary>
+    IReadOnlyList<Rect2D>? ExtraSelectionBounds = null);
 
 /// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
 public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
@@ -167,6 +169,7 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
 
         DrawBorderlessPanelOutlines(canvas);
         DrawEmptyTextOutlines(canvas);
+        DrawExtraSelectionOutlines(canvas);
 
         if (_scene.SelectedPanelId is { } selectedId && doc.Panels.TryGetValue(selectedId, out var selectedPanel))
         {
@@ -310,6 +313,17 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             if (panel.Borderless)
                 canvas.DrawRect(Screen(AnchorRing.BoundingBox(panel.Shape.Anchors)), faint);
         }
+    }
+
+    /// <summary>Every item a Shift+click multi-selection added beyond the primary: a plain dashed outline, matching the primary's own box but with no handles - those stay on the primary.</summary>
+    private void DrawExtraSelectionOutlines(SKCanvas canvas)
+    {
+        if (_scene.ExtraSelectionBounds is not { Count: > 0 } extras)
+            return;
+        using var box = Stroke(Accent, 1f);
+        box.PathEffect = SKPathEffect.CreateDash([4, 3], 0);
+        foreach (var bounds in extras)
+            canvas.DrawRect(Screen(bounds), box);
     }
 
     /// <summary>Bare text with nothing typed in it draws nothing on the page; a faint outline shows where it is, so it can still be found, filled in or deleted. Not printed.</summary>

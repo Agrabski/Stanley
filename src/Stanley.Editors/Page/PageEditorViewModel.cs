@@ -559,6 +559,20 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     // ---------------------------------------------------------------- selection
 
+    /// <summary>What kind of thing a <see cref="SelectedItem"/> points at.</summary>
+    private enum SelectionKind { Bubble, Character, Element }
+
+    /// <summary>One bubble, character or element in the selected panel, by its list index - what Shift+click adds to or removes from the selection.</summary>
+    private readonly record struct SelectedItem(SelectionKind Kind, int Index);
+
+    /// <summary>
+    /// Everything Shift+click has added to the selection beyond the primary item (the fields
+    /// above) - always in <see cref="_selectedPanelId"/>'s panel. Kept separate from the primary
+    /// fields, rather than folded into them, so the single-selection code they already drive
+    /// (<see cref="SelectedBubble"/> and friends) needs no changes.
+    /// </summary>
+    private readonly List<SelectedItem> _extraSelection = [];
+
     public PanelId? SelectedPanelId => _selectedPanelId;
 
     /// <summary>Index into the selected panel's <see cref="Panel.Bubbles"/>, or -1.</summary>
@@ -572,6 +586,71 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public bool HasSelectedCharacter => SelectedCharacter is not null;
     public bool HasSelection => HasSelectedPanel;
     public bool SelectedBubbleHasTails => SelectedBubble is { Tails.Count: > 0 };
+
+    /// <summary>The primary item - the bubble, character or element the single-selection properties point at - as a <see cref="SelectedItem"/>, or null with a panel (or nothing) selected.</summary>
+    private SelectedItem? PrimaryItem =>
+        _selectedBubbleIndex >= 0 ? new SelectedItem(SelectionKind.Bubble, _selectedBubbleIndex)
+        : _selectedCharacterIndex >= 0 ? new SelectedItem(SelectionKind.Character, _selectedCharacterIndex)
+        : _selectedElementIndex >= 0 ? new SelectedItem(SelectionKind.Element, _selectedElementIndex)
+        : null;
+
+    /// <summary>Every selected item, primary first then the extras in the order they were added - for group actions (move, nudge, delete).</summary>
+    private IEnumerable<SelectedItem> AllSelected()
+    {
+        if (PrimaryItem is { } primary)
+            yield return primary;
+        foreach (var extra in _extraSelection)
+            yield return extra;
+    }
+
+    /// <summary>How many bubbles, characters and elements are selected together: 0 with nothing selected, 1 for an ordinary single selection.</summary>
+    public int SelectionCount => PrimaryItem is null ? 0 : 1 + _extraSelection.Count;
+
+    /// <summary>More than one bubble, character or element is selected - Shift+click added to what a plain click picked.</summary>
+    public bool HasMultiSelection => SelectionCount > 1;
+
+    /// <summary>Whether this bubble, character or element (by list index, one of the three) is part of the current selection - the primary item or one Shift+click added. (Named apart from "IsSelected", the docking tab flag this class inherits.)</summary>
+    public bool IsPartOfSelection(PanelId panelId, int bubbleIndex = -1, int characterIndex = -1, int elementIndex = -1)
+    {
+        if (!Equals(_selectedPanelId, panelId))
+            return false;
+        if (bubbleIndex >= 0)
+            characterIndex = elementIndex = -1;
+        else if (characterIndex >= 0)
+            elementIndex = -1;
+        SelectedItem? item = bubbleIndex >= 0 ? new SelectedItem(SelectionKind.Bubble, bubbleIndex)
+            : characterIndex >= 0 ? new SelectedItem(SelectionKind.Character, characterIndex)
+            : elementIndex >= 0 ? new SelectedItem(SelectionKind.Element, elementIndex)
+            : null;
+        return item is { } value && (PrimaryItem == value || _extraSelection.Contains(value));
+    }
+
+    /// <summary>The page-space bounding box of every extra (everything Shift+click added beyond the primary item), for the canvas to outline. The primary keeps its own outline and handles, drawn as it always was.</summary>
+    public IReadOnlyList<Rect2D> ExtraSelectionBounds
+    {
+        get
+        {
+            if (_extraSelection.Count == 0 || SelectedPanel is not { } panel)
+                return [];
+            var bounds = new List<Rect2D>(_extraSelection.Count);
+            foreach (var item in _extraSelection)
+            {
+                switch (item.Kind)
+                {
+                    case SelectionKind.Bubble when item.Index < panel.Bubbles.Count:
+                        bounds.Add(AnchorRing.BoundingBox(panel.Bubbles[item.Index].Shape.Anchors));
+                        break;
+                    case SelectionKind.Character when item.Index < panel.CharacterInstances.Count:
+                        bounds.Add(CharacterBounds(panel.CharacterInstances[item.Index]));
+                        break;
+                    case SelectionKind.Element when item.Index < panel.Elements.Count:
+                        bounds.Add(PanelElements.Bounds(panel.Elements[item.Index]));
+                        break;
+                }
+            }
+            return bounds;
+        }
+    }
 
     /// <summary>A comic panel (and nothing in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
     public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter && !HasSelectedElement;
@@ -622,8 +701,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             characterIndex = elementIndex = -1;
         if (characterIndex >= 0)
             elementIndex = -1;
+        // A plain selection is always just this one item: Shift+click is the only way to build
+        // a multi-selection, so anything else picking a single thing collapses it back to that.
+        var hadExtras = _extraSelection.Count > 0;
+        _extraSelection.Clear();
         if (Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex && _selectedCharacterIndex == characterIndex
-            && _selectedElementIndex == elementIndex)
+            && _selectedElementIndex == elementIndex && !hadExtras)
             return;
 
         _selectedPanelId = panelId;
@@ -638,6 +721,78 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     public void ClearSelection() => Select(null);
 
+    /// <summary>
+    /// Shift+click on a bubble, character or element: adds it to the selection, becoming the
+    /// new primary item (the last one clicked keeps driving the ribbon and property edits);
+    /// Shift+click on one already selected removes it instead, promoting an extra to primary if
+    /// the primary itself was removed. A different panel starts a fresh (single-item) selection
+    /// there, since a multi-selection stays within one panel.
+    /// </summary>
+    public void ToggleSelect(PanelId panelId, int bubbleIndex = -1, int characterIndex = -1, int elementIndex = -1)
+    {
+        if (bubbleIndex >= 0)
+            characterIndex = elementIndex = -1;
+        else if (characterIndex >= 0)
+            elementIndex = -1;
+        if (bubbleIndex < 0 && characterIndex < 0 && elementIndex < 0)
+            return;
+        var item = bubbleIndex >= 0 ? new SelectedItem(SelectionKind.Bubble, bubbleIndex)
+            : characterIndex >= 0 ? new SelectedItem(SelectionKind.Character, characterIndex)
+            : new SelectedItem(SelectionKind.Element, elementIndex);
+
+        if (!Equals(_selectedPanelId, panelId))
+        {
+            Select(panelId, bubbleIndex, characterIndex, elementIndex);
+            return;
+        }
+
+        if (PrimaryItem is { } primary && primary == item)
+        {
+            // Toggling off the primary: the most recently added extra (if any) takes over.
+            if (_extraSelection.Count > 0)
+            {
+                var next = _extraSelection[^1];
+                _extraSelection.RemoveAt(_extraSelection.Count - 1);
+                SetPrimaryIndex(next);
+            }
+            else
+            {
+                Select(null);
+            }
+            return;
+        }
+
+        var existing = _extraSelection.IndexOf(item);
+        if (existing >= 0)
+        {
+            _extraSelection.RemoveAt(existing);
+            RaiseMultiSelectionChanged();
+            return;
+        }
+
+        if (PrimaryItem is { } current)
+            _extraSelection.Add(current);
+        SetPrimaryIndex(item);
+    }
+
+    /// <summary>Sets the primary item's index within the current panel, keeping <see cref="_extraSelection"/> as it is - the multi-selection half of what <see cref="Select"/> does for a plain single selection.</summary>
+    private void SetPrimaryIndex(SelectedItem item)
+    {
+        _selectedBubbleIndex = item.Kind == SelectionKind.Bubble ? item.Index : -1;
+        _selectedCharacterIndex = item.Kind == SelectionKind.Character ? item.Index : -1;
+        _selectedElementIndex = item.Kind == SelectionKind.Element ? item.Index : -1;
+        _notice = null;
+        RaiseSelectionChanged();
+    }
+
+    private void RaiseMultiSelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectionCount));
+        OnPropertyChanged(nameof(HasMultiSelection));
+        OnPropertyChanged(nameof(Hint));
+        NotifyCommands();
+    }
+
     private void RaiseSelectionChanged()
     {
         OnPropertyChanged(nameof(SelectedPanelId));
@@ -647,6 +802,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         OnPropertyChanged(nameof(HasSelectedBubble));
         OnPropertyChanged(nameof(HasSelectedCharacter));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(SelectionCount));
+        OnPropertyChanged(nameof(HasMultiSelection));
         OnPropertyChanged(nameof(IsPanelContext));
         OnPropertyChanged(nameof(IsBubbleContext));
         OnPropertyChanged(nameof(IsCharacterContext));
@@ -681,12 +838,24 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         if (_selectedPanelId is { } id)
         {
             if (!Working.Panels.TryGetValue(id, out var panel))
+            {
                 Select(null);
-            else if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count
-                     || _selectedElementIndex >= panel.Elements.Count)
-                Select(id);
-            else if (Working.LayoutLocked && IsPanelContext)
-                Select(null); // just locked (or redone a lock) with a panel selected
+            }
+            else
+            {
+                // Drop any extra whose bubble, character or element no longer exists - the same
+                // clean-up the primary already gets below, extended to the multi-selection.
+                var extrasBefore = _extraSelection.Count;
+                _extraSelection.RemoveAll(item => !IsValidIndex(panel, item));
+
+                if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count
+                         || _selectedElementIndex >= panel.Elements.Count)
+                    Select(id);
+                else if (Working.LayoutLocked && IsPanelContext)
+                    Select(null); // just locked (or redone a lock) with a panel selected
+                else if (_extraSelection.Count != extrasBefore)
+                    RaiseMultiSelectionChanged();
+            }
         }
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
         OnPropertyChanged(nameof(IsLayoutLocked));
@@ -696,6 +865,55 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         RaiseElementDerivedChanged();
         NotifyCommands();
     }
+
+    /// <summary>Whether <paramref name="item"/>'s index is still in range for its kind's list in <paramref name="panel"/> - what makes an extra stale.</summary>
+    private static bool IsValidIndex(Panel panel, SelectedItem item) => item.Kind switch
+    {
+        SelectionKind.Bubble => item.Index >= 0 && item.Index < panel.Bubbles.Count,
+        SelectionKind.Character => item.Index >= 0 && item.Index < panel.CharacterInstances.Count,
+        SelectionKind.Element => item.Index >= 0 && item.Index < panel.Elements.Count,
+        _ => false
+    };
+
+    /// <summary>
+    /// Moves every selected bubble, character and element in <paramref name="panelId"/> by
+    /// (<paramref name="dx"/>, <paramref name="dy"/>) from <paramref name="document"/>, each kept
+    /// inside or reachable exactly as its own single move would - the shared move logic behind
+    /// both a group drag (<see cref="UpdateMoveSelection"/>) and a group nudge
+    /// (<see cref="NudgeSelection"/>). Bubbles carry their tails along, drag or nudge alike,
+    /// since the point of moving a group is usually keeping a bubble with its speaker.
+    /// </summary>
+    private EditResult<PageDocument> MoveSelectedItems(PageDocument document, PanelId panelId, double dx, double dy) =>
+        EditPanel(document, panelId, panel =>
+        {
+            var bounds = Bounds(panel);
+            var bubbles = panel.Bubbles.ToList();
+            var characters = panel.CharacterInstances.ToList();
+            var elements = panel.Elements.ToList();
+            foreach (var item in AllSelected())
+            {
+                switch (item.Kind)
+                {
+                    case SelectionKind.Bubble when item.Index >= 0 && item.Index < bubbles.Count:
+                        bubbles[item.Index] = BubbleEditing.KeepInside(BubbleEditing.Move(bubbles[item.Index], dx, dy, withTails: true).Value, bounds);
+                        break;
+                    case SelectionKind.Character when item.Index >= 0 && item.Index < characters.Count:
+                        var moved = CharacterPlacementEditing.Move(characters[item.Index], dx, dy);
+                        characters[item.Index] = CharacterPlacementEditing.KeepReachable(moved, InstanceExtent(moved), bounds);
+                        break;
+                    case SelectionKind.Element when item.Index >= 0 && item.Index < elements.Count:
+                        elements[item.Index] = ElementEditing.KeepReachable(ElementEditing.Move(elements[item.Index], dx, dy), bounds);
+                        break;
+                }
+            }
+            return EditResult<Panel>.Success(panel with { Bubbles = bubbles, CharacterInstances = characters, Elements = elements });
+        });
+
+    public void BeginMoveSelection(PanelId panelId) => BeginGesture();
+
+    /// <summary>Drags the whole multi-selection together by (<paramref name="dx"/>, <paramref name="dy"/>) from where the drag began - one undo step (<see cref="EndGesture"/> commits it).</summary>
+    public void UpdateMoveSelection(PanelId panelId, double dx, double dy) =>
+        UpdateGesture(MoveSelectedItems(MoveBase, panelId, dx, dy));
 
     // ---------------------------------------------------------------- bubble style (selection + next new bubble)
 
@@ -740,6 +958,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
         PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
         PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
+        _ when HasMultiSelection => $"{SelectionCount} selected - drag to move them together, Delete removes them, Shift+click adds or removes.",
         _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
         _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
@@ -1111,13 +1330,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public void UpdateMoveBubble(PanelId panelId, int bubbleIndex, double dx, double dy, bool withTails = false) =>
         UpdateGesture(EditBubbleInPanel(MoveBase, panelId, bubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy, withTails)));
 
-    /// <summary>Nudges the selected bubble (or, with none, the selected panel) by a fixed amount - the arrow-key path.</summary>
+    /// <summary>Nudges every selected item (or, with none, the selected panel) by a fixed amount, as one undo step - the arrow-key path.</summary>
     public void NudgeSelection(double dx, double dy)
     {
         if (_selectedPanelId is not { } panelId)
             return;
 
-        if (HasSelectedBubble)
+        if (HasMultiSelection)
+            Apply(MoveSelectedItems(Working, panelId, dx, dy));
+        else if (HasSelectedBubble)
             Apply(EditBubbleInPanel(Working, panelId, _selectedBubbleIndex, (b, _) => BubbleEditing.Move(b, dx, dy)));
         else if (HasSelectedElement)
             Apply(EditElementInPanel(Working, panelId, _selectedElementIndex, e => EditResult<PanelElement>.Success(ElementEditing.Move(e, dx, dy))));
@@ -1203,13 +1424,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             Select(panelId, newIndex);
     }
 
-    /// <summary>Deletes the selected bubble, character or element if there is one, otherwise the selected panel.</summary>
+    /// <summary>Deletes every selected bubble, character and element (one undo step) if there's more than one, else the selected bubble, character or element if there is one, otherwise the selected panel.</summary>
     public void DeleteSelection()
     {
         if (_selectedPanelId is not { } panelId)
             return;
 
-        if (HasSelectedBubble)
+        if (HasMultiSelection)
+            DeleteSelectedItems(panelId);
+        else if (HasSelectedBubble)
             DeleteBubble(panelId, _selectedBubbleIndex);
         else if (HasSelectedElement)
             DeleteElement(panelId, _selectedElementIndex);
@@ -1217,6 +1440,32 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             DeleteCharacter(panelId, _selectedCharacterIndex);
         else
             DeletePanel(panelId);
+    }
+
+    /// <summary>Removes every selected bubble, character and element from <paramref name="panelId"/> in one undo step, then selects just the panel. Filters each list by index rather than removing one at a time, so which order the indices come off the selection in doesn't matter.</summary>
+    private void DeleteSelectedItems(PanelId panelId)
+    {
+        var bubbleIndices = new HashSet<int>();
+        var characterIndices = new HashSet<int>();
+        var elementIndices = new HashSet<int>();
+        foreach (var item in AllSelected())
+        {
+            var set = item.Kind switch
+            {
+                SelectionKind.Bubble => bubbleIndices,
+                SelectionKind.Character => characterIndices,
+                _ => elementIndices
+            };
+            set.Add(item.Index);
+        }
+
+        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with
+        {
+            Bubbles = p.Bubbles.Where((_, i) => !bubbleIndices.Contains(i)).ToList(),
+            CharacterInstances = p.CharacterInstances.Where((_, i) => !characterIndices.Contains(i)).ToList(),
+            Elements = p.Elements.Where((_, i) => !elementIndices.Contains(i)).ToList()
+        })));
+        Select(panelId);
     }
 
     private static Bubble WithDefaultTail(Bubble bubble, Rect2D panelBounds)
