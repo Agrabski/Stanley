@@ -1261,6 +1261,12 @@ public sealed class PageCanvasControl : Control
             case Key.D when ctrl && _drag == DragKind.None:
                 vm.Duplicate();
                 break;
+            case Key.G when ctrl && !e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _drag == DragKind.None:
+                if (vm.GroupSelectionCommand.CanExecute(null)) vm.GroupSelectionCommand.Execute(null);
+                break;
+            case Key.G when ctrl && e.KeyModifiers.HasFlag(KeyModifiers.Shift) && _drag == DragKind.None:
+                if (vm.UngroupSelectionCommand.CanExecute(null)) vm.UngroupSelectionCommand.Execute(null);
+                break;
             case Key.D0 or Key.NumPad0 when ctrl:
                 FitPage();
                 break;
@@ -1345,6 +1351,19 @@ public sealed class PageCanvasControl : Control
         var hit = HitTest(page);
         var items = new List<Control>();
 
+        // Right-clicking something still part of the current multi-selection offers Group for
+        // the whole selection, without collapsing it first (every branch below starts by calling
+        // Select/SelectElement, which would). The same "still in the selection" check PointerPressed
+        // uses to drag a multi-selection as one group (see OnPointerPressed).
+        if (hit.PanelId is { } multiPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody
+            && vm.IsPartOfSelection(multiPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex) && vm.HasMultiSelection)
+        {
+            var group = Item("Group", () => vm.GroupSelectionCommand.Execute(null), "Ctrl+G");
+            group.IsEnabled = vm.GroupSelectionCommand.CanExecute(null);
+            items.Add(group);
+            return items;
+        }
+
         if (hit.Kind is HitKind.BubbleBody or HitKind.BubbleHandle or HitKind.TailBase or HitKind.TailTarget && hit.PanelId is { } bubblePanel)
         {
             var index = hit.BubbleIndex;
@@ -1413,6 +1432,10 @@ public sealed class PageCanvasControl : Control
                 items.Add(new MenuItem { Header = "Thickness", ItemsSource = vm.WeightChoices.Select(w => Item(w.Name, () => vm.SpeedLinesThickness = w.Mm)).ToList() });
                 items.Add(Item("Shuffle", () => vm.ShuffleSpeedLinesCommand.Execute(null)));
             }
+            else if (element is ProjectModel.Issues.GroupElement)
+            {
+                items.Add(Item("Ungroup", () => vm.UngroupSelectionCommand.Execute(null), "Ctrl+Shift+G"));
+            }
             items.Add(new Separator());
             var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
             items.Add(Item(inFront ? "Put behind the characters" : "Put in front of the characters",
@@ -1425,6 +1448,7 @@ public sealed class PageCanvasControl : Control
                 ProjectModel.Issues.TextElement => "Delete text",
                 ProjectModel.Issues.PictureElement => "Delete picture",
                 ProjectModel.Issues.SpeedLinesElement => "Delete speed lines",
+                ProjectModel.Issues.GroupElement => "Delete group",
                 _ => "Delete shape"
             }, () => vm.DeleteElement(elementPanel, index), "Del"));
         }

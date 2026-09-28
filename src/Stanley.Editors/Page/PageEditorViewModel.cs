@@ -81,6 +81,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             () => SelectedBubbleHasTails);
         BringToFrontCommand = new RelayCommand(() => ReorderSelection(toFront: true), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
         SendToBackCommand = new RelayCommand(() => ReorderSelection(toFront: false), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
+        GroupSelectionCommand = new RelayCommand(GroupSelection, CanGroupSelection);
+        UngroupSelectionCommand = new RelayCommand(UngroupSelection, CanUngroupSelection);
         InsertCharacterCommand = new RelayCommand<CharacterDefinition>(character =>
         {
             if (character != null)
@@ -172,6 +174,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public IRelayCommand RemoveTailCommand { get; }
     public IRelayCommand BringToFrontCommand { get; }
     public IRelayCommand SendToBackCommand { get; }
+
+    /// <summary>Home tab's Arrange group: welds the current multi-selection of panel elements into one <see cref="GroupElement"/> (issue #86). Unavailable when the selection includes a bubble or character, or mixes background and foreground elements.</summary>
+    public IRelayCommand GroupSelectionCommand { get; }
+
+    /// <summary>Home tab's Arrange group: takes the selected <see cref="GroupElement"/> back apart into its loose children.</summary>
+    public IRelayCommand UngroupSelectionCommand { get; }
     public IRelayCommand<PanelLayoutPreset> ApplyLayoutCommand { get; }
 
     /// <summary>Insert tab: places the given character in the selected (or first) panel, at the panel's scale.</summary>
@@ -288,6 +296,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         RemoveTailCommand.NotifyCanExecuteChanged();
         BringToFrontCommand.NotifyCanExecuteChanged();
         SendToBackCommand.NotifyCanExecuteChanged();
+        GroupSelectionCommand.NotifyCanExecuteChanged();
+        UngroupSelectionCommand.NotifyCanExecuteChanged();
         InsertCharacterCommand.NotifyCanExecuteChanged();
         NewCharacterCommand.NotifyCanExecuteChanged();
         FlipCharacterCommand.NotifyCanExecuteChanged();
