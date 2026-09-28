@@ -17,14 +17,16 @@ internal sealed class CharacterStore(string rootDirectory)
 
     public CharacterDefinition Load(CharacterId id) => ReadCharacterFolder(CharacterDirOrThrow(id));
 
-    public IReadOnlyList<CharacterDefinition> List()
+    /// <param name="skipUnreadable">Leave out a folder that can't be read instead of throwing - for My Assets, a convenience where one damaged folder mustn't hide the rest. Never for a comic, whose save would then delete what it didn't read.</param>
+    public IReadOnlyList<CharacterDefinition> List(bool skipUnreadable = false)
     {
         if (!Directory.Exists(rootDirectory))
             return [];
 
         return Directory.EnumerateDirectories(rootDirectory)
             .Where(dir => File.Exists(Path.Combine(dir, ProjectPaths.CharacterFileName)))
-            .Select(ReadCharacterFolder)
+            .Select(dir => StoreReads.Read(dir, ReadCharacterFolder, skipUnreadable))
+            .OfType<CharacterDefinition>()
             .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(c => c.Id.Value, StringComparer.Ordinal)
             .ToList();

@@ -1,6 +1,6 @@
 <!--
   The File view, after Word's "backstage": a full-window page with a coloured command
-  rail on the left (New, Open, Info, Save, Save As, Export, Close) and the chosen page
+  rail on the left (New, Open, Info, Save, Save As, Export, Close, My Assets) and the chosen page
   on the right. It's also what the window shows when no comic is open.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -43,6 +43,10 @@
           <TextBlock Text="Close" Margin="26,0,0,0" />
         </Button>
         <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
+        <RadioButton Name="MyAssetsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsMyAssetsPage}" IsVisible="{Binding HasMyAssets}"
+                     ToolTip.Tip="Everything you've kept to use again in any comic">
+          <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource StarIcon}" /><TextBlock Text="My Assets" /></StackPanel>
+        </RadioButton>
         <RadioButton Name="OptionsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOptionsPage}">
           <TextBlock Text="Options" Margin="26,0,0,0" />
         </RadioButton>
@@ -205,6 +209,71 @@
           </StackPanel>
         </StackPanel>
 
+        <!-- My Assets (docs/asset-packs.md §6.2): everything kept, with kind chips. Keeping happens where the thing is. -->
+        <Panel IsVisible="{Binding IsMyAssetsPage}">
+          <StackPanel Name="MyAssetsPanel" DataContext="{Binding MyAssetsPage}" x:DataType="editors:MyAssetsPageViewModel">
+            <TextBlock Classes="backstageHeading" Text="My Assets" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,16"
+                       Text="Things you keep here can go into any comic: right-click a group on a page or a character in the Characters pane and choose Keep in My Assets. Each comic keeps its own copy, so nothing here is needed to open one." />
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,12">
+              <RadioButton Name="MyAssetsAllChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsAll}" Content="{Binding AllText}" />
+              <RadioButton Name="MyAssetsObjectGroupsChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsObjectGroups}" Content="{Binding ObjectGroupsText}" />
+              <RadioButton Name="MyAssetsCharactersChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsCharacters}" Content="{Binding CharactersText}" />
+            </StackPanel>
+            <TextBlock Text="{Binding Problem}" IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Border Name="MyAssetsRemoveBar" IsVisible="{Binding HasPendingRemoval}" Padding="12,8" Margin="0,0,0,12" CornerRadius="4"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+                  <Button Name="ConfirmRemoveAssetButton" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding RemovalQuestion}" TextWrapping="Wrap" VerticalAlignment="Center" />
+              </DockPanel>
+            </Border>
+            <TextBlock Name="MyAssetsEmptyText" IsVisible="{Binding IsEmpty}" Opacity="0.7" TextWrapping="Wrap" MaxWidth="640"
+                       Text="Nothing kept yet. Group a few shapes, texts or pictures on a page (select them, then Ctrl+G) and right-click the group - or right-click a character - and choose Keep in My Assets." />
+            <TextBlock IsVisible="{Binding IsFilteredEmpty}" Opacity="0.7" Text="None of these kept yet." />
+            <ItemsControl Name="MyAssetsGrid" ItemsSource="{Binding Tiles}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="editors:MyAssetTile">
+                  <Border Width="140" Height="176" Margin="0,0,10,10" Padding="8" CornerRadius="4" Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1">
+                    <Border.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Rename" IsVisible="{Binding CanRename}"
+                                  Command="{Binding $parent[ItemsControl].((editors:MyAssetsPageViewModel)DataContext).RenameCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Remove from My Assets"
+                                  Command="{Binding $parent[ItemsControl].((editors:MyAssetsPageViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Bottom" Spacing="1" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding Name}" IsVisible="{Binding IsNotEditingName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                        <TextBox Classes="assetName" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" IsVisible="{Binding IsEditingName}"
+                                 PropertyChanged="AssetNamePropertyChanged" KeyDown="AssetNameKeyDown" />
+                        <TextBlock Text="{Binding KindText}" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+                      </StackPanel>
+                      <Border Background="White" CornerRadius="3">
+                        <Panel>
+                          <editors:CharacterFigure Character="{Binding Character}" IsVisible="{Binding IsCharacter}" />
+                          <editors:ObjectGroupPreview Group="{Binding ObjectGroup}" IsVisible="{Binding IsObjectGroup}" />
+                        </Panel>
+                      </Border>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Opacity="0.6" FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap"
+                       Text="{Binding FolderText, StringFormat='Kept in {0} - change where in Options.'}" />
+          </StackPanel>
+        </Panel>
+
         <!-- Options -->
         <StackPanel IsVisible="{Binding IsOptionsPage}">
           <TextBlock Classes="backstageHeading" Text="Options" />
@@ -241,6 +310,17 @@
           <StackPanel Orientation="Horizontal" Spacing="8">
             <TextBlock Name="SvgEditorPathText" Text="{Binding SvgEditorPath, TargetNullValue='Not set up yet', FallbackValue='Not set up yet'}" VerticalAlignment="Center" />
             <Button Name="ChooseSvgEditorButton" Content="Change..." Command="{Binding ChooseSvgEditorCommand}" />
+          </StackPanel>
+
+          <StackPanel IsVisible="{Binding HasMyAssets}">
+            <TextBlock Classes="backstageSubheading" Text="My Assets" Margin="0,24,0,8" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,8"
+                        Text="The folder the things you keep for every comic live in. Put it somewhere that's backed up or synced - or in a git repository, if you'd like its history. What's already in the old folder stays there." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Name="MyAssetsFolderText" Text="{Binding MyAssetsFolderText}" VerticalAlignment="Center" />
+              <Button Name="ChooseMyAssetsFolderButton" Content="Change..." Command="{Binding ChooseMyAssetsFolderCommand}" />
+              <Button Content="Show folder" Command="{Binding ShowMyAssetsFolderCommand}" />
+            </StackPanel>
           </StackPanel>
         </StackPanel>
       </StackPanel>

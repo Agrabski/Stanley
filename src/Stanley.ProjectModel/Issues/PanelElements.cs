@@ -28,7 +28,8 @@ public static class PanelElements
         }
     }
 
-    private static IEnumerable<string> ArtFileNames(PanelElement element)
+    /// <summary>Every art file name <paramref name="element"/> uses - a picture's own, or every picture inside a group.</summary>
+    public static IEnumerable<string> ArtFileNames(PanelElement element)
     {
         switch (element)
         {

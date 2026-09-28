@@ -1448,6 +1448,18 @@ public sealed class PageCanvasControl : Control
             else if (element is ProjectModel.Issues.GroupElement)
             {
                 items.Add(Item("Ungroup", () => vm.UngroupSelectionCommand.Execute(null), "Ctrl+Shift+G"));
+                if (vm.HasMyAssets)
+                {
+                    var state = vm.SelectedGroupKeptState();
+                    var keep = Item(state switch
+                    {
+                        KeptState.NotKept => "Keep in My Assets",
+                        KeptState.ChangedHere => "Save to My Assets",
+                        _ => "Kept in My Assets"
+                    }, () => vm.KeepGroupInMyAssetsCommand.Execute(null));
+                    keep.IsEnabled = state != KeptState.Kept;
+                    items.Add(keep);
+                }
             }
             items.Add(new Separator());
             var inFront = element.Layer == ProjectModel.Issues.ElementLayer.Foreground;
@@ -1552,6 +1564,14 @@ public sealed class PageCanvasControl : Control
                     _viewModel!.RequestTextEdit(panelId, index);
             }));
             items.Add(AddTextItem(vm, panelId, at));
+            if (vm.HasMyAssetsObjectGroups)
+            {
+                items.Add(new MenuItem
+                {
+                    Header = "Insert from My Assets",
+                    ItemsSource = vm.MyAssetsObjectGroups.Select(group => Item(group.Name, () => vm.InsertObjectGroup(group))).ToList()
+                });
+            }
             items.Add(BackgroundMenu(vm, panelId));
             items.Add(BorderItem(vm, panelId));
             // The panel as Shape Fill and Shape Outline see it: its background colour and its border.

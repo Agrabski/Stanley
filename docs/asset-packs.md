@@ -1,6 +1,7 @@
 # Asset packs — reusable, shareable content across comics
 
-**Status: proposed, not implemented.** This supersedes `my-characters.md`, which
+**Status: in progress.** Slices 1–3 of §10 are implemented (grouping, the
+storage core, keep and add); slice 4 onwards is still the plan. This supersedes `my-characters.md`, which
 designed sharing for characters only. It came out of #99 ("save a group as an
 asset you can move between comics"), which needs #86 ("group several objects
 into one") first, and generalises the whole "My Characters" idea (still the
@@ -329,6 +330,19 @@ Stanley doesn't need to know about.
    `AppPaths`, settings, File-view page skeleton (grid + kind chips, no
    multi-select/pack creation yet).
    - Tests: as `my-characters.md` §10 slice 2, run for both kinds.
+   - *As built:* the Characters pane keeps its **New character** button and
+     gains **Reuse a character** beside it (the gallery: My Assets, then each
+     recent comic's characters) rather than folding both into one *Add
+     character* button - a new character stays one click. A kept page group is
+     named "Group N" and renamed on File › My Assets. What's fingerprinted for
+     a group is position-free (children stored relative to the group's
+     top-left, numbers rounded to 0.1 µm, child ids derived from the group's
+     id), so dragging a kept group around - or inserting a fresh copy - never
+     reads as a change; resizing it does. Recent comics are read when the
+     gallery opens (cached for the session), not in the background. The comic's
+     own `objects/` copies only ever grow, like its pictures, since another
+     issue may still use one. Undo toasts for My Assets writes come with
+     slice 4.
 4. **Staying in step.** The bar, Everywhere-on-save, before/after with
    Update/Keep as is, the open/focus check — generalised, tested against
    object groups and characters.

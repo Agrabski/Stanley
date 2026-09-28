@@ -14,7 +14,7 @@ namespace Stanley.ProjectModel.Storage;
 /// other four (docs/asset-packs.md §5) are added in a later slice reusing this same class.
 /// Takes a root directory rather than resolving one itself - the real default path
 /// (<c>Documents/Stanley/My Assets/</c>, a <c>STANLEY_DATA_DIR</c> test override) and the
-/// settings entry are <c>Stanley.App</c>'s job, added when the "Keep" UI ships.
+/// settings entry are <c>Stanley.App</c>'s job (<c>AppPaths.MyAssetsDirectory</c>).
 /// </summary>
 public sealed class MyAssets
 {
@@ -32,7 +32,8 @@ public sealed class MyAssets
 
     private string PacksDir => Path.Combine(RootDirectory, ProjectPaths.PacksDirName);
 
-    public IReadOnlyList<CharacterDefinition> ListCharacters() => _characters.List();
+    /// <summary>Every kept character, sorted by name; a folder that can't be read is left out rather than hiding the rest.</summary>
+    public IReadOnlyList<CharacterDefinition> ListCharacters() => _characters.List(skipUnreadable: true);
 
     public CharacterDefinition LoadCharacter(CharacterId id) => _characters.Load(id);
 
@@ -45,7 +46,8 @@ public sealed class MyAssets
         RemoveMember(AssetKind.Character, id.Value);
     }
 
-    public IReadOnlyList<ObjectGroup> ListObjectGroups() => _objectGroups.List();
+    /// <summary>Every kept object group, sorted by name; a folder that can't be read is left out rather than hiding the rest.</summary>
+    public IReadOnlyList<ObjectGroup> ListObjectGroups() => _objectGroups.List(skipUnreadable: true);
 
     public ObjectGroup LoadObjectGroup(ObjectGroupId id) => _objectGroups.Load(id);
 
@@ -58,14 +60,15 @@ public sealed class MyAssets
         RemoveMember(AssetKind.ObjectGroup, id.Value);
     }
 
-    /// <summary>Every pack in <c>packs/</c>, sorted by name - there's no index file, matching every other kind.</summary>
+    /// <summary>Every pack in <c>packs/</c>, sorted by name - there's no index file, matching every other kind. A pack file that can't be read is left out.</summary>
     public IReadOnlyList<AssetPack> ListPacks()
     {
         if (!Directory.Exists(PacksDir))
             return [];
 
         return Directory.EnumerateFiles(PacksDir, "*." + ProjectPaths.JsonExtension)
-            .Select(ProjectJson.Read<AssetPack>)
+            .Select(path => StoreReads.Read(path, ProjectJson.Read<AssetPack>, skipUnreadable: true))
+            .OfType<AssetPack>()
             .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(p => p.Id.Value, StringComparer.Ordinal)
             .ToList();

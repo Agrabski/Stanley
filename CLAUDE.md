@@ -76,7 +76,16 @@ character layer: the top of the foreground, the bottom of the background. A bubb
 **font size is absolute** - a bubble too small for its text grows to fit
 (`BubbleTextRenderer.NeededScale` → `BubbleEditing.GrowToFit`) instead of the letters
 shrinking; one dragged smaller by hand lets its text spill. An issue can be deleted
-down to just its title page; only the navigator's last page can't go. **Insert ›
+down to just its title page; only the navigator's last page can't go. **My Assets**
+(docs/asset-packs.md, slices 1–3 of §10 so far) is one per-user folder
+(`Documents/Stanley/My Assets`, movable in File › Options; `MyAssetsLibrary`) that
+every comic can take from: right-click a page group or a character › *Keep in My
+Assets* (a star on the character's row), then Insert › My Assets or the Characters
+pane's *Reuse a character* in any comic, which also lists the characters in your
+other recent comics; File › My Assets shows, renames and removes what's kept. A comic
+keeps its own copy of everything it uses (`objects/` for groups,
+`GroupElement.SourceId` links a page's group to it) with the fingerprint it last
+matched; the "changed in My Assets" side (slice 4) isn't built yet. **Insert ›
 Thought cloud** adds a scalloped panel for what a character imagines (`Panel.Kind =
 cloud`, outline from `PanelShapes.Cloud`, regenerated on resize) that floats over the
 layout - gutters, snapping, split and re-tiling leave it be, it draws and hit-tests on

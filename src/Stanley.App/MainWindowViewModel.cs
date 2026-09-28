@@ -22,6 +22,7 @@ public enum BackstagePage
     Info,
     SaveAs,
     Export,
+    MyAssets,
     Options
 }
 
@@ -71,6 +72,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private PageNavigatorViewModel? _navigator;
     private CharacterLibraryViewModel? _characters;
     private PictureLibrary? _pictures;
+    private ObjectGroupLibrary? _objectGroups;
     private bool _infoDirty;
     private bool _isBackstageOpen;
     private MetricPaperSize _newPaperSize = MetricPaperSize.A4;
@@ -81,6 +83,7 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <param name="tokenStore">The user's optional GitHub token for update checks; in-memory-only default if null.</param>
     /// <param name="updates">Checks for/applies app updates; update controls are hidden entirely if null.</param>
     /// <param name="launcher">Opens exported files and shows them in their folder; the export notice offers neither if null.</param>
+    /// <param name="myAssets">The user's My Assets folder; keeping things, the pickers' My Assets sections and File › My Assets are all hidden if null.</param>
     public MainWindowViewModel(
         IFileDialogs dialogs,
         RecentProjects recent,
@@ -90,9 +93,12 @@ public sealed class MainWindowViewModel : ObservableObject
         IDelayScheduler? scheduler = null,
         GithubTokenStore? tokenStore = null,
         IUpdateService? updates = null,
-        IFileLauncher? launcher = null)
+        IFileLauncher? launcher = null,
+        MyAssetsLibrary? myAssets = null)
     {
         _dialogs = dialogs;
+        MyAssets = myAssets;
+        MyAssetsPage = myAssets is null ? null : new MyAssetsPageViewModel(myAssets);
         _launcher = launcher;
         _recent = recent;
         _settings = settings ?? new AppSettings(null);
@@ -124,6 +130,8 @@ public sealed class MainWindowViewModel : ObservableObject
         CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
         InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, () => HasUpdateAvailable);
         ChooseSvgEditorCommand = new AsyncRelayCommand(ChooseSvgEditorAsync);
+        ChooseMyAssetsFolderCommand = new AsyncRelayCommand(ChooseMyAssetsFolderAsync, () => MyAssets != null);
+        ShowMyAssetsFolderCommand = new AsyncRelayCommand(ShowMyAssetsFolderAsync, () => MyAssets != null && _launcher != null);
         DiscardRecoveredCommand = new RelayCommand<RecoveredComic>(comic =>
         {
             if (comic is null)
@@ -248,7 +256,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files, KeptObjectGroups());
             AppLog.Info($"AutoSaved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
         }
@@ -277,7 +285,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
+            _recovery.Write(_project, _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files, KeptObjectGroups());
         }
         catch (Exception e) when (IsFileProblem(e))
         {
@@ -429,6 +437,40 @@ public sealed class MainWindowViewModel : ObservableObject
         _settings.SvgEditorPath = chosen;
         AppLog.Info($"SVG editor set to {chosen}.");
         OnPropertyChanged(nameof(SvgEditorPath));
+    }
+
+    // ---------------------------------------------------------------- My Assets
+
+    /// <summary>The user's My Assets, shared by every comic this window opens; null when the app runs without one (most tests).</summary>
+    public MyAssetsLibrary? MyAssets { get; }
+
+    public bool HasMyAssets => MyAssets != null;
+
+    /// <summary>File › My Assets.</summary>
+    public MyAssetsPageViewModel? MyAssetsPage { get; }
+
+    /// <summary>File › Options › My Assets: where it lives.</summary>
+    public string MyAssetsFolderText => MyAssets?.RootDirectory ?? "";
+
+    public IAsyncRelayCommand ChooseMyAssetsFolderCommand { get; }
+    public IAsyncRelayCommand ShowMyAssetsFolderCommand { get; }
+
+    private async Task ChooseMyAssetsFolderAsync()
+    {
+        if (MyAssets is null || await _dialogs.PickFolderAsync("Keep My Assets in") is not { Length: > 0 } chosen)
+            return;
+        _settings.MyAssetsDirectory = chosen;
+        MyAssets.MoveTo(chosen);
+        AppLog.Info($"My Assets moved to {chosen}.");
+        OnPropertyChanged(nameof(MyAssetsFolderText));
+    }
+
+    private async Task ShowMyAssetsFolderAsync()
+    {
+        if (MyAssets is null || _launcher is null)
+            return;
+        Directory.CreateDirectory(MyAssets.RootDirectory);
+        await _launcher.OpenAsync(MyAssets.RootDirectory);
     }
 
     private async Task CheckForUpdatesAsync()
@@ -717,7 +759,10 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(IsInfoPage));
             OnPropertyChanged(nameof(IsSaveAsPage));
             OnPropertyChanged(nameof(IsExportPage));
+            OnPropertyChanged(nameof(IsMyAssetsPage));
             OnPropertyChanged(nameof(IsOptionsPage));
+            if (value == BackstagePage.MyAssets)
+                MyAssetsPage?.Refresh();
         }
     } = BackstagePage.New;
 
@@ -726,6 +771,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public bool IsInfoPage { get => BackstagePage == BackstagePage.Info; set => SetPageFlag(BackstagePage.Info, value); }
     public bool IsSaveAsPage { get => BackstagePage == BackstagePage.SaveAs; set => SetPageFlag(BackstagePage.SaveAs, value); }
     public bool IsExportPage { get => BackstagePage == BackstagePage.Export; set => SetPageFlag(BackstagePage.Export, value); }
+    public bool IsMyAssetsPage { get => BackstagePage == BackstagePage.MyAssets; set => SetPageFlag(BackstagePage.MyAssets, value); }
     public bool IsOptionsPage { get => BackstagePage == BackstagePage.Options; set => SetPageFlag(BackstagePage.Options, value); }
 
     private void SetPageFlag(BackstagePage page, bool value)
@@ -850,7 +896,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         try
         {
-            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files);
+            _project.Save(_navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks, _pictures?.Files, KeptObjectGroups());
             AppLog.Info($"Saved \"{DocumentTitle}\" to {_project.Location}.");
             MarkSaved();
             return true;
@@ -887,7 +933,7 @@ public sealed class MainWindowViewModel : ObservableObject
             if (_project.IsUntitled && Path.GetFileName(path).Trim() is { Length: > 0 } name)
                 _project.Title = name;
             var saved = _project.SaveAs(ComicProject.FreeFolder(path), _navigator.Snapshot(), _navigator.PageNumbering, _characters?.Snapshot(), _navigator.IssueLooks,
-                _pictures?.Files);
+                _pictures?.Files, KeptObjectGroups());
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             RefreshFields(); // a new comic took the name it was saved under
             MarkSaved();
@@ -1032,6 +1078,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
     // ---------------------------------------------------------------- helpers
 
+    /// <summary>The comic's copies of kept object groups, for <c>objects/</c>.</summary>
+    private IReadOnlyCollection<ProjectModel.Objects.ObjectGroup>? KeptObjectGroups() => _objectGroups?.Groups.Values.ToList();
+
     private IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Characters.CharacterDefinition>? CommittedCharacters() =>
         _characters?.Snapshot().ToDictionary(c => c.Id);
 
@@ -1040,12 +1089,15 @@ public sealed class MainWindowViewModel : ObservableObject
         Unload();
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
-        (_workspace, _navigator, _characters, _pictures) = PageEditorHost.CreateWorkspace(project);
+        (_workspace, _navigator, _characters, _pictures, _objectGroups) = PageEditorHost.CreateWorkspace(project, MyAssets);
         _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory, () => _settings.SvgEditorPath, path =>
         {
             _settings.SvgEditorPath = path;
             OnPropertyChanged(nameof(SvgEditorPath));
         });
+        _characters.RecentComics = () => _recent.Paths;
+        _characters.ComicLocation = project.Location;
+        _characters.KeepFailed += ShowError;
         _workspace.History.PropertyChanged += OnHistoryChanged;
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _navigator.SpacingChanged += OnSpacingChanged;
@@ -1064,6 +1116,14 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (_workspace != null)
             _workspace.History.PropertyChanged -= OnHistoryChanged;
+        // My Assets outlives the comic: let go of it, so it doesn't keep the old comic's panes alive.
+        if (_characters != null)
+        {
+            _characters.MyAssets = null;
+            _characters.KeepFailed -= ShowError;
+        }
+        if (_navigator != null)
+            _navigator.MyAssets = null;
         if (_navigator != null)
         {
             _navigator.CurrentPageChanged -= OnCurrentPageChanged;
@@ -1074,6 +1134,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _navigator = null;
         _characters = null;
         _pictures = null;
+        _objectGroups = null;
         _infoDirty = false;
         _recoveredUnsaved = false;
         _pendingAutoSave?.Dispose();
@@ -1098,7 +1159,11 @@ public sealed class MainWindowViewModel : ObservableObject
         _recovery?.Clear();
         Message = null;
         if (_project?.Location is { } location)
+        {
             _recent.Add(location);
+            if (_characters != null)
+                _characters.ComicLocation = location;
+        }
         RefreshRecent();
         RaiseDocumentChanged();
     }

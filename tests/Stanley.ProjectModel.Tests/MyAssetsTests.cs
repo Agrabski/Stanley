@@ -121,5 +121,29 @@ public class MyAssetsTests : IDisposable
         Assert.Equivalent(character, myAssets.LoadCharacter(character.Id), strict: true);
     }
 
+    [Fact]
+    public void A_damaged_folder_or_pack_is_left_out_of_the_listing_rather_than_hiding_the_rest()
+    {
+        var myAssets = new MyAssets(_root);
+        var character = MakeCharacter();
+        var group = MakeGroup();
+        myAssets.SaveCharacter(character);
+        myAssets.SaveObjectGroup(group);
+        myAssets.SavePack(new AssetPack(AssetPackId.New(), "Crew", []));
+        WriteDamaged(Path.Combine(_root, "characters", "broken-bob", "character.json"));
+        WriteDamaged(Path.Combine(_root, "objects", "broken-rocket", "group.json"));
+        WriteDamaged(Path.Combine(_root, "packs", "broken-pack.json"));
+
+        Assert.Equal(character.Id, Assert.Single(myAssets.ListCharacters()).Id);
+        Assert.Equal(group.Id, Assert.Single(myAssets.ListObjectGroups()).Id);
+        Assert.Equal("Crew", Assert.Single(myAssets.ListPacks()).Name);
+    }
+
+    private static void WriteDamaged(string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "{ \"id\": ");
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

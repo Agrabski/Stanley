@@ -53,6 +53,10 @@ public sealed partial class CharacterItem : ObservableObject
 
 	public bool IsNotEditingName => !IsEditingName;
 
+	/// <summary>Kept in My Assets - the star on its row.</summary>
+	[ObservableProperty]
+	public partial bool IsKept { get; set; }
+
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(IsNotEditingName))]
 	public partial bool IsEditingName { get; set; }
