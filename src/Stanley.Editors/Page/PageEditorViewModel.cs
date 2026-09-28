@@ -65,8 +65,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         PropertyChanged += OnSelfPropertyChanged;
 
         DeleteSelectionCommand = new RelayCommand(DeleteSelection, () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement || (HasSelectedPanel && !Working.LayoutLocked));
-        SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel && !Working.LayoutLocked);
-        SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel && !Working.LayoutLocked);
+        SplitColumnsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Vertical), () => HasSelectedPanel && !Working.LayoutLocked && !IsSelectedPanelCloud);
+        SplitRowsCommand = new RelayCommand(() => SplitSelected(BoundaryOrientation.Horizontal), () => HasSelectedPanel && !Working.LayoutLocked && !IsSelectedPanelCloud);
         AddBubbleCommand = new RelayCommand(AddBubbleToSelectedPanel, () => Working.PanelOrder.Count > 0);
         EditTextCommand = new RelayCommand(() =>
         {
@@ -130,6 +130,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             if (preset != null)
                 ApplyLayoutPreset(preset);
         }, _ => !Working.LayoutLocked);
+        InsertThoughtCloudCommand = new RelayCommand(InsertThoughtCloud, () => !Working.LayoutLocked);
         ZoomInCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomIn));
         ZoomOutCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.ZoomOut));
         FitPageCommand = new RelayCommand(() => ViewportRequested?.Invoke(ViewportRequest.FitPage));
@@ -189,6 +190,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     /// <summary>Insert tab: switches to the panel tool, ready to drag out a new panel.</summary>
     public IRelayCommand DrawPanelCommand { get; }
+
+    /// <summary>Insert tab: a thought cloud, sized off the selected panel (or the page), selected and ready to move or resize - one undo step.</summary>
+    public IRelayCommand InsertThoughtCloudCommand { get; }
 
     /// <summary>Insert tab: a bubble of the given style in the selected (or first) panel, ready to type into.</summary>
     public IRelayCommand<BubbleStylePreset> InsertBubbleCommand { get; }
@@ -276,6 +280,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         SplitColumnsCommand.NotifyCanExecuteChanged();
         SplitRowsCommand.NotifyCanExecuteChanged();
         ApplyLayoutCommand.NotifyCanExecuteChanged();
+        InsertThoughtCloudCommand.NotifyCanExecuteChanged();
         AddBubbleCommand.NotifyCanExecuteChanged();
         InsertBubbleCommand.NotifyCanExecuteChanged();
         EditTextCommand.NotifyCanExecuteChanged();
@@ -651,6 +656,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return bounds;
         }
     }
+    /// <summary>The selected panel is a thought cloud (Insert › Thought cloud) rather than an ordinary rectangle - it can't be split, since it was never part of the grid to begin with.</summary>
+    public bool IsSelectedPanelCloud => SelectedPanel is { Kind: PanelKind.Cloud };
 
     /// <summary>A comic panel (and nothing in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
     public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter && !HasSelectedElement;
@@ -803,6 +810,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(SelectionCount));
         OnPropertyChanged(nameof(HasMultiSelection));
+        OnPropertyChanged(nameof(IsSelectedPanelCloud));
         OnPropertyChanged(nameof(IsPanelContext));
         OnPropertyChanged(nameof(IsBubbleContext));
         OnPropertyChanged(nameof(IsCharacterContext));
@@ -973,9 +981,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     private Rect2D CommittedPanelBounds(PanelId id) => AnchorRing.BoundingBox(Committed.Panels[id].Shape.Anchors);
 
+    /// <summary>Every other panel's bounds, to snap onto - a thought cloud floats over the grid rather than tiling it, so it's never itself a snap target (snapping a cloud's own move or resize onto the page margin still works; that comes from <see cref="PageBounds"/>, not from here).</summary>
     private IEnumerable<Rect2D> CommittedBoundsExcept(IReadOnlyCollection<PanelId> excluded) =>
         Committed.PanelOrder
-            .Where(id => !excluded.Contains(id) && Committed.Panels.ContainsKey(id))
+            .Where(id => !excluded.Contains(id) && Committed.Panels.TryGetValue(id, out var panel) && panel.Kind != PanelKind.Cloud)
             .Select(CommittedPanelBounds);
 
     /// <summary>
@@ -1180,7 +1189,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// <summary>
     /// Re-tiles the page into <paramref name="preset"/>'s grid. Existing panels are reused
     /// in reading order - so their bubbles come along into the new slots - and any extra
-    /// panels are removed (one undo step brings them back).
+    /// panels are removed (one undo step brings them back). Thought clouds don't tile, so
+    /// they're left exactly as they were, floating on top of whatever the new grid puts
+    /// under them - the friendliest thing a re-tile can do with something that was never
+    /// part of the grid to begin with.
     /// </summary>
     public void ApplyLayoutPreset(PanelLayoutPreset preset)
     {
@@ -1197,7 +1209,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return;
         }
 
-        var existing = ReadingOrder(Working.Panels);
+        var gridPanels = Working.Panels.Where(kv => kv.Value.Kind != PanelKind.Cloud).ToDictionary(kv => kv.Key, kv => kv.Value);
+        var existing = ReadingOrder(gridPanels);
         var panels = new Dictionary<PanelId, Panel>();
         var order = new List<PanelId>();
         for (var i = 0; i < layout.Value.Count; i++)
@@ -1206,7 +1219,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             Panel panel;
             if (i < existing.Count)
             {
-                var resized = PanelLayoutEditing.Resize(Working.Panels[existing[i]], rect, PageBounds);
+                var resized = PanelLayoutEditing.Resize(gridPanels[existing[i]], rect, PageBounds);
                 if (!resized.IsValid)
                 {
                     Apply(EditResult<PageDocument>.Failure(resized.Error!));
@@ -1222,13 +1235,20 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             order.Add(panel.Id);
         }
 
+        foreach (var cloud in CloudsInPosition(Working.Panels))
+        {
+            panels[cloud.Id] = cloud;
+            order.Add(cloud.Id);
+        }
+
         Apply(EditResult<PageDocument>.Success(new PageDocument(order, panels, Working.LayoutLocked)));
     }
 
-    /// <summary>Western reading order: rows top to bottom (panels whose tops are within a few mm share a row), left to right within a row.</summary>
+    /// <summary>Western reading order: rows top to bottom (panels whose tops are within a few mm share a row), left to right within a row. Thought clouds float over the grid rather than tiling it, so - reading order being otherwise undefined for them - they simply come last, in that same top-to-bottom, left-to-right order among themselves; this also keeps them drawn on top of the grid panels they overlap, since panels later in the order draw over ones earlier in it.</summary>
     private static List<PanelId> ReadingOrder(IReadOnlyDictionary<PanelId, Panel> panels)
     {
-        var items = panels.Values.Select(p => (p.Id, Bounds: AnchorRing.BoundingBox(p.Shape.Anchors))).OrderBy(i => i.Bounds.Top).ToList();
+        var items = panels.Values.Where(p => p.Kind != PanelKind.Cloud)
+            .Select(p => (p.Id, Bounds: AnchorRing.BoundingBox(p.Shape.Anchors))).OrderBy(i => i.Bounds.Top).ToList();
         var result = new List<PanelId>();
         var row = new List<(PanelId Id, Rect2D Bounds)>();
         foreach (var item in items)
@@ -1241,7 +1261,48 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             row.Add(item);
         }
         result.AddRange(row.OrderBy(r => r.Bounds.Left).Select(r => r.Id));
+        result.AddRange(CloudsInPosition(panels).Select(p => p.Id));
         return result;
+    }
+
+    /// <summary>Every thought cloud in <paramref name="panels"/>, top-to-bottom then left-to-right among themselves - a stable, position-based order that doesn't depend on dictionary enumeration.</summary>
+    private static IEnumerable<Panel> CloudsInPosition(IReadOnlyDictionary<PanelId, Panel> panels) =>
+        panels.Values.Where(p => p.Kind == PanelKind.Cloud)
+            .Select(p => (Panel: p, Bounds: AnchorRing.BoundingBox(p.Shape.Anchors)))
+            .OrderBy(p => p.Bounds.Top).ThenBy(p => p.Bounds.Left)
+            .Select(p => p.Panel);
+
+    /// <summary>
+    /// Insert › Thought cloud: a new panel shaped like a scalloped cloud, about a third the
+    /// size of the selected panel and tucked just inside its top - or, with nothing selected,
+    /// a third of the page's live area right at its top. It's a real panel: characters,
+    /// bubbles, elements and a background all work on it exactly as on any other, and it
+    /// floats on top of whatever it overlaps (last in <see cref="PageDocument.PanelOrder"/>
+    /// draws, and hit-tests, on top). One undo step; the cloud ends up selected.
+    /// </summary>
+    public void InsertThoughtCloud()
+    {
+        if (Working.LayoutLocked)
+        {
+            Apply(EditResult<PageDocument>.Failure("Layout is locked."));
+            return;
+        }
+
+        var reference = SelectedPanel is { } selected ? Bounds(selected) : (Rect2D?)null;
+        var bounds = ThoughtCloudEditing.DefaultBounds(reference, PageBounds, Grid);
+        var created = ThoughtCloudEditing.Create(bounds);
+        if (!created.IsValid)
+        {
+            Apply(EditResult<PageDocument>.Failure(created.Error!));
+            return;
+        }
+
+        var cloud = created.Value;
+        var panels = new Dictionary<PanelId, Panel>(Working.Panels) { [cloud.Id] = cloud };
+        Apply(EditResult<PageDocument>.Success(Working with { Panels = panels, PanelOrder = [.. Working.PanelOrder, cloud.Id] }));
+        if (!Working.Panels.ContainsKey(cloud.Id))
+            return;
+        Select(cloud.Id);
     }
 
     // ---------------------------------------------------------------- bubbles

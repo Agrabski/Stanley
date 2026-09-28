@@ -1493,9 +1493,14 @@ public sealed class PageCanvasControl : Control
             items.Add(ColorMenu("Shape Outline", new ColorMenuOptions(vm.SetPanelOutlineCommand, "No Outline", "More Outline Colors…", style.Stroke,
                 vm.SetPanelOutlineWeightCommand, style.StrokeWidthMm, vm.SetPanelOutlineDashCommand, style.Dash)));
             items.Add(new Separator());
-            items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
-            items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
-            items.Add(new Separator());
+            // A thought cloud was never part of the grid, so it can't be split - same rule
+            // SplitColumnsCommand/SplitRowsCommand enforce for the ribbon (IsSelectedPanelCloud).
+            if (!vm.IsSelectedPanelCloud)
+            {
+                items.Add(Item("Split side by side", () => vm.SplitPanel(panelId, BoundaryOrientation.Vertical, 0.5)));
+                items.Add(Item("Split top and bottom", () => vm.SplitPanel(panelId, BoundaryOrientation.Horizontal, 0.5)));
+                items.Add(new Separator());
+            }
             items.Add(Item("Delete panel", () => vm.DeletePanel(panelId), "Del"));
         }
         else
