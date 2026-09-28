@@ -2,10 +2,10 @@
 <!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="150" height="150" viewBox="-60 -1010 150 150" data-stanley-view="profile" data-stanley-slot="eyes">
   <g id="eyes" inkscape:groupmode="layer" inkscape:label="eyes">
-    <ellipse cx="50" cy="-931" rx="9" ry="12" fill="#ffffff" stroke="#1a1a1a" stroke-width="2.5"/>
-    <ellipse class="slot-eyes" cx="53" cy="-931" rx="3.6" ry="4.5" fill="#4a7ab5"/>
-    <ellipse cx="53" cy="-931" rx="1.6" ry="2" fill="#1a1a1a"/>
-    <ellipse cx="54.8" cy="-933" rx="1.4" ry="1.4" fill="#ffffff"/>
-    <path d="M54.1,-941.5 l3,-5 M56.4,-939 l4.5,-3.5 M58,-935 l5,-1.5" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <ellipse class="side-right" cx="50" cy="-931" rx="9" ry="12" fill="#ffffff" stroke="#1a1a1a" stroke-width="2.5"/>
+    <ellipse class="slot-eyes side-right" cx="53" cy="-931" rx="3.6" ry="4.5" fill="#4a7ab5"/>
+    <ellipse class="side-right" cx="53" cy="-931" rx="1.6" ry="2" fill="#1a1a1a"/>
+    <ellipse class="side-right" cx="54.8" cy="-933" rx="1.4" ry="1.4" fill="#ffffff"/>
+    <path class="side-right" d="M54.1,-941.5 l3,-5 M56.4,-939 l4.5,-3.5 M58,-935 l5,-1.5" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
 </svg>

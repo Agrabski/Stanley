@@ -27,6 +27,36 @@ public class ExpressionPresetsTests
     }
 
     [Fact]
+    public void Splitting_eyes_also_sets_the_presets_eyes_on_eyesLeft_and_eyesRight()
+    {
+        var pose = ExpressionPresets.Apply(Rest, ExpressionPresets.Get(ExpressionPreset.Surprised), splitEyes: true);
+
+        Assert.Equal("wide", pose.Expression[StickerSlots.EyesLeft]);
+        Assert.Equal("wide", pose.Expression[StickerSlots.EyesRight]);
+        Assert.Equal("wide", pose.Expression[StickerSlots.Eyes]); // the shared key still applies too, for an unsplit character
+    }
+
+    [Fact]
+    public void Unsplit_apply_never_touches_eyesLeft_or_eyesRight()
+    {
+        var pose = ExpressionPresets.Apply(Rest, ExpressionPresets.Get(ExpressionPreset.Surprised));
+
+        Assert.DoesNotContain(StickerSlots.EyesLeft, pose.Expression.Keys);
+        Assert.DoesNotContain(StickerSlots.EyesRight, pose.Expression.Keys);
+    }
+
+    [Fact]
+    public void Neutral_split_removes_eyesLeft_and_eyesRight_too()
+    {
+        var happySplit = ExpressionPresets.Apply(Rest, ExpressionPresets.Get(ExpressionPreset.Happy), splitEyes: true);
+
+        var neutralSplit = ExpressionPresets.Apply(happySplit, ExpressionPresets.Get(ExpressionPreset.Neutral), splitEyes: true);
+
+        Assert.DoesNotContain(StickerSlots.EyesLeft, neutralSplit.Expression.Keys);
+        Assert.DoesNotContain(StickerSlots.EyesRight, neutralSplit.Expression.Keys);
+    }
+
+    [Fact]
     public void Neutral_stores_nothing_for_the_face_and_other_slots_keep_their_variant()
     {
         var pose = Rest with { Expression = new SortedDictionary<string, string> { ["headwear"] = "tipped", [StickerSlots.Mouth] = "grin" } };

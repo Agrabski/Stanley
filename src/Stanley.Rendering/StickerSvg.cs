@@ -14,12 +14,14 @@ public sealed record ArtGradient(SKPoint Start, SKPoint End, float? Radius, IRea
 
 /// <summary>
 /// One drawn element of sticker art, in the SVG's own units: its outline, fill and stroke,
-/// the colour slot it follows (<c>class="slot-hair"</c>, its own or an ancestor's) and
-/// whether it keeps to the colour alone (<c>solid</c>) - or, for PNG art, the
+/// the colour slot it follows (<c>class="slot-hair"</c>, its own or an ancestor's), whether
+/// it keeps to the colour alone (<c>solid</c>), and the one side of a symmetric slot it's
+/// on (<c>class="side-left"</c>/<c>"side-right"</c>, docs/sticker-system.md §21 - split
+/// eyes; null for most art, which isn't sided at all) - or, for PNG art, the
 /// <paramref name="Image"/> filling <paramref name="Path"/>'s bounds.
 /// </summary>
 public sealed record ArtElement(SKPath Path, ArtPaint? Fill, ArtPaint? Stroke, float StrokeWidth, SKStrokeCap Cap, SKStrokeJoin Join,
-    float[]? Dash, string? Slot, bool Solid, SKPath? Clip, bool EvenOdd, SKImage? Image = null);
+    float[]? Dash, string? Slot, bool Solid, SKPath? Clip, bool EvenOdd, SKImage? Image = null, LimbSide? Side = null);
 
 /// <summary>
 /// Sticker art read from an SVG file (docs/sticker-system.md §6.1): its view box, its
@@ -148,7 +150,7 @@ public static class StickerSvg
 
         // Remember what each drawable element follows, by an id VectSharp passes through as
         // its drawing tag (elements that already have an id keep it - <use> refers to them).
-        var slots = new Dictionary<string, (string? Slot, bool Solid)>(StringComparer.Ordinal);
+        var slots = new Dictionary<string, (string? Slot, bool Solid, LimbSide? Side)>(StringComparer.Ordinal);
         var n = 0;
         foreach (var element in root.Descendants().Where(IsDrawable))
         {
@@ -278,7 +280,7 @@ public static class StickerSvg
         }
     }
 
-    private static List<ArtElement> Replay(XElement svg, SKRect viewBox, IReadOnlyDictionary<string, (string? Slot, bool Solid)> slots, List<string> report)
+    private static List<ArtElement> Replay(XElement svg, SKRect viewBox, IReadOnlyDictionary<string, (string? Slot, bool Solid, LimbSide? Side)> slots, List<string> report)
     {
         var page = VectSharp.SVG.Parser.FromString(svg.ToString(SaveOptions.DisableFormatting));
         var context = new ReplayContext(viewBox, slots, report);
@@ -318,10 +320,11 @@ public static class StickerSvg
         e.Attribute("data-stanley-guide") != null
         || string.Equals((string?)e.Attribute(Inkscape + "label"), "template", StringComparison.OrdinalIgnoreCase);
 
-    private static (string? Slot, bool Solid) SlotOf(XElement element)
+    private static (string? Slot, bool Solid, LimbSide? Side) SlotOf(XElement element)
     {
         string? slot = null;
         var solid = false;
+        LimbSide? side = null;
         for (var e = element; e != null; e = e.Parent)
         {
             foreach (var c in ((string?)e.Attribute("class") ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
@@ -330,9 +333,13 @@ public static class StickerSvg
                     slot ??= c["slot-".Length..];
                 else if (c == "solid")
                     solid = true;
+                else if (c == "side-left")
+                    side ??= LimbSide.Left;
+                else if (c == "side-right")
+                    side ??= LimbSide.Right;
             }
         }
-        return (slot, solid);
+        return (slot, solid, side);
     }
 
     /// <summary>
@@ -340,7 +347,7 @@ public static class StickerSvg
     /// transform stack, the path being built, clipping, and each fill or stroke as an
     /// element with its tag's colour slot.
     /// </summary>
-    private sealed class ReplayContext(SKRect viewBox, IReadOnlyDictionary<string, (string? Slot, bool Solid)> slots, List<string> report) : IGraphicsContext
+    private sealed class ReplayContext(SKRect viewBox, IReadOnlyDictionary<string, (string? Slot, bool Solid, LimbSide? Side)> slots, List<string> report) : IGraphicsContext
     {
         private SKMatrix _matrix = SKMatrix.CreateTranslation(viewBox.Left, viewBox.Top);
         private SKPath? _clip;
@@ -468,7 +475,7 @@ public static class StickerSvg
             var path = TakePath(evenOdd);
             if (path.IsEmpty)
                 return;
-            var (slot, solid) = slots.TryGetValue(Tag ?? "", out var s) ? s : (null, false);
+            var (slot, solid, side) = slots.TryGetValue(Tag ?? "", out var s) ? s : (null, false, null);
             var scale = MathF.Sqrt(MathF.Abs(_matrix.ScaleX * _matrix.ScaleY - _matrix.SkewX * _matrix.SkewY));
             var paint = ToPaint(fill ? FillStyle : StrokeStyle);
             if (paint is null)
@@ -480,7 +487,7 @@ public static class StickerSvg
                 LineCap switch { LineCaps.Round => SKStrokeCap.Round, LineCaps.Square => SKStrokeCap.Square, _ => SKStrokeCap.Butt },
                 LineJoin switch { LineJoins.Round => SKStrokeJoin.Round, LineJoins.Bevel => SKStrokeJoin.Bevel, _ => SKStrokeJoin.Miter },
                 _dash.DashArray is { Length: > 0 } dashes && dashes.Any(d => d > 0) ? dashes.Select(d => (float)(d * scale)).ToArray() : null,
-                slot, solid, _clip, evenOdd));
+                slot, solid, _clip, evenOdd, Side: side));
         }
 
         private ArtPaint? ToPaint(Brush brush)

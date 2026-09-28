@@ -62,6 +62,113 @@ public static class LookEditing
         return result with { Revisions = revisions };
     }
 
+    // ---------------------------------------------------------------- split eyes (docs/sticker-system.md §21)
+
+    /// <summary>Whether the character's eyes are split left/right: some sticker worn in "eyes" is restricted to one side.</summary>
+    public static bool IsEyesSplit(CharacterDefinition character) =>
+        character.StickerSides is { Count: > 0 } sides
+        && character.Stickers.TryGetValue(StickerSlots.Eyes, out var worn) && worn.Any(sides.ContainsKey);
+
+    /// <summary>The sticker worn for one eye once the eyes are split, or null unsplit (there's nothing to tell them apart).</summary>
+    public static StickerAsset? EyeSticker(CharacterDefinition character, LimbSide side)
+    {
+        if (character.StickerSides is not { } sides || !character.Stickers.TryGetValue(StickerSlots.Eyes, out var worn))
+            return null;
+        foreach (var id in worn)
+        {
+            if (sides.TryGetValue(id, out var s) && s == side)
+                return character.Wardrobe.Find(id);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Splits the eyes left/right: the worn "eyes" sticker keeps showing on the left, and a
+    /// fresh copy of it (its own id, so its colour, style and expression can diverge from the
+    /// left) takes the right - splitting never changes how the character already looks.
+    /// Does nothing with no eyes worn, or already split.
+    /// </summary>
+    public static CharacterDefinition SplitEyes(CharacterDefinition character)
+    {
+        if (IsEyesSplit(character) || !character.Stickers.TryGetValue(StickerSlots.Eyes, out var worn) || worn.Count == 0)
+            return character;
+        var primary = worn[0];
+        if (character.Wardrobe.Find(primary) is not { } asset)
+            return character;
+        var copy = StickerCopies.Copy(asset, default);
+        character = Wear(character, copy);
+        var sides = new SortedDictionary<StickerId, LimbSide>(character.StickerSides ?? new SortedDictionary<StickerId, LimbSide>())
+        {
+            [primary] = LimbSide.Left,
+            [copy.Id] = LimbSide.Right
+        };
+        return character with { StickerSides = sides };
+    }
+
+    /// <summary>
+    /// Undoes <see cref="SplitEyes"/>: keeps the left eye's sticker, colour and style, takes
+    /// off whatever's on the right (it stays in the wardrobe unless tidied away unused on
+    /// save), and drops the left/right colour overrides along with it. Does nothing unsplit.
+    /// </summary>
+    public static CharacterDefinition UnsplitEyes(CharacterDefinition character)
+    {
+        if (character.StickerSides is not { Count: > 0 } sides || !character.Stickers.TryGetValue(StickerSlots.Eyes, out var worn))
+            return character;
+        StickerId? kept = null;
+        foreach (var id in worn)
+        {
+            if (sides.TryGetValue(id, out var s) && s == LimbSide.Left)
+            {
+                kept = id;
+                break;
+            }
+        }
+        if (kept is not { } keptId)
+            return character;
+        foreach (var id in worn.Where(id => id != keptId && sides.ContainsKey(id)).ToList())
+            character = TakeOff(character, id);
+        var remaining = new SortedDictionary<StickerId, LimbSide>(character.StickerSides ?? new SortedDictionary<StickerId, LimbSide>());
+        foreach (var id in sides.Keys)
+            remaining.Remove(id);
+        var colors = new SortedDictionary<string, ColorValue>(character.ColorSlots, StringComparer.Ordinal);
+        colors.Remove(StickerSlots.EyesLeft);
+        colors.Remove(StickerSlots.EyesRight);
+        return character with { StickerSides = remaining.Count == 0 ? null : remaining, ColorSlots = colors };
+    }
+
+    /// <summary>
+    /// What <see cref="WearOnSide"/> would actually wear for <paramref name="side"/>:
+    /// <paramref name="asset"/> itself, or - already worn on the other side, where the same id
+    /// can't also go - a copy of its own. Callers that need to know the id they're about to
+    /// wear (to select it once it's on) resolve it first with this.
+    /// </summary>
+    public static StickerAsset ResolveForSide(CharacterDefinition character, StickerAsset asset, LimbSide side)
+    {
+        var opposite = side == LimbSide.Left ? LimbSide.Right : LimbSide.Left;
+        return character.StickerSides is { } sides && sides.TryGetValue(asset.Id, out var existing) && existing == opposite
+            ? StickerCopies.Copy(asset, default)
+            : asset;
+    }
+
+    /// <summary>
+    /// Wears <paramref name="asset"/> for one eye only (<see cref="ResolveForSide"/> first),
+    /// replacing whatever currently shows there - the character must already be split
+    /// (<see cref="SplitEyes"/>).
+    /// </summary>
+    public static CharacterDefinition WearOnSide(CharacterDefinition character, StickerAsset asset, LimbSide side)
+    {
+        asset = ResolveForSide(character, asset, side);
+        var worn = character.Stickers.TryGetValue(StickerSlots.Eyes, out var w) ? w : [];
+        if (character.StickerSides is { } sides)
+        {
+            foreach (var id in worn.Where(id => id != asset.Id && sides.TryGetValue(id, out var s) && s == side).ToList())
+                character = TakeOff(character, id);
+        }
+        character = Wear(character, asset);
+        var updated = new SortedDictionary<StickerId, LimbSide>(character.StickerSides ?? new SortedDictionary<StickerId, LimbSide>()) { [asset.Id] = side };
+        return character with { StickerSides = updated };
+    }
+
     // ---------------------------------------------------------------- styles (docs/sticker-system.md §20)
 
     /// <summary>
@@ -187,8 +294,11 @@ public static class LookEditing
             }
             foreach (var slot in worn.Asset.Sticker.Colors.Keys)
             {
-                if (!slots.Contains(slot))
-                    slots.Add(slot);
+                // A split eye (docs/sticker-system.md §21) shows its own left/right swatch
+                // instead of the shared one, once it's worn on one side.
+                var effective = slot == StickerSlots.Eyes && worn.Side is { } side ? StickerSlots.SidedSlot(slot, side) : slot;
+                if (!slots.Contains(effective))
+                    slots.Add(effective);
             }
         }
         return slots;

@@ -55,4 +55,13 @@ public static class StickerSlots
 
     /// <summary>Paint order within a layer: the slot's z-order, custom slots with accessories.</summary>
     public static int ZOrder(string slot) => Get(slot).ZOrder;
+
+    /// <summary>
+    /// The colour and expression key for a sticker restricted to one side of a symmetric slot
+    /// (docs/sticker-system.md §21: split eyes) - "eyesLeft", "eyesRight".
+    /// </summary>
+    public static string SidedSlot(string slot, LimbSide side) => slot + (side == LimbSide.Left ? "Left" : "Right");
+
+    public const string EyesLeft = "eyesLeft";
+    public const string EyesRight = "eyesRight";
 }

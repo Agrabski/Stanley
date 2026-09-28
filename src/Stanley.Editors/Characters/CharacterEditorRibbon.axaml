@@ -257,6 +257,7 @@
         <Rectangle Classes="divider" />
 
         <DockPanel Classes="group">
+          <StackPanel Orientation="Vertical" Spacing="2">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <ItemsControl Name="HairGalleries" ItemsSource="{Binding HairGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}" />
             <ItemsControl Name="FaceGalleries" ItemsSource="{Binding FaceGalleries}" ItemTemplate="{StaticResource CompactSlotGalleryTemplate}" Width="148">
@@ -292,6 +293,23 @@
                 </Flyout>
               </DropDownButton.Flyout>
             </DropDownButton>
+          </StackPanel>
+          <CheckBox Name="SplitEyesCheck" IsChecked="{Binding IsEyesSplit}" IsEnabled="{Binding CanSplitEyes}" Focusable="False" FontSize="10"
+                    ToolTip.Tip="Set the eyes' shape, colour and expression separately for left and right">Different left/right eyes</CheckBox>
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsEyesSplit}">
+            <StackPanel Spacing="1" Width="72">
+              <TextBlock Text="Left eye" FontSize="9" Opacity="0.7" />
+              <ComboBox ItemsSource="{Binding EyeExpressionOptions}" SelectedValue="{Binding PreviewLeftEye}" SelectedValueBinding="{Binding Value}"
+                        DisplayMemberBinding="{Binding Label}" FontSize="10" Padding="4,2" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="Preview the left eye's own expression - a preview only; expressions are set per panel" />
+            </StackPanel>
+            <StackPanel Spacing="1" Width="72">
+              <TextBlock Text="Right eye" FontSize="9" Opacity="0.7" />
+              <ComboBox ItemsSource="{Binding EyeExpressionOptions}" SelectedValue="{Binding PreviewRightEye}" SelectedValueBinding="{Binding Value}"
+                        DisplayMemberBinding="{Binding Label}" FontSize="10" Padding="4,2" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="Preview the right eye's own expression - a preview only; expressions are set per panel" />
+            </StackPanel>
+          </StackPanel>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Hair &amp; face" />
         </DockPanel>
