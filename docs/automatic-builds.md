@@ -1,6 +1,6 @@
 # Getting and installing Stanley
 
-Linux only. Repo is private — you need collaborator access.
+Linux only.
 
 ## Get it
 
@@ -85,12 +85,15 @@ remove everything.
 
 File › Options › Updates:
 
-1. GitHub → Settings → Developer settings → Personal access tokens →
-   Fine-grained tokens → this repo only → **Contents: Read-only**.
-2. Paste the token into **GitHub token**.
-3. Pick a channel: **Stable** or **Nightly**.
-4. Turn on **Check for updates automatically**, or press **Check now**.
+1. Pick a channel: **Stable** or **Nightly**.
+2. Turn on **Check for updates automatically**, or press **Check now**.
    **Install and restart** applies an update once found.
+
+Stanley is a public repository, so this works with no setup. If you hit
+GitHub's rate limit for anonymous requests (or you're running a private
+fork), add your own token: GitHub → Settings → Developer settings →
+Personal access tokens → Fine-grained tokens → this repo only →
+**Contents: Read-only** — then paste it into **GitHub token**.
 
 Only works when launched from the AppImage (`~/bin/stanley`; the menu entry above
 does that).

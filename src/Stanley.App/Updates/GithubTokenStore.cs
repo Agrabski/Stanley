@@ -3,12 +3,13 @@ using Stanley.App.Diagnostics;
 namespace Stanley.App.Updates;
 
 /// <summary>
-/// The user's own GitHub personal access token (read access to this repository is enough),
-/// used to check for and download updates - Stanley is a private repository, so there's no
-/// anonymous feed to poll. Kept out of <see cref="Documents.AppSettings"/> (a plain-text
-/// preferences file meant to be freely read/copied) in its own file, written owner-only
-/// where the platform supports it (POSIX; this doesn't touch Windows ACLs). A missing or
-/// unreadable file means no token, same as a settings file that isn't there yet.
+/// The user's own GitHub personal access token, optionally used to check for and download
+/// updates - Stanley is a public repository, so update checks work anonymously without one;
+/// a token only helps get past GitHub's anonymous rate limit or point at a private fork.
+/// Kept out of <see cref="Documents.AppSettings"/> (a plain-text preferences file meant to be
+/// freely read/copied) in its own file, written owner-only where the platform supports it
+/// (POSIX; this doesn't touch Windows ACLs). A missing or unreadable file means no token,
+/// same as a settings file that isn't there yet.
 /// </summary>
 public sealed class GithubTokenStore
 {
