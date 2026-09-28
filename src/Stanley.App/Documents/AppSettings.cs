@@ -86,6 +86,14 @@ public sealed class AppSettings
         set => Set(nameof(SvgEditorPath), value?.Trim() ?? "");
     }
 
+    /// <summary>File &gt; Options &gt; My Assets: a folder of the user's choosing for My Assets (a synced or backed-up one,
+    /// or a git repository for its history). Null means the default, <see cref="AppPaths.MyAssetsDirectory"/>.</summary>
+    public string? MyAssetsDirectory
+    {
+        get => _values.TryGetValue(nameof(MyAssetsDirectory), out var value) && value.Length > 0 ? value : null;
+        set => Set(nameof(MyAssetsDirectory), value?.Trim() ?? "");
+    }
+
     private void Set(string key, string value)
     {
         _values[key] = value;

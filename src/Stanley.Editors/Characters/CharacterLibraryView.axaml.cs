@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 namespace Stanley.Editors;
@@ -32,7 +33,32 @@ public partial class CharacterLibraryView : UserControl
 		CharacterList.AddHandler(PointerReleasedEvent, OnListPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
 		CharacterList.ContextRequested += OnContextRequested;
 		CharacterList.KeyDown += OnListKeyDown;
+		// Picking a tile adds the character; the gallery then goes away, as a menu would. Posted:
+		// a button runs its command after its Click event, and a closed flyout's buttons have lost
+		// the DataContext their commands are bound through.
+		CharacterGalleryPanel.AddHandler(Button.ClickEvent, (_, e) =>
+		{
+			if (e.Source is Button { Classes: var classes } && classes.Contains("characterChoice"))
+				Dispatcher.UIThread.Post(() => AddCharacterButton.Flyout?.Hide());
+		});
 	}
+
+	protected override void OnDataContextChanged(EventArgs e)
+	{
+		if (_revealing is { } previous)
+			previous.CharacterRevealed -= OnCharacterRevealed;
+		_revealing = ViewModel;
+		if (_revealing != null)
+			_revealing.CharacterRevealed += OnCharacterRevealed;
+		base.OnDataContextChanged(e);
+	}
+
+	private CharacterLibraryViewModel? _revealing;
+
+	/// <summary>A character just added from the gallery (or one the comic already had): scrolled into view, not opened.</summary>
+	private void OnCharacterRevealed(CharacterItem item) => CharacterList.ScrollIntoView(item);
+
+	private void OnGalleryOpening(object? sender, EventArgs e) => ViewModel?.RefreshGallery();
 
 	private CharacterLibraryViewModel? ViewModel => DataContext as CharacterLibraryViewModel;
 
@@ -122,15 +148,16 @@ public partial class CharacterLibraryView : UserControl
 
 		var menu = new ContextMenu
 		{
-			ItemsSource = new Control[]
-			{
+			ItemsSource = (Control[])
+			[
 				Item("Rename", () => item.IsEditingName = true),
 				Item("Edit body", () => vm.Show(item), gesture: "Enter"),
 				Item("Place on page", () => vm.PlaceOnPageCommand.Execute(item)),
 				new Separator(),
+				.. MyAssetsItems(vm, item),
 				Item("Duplicate", () => vm.DuplicateCharacterCommand.Execute(item)),
 				Item(item.Usage > 0 ? "Delete (remove it from its panels first)" : "Delete", () => vm.DeleteCharacterCommand.Execute(item), item.Usage == 0, "Delete"),
-			}
+			]
 		};
 		menu.Open(CharacterList);
 		e.Handled = true;
@@ -151,6 +178,21 @@ public partial class CharacterLibraryView : UserControl
 			vm.DeleteCharacterCommand.Execute(current);
 			e.Handled = true;
 		}
+	}
+
+	/// <summary>Keep in My Assets, Save to My Assets once it's changed here, or a quiet "Kept in My Assets" while it matches.</summary>
+	private static Control[] MyAssetsItems(CharacterLibraryViewModel vm, CharacterItem item)
+	{
+		if (!vm.HasMyAssets)
+			return [];
+		var keep = vm.KeptStateOf(item) switch
+		{
+			KeptState.NotKept => Item("Keep in My Assets", () => vm.KeepInMyAssetsCommand.Execute(item)),
+			KeptState.ChangedHere => Item("Save to My Assets", () => vm.KeepInMyAssetsCommand.Execute(item)),
+			_ => Item("Kept in My Assets", () => { }, enabled: false)
+		};
+		keep.Icon = new PathIcon { Data = (Avalonia.Media.Geometry)Application.Current!.FindResource("StarIcon")!, Width = 14, Height = 14 };
+		return [keep, new Separator()];
 	}
 
 	private static MenuItem Item(string header, Action action, bool enabled = true, string? gesture = null)

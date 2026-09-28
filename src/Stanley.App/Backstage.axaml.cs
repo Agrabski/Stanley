@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Stanley.Editing;
 using Stanley.Editors;
@@ -58,6 +60,34 @@ public partial class Backstage : UserControl
             ToolTip.SetTip(tile, template.Description);
             tile.Click += (_, _) => (DataContext as MainWindowViewModel)?.NewFromTemplateCommand.Execute(template);
             (template.Kind == ComicTemplateKind.Strip ? StripTiles : WebcomicTiles).Children.Add(tile);
+        }
+    }
+
+    /// <summary>File › My Assets › Rename: the name box takes the focus with its text selected as it appears...</summary>
+    private void AssetNamePropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == IsVisibleProperty && e.OldValue is false && sender is TextBox { IsVisible: true } box)
+        {
+            box.Focus();
+            box.SelectAll();
+        }
+    }
+
+    /// <summary>...and Enter keeps the new name, Esc the old one.</summary>
+    private void AssetNameKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: MyAssetTile tile } box)
+            return;
+        if (e.Key == Key.Enter)
+        {
+            tile.Name = box.Text ?? "";
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            box.Text = tile.Name;
+            tile.IsEditingName = false;
+            e.Handled = true;
         }
     }
 }

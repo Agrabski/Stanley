@@ -15,14 +15,16 @@ internal sealed class ObjectGroupStore(string rootDirectory)
     public ObjectGroup Load(ObjectGroupId id) => ReadFolder(DirOrThrow(id));
 
     /// <summary>Every object group in this root, sorted by name - there's no index file, matching every other kind.</summary>
-    public IReadOnlyList<ObjectGroup> List()
+    /// <param name="skipUnreadable">As <see cref="CharacterStore.List"/>: leave out a folder that can't be read (My Assets only).</param>
+    public IReadOnlyList<ObjectGroup> List(bool skipUnreadable = false)
     {
         if (!Directory.Exists(rootDirectory))
             return [];
 
         return Directory.EnumerateDirectories(rootDirectory)
             .Where(dir => File.Exists(Path.Combine(dir, ProjectPaths.GroupFileName)))
-            .Select(ReadFolder)
+            .Select(dir => StoreReads.Read(dir, ReadFolder, skipUnreadable))
+            .OfType<ObjectGroup>()
             .OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(g => g.Id.Value, StringComparer.Ordinal)
             .ToList();

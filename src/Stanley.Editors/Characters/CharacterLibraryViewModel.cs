@@ -23,7 +23,7 @@ namespace Stanley.Editors;
 /// replacing what's there (<see cref="CharacterShown"/>); <see cref="ReturnToPage"/> ("Close"
 /// in that character's ribbon) closes just that one tab and shows the page.
 /// </summary>
-public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
+public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 {
 	private readonly EditorHistory _history;
 	private CharacterItem? _current;
@@ -45,7 +45,7 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 			item =>
 			{
 				if ((item ?? Current) is { } source)
-					Show(AddCharacter(source.Character with { Id = CharacterId.New(), Name = source.Name + " (copy)" }));
+					Show(AddCharacter(source.Character with { Id = CharacterId.New(), Name = source.Name + " (copy)", MyAssetsVersion = null }));
 			},
 			item => (item ?? Current) != null
 		);
@@ -64,6 +64,8 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 					PlaceOnPage(target);
 			}
 		);
+
+		InitializeMyAssetsCommands();
 
 		Items = [.. characters.Select(CreateItem)];
 		Items.CollectionChanged += (_, _) => Refresh();
@@ -227,13 +229,13 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 		NotifyCommands();
 	}
 
-	private CharacterItem AddCharacter(CharacterDefinition character)
+	private CharacterItem AddCharacter(CharacterDefinition character, string? description = null)
 	{
 		var item = CreateItem(character);
 		var before = Items.ToList();
 		var after = before.Append(item).ToList();
 		SetItems(after);
-		_history.Push($"New character \"{character.Name}\"", () => SetItems(before), () => SetItems(after), this);
+		_history.Push(description ?? $"New character \"{character.Name}\"", () => SetItems(before), () => SetItems(after), this);
 		return item;
 	}
 
@@ -262,7 +264,7 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	{
 		var editor = new CharacterEditorViewModel(_history, character, this);
 		editor.PropertyChanged += OnEditorPropertyChanged;
-		return new(editor) { Usage = _usage(character.Id) };
+		return new(editor) { Usage = _usage(character.Id), IsKept = IsKept(character) };
 	}
 
 	private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -274,6 +276,8 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	private void Refresh()
 	{
 		var all = Items.Select(i => i.Editor.Working).ToList();
+		foreach (var item in Items)
+			item.IsKept = IsKept(item.Editor.Working);
 		_snapshot = all.ToDictionary(c => c.Id);
 		_inOrder = all
 			.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -304,5 +308,6 @@ public sealed class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	{
 		DuplicateCharacterCommand.NotifyCanExecuteChanged();
 		DeleteCharacterCommand.NotifyCanExecuteChanged();
+		KeepInMyAssetsCommand.NotifyCanExecuteChanged();
 	}
 }

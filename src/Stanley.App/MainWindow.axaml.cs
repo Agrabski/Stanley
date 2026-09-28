@@ -34,7 +34,8 @@ public partial class MainWindow : Window
                 scheduler: new DispatcherDelayScheduler(),
                 tokenStore: tokenStore,
                 updates: new VelopackUpdateService(() => tokenStore.Token, () => settings.UpdateChannel),
-                launcher: new SystemFileLauncher(this));
+                launcher: new SystemFileLauncher(this),
+                myAssets: new MyAssetsLibrary(settings.MyAssetsDirectory ?? AppPaths.MyAssetsDirectory));
         }
         ViewModel = viewModel;
         DataContext = ViewModel;

@@ -36,6 +36,8 @@ public partial class PageEditorRibbon : UserControl
         void CloseTitlePageGallery() => Dispatcher.UIThread.Post(() => TitlePageButton.Flyout?.Hide());
         TitlePageGallery.AddHandler(Button.ClickEvent, (_, _) => CloseTitlePageGallery());
         RemoveTitlePageButton.Click += (_, _) => CloseTitlePageGallery();
+        // Insert › My Assets closes behind a pick the same way.
+        MyAssetsGroupGallery.AddHandler(Button.ClickEvent, (_, _) => Dispatcher.UIThread.Post(() => InsertFromMyAssetsButton.Flyout?.Hide()));
 
         MarginInput.ValueChanged += (_, e) =>
         {

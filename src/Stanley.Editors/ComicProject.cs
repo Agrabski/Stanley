@@ -4,6 +4,7 @@ using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Objects;
 using Stanley.ProjectModel.Storage;
 using Stanley.Rendering;
 using PanelModel = Stanley.ProjectModel.Issues.Panel;
@@ -61,9 +62,11 @@ public sealed class ComicProject
         IReadOnlyList<CharacterDefinition> characters, HashSet<CharacterId> savedCharacters,
         IReadOnlyDictionary<string, ArtFile> pictures, HashSet<string> savedPictures,
         ComicPage? titlePage = null, SavedTitlePage? savedTitlePage = null,
-        IReadOnlyList<IssueId>? issueOrder = null, IReadOnlyDictionary<IssueId, IssueSummary>? otherIssues = null)
+        IReadOnlyList<IssueId>? issueOrder = null, IReadOnlyDictionary<IssueId, IssueSummary>? otherIssues = null,
+        IReadOnlyList<ObjectGroup>? objectGroups = null)
     {
         TitlePage = titlePage;
+        ObjectGroups = objectGroups ?? [];
         _savedTitlePage = savedTitlePage;
         _format = format;
         Grid = GridOf(format);
@@ -155,6 +158,9 @@ public sealed class ComicProject
 
     /// <summary>The project's characters as they were opened, sorted by name.</summary>
     public IReadOnlyList<CharacterDefinition> Characters { get; }
+
+    /// <summary>The comic's own copies of the object groups it kept in or took from My Assets (<c>objects/</c>, docs/asset-packs.md §7.1), as opened.</summary>
+    public IReadOnlyList<ObjectGroup> ObjectGroups { get; }
 
     /// <summary>The pictures the pages use (background pictures, picture elements) as they were opened, by art file name. One a page names but that isn't on disk is missing here and draws as a placeholder.</summary>
     public IReadOnlyDictionary<string, ArtFile> Pictures { get; }
@@ -253,7 +259,8 @@ public sealed class ComicProject
         var issueOrder = manifest.IssueIds.Count > 0 ? manifest.IssueIds : (IReadOnlyList<IssueId>)[issue.Id];
 
         return new ComicProject(repository.RootDirectory, manifest.Title, manifest.DefaultPageTrim, manifest.Format, issue, pages, records, saved,
-            characters, [.. characters.Select(c => c.Id)], pictures, issuePictures, titlePage, savedTitlePage, issueOrder, otherIssues);
+            characters, [.. characters.Select(c => c.Id)], pictures, issuePictures, titlePage, savedTitlePage, issueOrder, otherIssues,
+            repository.ListObjectGroups());
     }
 
     /// <summary>A new page at the project's size: one panel filling the live area, or the format's panels.</summary>
@@ -299,9 +306,10 @@ public sealed class ComicProject
     /// </summary>
     /// <param name="issueLooks">The issue's look per character; null leaves the issue's as it was.</param>
     /// <param name="pictures">The comic's pictures by art file name: the ones the pages use are written to the issue's art folder, and ones a page used at the last save but none uses now are deleted. Null leaves the art folder alone.</param>
+    /// <param name="objectGroups">The comic's copies of kept object groups, written to <c>objects/</c> (a file whose content is unchanged stays as it is). None is ever deleted - another issue may use it. Null leaves <c>objects/</c> alone.</param>
     public void Save(IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
         IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, IReadOnlyCollection<ObjectGroup>? objectGroups = null)
     {
         if (Location is null)
             throw new InvalidOperationException("This comic hasn't been saved yet - use SaveAs.");
@@ -317,6 +325,13 @@ public sealed class ComicProject
             _savedPictures = WritePictures(repository, issuePages, pictures, prune: true);
         if (characters != null)
             _savedCharacters = WriteCharacters(repository, Tidied(characters, pages), prune: true);
+        WriteObjectGroups(repository, objectGroups);
+    }
+
+    private static void WriteObjectGroups(ProjectRepository repository, IReadOnlyCollection<ObjectGroup>? groups)
+    {
+        foreach (var group in groups ?? [])
+            repository.SaveObjectGroup(group);
     }
 
     /// <summary>The issue's own pages, and the comic's title page if it's among them.</summary>
@@ -415,7 +430,7 @@ public sealed class ComicProject
     /// </summary>
     public void WriteCopy(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
         IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, IReadOnlyCollection<ObjectGroup>? objectGroups = null)
     {
         var repository = ProjectRepository.Initialize(folder, Title, Trim, Format);
         var (issuePages, titlePage) = Split(pages);
@@ -423,6 +438,7 @@ public sealed class ComicProject
         WriteTitlePage(repository, titlePage, pictures ?? Pictures, prune: false);
         WritePictures(repository, issuePages, pictures ?? Pictures, prune: false);
         WriteCharacters(repository, Tidied(characters ?? Characters, pages), prune: false);
+        WriteObjectGroups(repository, objectGroups ?? ObjectGroups);
     }
 
     /// <summary>
@@ -443,9 +459,10 @@ public sealed class ComicProject
             List<IssueId> issueOrder = issueId != null ? original._issueOrder : [.. original._issueOrder, copy._issue.Id];
             return new ComicProject(original.Location, copy.Title, original.Trim, copy._format, copy._issue, copy.Pages, original._pageRecords, original._savedPanels,
                 copy.Characters, original._savedCharacters, copy.Pictures, original._savedPictures, copy.TitlePage, original._savedTitlePage,
-                issueOrder, original._otherIssues);
+                issueOrder, original._otherIssues, copy.ObjectGroups);
         }
-        return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, [], copy.TitlePage);
+        return new ComicProject(null, copy.Title, copy.Trim, copy._format, copy._issue, copy.Pages, [], [], copy.Characters, [], copy.Pictures, [], copy.TitlePage,
+            objectGroups: copy.ObjectGroups);
     }
 
     private (Issue Issue, Dictionary<PageId, Page> Records, Dictionary<PageId, HashSet<PanelId>> Saved) WritePages(
@@ -531,7 +548,7 @@ public sealed class ComicProject
     /// </summary>
     public string SaveAs(string folder, IReadOnlyList<(PageId Id, PageDocument Document)> pages, PageNumbering? pageNumbering = null,
         IReadOnlyList<CharacterDefinition>? characters = null, IReadOnlyDictionary<CharacterId, CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ArtFile>? pictures = null, IReadOnlyCollection<ObjectGroup>? objectGroups = null)
     {
         var target = ChooseTargetFolder(Path.GetFullPath(folder));
         if (Title == UntitledTitle)
@@ -544,7 +561,7 @@ public sealed class ComicProject
             CopyProject(source, target);
 
         Location = target;
-        Save(pages, pageNumbering, characters, issueLooks, pictures);
+        Save(pages, pageNumbering, characters, issueLooks, pictures, objectGroups);
         return target;
     }
 
