@@ -327,6 +327,90 @@ public static class CharacterPosing
         return instance with { Pose = instance.Pose with { BoneRotations = rotations, HipsShift = shift } };
     }
 
+    /// <summary>
+    /// Turns the character to <paramref name="angle"/> and carries its pose round with it.
+    /// The stored rotations can't simply be kept: an angle means something else in the
+    /// other view (a side-on wave, turned to the front, swings the arm across the face).
+    /// A preset - as the gallery gave it, or mirrored - becomes the same preset as the new
+    /// view draws it. Any other pose is translated limb by limb (<see cref="Translate"/>).
+    /// Standing at rest, or front to three-quarter (drawn alike), only the view changes.
+    /// </summary>
+    public static CharacterInstance Turn(CharacterDefinition character, CharacterInstance instance, ViewAngle angle)
+    {
+        var from = instance.Pose.ViewAngle;
+        if (from == angle)
+            return instance;
+        if (!IsPosed(instance.Pose) || (from == ViewAngle.Profile) == (angle == ViewAngle.Profile))
+            return instance with { Pose = instance.Pose with { ViewAngle = angle } };
+        if (PosePresets.Recognize(character, instance) is { } known)
+        {
+            var posed = PosePresets.Apply(character, instance, known.Preset, angle);
+            return known.Mirrored ? MirrorPose(posed) : posed;
+        }
+        return Translate(character, instance, angle);
+    }
+
+    /// <summary>
+    /// A pose of one's own seen from the other side, as near as a flat figure allows: each
+    /// hand keeps its height by its shoulder and reaches out as far - out to the side from
+    /// the front is forward side on, and forward or back side on is out to the side from
+    /// the front; each foot keeps its lift off the floor and half its step (a step to the
+    /// side from the front is a stride side on - the near foot forward); the hips keep
+    /// their drop and the head its tilt; a lean or a sideways bend of the back, which
+    /// means something else in the other view, straightens. Elbows and knees bend the
+    /// way presets bend them (<see cref="PosePresets"/>).
+    /// </summary>
+    private static CharacterInstance Translate(CharacterDefinition character, CharacterInstance instance, ViewAngle angle)
+    {
+        const double stepKept = 0.5;
+        var toSide = angle == ViewAngle.Profile;
+        var figure = Figure(character, instance);
+        CharacterInstance Standing(CharacterInstance c, ViewAngle view) => c with { Pose = c.Pose with { ViewAngle = view, BoneRotations = [], HipsShift = null } };
+        var restBefore = Figure(character, Standing(instance, instance.Pose.ViewAngle)).Layout;
+        var restAfter = Figure(character, Standing(instance, angle)).Layout;
+
+        // The trunk: the hips drop as far, the neck and head keep their tilt, the back straightens.
+        var keptTrunk = new[] { HumanoidBone.Neck, HumanoidBone.Head };
+        var posed = Standing(instance, angle);
+        posed = posed with { Pose = posed.Pose with { BoneRotations = instance.Pose.BoneRotations.Where(r => keptTrunk.Contains(r.Bone)).ToList() } };
+        if (instance.Pose.HipsShift is { } shift && shift.Y != 0)
+            posed = posed with { Pose = posed.Pose with { HipsShift = new Point2D(0, Math.Min(shift.Y, MaxHipsDrop(character, posed))) } };
+
+        foreach (var limb in Enum.GetValues<Limb>())
+        {
+            var (root, middle, end) = Chain(limb);
+            var bent = instance.Pose.BoneRotations.Any(r => (r.Bone == root || r.Bone == middle) && Math.Abs(r.Degrees) > 1e-9);
+            var (rootBefore, length) = LimbFrame(character, instance, limb);
+            var (rootAfter, newLength) = LimbFrame(character, posed, limb);
+            var at = Joint(figure.Layout, end);
+            var outward = PosePresets.Outward(character, posed, limb);
+            Point2D target;
+            if (IsLeg(limb))
+            {
+                if (!bent && posed.Pose.HipsShift is null)
+                    continue;
+                // Measured from where the foot stands at rest, so a planted foot stays planted.
+                var rest = Joint(restBefore, end);
+                var step = Math.Abs(at.X - rest.X) / length * stepKept;
+                var lift = (at.Y - rest.Y) / length;
+                if (toSide)
+                    step *= limb == Limb.RightLeg ? 1 : -1; // the near foot forward
+                var floor = Joint(restAfter, end);
+                target = new Point2D(floor.X + step * newLength * outward, Math.Min(floor.Y, floor.Y + lift * newLength));
+            }
+            else
+            {
+                if (!bent)
+                    continue;
+                var reach = Math.Abs(at.X - rootBefore.X) / length;
+                target = new Point2D(rootAfter.X + reach * newLength * outward, rootAfter.Y + (at.Y - rootBefore.Y) / length * newLength);
+            }
+            var page = posed.Placement.ToPage(target);
+            posed = Reach(character, posed, limb, page, PosePresets.Bend(character, posed, limb, toSide, page));
+        }
+        return posed;
+    }
+
     /// <summary>Back to standing at rest (the view is kept).</summary>
     public static CharacterInstance ResetPose(CharacterInstance instance) =>
         instance.Pose.BoneRotations.Count == 0 && instance.Pose.HipsShift is null

@@ -364,6 +364,21 @@ turn the character side on), solved with the same IK - so one preset fits a
 toddler, a chibi and a heavy adult alike, and the result is ordinary pose data to
 keep adjusting. Not yet: a saved/user pose library, hand/foot rotation handles.
 
+**Turning a posed character (fix for #91-#98).** Stored rotations mean something
+else in the other view - a side-on wave's arm, kept for the front, swings across the
+face; a front cheer's arms, kept side on, fling one arm out behind - so turning
+Front/Side (`CharacterPosing.Turn`, behind the View toggle, S/F and right-click) carries
+the pose round instead of keeping the numbers. Every preset has a version drawn for each
+view (`PosePresetDefinition.Front`/`Side`, each a `PoseGoals`; a front walk is a lifted
+foot and a swing of the arms, a side shrug is forearms forward): a pose that is still a
+preset as the gallery gave it, or that preset mirrored (`PosePresets.Recognize`),
+becomes the same preset as the new view draws it, and turning back gives it back. A pose
+of one's own is translated limb by limb - each hand keeps its height by the shoulder and
+its reach (out to the side from the front is forward side on, and back), each foot its
+lift and half its step (a step to the side is a stride side on, near foot forward), the
+hips their drop and the head its tilt; a lean straightens, since from the front it would
+be a sideways bend.
+
 **Trunk by inverse kinematics (added later, on request).** The chest and head rings
 no longer rotate rigid blocks. The back bends at three joints (lower back about the
 hips, mid back, upper chest) and the torso outline follows a smooth blend of them;
