@@ -242,6 +242,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(Hint));
         OnPropertyChanged(nameof(HairGalleries));
         OnPropertyChanged(nameof(FaceGalleries));
+        RaiseStylesChanged(); // previewed in the stage's view
     }
 
     // ---------------------------------------------------------------- colours
@@ -561,6 +562,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(HasDrawnArt));
         OnPropertyChanged(nameof(SelectedText));
         OnPropertyChanged(nameof(SelectedTextBold));
+        RaiseStylesChanged();
         RaiseArtChanged();
         TakeOffSelectedCommand.NotifyCanExecuteChanged();
         RemoveSelectedCommand.NotifyCanExecuteChanged();

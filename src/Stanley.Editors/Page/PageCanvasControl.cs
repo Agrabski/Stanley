@@ -480,9 +480,9 @@ public sealed class PageCanvasControl : Control
     }
 
     /// <summary>
-    /// Right-click › This panel only: take something off or put something on, recolour or
-    /// re-pattern a colour slot - for this one panel (sunglasses for one shot) - or go
-    /// back to the look.
+    /// Right-click › This panel only: take something off or put something on, change how
+    /// something is worn (its style), recolour or re-pattern a colour slot - for this one
+    /// panel (sunglasses for one shot) - or go back to the look.
     /// </summary>
     private MenuItem PanelOnlyMenu(PageEditorViewModel vm, ProjectModel.Ids.PanelId panelId, int index)
     {
@@ -503,6 +503,19 @@ public sealed class PageCanvasControl : Control
                 {
                     Header = "Put on",
                     ItemsSource = spare.Select(a => Item(a.Sticker.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.Wear(c, a)))).ToList()
+                });
+            // How things are worn: the hood up for this shot, the cap turned backwards.
+            var styled = vm.PanelStyles(panelId, index);
+            if (styled.Count > 0)
+                items.Add(new MenuItem
+                {
+                    Header = "Style",
+                    ItemsSource = styled.Select(s => new MenuItem
+                    {
+                        Header = s.Name,
+                        ItemsSource = s.Styles.Select(style => Item((style.IsCurrent ? "✓ " : "") + style.Label,
+                            () => vm.SetPanelStyle(panelId, index, s.Sticker, style.Variant))).ToList()
+                    }).ToList()
                 });
             var slots = LookEditing.ColorSlotsInUse(shown);
             items.Add(new MenuItem

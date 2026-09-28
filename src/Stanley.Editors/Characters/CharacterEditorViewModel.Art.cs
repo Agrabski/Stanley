@@ -59,8 +59,9 @@ public sealed partial class CharacterEditorViewModel
 
     /// <summary>
     /// Draws a sticker for <paramref name="slot"/> in the configured SVG editor: the selected
-    /// sticker if it's a drawn one in that slot (its art for the view and expression on the
-    /// stage, or a template if that view isn't drawn yet), else a new sticker, worn at once.
+    /// sticker if it's a drawn one in that slot (its art for the view and expression - or the
+    /// style it's worn in - on the stage, or a template if that view isn't drawn yet), else a
+    /// new sticker, worn at once.
     /// Each save there comes back as one undo step. Nothing is created yet if no editor is set up -
     /// <see cref="SvgEditorConfigurationRequested"/> asks for one first, and calling this
     /// again afterwards picks up where it left off.
@@ -83,7 +84,8 @@ public sealed partial class CharacterEditorViewModel
             ApplyLook(c => LookEditing.Wear(c, drawn));
             SelectSticker(asset.Id);
         }
-        ShowMessage(OpenArt(asset, asset.Sticker.VariantFor(asset.Sticker.Slot, StagePose?.Expression), view, historySource: null));
+        // The variant on the stage: the previewed expression's for a face, else the style it's worn in.
+        ShowMessage(OpenArt(asset, asset.Sticker.VariantFor(asset.Sticker.Slot, StagePose?.Expression, ChosenStyle(asset.Id)), view, historySource: null));
     }
 
     /// <summary>
@@ -100,9 +102,10 @@ public sealed partial class CharacterEditorViewModel
         var id = asset.Id;
         if (_artEdits.Remove((id, variant, view), out var previous))
             previous.Dispose();
-        // A sticker's first variant is the sticker; any other is named after its expression too.
+        // A sticker's first variant is the sticker; any other is named after its expression (or style) too.
         var first = asset.Sticker.Variants.Count == 0 || asset.Sticker.Variants[0] == variant;
-        var name = first ? asset.Sticker.Name : $"{asset.Sticker.Name} ({ExpressionPresets.VariantName(asset.Sticker.Slot, variant).ToLowerInvariant()})";
+        var variantName = StickerSlots.Get(asset.Sticker.Slot).IsFace ? ExpressionPresets.VariantName(asset.Sticker.Slot, variant) : LookEditing.StyleName(variant);
+        var name = first ? asset.Sticker.Name : $"{asset.Sticker.Name} ({variantName.ToLowerInvariant()})";
         var fileName = $"{Slug(asset.Sticker.Name)}-{id.Value}-{(first ? "" : Slug(variant) + "-")}{StickerAsset.ViewFileStem(view)}.svg";
         var session = ArtEditing.Edit(fileName, StickerImport.ArtToEdit(asset, view, variant), text =>
         {
