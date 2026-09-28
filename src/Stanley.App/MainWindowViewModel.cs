@@ -78,7 +78,7 @@ public sealed class MainWindowViewModel : ObservableObject
     /// <param name="settings">User preferences (AutoSave); in-memory defaults if null.</param>
     /// <param name="recovery">Crash recovery; none if null.</param>
     /// <param name="scheduler">Runs AutoSave, recovery snapshots and the startup update check after a delay; without one, none of them run on their own (tests drive them directly).</param>
-    /// <param name="tokenStore">The user's GitHub token for update checks; in-memory-only default if null.</param>
+    /// <param name="tokenStore">The user's optional GitHub token for update checks; in-memory-only default if null.</param>
     /// <param name="updates">Checks for/applies app updates; update controls are hidden entirely if null.</param>
     /// <param name="launcher">Opens exported files and shows them in their folder; the export notice offers neither if null.</param>
     public MainWindowViewModel(
@@ -346,10 +346,10 @@ public sealed class MainWindowViewModel : ObservableObject
     // ---------------------------------------------------------------- updates
 
     /// <summary>
-    /// The user's own GitHub personal access token (read access to this repository is
-    /// enough): Stanley is private, so there's no anonymous release feed to check. Kept on
-    /// this machine only (<see cref="Updates.GithubTokenStore"/>), never in
-    /// <see cref="AppSettings"/>.
+    /// An optional GitHub personal access token: Stanley is public, so update checks work
+    /// anonymously without one. Only useful to get past GitHub's anonymous rate limit or to
+    /// point at a private fork. Kept on this machine only (<see cref="Updates.GithubTokenStore"/>),
+    /// never in <see cref="AppSettings"/>.
     /// </summary>
     public string? GithubToken
     {
@@ -360,7 +360,6 @@ public sealed class MainWindowViewModel : ObservableObject
                 return;
             _tokenStore.Token = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(CanCheckForUpdates));
         }
     }
 
@@ -397,8 +396,8 @@ public sealed class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>Whether there's anything to check with: an update service (a real install, not a dev/test build) and a token.</summary>
-    public bool CanCheckForUpdates => _updates is { IsInstalled: true } && !string.IsNullOrWhiteSpace(GithubToken);
+    /// <summary>Whether there's anything to check with: an update service (a real install, not a dev/test build). No token is required - Stanley is public.</summary>
+    public bool CanCheckForUpdates => _updates is { IsInstalled: true };
 
     public bool IsCheckingForUpdates { get => _isCheckingForUpdates; private set => SetProperty(ref _isCheckingForUpdates, value); }
 

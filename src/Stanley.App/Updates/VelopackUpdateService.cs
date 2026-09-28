@@ -5,10 +5,10 @@ namespace Stanley.App.Updates;
 
 /// <summary>
 /// Wraps Velopack's <see cref="UpdateManager"/> against this repository's GitHub releases.
-/// Stanley is private, so every user supplies their own personal access token (File &gt;
-/// Options &gt; Updates) rather than one being baked into the build; the channel picks
-/// which packed release track (stable vs. nightly, per OS - see
-/// docs/auto-update.md) a check looks at.
+/// Stanley is public, so checks work anonymously out of the box; a token (File &gt; Options
+/// &gt; Updates) is only needed to get past GitHub's anonymous rate limit or to point at a
+/// private fork. The channel picks which packed release track (stable vs. nightly, per OS -
+/// see docs/automatic-builds.md) a check looks at.
 /// </summary>
 public sealed class VelopackUpdateService : IUpdateService
 {
@@ -39,8 +39,6 @@ public sealed class VelopackUpdateService : IUpdateService
     {
         _pending = null;
         var manager = CreateManager();
-        if (manager is null)
-            return null;
 
         var info = await manager.CheckForUpdatesAsync().ConfigureAwait(false);
         if (info is null)
@@ -56,22 +54,16 @@ public sealed class VelopackUpdateService : IUpdateService
             return;
 
         var manager = CreateManager();
-        if (manager is null)
-            return;
-
         await manager.DownloadUpdatesAsync(_pending, cancelToken: cancellationToken).ConfigureAwait(false);
         manager.ApplyUpdatesAndRestart(_pending.TargetFullRelease);
     }
 
-    /// <summary>Null without a token configured - there's nothing to read this private repo's releases with.</summary>
-    private UpdateManager? CreateManager()
+    /// <summary>An empty/whitespace token is passed through as null, for an anonymous (public-repo) check.</summary>
+    private UpdateManager CreateManager()
     {
         var token = _token();
-        if (string.IsNullOrWhiteSpace(token))
-            return null;
-
         var channel = _channel();
-        var source = new GithubSource(RepoUrl, token, prerelease: channel == AppUpdateChannel.Nightly);
+        var source = new GithubSource(RepoUrl, string.IsNullOrWhiteSpace(token) ? null : token, prerelease: channel == AppUpdateChannel.Nightly);
         var options = new UpdateOptions { ExplicitChannel = ResolveChannel(channel) };
         return new UpdateManager(source, options);
     }

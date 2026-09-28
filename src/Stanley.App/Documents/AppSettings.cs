@@ -60,8 +60,8 @@ public sealed class AppSettings
         set => Set(nameof(Theme), value.ToString());
     }
 
-    /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - it needs a
-    /// GitHub token configured first (Stanley is a private repository), so turning it on is a deliberate opt-in.</summary>
+    /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - Stanley
+    /// doesn't reach out to GitHub on its own until the user opts in.</summary>
     public bool AutoCheckForUpdates
     {
         get => _values.TryGetValue(nameof(AutoCheckForUpdates), out var value) && bool.TryParse(value, out var on) && on;

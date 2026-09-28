@@ -223,12 +223,12 @@
             <RadioButton Name="NightlyChannelButton" GroupName="UpdateChannel" IsChecked="{Binding IsNightlyChannel}" Content="Nightly - every change to develop, for testers" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
-            <TextBlock Text="GitHub token" VerticalAlignment="Center" />
+            <TextBlock Text="GitHub token (optional)" VerticalAlignment="Center" />
             <TextBox Name="GithubTokenBox" Text="{Binding GithubToken}" PasswordChar="•" Width="320"
-                      PlaceholderText="Personal access token, read access to this repository" />
+                      PlaceholderText="Only needed to avoid GitHub's rate limit, or for a private fork" />
           </StackPanel>
           <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,4,0,0"
-                      Text="Stanley is a private repository, so checking for updates needs your own GitHub personal access token (read access to this repository is enough). It's kept on this machine only, and only ever sent to GitHub." />
+                      Text="Stanley is a public repository, so checking for updates works out of the box. Add a personal access token only if you hit GitHub's rate limit for anonymous requests, or if you're running a private fork. It's kept on this machine only, and only ever sent to GitHub." />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
             <Button Name="CheckForUpdatesButton" Content="Check now" Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding CanCheckForUpdates}" />
             <Button Name="InstallUpdateButton" Content="Install and restart" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding HasUpdateAvailable}" />
