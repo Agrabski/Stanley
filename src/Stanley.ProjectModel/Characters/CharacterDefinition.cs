@@ -17,6 +17,12 @@ namespace Stanley.ProjectModel.Characters;
 /// <param name="Fabrics">Colour slot -&gt; pattern/texture on top of its colour; absent when there are none.</param>
 /// <param name="Expressions">Faces saved to use again in any panel, in the order they were saved; absent when there are none.</param>
 /// <param name="StickerVariants">Sticker id -&gt; the style it's worn in: one of its variants (a hood up, a cap's brim back). A sticker worn its default way has no entry, and the map is absent when none has.</param>
+/// <param name="StickerSides">
+/// Sticker id -&gt; the one side of a symmetric head slot it's restricted to (docs/sticker-system.md
+/// §21: split eyes). Absent for a sticker means it draws on both sides, as every sticker did
+/// before this existed. Only meaningful for a sticker worn in <see cref="StickerSlots.Eyes"/>
+/// today; character-level only (not per look or per panel), and absent when nothing is split.
+/// </param>
 /// <param name="MyAssetsVersion">
 /// The My Assets fingerprint this character last matched (docs/asset-packs.md §7.1) - absent
 /// for a character that was never kept. It changes only through a deliberate keep/save/update
@@ -32,6 +38,7 @@ public sealed record CharacterDefinition(
     SortedDictionary<string, Fabric>? Fabrics = null,
     IReadOnlyList<SavedExpression>? Expressions = null,
     SortedDictionary<StickerId, string>? StickerVariants = null,
+    SortedDictionary<StickerId, LimbSide>? StickerSides = null,
     string? MyAssetsVersion = null)
 {
     /// <summary>

@@ -12,6 +12,8 @@ public sealed partial class CharacterEditorViewModel
     private StickerId? _selectedSticker;
 
     public IRelayCommand<StickerChoice> WearCommand { get; private set; } = null!;
+    public IRelayCommand<StickerChoice> WearLeftEyeCommand { get; private set; } = null!;
+    public IRelayCommand<StickerChoice> WearRightEyeCommand { get; private set; } = null!;
     public IRelayCommand<ColorSwatchChoice> SetColorCommand { get; private set; } = null!;
     public IRelayCommand TakeOffSelectedCommand { get; private set; } = null!;
     public IRelayCommand RemoveSelectedCommand { get; private set; } = null!;
@@ -28,6 +30,16 @@ public sealed partial class CharacterEditorViewModel
         {
             if (choice != null)
                 Wear(choice);
+        });
+        WearLeftEyeCommand = new RelayCommand<StickerChoice>(choice =>
+        {
+            if (choice != null)
+                WearEyeSide(choice, LimbSide.Left);
+        });
+        WearRightEyeCommand = new RelayCommand<StickerChoice>(choice =>
+        {
+            if (choice != null)
+                WearEyeSide(choice, LimbSide.Right);
         });
         SetColorCommand = new RelayCommand<ColorSwatchChoice>(choice =>
         {
@@ -69,8 +81,14 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>The hair gallery.</summary>
     public IReadOnlyList<SlotGallery> HairGalleries => Galleries(StickerSlots.Hair);
 
-    /// <summary>The face's galleries (Eyes, Brows, Mouth, Nose).</summary>
-    public IReadOnlyList<SlotGallery> FaceGalleries => Galleries(StickerSlots.Eyes, StickerSlots.Brows, StickerSlots.Mouth, StickerSlots.Nose);
+    /// <summary>
+    /// The face's galleries: Eyes (or, split left/right - docs/sticker-system.md §21 - Left
+    /// eye and Right eye instead), Brows, Mouth, Nose.
+    /// </summary>
+    public IReadOnlyList<SlotGallery> FaceGalleries =>
+        (IsEyesSplit ? [EyeSideGallery(LimbSide.Left), EyeSideGallery(LimbSide.Right)] : new[] { Gallery(StickerSlots.Eyes) })
+        .Concat(Galleries(StickerSlots.Brows, StickerSlots.Mouth, StickerSlots.Nose))
+        .ToList();
 
     /// <summary>The clothes slots' galleries (Top, Prints, Outer, Bottom, Shoes).</summary>
     public IReadOnlyList<SlotGallery> ClothesGalleries => Galleries(StickerSlots.Top, StickerSlots.Print, StickerSlots.Outer, StickerSlots.Bottom, StickerSlots.Shoes);
@@ -167,6 +185,65 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>Whether any worn sticker in <paramref name="slot"/> is the design named <paramref name="name"/>.</summary>
     private static bool IsWornDesign(CharacterDefinition character, string slot, string name) => StickerCopies.WornCopies(character, slot, name) > 0;
 
+    // ---------------------------------------------------------------- split eyes (docs/sticker-system.md §21)
+
+    /// <summary>Whether this character's eyes are split left/right: the Face group shows two eye galleries and swatches instead of one.</summary>
+    public bool IsEyesSplit
+    {
+        get => LookEditing.IsEyesSplit(LookWorking);
+        set
+        {
+            if (value == IsEyesSplit)
+                return;
+            _previewEyeLeft = _previewEyeRight = null;
+            ApplyLook(value ? LookEditing.SplitEyes : LookEditing.UnsplitEyes);
+        }
+    }
+
+    /// <summary>Whether there's an eyes sticker worn to split - the checkbox is disabled otherwise.</summary>
+    public bool CanSplitEyes => LookWorking.Stickers.TryGetValue(StickerSlots.Eyes, out var worn) && worn.Count > 0;
+
+    /// <summary>
+    /// One eye's gallery once the eyes are split: this character's own eye designs
+    /// (deduplicated by name - splitting can leave two identical copies, one per side),
+    /// then the library's, each previewed on this side alone.
+    /// </summary>
+    public SlotGallery EyeSideGallery(LimbSide side)
+    {
+        const string slot = StickerSlots.Eyes;
+        var character = LookWorking;
+        var info = StickerSlots.Get(slot) with { Label = side == LimbSide.Left ? "Left eye" : "Right eye" };
+        var pose = StagePose;
+        var currentId = LookEditing.EyeSticker(character, side)?.Id;
+        var owned = character.Wardrobe.Stickers.Values.Where(a => a.Sticker.Slot == slot)
+            .OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase)
+            .GroupBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => g.FirstOrDefault(a => a.Id == currentId) ?? g.First())
+            .ToList();
+        var choices = new List<StickerChoice>();
+        foreach (var asset in owned)
+        {
+            var isCurrent = asset.Id == currentId;
+            // Already worn on the other side, it needs a copy of its own - resolved here so the
+            // preview and the click (SelectSticker) agree on which id actually gets worn.
+            var target = LookEditing.ResolveForSide(character, asset, side);
+            choices.Add(new(asset.Sticker.Name, slot, LookEditing.WearOnSide(character, target, side), target, null, isCurrent, pose));
+        }
+        var ownedSources = owned.Select(a => a.Sticker.Source).OfType<string>().ToHashSet();
+        foreach (var item in Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
+            choices.Add(new(item.Name, slot, LookEditing.WearOnSide(character, item.Preview, side), null, item, false, pose));
+        var currentName = currentId is { } id && character.Wardrobe.Find(id) is { } cur ? cur.Sticker.Name : "None";
+        return new(info, currentName, choices, side == LimbSide.Left ? WearLeftEyeCommand : WearRightEyeCommand);
+    }
+
+    /// <summary>A click in a split eye's gallery: wears the choice on that side only, one undo step.</summary>
+    private void WearEyeSide(StickerChoice choice, LimbSide side)
+    {
+        var wearing = LookEditing.ResolveForSide(LookWorking, choice.Asset ?? choice.Library!.Instantiate(), side);
+        ApplyLook(c => LookEditing.WearOnSide(c, wearing, side));
+        SelectSticker(wearing.Id);
+    }
+
     /// <summary>The Sticker tab's "Duplicate": another copy of the selected print or badge, a small step from it, selected to move.</summary>
     private void DuplicateSelected()
     {
@@ -197,6 +274,8 @@ public sealed partial class CharacterEditorViewModel
     // ---------------------------------------------------------------- preview expression
 
     private ExpressionPresetDefinition _previewExpression = ExpressionPresets.Get(ExpressionPreset.Neutral);
+    private string? _previewEyeLeft;
+    private string? _previewEyeRight;
 
     public IRelayCommand<ExpressionPresetChoice> PreviewExpressionCommand { get; private set; } = null!;
 
@@ -209,21 +288,30 @@ public sealed partial class CharacterEditorViewModel
             if (_previewExpression == value)
                 return;
             _previewExpression = value;
+            _previewEyeLeft = _previewEyeRight = null; // a whole-face preset starts both eyes fresh
             OnPropertyChanged();
             RaisePreviewPoseChanged();
         }
     }
 
-    /// <summary>What the stage shows the character in: the previewed view and expression (null at rest, front view and neutral).</summary>
+    /// <summary>
+    /// What the stage shows the character in: the previewed view and expression (null at
+    /// rest, front view and neutral). Split eyes (docs/sticker-system.md §21) get the
+    /// preset's eyes on both sides, then <see cref="PreviewLeftEye"/>/<see cref="PreviewRightEye"/>
+    /// override either one.
+    /// </summary>
     public Stanley.ProjectModel.Poses.PoseData? StagePose
     {
         get
         {
-            if (_previewExpression.Preset == ExpressionPreset.Neutral)
+            if (_previewExpression.Preset == ExpressionPreset.Neutral && _previewEyeLeft is null && _previewEyeRight is null)
                 return null;
-            if (field is not { } pose || pose.ViewAngle != PreviewAngle || ExpressionPresets.Of(pose) != _previewExpression)
-                field = ExpressionPresets.Apply(new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new()), _previewExpression);
-            return field;
+            var pose = ExpressionPresets.Apply(new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new()), _previewExpression, IsEyesSplit);
+            if (_previewEyeLeft is { } left)
+                pose = ExpressionPresets.SetVariant(pose, StickerSlots.EyesLeft, left);
+            if (_previewEyeRight is { } right)
+                pose = ExpressionPresets.SetVariant(pose, StickerSlots.EyesRight, right);
+            return pose;
         }
     }
 
@@ -233,7 +321,37 @@ public sealed partial class CharacterEditorViewModel
         get
         {
             var rest = new Stanley.ProjectModel.Poses.PoseData(PreviewAngle, [], new());
-            return ExpressionPresets.All.Select(p => new ExpressionPresetChoice(p, LookWorking, ExpressionPresets.Apply(rest, p), p == _previewExpression)).ToList();
+            return ExpressionPresets.All.Select(p => new ExpressionPresetChoice(p, LookWorking, ExpressionPresets.Apply(rest, p, IsEyesSplit), p == _previewExpression)).ToList();
+        }
+    }
+
+    /// <summary>The eyes' variant vocabulary (docs/sticker-system.md §7), for the split "Left eye"/"Right eye" expression dropdowns.</summary>
+    public IReadOnlyList<EyeExpressionOption> EyeExpressionOptions { get; } =
+        ExpressionPresets.Vocabulary[StickerSlots.Eyes].Select(v => new EyeExpressionOption(v, ExpressionPresets.VariantName(StickerSlots.Eyes, v))).ToList();
+
+    /// <summary>The left eye's previewed expression, once split - the whole-face preset's until picked separately.</summary>
+    public string PreviewLeftEye
+    {
+        get => _previewEyeLeft ?? _previewExpression.Eyes;
+        set
+        {
+            if (value == PreviewLeftEye)
+                return;
+            _previewEyeLeft = value == _previewExpression.Eyes ? null : value;
+            RaisePreviewPoseChanged();
+        }
+    }
+
+    /// <summary>The right eye's previewed expression, once split - the whole-face preset's until picked separately.</summary>
+    public string PreviewRightEye
+    {
+        get => _previewEyeRight ?? _previewExpression.Eyes;
+        set
+        {
+            if (value == PreviewRightEye)
+                return;
+            _previewEyeRight = value == _previewExpression.Eyes ? null : value;
+            RaisePreviewPoseChanged();
         }
     }
 
@@ -254,6 +372,8 @@ public sealed partial class CharacterEditorViewModel
     {
         OnPropertyChanged(nameof(StagePose));
         OnPropertyChanged(nameof(PreviewExpressionChoices));
+        OnPropertyChanged(nameof(PreviewLeftEye));
+        OnPropertyChanged(nameof(PreviewRightEye));
         OnPropertyChanged(nameof(ExpressionWarning));
         OnPropertyChanged(nameof(Hint));
         OnPropertyChanged(nameof(HairGalleries));
@@ -378,6 +498,8 @@ public sealed partial class CharacterEditorViewModel
     {
         CharacterDefinition.SkinSlot => "Skin",
         "accent" => "Accents",
+        StickerSlots.EyesLeft => "Left eye",
+        StickerSlots.EyesRight => "Right eye",
         _ => slot.Length == 0 ? slot : char.ToUpperInvariant(slot[0]) + slot[1..]
     };
 
@@ -385,7 +507,7 @@ public sealed partial class CharacterEditorViewModel
     {
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
         "hair" or "brows" => HairColors,
-        "eyes" => EyeColors,
+        StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight => EyeColors,
         _ => ClothColors
     };
 
@@ -597,6 +719,8 @@ public sealed partial class CharacterEditorViewModel
         _lookWorking = null;
         OnPropertyChanged(nameof(LookWorking));
         RaiseLooksChanged();
+        OnPropertyChanged(nameof(IsEyesSplit));
+        OnPropertyChanged(nameof(CanSplitEyes));
         OnPropertyChanged(nameof(HairGalleries));
         OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));
@@ -605,6 +729,8 @@ public sealed partial class CharacterEditorViewModel
             OnPropertyChanged(nameof(ColorEditors));
         OnPropertyChanged(nameof(WornStickers));
         OnPropertyChanged(nameof(PreviewExpressionChoices));
+        OnPropertyChanged(nameof(PreviewLeftEye));
+        OnPropertyChanged(nameof(PreviewRightEye));
         OnPropertyChanged(nameof(ExpressionWarning));
         OnPropertyChanged(nameof(Hint));
         RaiseSelectedStickerChanged();

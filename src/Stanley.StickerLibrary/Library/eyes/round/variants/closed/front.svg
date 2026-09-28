@@ -2,9 +2,9 @@
 <!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="160" height="150" viewBox="-80 -1010 160 150" data-stanley-view="front" data-stanley-slot="eyes">
   <g id="eyes" inkscape:groupmode="layer" inkscape:label="eyes">
-    <path d="M-30.5,-930 Q-21,-922 -11.5,-930" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M-24.8,-925.5 L-26.2,-922 M-17.2,-925.5 L-15.8,-922" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M11.5,-930 Q21,-922 30.5,-930" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M17.2,-925.5 L15.8,-922 M24.8,-925.5 L26.2,-922" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="side-right" d="M-30.5,-930 Q-21,-922 -11.5,-930" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="side-right" d="M-24.8,-925.5 L-26.2,-922 M-17.2,-925.5 L-15.8,-922" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="side-left" d="M11.5,-930 Q21,-922 30.5,-930" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="side-left" d="M17.2,-925.5 L15.8,-922 M24.8,-925.5 L26.2,-922" fill="none" stroke="#1a1a1a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
 </svg>

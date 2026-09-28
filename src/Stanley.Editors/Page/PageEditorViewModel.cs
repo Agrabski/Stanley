@@ -1994,9 +1994,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
             return;
-        if (ExpressionPresets.Of(panel.CharacterInstances[index].Pose) == preset)
+        var instance = panel.CharacterInstances[index];
+        if (ExpressionPresets.Of(instance.Pose) == preset)
             return;
-        Apply(EditCharacterInPanel(Working, panelId, index, c => ExpressionPresets.Apply(c, preset)));
+        // Split eyes (docs/sticker-system.md §21) also get the preset's eyes, so a preset still sets the whole face.
+        var splitEyes = CharacterSnapshot.TryGetValue(instance.CharacterId, out var character) && LookEditing.IsEyesSplit(character);
+        Apply(EditCharacterInPanel(Working, panelId, index, c => ExpressionPresets.Apply(c, preset, splitEyes)));
         RaiseCharacterViewChanged();
     }
 
@@ -2009,8 +2012,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
                 return [];
             var current = ExpressionPresets.Of(instance.Pose);
             var standing = new ProjectModel.Poses.PoseData(instance.Pose.ViewAngle, [], new SortedDictionary<string, string>());
+            var splitEyes = SelectedCharacterDefinition is { } definition && LookEditing.IsEyesSplit(definition);
             return ExpressionPresets.All
-                .Select(p => new ExpressionPresetChoice(p, character, ExpressionPresets.Apply(standing, p), p == current))
+                .Select(p => new ExpressionPresetChoice(p, character, ExpressionPresets.Apply(standing, p, splitEyes), p == current))
                 .ToList();
         }
     }
