@@ -369,6 +369,11 @@ three slots:
 Any slot can have variants; the vocabulary above only makes presets portable. A
 character's "Tophat" could have `on`/`tipped`, set per panel by the same mechanism.
 
+Outside the face, variants are usually **styles** - ways to wear a sticker (a hood up or
+down, a cap's brim forward or back) - chosen per sticker rather than per slot, and kept
+with the character, a named look or one panel: see §20. An expression for the slot still
+wins over a chosen style.
+
 **Build breakpoints** (from the plan) remain designed but unbuilt. A sticker would
 declare `buildBreakpoints: { "slim": 0, "heavy": 1 }` and the renderer would snap to
 the nearest one. Build it only when a real garment fails with Warp.
@@ -894,3 +899,39 @@ a band name, emoji), beyond patterns and textures.
   dragging work as for drawn art; "Hug the shape" and "Edit drawing..." are hidden for
   text. "Draw your own..." and "Import..." work in the Prints gallery like anywhere
   else, for a print of your own.
+
+## 20. Styles
+
+**Status: implemented.** Ways to wear a sticker: a hood up or down (#72), a cap with its
+brim forward, backward or to either side (#74). A style is one of the sticker's
+`variants` (§7), chosen **per sticker**, not per slot, so a cap and a hood worn together
+in `headwear` each keep their own.
+- **Storage**: sticker id → variant, sparse and absent when unused, along the look chain
+  (§9.1): `CharacterDefinition.StickerVariants` (`stickerVariants` in `character.json`) →
+  the named look's `CharacterRevision.StickerVariantValues` (`stickerVariantValues`) → one
+  panel's `CharacterInstanceOverrides.StickerVariantOverrides` (`stickerVariantOverrides`).
+  A sticker worn its default way (its first variant, or `neutral` if it has one) has no
+  entry, so choosing the default removes it. A named look or a panel that goes back to the
+  default over a style underneath stores the default explicitly, as a plain fabric does.
+  Removing a sticker from the wardrobe, or tidying an unused library copy away on save,
+  drops its entries from the character and every named look.
+- **Resolution**: `CharacterLooks.Resolve` puts the chosen style on each `WornSticker`
+  (`Variant`), and `Sticker.VariantFor(slot, expression, chosen)` picks what is drawn: the
+  expression's variant for the slot if the sticker has it (faces work as in §7), else the
+  chosen style if it has it, else `neutral`, else the first. The render cache keys on the
+  definition, the look and the panel's overrides, so each style draws on its own.
+- **Parts per style**: a part (§5) with `"variants": [...]` exists only in those, so a
+  style can change a sticker's shape, not just its drawing:
+  the hood's cover pieces only when it's up, the brim behind the head only when it's back.
+  Drawn parts take their art from `variants/<style>/<view>.svg` as for any variant.
+- **Character editor**: the contextual Sticker tab has a **Worn** gallery - each style of
+  the selected sticker, previewed on the character wearing it that way (a close-up for
+  head stickers), the current one marked. A click is one undo step through the same look
+  editing as colours and fabrics, so it lands in the named look being edited. It shows
+  only for a worn sticker outside the face with more than one variant: a face's variants
+  are expressions, previewed with *Preview expression*. Labels are the variant keys made
+  readable (`brim-back` → "Brim back"). *Draw your own...* on a styled sticker edits the
+  style it's shown in.
+- **Page editor**: right-click › *This panel only* › **Style** lists each worn sticker
+  that has styles, with its styles (the current one ticked); picking one keeps it as the
+  panel's override, and *Back to the look* clears it with the panel's other changes.

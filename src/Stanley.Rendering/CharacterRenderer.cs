@@ -417,7 +417,7 @@ public sealed class FigureRenderer : ICharacterRenderer
             IReadOnlyDictionary<BodyRegion, double>? under = null)
         {
             var sticker = worn.Asset.Sticker;
-            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression);
+            var variant = StickerArtPieces.VariantFor(sticker, worn.Slot, pose?.Expression, worn.Variant);
             var parts = sticker.Parts.Where(p => p.AppliesTo(variant)).ToList();
             var covers = new List<(StickerPart, PartPiece)>();
             var eases = new Dictionary<BodyRegion, double>();
