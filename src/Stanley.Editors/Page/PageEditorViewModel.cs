@@ -686,15 +686,14 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public event Action? SelectionChanged;
 
     /// <remarks>
-    /// With the layout locked, panels themselves can't be selected: asking for a panel with
-    /// nothing in it picked clears the selection instead. Bubbles, characters and elements
-    /// inside panels stay selectable. At most one thing in the panel is selected: a bubble
-    /// wins over a character, a character over an element.
+    /// A locked layout still lets a panel itself be selected - only its geometry (move,
+    /// resize, split, delete, re-tile) is protected, so a double-click character or Insert
+    /// &gt; Character has somewhere to land. Bubbles, characters and elements inside panels
+    /// stay selectable too. At most one thing in the panel is selected: a bubble wins over a
+    /// character, a character over an element, either over the panel itself.
     /// </remarks>
     public void Select(PanelId? panelId, int bubbleIndex = -1, int characterIndex = -1, int elementIndex = -1)
     {
-        if (Working.LayoutLocked && bubbleIndex < 0 && characterIndex < 0 && elementIndex < 0)
-            panelId = null;
         if (panelId is null)
             bubbleIndex = characterIndex = elementIndex = -1;
         if (bubbleIndex >= 0)
@@ -851,8 +850,6 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
                 if (_selectedBubbleIndex >= panel.Bubbles.Count || _selectedCharacterIndex >= panel.CharacterInstances.Count
                          || _selectedElementIndex >= panel.Elements.Count)
                     Select(id);
-                else if (Working.LayoutLocked && IsPanelContext)
-                    Select(null); // just locked (or redone a lock) with a panel selected
                 else if (_extraSelection.Count != extrasBefore)
                     RaiseMultiSelectionChanged();
             }
@@ -965,9 +962,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when HasSelectedText => "Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
+        _ when HasSelectedPanel && Working.LayoutLocked => "Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock on the Layout tab.",
         _ when HasSelectedPanel => "Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Home › Shape Fill colours it · Delete removes it.",
         _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
-        _ when Working.LayoutLocked => "Layout is locked - panels can't be selected or changed. Click a bubble or character to edit it, double-click inside a panel to add a bubble. Unlock on the Layout tab.",
+        _ when Working.LayoutLocked => "Layout is locked - click a panel to select it (or a bubble or character to edit it). Double-click inside a panel to add a bubble. Unlock on the Layout tab.",
         _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character. Hold Ctrl to see every button's shortcut."
     };
 

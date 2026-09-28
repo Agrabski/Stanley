@@ -811,8 +811,10 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case HitKind.PanelBody when vm.Working.LayoutLocked:
-                // Locked panels can't be selected: behave like the pasteboard.
-                vm.ClearSelection();
+                // Its layout can't be changed, but it can still be selected (issue #67) - so a
+                // double-click character or Insert > Character has somewhere to go. Dragging
+                // from it does nothing but pan the view, like the pasteboard.
+                vm.Select(hit.PanelId);
                 StartDrag(e, DragKind.Pan);
                 break;
 
@@ -1151,9 +1153,9 @@ public sealed class PageCanvasControl : Control
         var vm = _viewModel!;
         Hit? hit = vm.Tool == PageEditorTool.Select && !_spaceHeld ? HitTest(page) : null;
         var gutter = hit?.Gutter;
-        // No "you could select this" highlight on a locked layout; the Bubble tool still
-        // shows which panel a new bubble would land in.
-        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text || vm.IsShapeTool || vm.Tool == PageEditorTool.Select && !vm.Working.LayoutLocked ? PanelAt(page) : null;
+        // The "you could select/land this here" highlight shows for the Select tool even on a
+        // locked layout, since a locked panel can still be selected (issue #67).
+        var panel = vm.Tool is PageEditorTool.Bubble or PageEditorTool.Text or PageEditorTool.Select || vm.IsShapeTool ? PanelAt(page) : null;
         if (!Equals(gutter, _hoverGutter) || !Equals(panel, _hoverPanelId))
         {
             _hoverGutter = gutter;
@@ -1451,10 +1453,10 @@ public sealed class PageCanvasControl : Control
         }
         else if (PanelAt(page) is { } lockedPanelId && vm.Working.LayoutLocked)
         {
-            vm.ClearSelection();
+            vm.Select(lockedPanelId);
             if (vm.CanPaste)
             {
-                // A locked layout's panels can't be selected, so paste into the one that was right-clicked.
+                // Paste explicitly targets the panel that was right-clicked, regardless of what's selected.
                 items.Add(Item("Paste", () => vm.PasteInto(lockedPanelId), "Ctrl+V"));
                 items.Add(new Separator());
             }

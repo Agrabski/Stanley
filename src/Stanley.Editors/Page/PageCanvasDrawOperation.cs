@@ -179,13 +179,10 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
                 && _scene.SelectedCharacterIndex < selectedPanel.CharacterInstances.Count && _scene.SelectedCharacterBounds is not null;
             var hasElement = !hasBubble && !hasCharacter && _scene.SelectedElementIndex >= 0 && _scene.SelectedElementIndex < selectedPanel.Elements.Count;
 
-            // A locked layout never shows a panel as selected, not even as the faint
-            // "this bubble's panel" outline.
-            if (!doc.LayoutLocked)
-            {
-                using var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter || hasElement ? (byte)120 : (byte)255), 2f);
+            // The outline shows whether or not the layout is locked - a locked panel can
+            // still be selected, only its resize handles below are hidden.
+            using (var outline = Stroke(Accent.WithAlpha(hasBubble || hasCharacter || hasElement ? (byte)120 : (byte)255), 2f))
                 canvas.DrawRect(panelRect, outline);
-            }
             var isEditing = hasBubble && _scene.EditingBubble is { } editing && editing.Panel.Equals(selectedId)
                 && editing.Bubble.Equals(selectedPanel.Bubbles[_scene.SelectedBubbleIndex].Id);
             if (isEditing)
