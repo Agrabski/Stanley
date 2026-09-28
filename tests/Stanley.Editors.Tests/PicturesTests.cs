@@ -93,6 +93,36 @@ public sealed class PicturesTests : IDisposable
     }
 
     [Fact]
+    public void A_picture_dropped_onto_the_page_is_placed_from_its_raw_bytes_like_a_picked_file()
+    {
+        var (_, editor, pictures, history) = Session(ComicProject.CreateNew());
+        var panel = editor.Working.PanelOrder[0];
+        var request = new PictureImportRequest(panel, AsBackground: false);
+
+        Assert.True(editor.ImportPicture(request, "Tree.PNG", Png(30, 60, SKColors.Green).Bytes!));
+
+        var picture = Assert.IsType<PictureElement>(Assert.Single(editor.Working.Panels[panel].Elements));
+        Assert.Equal(0.5, picture.Bounds.Width / picture.Bounds.Height, 6);
+        Assert.True(pictures.Files.ContainsKey(picture.ArtFileName));
+
+        history.Undo();
+        Assert.Empty(editor.Working.Panels[panel].Elements);
+    }
+
+    [Fact]
+    public void A_dropped_file_that_isnt_a_picture_is_refused_with_a_reason()
+    {
+        var (_, editor, pictures, history) = Session(ComicProject.CreateNew());
+        var request = new PictureImportRequest(editor.Working.PanelOrder[0], AsBackground: false);
+
+        Assert.False(editor.ImportPicture(request, "notes.png", new byte[] { 1, 2, 3 }));
+
+        Assert.NotNull(editor.LastError);
+        Assert.Empty(pictures.Files);
+        Assert.False(history.CanUndo);
+    }
+
+    [Fact]
     public void The_same_picture_imported_twice_is_one_file()
     {
         var library = new PictureLibrary();

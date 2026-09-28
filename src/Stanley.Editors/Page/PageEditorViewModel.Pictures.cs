@@ -114,6 +114,14 @@ public sealed partial class PageEditorViewModel
         return index >= 0;
     }
 
+    /// <summary>
+    /// Same as <see cref="ImportPicture(PictureImportRequest, string, ArtFile)"/>, from a picture's
+    /// raw bytes rather than an already-built <see cref="ArtFile"/> - what a dropped OS file or a
+    /// freshly read stream hands over.
+    /// </summary>
+    public bool ImportPicture(PictureImportRequest request, string fileName, byte[] bytes) =>
+        ImportPicture(request, fileName, IssueArt.IsSvg(fileName) ? ArtFile.Svg(System.Text.Encoding.UTF8.GetString(bytes)) : ArtFile.Png(bytes));
+
     /// <summary>A placed picture is selected: the ribbon shows its "Picture" contextual tab.</summary>
     public bool IsPictureContext => SelectedElement is PictureElement;
 }
