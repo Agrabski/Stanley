@@ -10,8 +10,10 @@ learn, with escape hatches for advanced users.
 
 See [Getting and installing Stanley](docs/automatic-builds.md) for how to
 download, install, keep on the start menu and self-update. Short version:
-download the `Stanley*.AppImage` from the [Releases](../../releases) page,
-`chmod +x` it, and run it.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Agrabski/Stanley/develop/install.sh | sh
+```
 
 ## System requirements
 
