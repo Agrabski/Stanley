@@ -45,6 +45,15 @@ public sealed class FakeFileDialogs : IFileDialogs
         LastUpdateVersionOffered = version;
         return Task.FromResult(InstallUpdateAnswers.Count > 0 ? InstallUpdateAnswers.Dequeue() : false);
     }
+
+    public Queue<bool> DeleteIssueAnswers { get; } = new();
+    public int DeleteIssuePrompts { get; private set; }
+
+    public Task<bool> AskDeleteIssueAsync(string caption)
+    {
+        DeleteIssuePrompts++;
+        return Task.FromResult(DeleteIssueAnswers.Count > 0 ? DeleteIssueAnswers.Dequeue() : false);
+    }
 }
 
 /// <summary>Records what it was asked to open or show, and answers as told.</summary>
@@ -541,6 +550,70 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         Assert.Same(editor, vm.Editor);
         Assert.False(vm.IsBackstageOpen);
+    }
+
+    [Fact]
+    public async Task DeleteIssue_ANonCurrentOne_AsksFirstThenRemovesItFromTheList()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Deletable"));
+        await vm.SaveAsync();
+        var firstIssueId = vm.Project!.IssueId;
+        await vm.NewIssueAsync();
+        var secondIssueId = vm.Project!.IssueId;
+        Assert.Equal(2, vm.Issues.Count);
+
+        _dialogs.DeleteIssueAnswers.Enqueue(true);
+        await vm.DeleteIssueAsync(firstIssueId);
+
+        Assert.Equal(1, _dialogs.DeleteIssuePrompts);
+        var remaining = Assert.Single(vm.Issues);
+        Assert.Equal(secondIssueId, remaining.Id);
+        Assert.Equal("Issue #1 deleted", vm.Message);
+    }
+
+    [Fact]
+    public async Task DeleteIssue_CancellingTheConfirmation_DeletesNothing()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Kept"));
+        await vm.SaveAsync();
+        var firstIssueId = vm.Project!.IssueId;
+        await vm.NewIssueAsync();
+
+        await vm.DeleteIssueAsync(firstIssueId); // no answer queued - defaults to Cancel
+
+        Assert.Equal(2, vm.Issues.Count);
+    }
+
+    [Fact]
+    public async Task DeleteIssue_TheCurrentlyOpenOne_Refuses_AndAsksNothing()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "CantDeleteOpen"));
+        await vm.SaveAsync();
+        await vm.NewIssueAsync();
+        var currentId = vm.Project!.IssueId;
+
+        await vm.DeleteIssueAsync(currentId);
+
+        Assert.Equal(0, _dialogs.DeleteIssuePrompts);
+        Assert.Equal(2, vm.Issues.Count);
+        Assert.Equal("Can't delete the issue that's open - switch to another one first.", vm.Message);
+    }
+
+    [Fact]
+    public async Task DeleteIssue_TheOnlyIssue_Refuses()
+    {
+        var vm = NewViewModel();
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "OnlyOne"));
+        await vm.SaveAsync();
+        var onlyId = vm.Project!.IssueId;
+
+        // The only issue is also the one open - refused for that reason before "keep at least one" is even reached.
+        await vm.DeleteIssueAsync(onlyId);
+
+        Assert.Single(vm.Issues);
     }
 
     [Fact]

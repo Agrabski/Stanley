@@ -510,6 +510,7 @@ public class PageEditorTests
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
         public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
         public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
+        public Task<bool> AskDeleteIssueAsync(string caption) => Task.FromResult(false);
     }
 
     /// <summary>Clicking a panel on a locked layout selects it (issue #67) without moving it - a drag from it only pans the view, like the pasteboard - while double-click still adds a bubble.</summary>

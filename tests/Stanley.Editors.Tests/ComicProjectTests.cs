@@ -299,6 +299,78 @@ public sealed class ComicProjectTests : IDisposable
     }
 
     [Fact]
+    public void DeleteIssue_OnAnUnsavedComic_Throws()
+    {
+        var project = ComicProject.CreateNew();
+
+        Assert.Throws<InvalidOperationException>(() => project.DeleteIssue(project.IssueId));
+    }
+
+    /// <summary>The comic's last remaining issue can't go, even from a stale instance that isn't the one open on it (someone else deleted the others first).</summary>
+    [Fact]
+    public void DeleteIssue_TheComicsLastRemainingIssue_Throws()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "last-issue");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        var firstId = project.IssueId;
+        var secondId = project.NewIssue();
+        var openedOnSecond = ComicProject.Open(folder, secondId);
+        openedOnSecond.DeleteIssue(firstId); // down to just the second - manifest now has one issue
+
+        Assert.Throws<InvalidOperationException>(() => project.DeleteIssue(secondId)); // project is still (stale) open on the deleted first issue
+    }
+
+    [Fact]
+    public void DeleteIssue_TheCurrentlyOpenIssue_Throws()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "cant-delete-open");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        project.NewIssue();
+
+        Assert.Throws<InvalidOperationException>(() => project.DeleteIssue(project.IssueId));
+    }
+
+    [Fact]
+    public void DeleteIssue_RemovesItsFolderAndTheManifestEntry()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "deleted");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        var firstId = project.IssueId;
+        var secondId = project.NewIssue();
+        var secondDir = IssueDir(folder, secondId);
+        var reopened = ComicProject.Open(folder, firstId); // knows about both issues, unlike the still-open `project`
+
+        reopened.DeleteIssue(secondId);
+
+        Assert.Equal([firstId], new ProjectRepository(folder).LoadManifest().IssueIds);
+        Assert.False(Directory.Exists(secondDir));
+        Assert.DoesNotContain(secondId, reopened.Issues.Select(i => i.Id));
+    }
+
+    [Fact]
+    public void DeleteIssue_NeverTouchesAnotherIssuesFiles()
+    {
+        var project = ComicProject.CreateNew();
+        var folder = Path.Combine(_root, "untouched-by-delete");
+        project.SaveAs(folder, NavigatorFor(project).Snapshot());
+        var firstDir = IssueDir(folder, project.IssueId);
+        var before = Directory.EnumerateFiles(firstDir, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.ReadAllBytes);
+        var secondId = project.NewIssue();
+        var thirdId = project.NewIssue();
+
+        var opened = ComicProject.Open(folder, secondId);
+        opened.DeleteIssue(thirdId);
+
+        var after = Directory.EnumerateFiles(firstDir, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.ReadAllBytes);
+        Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
+        foreach (var (path, bytes) in before)
+            Assert.Equal(bytes, after[path]);
+    }
+
+    [Fact]
     public void IssueTitle_RoundTripsThroughSaveAndOpen()
     {
         var project = ComicProject.CreateNew();

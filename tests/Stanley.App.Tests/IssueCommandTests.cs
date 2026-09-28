@@ -140,5 +140,85 @@ public class IssueCommandTests : IDisposable
         Assert.NotEqual(0, exitCode);
     }
 
+    [Fact]
+    public void Remove_ANonCurrentIssue_DeletesItsFolderAndTheManifestEntry()
+    {
+        var path = InitProject("removable");
+        var firstId = Run("add", path).Output.Trim();
+        var secondId = Run("add", path, "--title", "Annual").Output.Trim();
+
+        var (exitCode, _) = Run("remove", path, secondId);
+
+        Assert.Equal(0, exitCode);
+        var repository = new ProjectRepository(path);
+        Assert.Equal([IssueId.FromValue(firstId)], repository.LoadManifest().IssueIds);
+        Assert.False(Directory.Exists(Directory.EnumerateDirectories(Path.Combine(path, "issues"))
+            .SingleOrDefault(d => Path.GetFileName(d).StartsWith(secondId + "-", StringComparison.Ordinal))));
+    }
+
+    [Fact]
+    public void Remove_TheComicsOnlyIssue_Fails()
+    {
+        var path = InitProject("last-one");
+        var firstId = Run("add", path).Output.Trim();
+
+        var (exitCode, _) = Run("remove", path, firstId);
+
+        Assert.NotEqual(0, exitCode);
+        Assert.Single(new ProjectRepository(path).LoadManifest().IssueIds);
+    }
+
+    [Fact]
+    public void Remove_NeverTouchesAnotherIssuesFiles()
+    {
+        var path = InitProject("remove-untouched");
+        var firstId = Run("add", path).Output.Trim();
+        var secondId = Run("add", path).Output.Trim();
+        var firstDir = Directory.EnumerateDirectories(Path.Combine(path, "issues")).Single(d => Path.GetFileName(d).StartsWith(firstId + "-", StringComparison.Ordinal));
+        var before = Directory.EnumerateFiles(firstDir, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.ReadAllBytes);
+
+        Run("remove", path, secondId);
+
+        var after = Directory.EnumerateFiles(firstDir, "*", SearchOption.AllDirectories).ToDictionary(f => f, File.ReadAllBytes);
+        Assert.Equal(before.Keys.OrderBy(k => k), after.Keys.OrderBy(k => k));
+        foreach (var (file, bytes) in before)
+            Assert.Equal(bytes, after[file]);
+    }
+
+    [Fact]
+    public void Remove_AnUnknownId_Fails()
+    {
+        var path = InitProject("unknown-id");
+        Run("add", path);
+        Run("add", path);
+
+        var (exitCode, _) = Run("remove", path, IssueId.New().Value);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    [Fact]
+    public void Remove_AMalformedId_Fails()
+    {
+        var path = InitProject("malformed-id");
+        Run("add", path);
+        Run("add", path);
+
+        var (exitCode, _) = Run("remove", path, "not an id!");
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    [Fact]
+    public void Remove_OnAFolderThatIsntAProject_Fails()
+    {
+        var path = Path.Combine(_root, "not-a-project-either");
+        Directory.CreateDirectory(path);
+
+        var (exitCode, _) = Run("remove", path, IssueId.New().Value);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

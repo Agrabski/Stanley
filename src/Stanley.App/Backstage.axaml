@@ -167,8 +167,12 @@
                     </StackPanel>
                     <TextBlock Text="{Binding PageCountText}" FontSize="12" Opacity="0.75" />
                   </StackPanel>
-                  <Button Grid.Column="1" Content="Open" VerticalAlignment="Center" IsVisible="{Binding !IsCurrent}"
-                          Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).SwitchIssueCommand}" CommandParameter="{Binding Id}" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsCurrent}">
+                    <Button Content="Open" VerticalAlignment="Center"
+                            Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).SwitchIssueCommand}" CommandParameter="{Binding Id}" />
+                    <Button Content="Delete" VerticalAlignment="Center" ToolTip.Tip="Delete this issue - its pages, panels and pictures. Can't be undone."
+                            Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).DeleteIssueCommand}" CommandParameter="{Binding Id}" />
+                  </StackPanel>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

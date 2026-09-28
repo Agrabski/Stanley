@@ -180,6 +180,13 @@ public sealed class ProjectRepository
         ProjectJson.Write(Path.Combine(dir, ProjectPaths.IssueFileName), issue);
     }
 
+    /// <summary>Removes an issue's whole folder (its pages, panels and art). A no-op if it was never saved. The caller removes it from the manifest's <c>IssueIds</c>.</summary>
+    public void DeleteIssue(IssueId id)
+    {
+        if (ProjectPaths.FindEntityDir(IssuesDir, id) is { } dir)
+            Directory.Delete(dir, recursive: true);
+    }
+
     private string PagesDir(IssueId issueId) => Path.Combine(IssueDirOrThrow(issueId), ProjectPaths.PagesDirName);
 
     private string PageDirOrThrow(IssueId issueId, PageId pageId) =>

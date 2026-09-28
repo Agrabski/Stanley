@@ -147,6 +147,7 @@ public class ClipboardAndShortcutTests
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
         public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
         public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
+        public Task<bool> AskDeleteIssueAsync(string caption) => Task.FromResult(false);
     }
 
     private sealed class RecordingLauncher : Stanley.App.Documents.IFileLauncher
