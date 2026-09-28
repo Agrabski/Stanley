@@ -73,7 +73,13 @@ character layer: the top of the foreground, the bottom of the background. A bubb
 **font size is absolute** - a bubble too small for its text grows to fit
 (`BubbleTextRenderer.NeededScale` → `BubbleEditing.GrowToFit`) instead of the letters
 shrinking; one dragged smaller by hand lets its text spill. An issue can be deleted
-down to just its title page; only the navigator's last page can't go.
+down to just its title page; only the navigator's last page can't go. **Insert ›
+Thought cloud** adds a scalloped panel for what a character imagines (`Panel.Kind =
+cloud`, outline from `PanelShapes.Cloud`, regenerated on resize) that floats over the
+layout - gutters, snapping, split and re-tiling leave it be, it draws and hit-tests on
+top, and otherwise works like any panel. Its `Panel.Trail` is three shrinking dots
+towards the thinker: dragged by the tip or base, added or removed from the right-click
+menu (`ThoughtCloudEditing`).
 `Stanley.App` is the single `stanley` executable: no args opens the Avalonia
 GUI, any args dispatch through a CLI (System.CommandLine; `init`, and `issue
 list`/`issue add`) instead, without touching Avalonia at all — one binary, not a

@@ -208,6 +208,8 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             {
                 foreach (var corner in Corners(panelRect))
                     DrawSquareHandle(canvas, corner, Accent);
+                if (selectedPanel.Trail is { } trail)
+                    DrawTrailHandles(canvas, trail, selectedPanel.Shape);
             }
         }
 
@@ -270,6 +272,23 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             canvas.DrawCircle(tip, 6f, fill);
             canvas.DrawCircle(tip, 6f, outline);
         }
+    }
+
+    /// <summary>A thought cloud's trail handles, the same two dots a bubble tail's base and tip get.</summary>
+    private void DrawTrailHandles(SKCanvas canvas, ProjectModel.Geometry.ThoughtTrail trail, ProjectModel.Geometry.PanelShape shape)
+    {
+        using var fill = new SKPaint { Color = TailHandle, IsAntialias = true };
+        using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        using var ring = Stroke(TailHandle, 2f);
+        using var outline = Stroke(SKColors.White, 1.5f);
+
+        var baseScreen = Screen(AnchorRing.PointAt(shape.Anchors, trail.AttachmentT));
+        canvas.DrawCircle(baseScreen, 4.5f, white);
+        canvas.DrawCircle(baseScreen, 4.5f, ring);
+
+        var tip = Screen(trail.Target);
+        canvas.DrawCircle(tip, 6f, fill);
+        canvas.DrawCircle(tip, 6f, outline);
     }
 
     /// <summary>

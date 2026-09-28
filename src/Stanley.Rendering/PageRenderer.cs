@@ -107,6 +107,12 @@ public static class PageRenderer
                     SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
             canvas.Restore();
 
+            // A thought cloud's trail leads towards the thinker, who may well be in a
+            // different panel underneath - so it draws outside this panel's own clip, on
+            // top of everything so far, borderless panel or not.
+            if (panel.Trail is { } trail)
+                ThoughtTrailRenderer.Draw(canvas, trail, panel.Shape, strokeWidth: BubbleStrokeMm);
+
             if (panel.Borderless)
                 continue;
             if (panel.BorderStyle is { } style)

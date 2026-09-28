@@ -299,6 +299,13 @@
                                 <TextBlock Text="Panel" />
                             </StackPanel>
                         </Button>
+                        <Button Name="InsertThoughtCloudButton" Classes="tool" Command="{Binding InsertThoughtCloudCommand}"
+                                ToolTip.Tip="A cloud-shaped panel for what a character imagines - floats over the layout, and works like any other panel">
+                            <StackPanel>
+                                <PathIcon Data="{StaticResource ThoughtCloudIcon}" />
+                                <TextBlock Text="Thought cloud" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <TextBlock Classes="groupLabel" Text="Panels" />
                 </DockPanel>

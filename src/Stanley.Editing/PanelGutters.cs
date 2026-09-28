@@ -19,9 +19,11 @@ public static class PanelGutters
 
     /// <param name="tolerance">How far outside the gap itself the point may be and still grab it.</param>
     /// <param name="maxGap">The widest gap still treated as a gutter rather than empty page.</param>
+    /// <remarks>A thought cloud floats over the grid rather than tiling it, so it never forms a
+    /// gutter with anything - dragging its own edges is a plain resize, not a shared boundary.</remarks>
     public static GutterHit? FindAt(IEnumerable<Panel> panels, Point2D point, double tolerance, double maxGap = 20)
     {
-        var rects = panels.Select(p => (p.Id, Bounds: AnchorRing.BoundingBox(p.Shape.Anchors))).ToList();
+        var rects = panels.Where(p => p.Kind != PanelKind.Cloud).Select(p => (p.Id, Bounds: AnchorRing.BoundingBox(p.Shape.Anchors))).ToList();
         return FindAlong(rects, point, tolerance, maxGap, BoundaryOrientation.Vertical)
             ?? FindAlong(rects, point, tolerance, maxGap, BoundaryOrientation.Horizontal);
     }
