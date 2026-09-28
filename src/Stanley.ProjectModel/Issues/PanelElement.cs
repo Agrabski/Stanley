@@ -149,5 +149,13 @@ public sealed record SpeedLinesElement(ElementId Id, ElementLayer Layer, Rect2D 
 /// group's <see cref="PanelElement.Layer"/> - grouping across background and foreground
 /// isn't offered, since a group would otherwise have to split across both drawing passes.
 /// </summary>
-public sealed record GroupElement(ElementId Id, ElementLayer Layer, IReadOnlyList<PanelElement> Children)
+/// <param name="SourceId">
+/// Null for an ordinary group, local to this panel. Once the group has been kept in My
+/// Assets (docs/asset-packs.md §6.1), this points at its out-of-line canonical copy
+/// (<c>objects/&lt;id&gt;-slug/group.json</c>, <see cref="ObjectGroupId"/>) - the same
+/// "embedded copy plus a cross-reference" shape a kept character already has via its own
+/// id. <see cref="Children"/> stays authoritative here regardless: this panel keeps
+/// drawing and editing its own copy even if it has since diverged from the kept one.
+/// </param>
+public sealed record GroupElement(ElementId Id, ElementLayer Layer, IReadOnlyList<PanelElement> Children, ObjectGroupId? SourceId = null)
     : PanelElement(Id, Layer);

@@ -60,6 +60,29 @@ public class PanelElementJsonTests
     }
 
     [Fact]
+    public void A_kept_groups_source_id_round_trips_but_is_left_out_when_absent()
+    {
+        var leaf = new ShapeElement(ElementId.New(), ElementLayer.Background, [Corner(0, 0), Corner(10, 0), Corner(10, 10)], Closed: true,
+            new ShapeStyle(null, ColorValue.FromHex("#123456"), 0));
+        var kept = new GroupElement(ElementId.New(), ElementLayer.Background, [leaf], ObjectGroupId.New());
+        var plain = new GroupElement(ElementId.New(), ElementLayer.Background, [leaf]);
+        var panel = PanelWith(null, kept, plain);
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"sourceId\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        var readKept = Assert.IsType<GroupElement>(read.Elements[0]);
+        var readPlain = Assert.IsType<GroupElement>(read.Elements[1]);
+        Assert.Equal(kept.SourceId, readKept.SourceId);
+        Assert.Null(readPlain.SourceId);
+
+        var plainOnlyJson = ProjectJson.Serialize(PanelWith(null, plain));
+        Assert.DoesNotContain("sourceId", plainOnlyJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Unset_style_colours_are_left_out_of_the_file()
     {
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi", new TextStyle(10, ColorValue.FromHex("#000000")));
