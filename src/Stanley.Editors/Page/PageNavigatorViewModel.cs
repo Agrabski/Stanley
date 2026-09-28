@@ -215,6 +215,28 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         SpacingChanged?.Invoke();
     }
 
+    /// <summary>The user's My Assets, which every page can keep a group in and insert one from; null for none.</summary>
+    public MyAssetsLibrary? MyAssets
+    {
+        get;
+        set
+        {
+            field = value;
+            SyncPages();
+        }
+    }
+
+    /// <summary>The comic's copies of kept object groups, shared by every page; null for a comic edited without them.</summary>
+    public ObjectGroupLibrary? ObjectGroups
+    {
+        get;
+        set
+        {
+            field = value;
+            SyncPages();
+        }
+    }
+
     /// <summary>What the fields in texts show on every page (the comic's title and issue number); the session keeps it up to date.</summary>
     public TextFields? Fields
     {
@@ -527,6 +549,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         {
             page.Editor.Grid = _grid;
             page.Editor.Fields = _fields;
+            page.Editor.MyAssets = MyAssets;
+            page.Editor.ObjectGroups = ObjectGroups;
         }
     }
 
@@ -561,7 +585,9 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             Characters = _characters,
             Pictures = _pictures,
             Grid = _grid,
-            Fields = _fields
+            Fields = _fields,
+            MyAssets = MyAssets,
+            ObjectGroups = ObjectGroups
         };
         if (settingsFrom != null)
         {

@@ -4,8 +4,9 @@ using Stanley.EditorFramework;
 
 namespace Stanley.Editors;
 
-/// <summary>Everything one open comic is edited through: the workspace (history + panes), the page navigator, the Characters pane and the comic's pictures.</summary>
-public sealed record EditorSession(EditorWorkspace Workspace, PageNavigatorViewModel Navigator, CharacterLibraryViewModel Characters, PictureLibrary Pictures);
+/// <summary>Everything one open comic is edited through: the workspace (history + panes), the page navigator, the Characters pane, the comic's pictures and its copies of kept object groups.</summary>
+public sealed record EditorSession(EditorWorkspace Workspace, PageNavigatorViewModel Navigator, CharacterLibraryViewModel Characters, PictureLibrary Pictures,
+    ObjectGroupLibrary ObjectGroups);
 
 public static class PageEditorHost
 {
@@ -15,17 +16,21 @@ public static class PageEditorHost
     /// docked on the left, and the first page's editor in the editor area. Picking a page
     /// swaps the page tab; opening a character adds its own tab alongside it (and alongside
     /// any other character already open) instead of replacing anything. The ribbon follows
-    /// whichever tab is active, never the side panes.
+    /// whichever tab is active, never the side panes. With <paramref name="myAssets"/>, the
+    /// Characters pane and every page can keep things in My Assets and take them from there.
     /// </summary>
-    public static EditorSession CreateWorkspace(ComicProject project)
+    public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null)
     {
         var history = new EditorHistory();
-        var characters = new CharacterLibraryViewModel(history, project.Characters);
+        var characters = new CharacterLibraryViewModel(history, project.Characters) { MyAssets = myAssets };
         var pictures = new PictureLibrary(project.Pictures);
+        var objectGroups = new ObjectGroupLibrary(project.ObjectGroups);
         var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures,
             project.Grid, project.NewPageLayout, project.TitlePage)
         {
-            Fields = project.Fields
+            Fields = project.Fields,
+            MyAssets = myAssets,
+            ObjectGroups = objectGroups
         };
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
 
@@ -69,6 +74,6 @@ public static class PageEditorHost
             characters.RefreshUsage();
         };
 
-        return new EditorSession(workspace, navigator, characters, pictures);
+        return new EditorSession(workspace, navigator, characters, pictures, objectGroups);
     }
 }

@@ -62,7 +62,8 @@ public sealed class RecoveryStore : IDisposable
     public void Write(ComicProject project, IReadOnlyList<(PageId Id, Editors.PageDocument Document)> pages, PageNumbering numbering,
         IReadOnlyList<ProjectModel.Characters.CharacterDefinition>? characters = null,
         IReadOnlyDictionary<ProjectModel.Ids.CharacterId, ProjectModel.Ids.CharacterRevisionId>? issueLooks = null,
-        IReadOnlyDictionary<string, ProjectModel.Characters.ArtFile>? pictures = null)
+        IReadOnlyDictionary<string, ProjectModel.Characters.ArtFile>? pictures = null,
+        IReadOnlyCollection<ProjectModel.Objects.ObjectGroup>? objectGroups = null)
     {
         if (SessionDirectory is not { } dir)
             return;
@@ -72,7 +73,7 @@ public sealed class RecoveryStore : IDisposable
         if (Directory.Exists(fresh))
             Directory.Delete(fresh, recursive: true);
 
-        project.WriteCopy(fresh, pages, numbering, characters, issueLooks, pictures);
+        project.WriteCopy(fresh, pages, numbering, characters, issueLooks, pictures, objectGroups);
         if (Directory.Exists(current))
             Directory.Delete(current, recursive: true);
         Directory.Move(fresh, current);

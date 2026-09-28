@@ -144,6 +144,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         InitializeFieldCommands();
         InitializeFaceCommands();
         InitializeClipboardCommands();
+        InitializeMyAssetsCommands();
     }
 
     // A ribbon slider (the Speed Lines tab's "Lines" and "Thickness") is a drag gesture too,
@@ -309,6 +310,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         NotifyElementCommands();
         if (CopyCommand != null) // null while the constructor is still setting up
             NotifyClipboardCommands();
+        NotifyMyAssetsCommands();
     }
 
     // ---------------------------------------------------------------- tool & settings

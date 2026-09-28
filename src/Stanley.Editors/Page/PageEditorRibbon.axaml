@@ -10,6 +10,7 @@
              xmlns:local="using:Stanley.Editors"
              xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
              xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
              xmlns:editing="using:Stanley.Editing"
              x:Class="Stanley.Editors.PageEditorRibbon"
              x:DataType="local:PageEditorViewModel">
@@ -444,6 +445,52 @@
                     <TextBlock Classes="groupLabel" Text="Pictures" />
                 </DockPanel>
                 <Rectangle Classes="divider" />
+
+                <!-- Insert › From My Assets (docs/asset-packs.md §6.3): a group kept from any comic, dropped in the selected panel as Paste would. -->
+                <DockPanel Classes="group" IsVisible="{Binding HasMyAssets}">
+                    <DropDownButton Name="InsertFromMyAssetsButton" Classes="slotGallery" Width="96"
+                                    ToolTip.Tip="Put something you kept in My Assets - from this comic or any other - in the selected panel">
+                        <StackPanel Spacing="2">
+                            <PathIcon Data="{StaticResource StarIcon}" Width="20" Height="20" />
+                            <TextBlock Text="My Assets" FontSize="11" HorizontalAlignment="Center" />
+                        </StackPanel>
+                        <DropDownButton.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft">
+                                <StackPanel Spacing="8" MaxWidth="420">
+                                    <TextBlock Text="Object groups" FontWeight="SemiBold" />
+                                    <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasMyAssetsObjectGroups}">
+                                        <ItemsControl Name="MyAssetsGroupGallery" ItemsSource="{Binding MyAssetsObjectGroups}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="objects:ObjectGroup">
+                                                    <Button Classes="small" Width="96" Height="96" Padding="4" Margin="0,0,4,4"
+                                                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                                            Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertObjectGroupCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel'}">
+                                                        <DockPanel>
+                                                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11"
+                                                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                            <Border Background="White" CornerRadius="2">
+                                                                <local:ObjectGroupPreview Group="{Binding}" />
+                                                            </Border>
+                                                        </DockPanel>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <TextBlock IsVisible="{Binding !HasMyAssetsObjectGroups}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                               Text="Nothing kept yet. Group a few things on a page (Ctrl+G), right-click the group and choose Keep in My Assets - it'll be here in every comic." />
+                                </StackPanel>
+                            </Flyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                    <TextBlock Classes="groupLabel" Text="Reuse" />
+                </DockPanel>
+                <Rectangle Classes="divider" IsVisible="{Binding HasMyAssets}" />
 
                 <DockPanel Classes="group">
                     <Button Name="InsertSpeedLinesButton" Classes="tool" Command="{Binding InsertSpeedLinesCommand}"

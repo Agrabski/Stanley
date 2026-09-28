@@ -250,7 +250,7 @@ public sealed partial class PageEditorViewModel
         IEnumerable<string> names = clipping switch
         {
             PanelClipping p => PanelElements.ArtFileNames(p.Panel),
-            ElementClipping { Element: PictureElement picture } => [picture.ArtFileName],
+            ElementClipping { Element: var element } => PanelElements.ArtFileNames(element),
             _ => []
         };
         var files = PictureSnapshot;
@@ -274,8 +274,12 @@ public sealed partial class PageEditorViewModel
         return renames;
     }
 
-    private static PanelElement WithPictures(PanelElement element, IReadOnlyDictionary<string, string> renames) =>
-        element is PictureElement picture && renames.TryGetValue(picture.ArtFileName, out var name) ? picture with { ArtFileName = name } : element;
+    private static PanelElement WithPictures(PanelElement element, IReadOnlyDictionary<string, string> renames) => element switch
+    {
+        PictureElement picture when renames.TryGetValue(picture.ArtFileName, out var name) => picture with { ArtFileName = name },
+        GroupElement group when renames.Count > 0 => group with { Children = group.Children.Select(c => WithPictures(c, renames)).ToList() },
+        _ => element
+    };
 
     // ---------------------------------------------------------------- Alt+drag
 

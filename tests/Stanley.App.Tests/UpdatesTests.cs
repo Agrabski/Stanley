@@ -39,10 +39,9 @@ public sealed class UpdatesTests : IDisposable
             Directory.Delete(_root, recursive: true);
     }
 
-    private MainWindowViewModel NewViewModel(FakeUpdateService? updates, AppSettings? settings = null, GithubTokenStore? tokenStore = null) =>
+    private MainWindowViewModel NewViewModel(FakeUpdateService? updates, AppSettings? settings = null) =>
         new(_dialogs, new RecentProjects(null),
             settings: settings ?? new AppSettings(null),
-            tokenStore: tokenStore ?? new GithubTokenStore(null),
             updates: updates,
             scheduler: _scheduler);
 
@@ -117,20 +116,17 @@ public sealed class UpdatesTests : IDisposable
     // ---------------------------------------------------------------- MainWindowViewModel wiring
 
     [Fact]
-    public void CanCheckForUpdates_NeedsBothAnInstalledServiceAndAToken()
+    public void CanCheckForUpdates_NeedsAnInstalledService_NoTokenRequired()
     {
         var vm = NewViewModel(new FakeUpdateService { IsInstalled = true });
-        Assert.False(vm.CanCheckForUpdates); // no token yet
 
-        vm.GithubToken = "ghp_abc123";
-        Assert.True(vm.CanCheckForUpdates);
+        Assert.True(vm.CanCheckForUpdates); // Stanley is public - anonymous checks just work
     }
 
     [Fact]
     public void CanCheckForUpdates_FalseWithoutAnUpdateService()
     {
         var vm = NewViewModel(updates: null);
-        vm.GithubToken = "ghp_abc123";
         Assert.False(vm.CanCheckForUpdates);
     }
 
@@ -139,7 +135,6 @@ public sealed class UpdatesTests : IDisposable
     {
         var updates = new FakeUpdateService();
         var vm = NewViewModel(updates);
-        vm.GithubToken = "ghp_abc123";
 
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
 
@@ -153,7 +148,6 @@ public sealed class UpdatesTests : IDisposable
     {
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", "Notes") };
         var vm = NewViewModel(updates);
-        vm.GithubToken = "ghp_abc123";
 
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
 
@@ -167,7 +161,6 @@ public sealed class UpdatesTests : IDisposable
     {
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", null) };
         var vm = NewViewModel(updates);
-        vm.GithubToken = "ghp_abc123";
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
 
         var editor = vm.Editor!;
@@ -186,7 +179,6 @@ public sealed class UpdatesTests : IDisposable
     {
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", null) };
         var vm = NewViewModel(updates);
-        vm.GithubToken = "ghp_abc123";
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
 
         await vm.InstallUpdateCommand.ExecuteAsync(null);
@@ -195,13 +187,12 @@ public sealed class UpdatesTests : IDisposable
     }
 
     [Fact]
-    public void AutoCheckForUpdates_OnStartup_SchedulesACheck_IfATokenIsAlreadyConfigured()
+    public void AutoCheckForUpdates_OnStartup_SchedulesACheck_NoTokenNeeded()
     {
         var settings = new AppSettings(null) { AutoCheckForUpdates = true };
-        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
         var updates = new FakeUpdateService();
 
-        _ = NewViewModel(updates, settings, tokenStore);
+        _ = NewViewModel(updates, settings);
 
         Assert.Equal(1, _scheduler.PendingCount);
         _scheduler.Advance(TimeSpan.FromSeconds(5));
@@ -212,17 +203,6 @@ public sealed class UpdatesTests : IDisposable
     public void AutoCheckForUpdates_Off_SchedulesNothing()
     {
         var settings = new AppSettings(null) { AutoCheckForUpdates = false };
-        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
-
-        _ = NewViewModel(new FakeUpdateService(), settings, tokenStore);
-
-        Assert.Equal(0, _scheduler.PendingCount);
-    }
-
-    [Fact]
-    public void AutoCheckForUpdates_On_ButNoTokenYet_SchedulesNothing()
-    {
-        var settings = new AppSettings(null) { AutoCheckForUpdates = true };
 
         _ = NewViewModel(new FakeUpdateService(), settings);
 
@@ -235,11 +215,10 @@ public sealed class UpdatesTests : IDisposable
     public void AutoCheckForUpdates_OnStartup_FindsOne_PopsUpAnOffer_AndAcceptingInstalls()
     {
         var settings = new AppSettings(null) { AutoCheckForUpdates = true };
-        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", "Notes") };
         _dialogs.InstallUpdateAnswers.Enqueue(true);
 
-        _ = NewViewModel(updates, settings, tokenStore);
+        _ = NewViewModel(updates, settings);
         _scheduler.Advance(TimeSpan.FromSeconds(5));
 
         Assert.Equal(1, _dialogs.InstallUpdatePrompts);
@@ -251,11 +230,10 @@ public sealed class UpdatesTests : IDisposable
     public void AutoCheckForUpdates_OnStartup_FindsOne_DecliningLeavesItUninstalled()
     {
         var settings = new AppSettings(null) { AutoCheckForUpdates = true };
-        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", null) };
         _dialogs.InstallUpdateAnswers.Enqueue(false);
 
-        var vm = NewViewModel(updates, settings, tokenStore);
+        var vm = NewViewModel(updates, settings);
         _scheduler.Advance(TimeSpan.FromSeconds(5));
 
         Assert.Equal(1, _dialogs.InstallUpdatePrompts);
@@ -267,10 +245,9 @@ public sealed class UpdatesTests : IDisposable
     public void AutoCheckForUpdates_OnStartup_FindsNothing_DoesNotPopUp()
     {
         var settings = new AppSettings(null) { AutoCheckForUpdates = true };
-        var tokenStore = new GithubTokenStore(null) { Token = "ghp_abc123" };
         var updates = new FakeUpdateService();
 
-        _ = NewViewModel(updates, settings, tokenStore);
+        _ = NewViewModel(updates, settings);
         _scheduler.Advance(TimeSpan.FromSeconds(5));
 
         Assert.Equal(0, _dialogs.InstallUpdatePrompts);
@@ -281,10 +258,21 @@ public sealed class UpdatesTests : IDisposable
     {
         var updates = new FakeUpdateService { NextResult = new AvailableUpdate("0.9.0", "Notes") };
         var vm = NewViewModel(updates);
-        vm.GithubToken = "ghp_abc123";
 
         await vm.CheckForUpdatesCommand.ExecuteAsync(null);
 
         Assert.Equal(0, _dialogs.InstallUpdatePrompts);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesCommand_WorksAnonymously_WithAnOptionalToken()
+    {
+        var updates = new FakeUpdateService();
+        var vm = NewViewModel(updates);
+        vm.GithubToken = "ghp_abc123"; // only needed to dodge GitHub's anonymous rate limit
+
+        await vm.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, updates.CheckCount);
     }
 }

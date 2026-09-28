@@ -60,8 +60,8 @@ public sealed class AppSettings
         set => Set(nameof(Theme), value.ToString());
     }
 
-    /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - it needs a
-    /// GitHub token configured first (Stanley is a private repository), so turning it on is a deliberate opt-in.</summary>
+    /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - Stanley
+    /// doesn't reach out to GitHub on its own until the user opts in.</summary>
     public bool AutoCheckForUpdates
     {
         get => _values.TryGetValue(nameof(AutoCheckForUpdates), out var value) && bool.TryParse(value, out var on) && on;
@@ -84,6 +84,14 @@ public sealed class AppSettings
     {
         get => _values.TryGetValue(nameof(SvgEditorPath), out var value) && value.Length > 0 ? value : null;
         set => Set(nameof(SvgEditorPath), value?.Trim() ?? "");
+    }
+
+    /// <summary>File &gt; Options &gt; My Assets: a folder of the user's choosing for My Assets (a synced or backed-up one,
+    /// or a git repository for its history). Null means the default, <see cref="AppPaths.MyAssetsDirectory"/>.</summary>
+    public string? MyAssetsDirectory
+    {
+        get => _values.TryGetValue(nameof(MyAssetsDirectory), out var value) && value.Length > 0 ? value : null;
+        set => Set(nameof(MyAssetsDirectory), value?.Trim() ?? "");
     }
 
     private void Set(string key, string value)
