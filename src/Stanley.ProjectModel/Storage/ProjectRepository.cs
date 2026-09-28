@@ -2,6 +2,7 @@ using Stanley.ProjectModel.Backgrounds;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Objects;
 using Stanley.ProjectModel.Poses;
 using Stanley.ProjectModel.Props;
 using Stanley.ProjectModel.Serialization;
@@ -18,14 +19,23 @@ public sealed class ProjectRepository
 {
     public string RootDirectory { get; }
 
-    public ProjectRepository(string rootDirectory) => RootDirectory = Path.GetFullPath(rootDirectory);
+    private readonly CharacterStore _characters;
+    private readonly ObjectGroupStore _objectGroups;
+
+    public ProjectRepository(string rootDirectory)
+    {
+        RootDirectory = Path.GetFullPath(rootDirectory);
+        _characters = new CharacterStore(CharactersDir);
+        _objectGroups = new ObjectGroupStore(ObjectsDir);
+    }
 
     /// <summary>Whether <paramref name="rootDirectory"/> already contains a Stanley project (i.e. has a <c>stanley.json</c>).</summary>
     public static bool IsInitialized(string rootDirectory) =>
         File.Exists(Path.Combine(Path.GetFullPath(rootDirectory), ProjectPaths.ManifestFileName));
 
     /// <summary>Creates a brand-new, empty project on disk: the manifest, top-level folders, and the LFS <c>.gitattributes</c> rule.</summary>
-    public static ProjectRepository Initialize(string rootDirectory, string title, PageTrim defaultPageTrim)
+    /// <param name="format">What the comic is set up as (a strip, a webcomic...); null for a printed comic book.</param>
+    public static ProjectRepository Initialize(string rootDirectory, string title, PageTrim defaultPageTrim, ComicFormat? format = null)
     {
         var repository = new ProjectRepository(rootDirectory);
         Directory.CreateDirectory(repository.RootDirectory);
@@ -35,6 +45,7 @@ public sealed class ProjectRepository
         Directory.CreateDirectory(repository.PropsDir);
         Directory.CreateDirectory(repository.BackgroundsDir);
         Directory.CreateDirectory(repository.IssuesDir);
+        Directory.CreateDirectory(repository.ObjectsDir);
 
         File.WriteAllText(
             Path.Combine(repository.RootDirectory, ProjectPaths.GitAttributesFileName),
@@ -42,7 +53,7 @@ public sealed class ProjectRepository
             "*.jpg filter=lfs diff=lfs merge=lfs -text\n" +
             "*.psd filter=lfs diff=lfs merge=lfs -text\n");
 
-        repository.SaveManifest(new SeriesManifest(title, defaultPageTrim, []));
+        repository.SaveManifest(new SeriesManifest(title, defaultPageTrim, [], format));
         return repository;
     }
 
@@ -54,56 +65,44 @@ public sealed class ProjectRepository
 
     private string CharactersDir => Path.Combine(RootDirectory, ProjectPaths.CharactersDirName);
 
-    private string CharacterDirOrThrow(CharacterId id) =>
-        ProjectPaths.FindEntityDir(CharactersDir, id) ?? throw NotFoundDir("character", id.Value);
+    /// <summary>A character with everything in its folder: its stickers and pattern tiles (<see cref="CharacterDefinition.Wardrobe"/>) and its named looks.</summary>
+    public CharacterDefinition LoadCharacter(CharacterId id) => _characters.Load(id);
 
-    public CharacterDefinition LoadCharacter(CharacterId id) =>
-        ProjectJson.Read<CharacterDefinition>(Path.Combine(CharacterDirOrThrow(id), ProjectPaths.CharacterFileName));
+    /// <summary>
+    /// Every character in the project, sorted by name. There's no index file: a character
+    /// is whatever <c>characters/&lt;id&gt;-slug/character.json</c> folders exist, so adding
+    /// one never touches a shared file (and never conflicts in a merge).
+    /// </summary>
+    public IReadOnlyList<CharacterDefinition> ListCharacters() => _characters.List();
 
-    public void SaveCharacter(CharacterDefinition character)
-    {
-        var dir = ProjectPaths.ResolveOrCreateEntityDir(CharactersDir, character.Id, character.Name);
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.RevisionsDirName));
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.StickersDirName));
-        ProjectJson.Write(Path.Combine(dir, ProjectPaths.CharacterFileName), character);
-    }
+    /// <summary>Removes a character's whole folder (revisions and stickers too). A no-op if it was never saved.</summary>
+    public void DeleteCharacter(CharacterId id) => _characters.Delete(id);
 
-    public CharacterRevision LoadCharacterRevision(CharacterId characterId, CharacterRevisionId revisionId)
-    {
-        var dir = Path.Combine(CharacterDirOrThrow(characterId), ProjectPaths.RevisionsDirName);
-        var path = ProjectPaths.FindEntityFile(dir, revisionId, ProjectPaths.JsonExtension)
-            ?? throw NotFoundFile("character revision", revisionId.Value);
-        return ProjectJson.Read<CharacterRevision>(path);
-    }
+    /// <summary>
+    /// Writes the character's whole folder: <c>character.json</c>, every sticker in its
+    /// wardrobe (<c>sticker.json</c> plus its art files, byte for byte), its pattern tiles
+    /// and its named looks - and removes the stickers, art files, tiles and looks it no
+    /// longer has. Files whose content is unchanged aren't rewritten.
+    /// </summary>
+    public void SaveCharacter(CharacterDefinition character) => _characters.Save(character);
 
-    public void SaveCharacterRevision(CharacterRevision revision)
-    {
-        var dir = Path.Combine(CharacterDirOrThrow(revision.CharacterId), ProjectPaths.RevisionsDirName);
-        var path = ProjectPaths.ResolveOrCreateEntityFilePath(dir, revision.Id, revision.Name, ProjectPaths.JsonExtension);
-        ProjectJson.Write(path, revision);
-    }
+    public CharacterRevision LoadCharacterRevision(CharacterId characterId, CharacterRevisionId revisionId) => _characters.LoadRevision(characterId, revisionId);
 
-    private string StickersDir(CharacterId characterId) => Path.Combine(CharacterDirOrThrow(characterId), ProjectPaths.StickersDirName);
+    public void SaveCharacterRevision(CharacterRevision revision) => _characters.SaveRevision(revision);
 
-    private string StickerDirOrThrow(CharacterId characterId, StickerId stickerId) =>
-        ProjectPaths.FindEntityDir(StickersDir(characterId), stickerId) ?? throw NotFoundDir("sticker", stickerId.Value);
+    private string ObjectsDir => Path.Combine(RootDirectory, ProjectPaths.ObjectsDirName);
 
-    public Sticker LoadSticker(CharacterId characterId, StickerId stickerId) =>
-        ProjectJson.Read<Sticker>(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StickerFileName));
+    /// <summary>An out-of-line object group (docs/asset-packs.md §7.1) a panel's <see cref="GroupElement.SourceId"/> can reference, with the art files its children use.</summary>
+    public ObjectGroup LoadObjectGroup(ObjectGroupId id) => _objectGroups.Load(id);
 
-    public void SaveSticker(CharacterId characterId, Sticker sticker)
-    {
-        var dir = ProjectPaths.ResolveOrCreateEntityDir(StickersDir(characterId), sticker.Id, sticker.Name);
-        Directory.CreateDirectory(Path.Combine(dir, ProjectPaths.VariantsDirName));
-        ProjectJson.Write(Path.Combine(dir, ProjectPaths.StickerFileName), sticker);
-    }
+    /// <summary>Every object group kept in this comic's <c>objects/</c> folder.</summary>
+    public IReadOnlyList<ObjectGroup> ListObjectGroups() => _objectGroups.List();
 
-    /// <summary>The <see cref="StickerKind.BuildStretch"/> region sibling of a sticker.</summary>
-    public StretchRegion LoadStretchRegion(CharacterId characterId, StickerId stickerId) =>
-        ProjectJson.Read<StretchRegion>(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StretchFileName));
+    /// <summary>Writes an object group's <c>group.json</c> and its art files, removing art it no longer references.</summary>
+    public void SaveObjectGroup(ObjectGroup group) => _objectGroups.Save(group);
 
-    public void SaveStretchRegion(CharacterId characterId, StickerId stickerId, StretchRegion region) =>
-        ProjectJson.Write(Path.Combine(StickerDirOrThrow(characterId, stickerId), ProjectPaths.StretchFileName), region);
+    /// <summary>Removes an object group's whole folder. A no-op if it was never saved. Existing panels keep whatever inline copy they already have.</summary>
+    public void DeleteObjectGroup(ObjectGroupId id) => _objectGroups.Delete(id);
 
     private string PosesDir => Path.Combine(RootDirectory, ProjectPaths.PosesDirName);
 
@@ -222,6 +221,120 @@ public sealed class ProjectRepository
     public void DeletePanel(IssueId issueId, PageId pageId, PanelId panelId)
     {
         var path = ProjectPaths.PanelFilePath(Path.Combine(PageDirOrThrow(issueId, pageId), ProjectPaths.PanelsDirName), panelId);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    private string IssueArtDir(IssueId issueId) => Path.Combine(IssueDirOrThrow(issueId), ProjectPaths.ArtDirName);
+
+    /// <summary>A picture from the issue's <c>art/</c> folder (see <see cref="IssueArt"/>), or null if there's no such file (or the name isn't a plain picture file name).</summary>
+    public ArtFile? LoadIssueArt(IssueId issueId, string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return null;
+        var path = Path.Combine(IssueArtDir(issueId), name);
+        return File.Exists(path) ? ArtFileIO.ReadArtFile(path) : null;
+    }
+
+    /// <summary>Writes a picture into the issue's <c>art/</c> folder - unless the same content is already there, so an unchanged save touches nothing.</summary>
+    public void SaveIssueArt(IssueId issueId, string name, ArtFile file)
+    {
+        if (!IssueArt.IsValidName(name))
+            throw new ArgumentException($"'{name}' isn't a picture file name.", nameof(name));
+        var dir = IssueArtDir(issueId);
+        var path = Path.Combine(dir, name);
+        if (File.Exists(path) && ArtFileIO.ReadArtFile(path).SameContent(file))
+            return;
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(path, file.ToBytes());
+    }
+
+    /// <summary>Removes a picture from the issue's <c>art/</c> folder; a no-op if it isn't there.</summary>
+    public void DeleteIssueArt(IssueId issueId, string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return;
+        var path = Path.Combine(IssueArtDir(issueId), name);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    // ---------------------------------------------------------------- the comic's title page
+
+    private string TitlePageDir => Path.Combine(RootDirectory, ProjectPaths.TitlePageDirName);
+
+    private string TitlePagePanelsDir => Path.Combine(TitlePageDir, ProjectPaths.PanelsDirName);
+
+    private string TitlePageArtDir => Path.Combine(TitlePageDir, ProjectPaths.ArtDirName);
+
+    /// <summary>The comic's title page (<c>title-page/page.json</c>) - shared by every issue that has none of its own - or null if the comic has none.</summary>
+    public Page? LoadTitlePage()
+    {
+        var path = Path.Combine(TitlePageDir, ProjectPaths.PageFileName);
+        return File.Exists(path) ? ProjectJson.Read<Page>(path) : null;
+    }
+
+    public void SaveTitlePage(Page page)
+    {
+        Directory.CreateDirectory(TitlePagePanelsDir);
+        ProjectJson.Write(Path.Combine(TitlePageDir, ProjectPaths.PageFileName), page);
+    }
+
+    public Panel LoadTitlePagePanel(PanelId panelId)
+    {
+        var path = ProjectPaths.PanelFilePath(TitlePagePanelsDir, panelId);
+        if (!File.Exists(path))
+            throw NotFoundFile("panel", panelId.Value);
+        return ProjectJson.Read<Panel>(path);
+    }
+
+    public void SaveTitlePagePanel(Panel panel)
+    {
+        Directory.CreateDirectory(TitlePagePanelsDir);
+        ProjectJson.Write(ProjectPaths.PanelFilePath(TitlePagePanelsDir, panel.Id), panel);
+    }
+
+    /// <summary>Removes one of the title page's panel files; a no-op if it isn't there.</summary>
+    public void DeleteTitlePagePanel(PanelId panelId)
+    {
+        var path = ProjectPaths.PanelFilePath(TitlePagePanelsDir, panelId);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    /// <summary>Removes the comic's title page - page, panels and pictures; a no-op if it has none.</summary>
+    public void DeleteTitlePage()
+    {
+        if (Directory.Exists(TitlePageDir))
+            Directory.Delete(TitlePageDir, recursive: true);
+    }
+
+    /// <summary>A picture from the title page's own <c>art/</c> folder (named like an issue's, see <see cref="IssueArt"/>), or null if it isn't there.</summary>
+    public ArtFile? LoadTitlePageArt(string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return null;
+        var path = Path.Combine(TitlePageArtDir, name);
+        return File.Exists(path) ? ArtFileIO.ReadArtFile(path) : null;
+    }
+
+    /// <summary>Writes a picture the title page uses - unless the same content is already there.</summary>
+    public void SaveTitlePageArt(string name, ArtFile file)
+    {
+        if (!IssueArt.IsValidName(name))
+            throw new ArgumentException($"'{name}' isn't a picture file name.", nameof(name));
+        var path = Path.Combine(TitlePageArtDir, name);
+        if (File.Exists(path) && ArtFileIO.ReadArtFile(path).SameContent(file))
+            return;
+        Directory.CreateDirectory(TitlePageArtDir);
+        File.WriteAllBytes(path, file.ToBytes());
+    }
+
+    public void DeleteTitlePageArt(string name)
+    {
+        if (!IssueArt.IsValidName(name))
+            return;
+        var path = Path.Combine(TitlePageArtDir, name);
         if (File.Exists(path))
             File.Delete(path);
     }

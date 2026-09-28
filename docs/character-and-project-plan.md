@@ -12,6 +12,12 @@ bloat that file.
 These directions came out of design discussions. Treat them as the working
 plan unless the user says otherwise.
 
+> **Stickers are revised in [`sticker-system.md`](sticker-system.md)**, which
+> wins where the two differ. The main changes: clothing is generated from the
+> body ("cover" parts) instead of drawn per bone; drawn art is mapped from region
+> templates (Pin/Warp) instead of rigidly attached to a bone; `stretch.json`/9-slice
+> is dropped; and the per-slot catalogue on the definition becomes a folder scan.
+
 ### Three-layer model — keep these separate
 - **CharacterDefinition**: the "wardrobe" — a 2D skeleton (VRM humanoid bone
   set) with a **per-view-angle rest layout** (front/three-quarter/profile are
@@ -62,6 +68,10 @@ plan unless the user says otherwise.
   core. Its output isn't repeatable and characters drift between panels.
 
 ### Body type / build
+
+*(Superseded for stickers by `sticker-system.md`: covers follow `build` and the
+other body sliders automatically, drawn art uses Warp, and build breakpoints stay
+designed but unbuilt.)*
 - **`build`** is a continuous character parameter (0–1, slim → heavy),
   stored as a skeleton proportion override at the **Revision** level —
   same tier as aging/redesigns — with a sparse per-instance override
@@ -253,6 +263,20 @@ MyComic/
   reference — no shared scene graph spanning panels.
 
 ### Backgrounds
+- *Built so far* (see "Panel elements and backgrounds" in `CLAUDE.md`): the inline
+  tier - a panel's own colour, gradient or picture background - plus per-panel
+  shapes, text, pictures and speed lines in a back layer (behind the characters)
+  and a front layer (in front of them, under the bubbles), which is this
+  section's back/front split at panel level. The library tier (`backgrounds/`,
+  `props/`, revisions, crops) isn't built yet.
+- **Speed lines** (`SpeedLinesElement`) are a panel element like the others: a
+  burst of thin, tapered wedges radiating out past the panel's edges from a
+  draggable, resizable clear ellipse (`Focus`) - move and resize handles work
+  the same way as any other element's box. The wedges themselves aren't stored
+  - only `Focus` and a small `SpeedLinesStyle` (colour, count, thickness,
+  jitter, seed) are - and are regenerated deterministically from `Seed` on
+  every draw (a hand-rolled hash, not `System.Random`, so a comic's render is
+  identical on every machine). "Shuffle" just advances the seed.
 - Two tiers, same as before: an **inline** background (a panel points
   straight at one image, no library entry — the default/simple path) or a
   **library entry** under `backgrounds/` for recurring locations, referenced
@@ -284,7 +308,10 @@ MyComic/
   character to editable layers.
 
 ### Open questions (ask the user before deciding)
-- Lettering/text rendering (deferred, same as the bubble POC).
+- Lettering fonts beyond what's built: bubble and free text can use any installed font
+  or the bundled default (Inter); a comic-style lettering font to bundle (OFL, none is
+  on NuGet), and carrying fonts with a project so it looks the same on a computer that
+  lacks them, are still open.
 - Export/print output pipeline.
 - Whether an "extract inline background to a reusable library entry" action
   is worth building, or manual promotion (copy the file, add

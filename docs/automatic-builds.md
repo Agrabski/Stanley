@@ -1,0 +1,76 @@
+# Getting and installing Stanley
+
+Linux only.
+
+## Get it
+
+- Latest tested build: *Releases › nightly*
+- Latest stable release: *Releases* › newest `vX.Y.Z`
+
+One file per release: `Stanley*.AppImage`.
+
+## Install
+
+These steps are for Ubuntu and the distributions based on it (Linux Mint, Pop!_OS,
+Zorin, elementary OS…). Other distributions work the same way.
+
+Execute the command below in your terminal
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Agrabski/Stanley/develop/install.sh | sh
+```
+
+- **On your PATH.** Stanley is also a command-line tool (`stanley init ./MyComic`,
+  `stanley --version`). Ubuntu and Mint add `~/bin` to your PATH when you log in,
+  if the folder exists. If you just created it, log out and back in once before
+  typing `stanley` in a terminal. The menu entry below works straight away.
+- **Keep it in your home folder.** Self-update replaces this file where it is,
+  under the same name. In a folder owned by root (`/opt`, `/usr/local/bin`), every
+  update asks for your admin password.
+- `~/.local/bin` works just as well, if you prefer it. Change the path in step 2 to
+  match.
+- To try it once without installing: `chmod +x Stanley*.AppImage`, then
+  `./Stanley*.AppImage` in the download folder.
+
+Stanley then shows up:
+- **Ubuntu** (GNOME): in *Show Applications* — search "Stanley". To keep it in the
+  dock, right-click › *Pin to Dash* (*Add to Favorites* on older versions).
+- **Linux Mint** (Cinnamon, MATE, Xfce): in *Menu › Graphics*, or search "Stanley".
+  Right-click it to add it to the panel or the desktop.
+
+If it doesn't appear straight away, log out and back in.
+
+`stanley --version` shows the build.
+
+### No `libfuse2`?
+
+You'll see `Error: No suitable fusermount binary found on the $PATH` — ignore it,
+the AppImage still runs. To silence it: `sudo apt install libfuse2t64` (Ubuntu
+24.04 / Mint 22 and newer) or `sudo apt install libfuse2` (older).
+
+### Uninstall
+
+```sh
+rm ~/bin/stanley ~/.local/share/applications/stanley.desktop
+```
+
+Your comics stay wherever you saved them. Stanley's own settings, logs and
+crash-recovery snapshots are in `~/.config/Stanley`; delete that folder too to
+remove everything.
+
+## Turn on self-update
+
+File › Options › Updates:
+
+1. Pick a channel: **Stable** or **Nightly**.
+2. Turn on **Check for updates automatically**, or press **Check now**.
+   **Install and restart** applies an update once found.
+
+Stanley is a public repository, so this works with no setup. If you hit
+GitHub's rate limit for anonymous requests (or you're running a private
+fork), add your own token: GitHub → Settings → Developer settings →
+Personal access tokens → Fine-grained tokens → this repo only →
+**Contents: Read-only** — then paste it into **GitHub token**.
+
+Only works when launched from the AppImage (`~/bin/stanley`; the menu entry above
+does that).

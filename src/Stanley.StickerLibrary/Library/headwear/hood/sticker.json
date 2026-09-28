@@ -1,0 +1,46 @@
+{
+  "colors": {
+    "top": "#7a8b99"
+  },
+  "id": "library",
+  "name": "Hood",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "depth": "back",
+      "name": "back",
+      "region": "head",
+      "variants": [
+        "up"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "hood",
+      "region": "head",
+      "variants": [
+        "up"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "depth": "back",
+      "name": "down",
+      "region": "torso",
+      "variants": [
+        "down"
+      ]
+    }
+  ],
+  "slot": "headwear",
+  "variants": [
+    "up",
+    "down"
+  ]
+}

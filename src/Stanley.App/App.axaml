@@ -5,6 +5,8 @@
   <Application.Styles>
     <FluentTheme />
     <dockFluent:DockFluentTheme />
+    <!-- ColorView, behind "More Colors…" in the fill and outline menus. -->
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
     <StyleInclude Source="avares://Stanley.Editors/RibbonStyles.axaml" />
   </Application.Styles>
 </Application>

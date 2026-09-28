@@ -1,0 +1,399 @@
+# Builds, tests and releases for Stanley. Branches: feature PRs go into
+# `develop`; `develop` is merged into `main` to release.
+#
+# - pull_request to develop/main: build + test, plus a notice saying which
+#   issues the PR closes and how that bumps the next version.
+# - nightly (schedule, at most once a day; or workflow_dispatch): if `develop`
+#   changed since the last nightly, build + test + publish it. Publishing packs
+#   the Linux build with Velopack (vpk) and uploads it to the rolling "nightly"
+#   release/tag on the Nightly channel - see velopack-release below. A manual
+#   run always builds. See "Scheduling" below for why there are two slots.
+# - push to main: build + test, and keep the draft release "vX.Y.Z" up to date
+#   (version and notes from the issues closed by the PRs main now contains, see
+#   .github/scripts/release-notes.js).
+# - release published (someone pressed Publish on the draft, creating the vX.Y.Z
+#   tag): build + test that tag, pack and upload it with Velopack on the Stable
+#   channel, merge the tag back into develop (so develop's nightlies version
+#   after it).
+# The binaries' version comes from MinVer (git tags), see Stanley.App.csproj.
+#
+# Scheduling: GitHub runs `schedule` workflows from the default branch's copy of
+# this file (develop), late when Actions is busy - worst at the top of the hour
+# (the first 02:00 nightly started at 07:34) - and under enough load it drops
+# them altogether. So the cron avoids :00, and a second slot later in the day
+# catches a dropped or failed first one. nightly-gate keeps it to one build a
+# day: a scheduled run skips if develop is still the commit the "nightly" tag
+# points at, or if a nightly was already uploaded today (UTC). velopack-release
+# moves the tag to each build's commit, since vpk only sets it when it first
+# creates the release.
+#
+# Linux (linux-x64) is the only build/release target - Windows and macOS
+# aren't supported.
+#
+# velopack-release (the job that uploads the packed build): unlike a stable
+# vX.Y.Z release (a new tag every time, never reused), the "nightly" release/
+# tag is reused every run. Velopack's GitHub feed is designed to accumulate -
+# delta updates diff against whatever earlier packages are still attached to
+# the release - so that job never deletes/recreates the nightly release the
+# way earlier versions of this workflow did; it prunes the previous nightly
+# package first instead, so the feed survives across runs without growing
+# without bound.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [develop, main]
+  release:
+    types: [published]
+  schedule:
+    - cron: "30 20 * * *" # 20:30 UTC daily - the nightly
+    - cron: "17 14 * * *" # 14:17 UTC - only builds if the first slot didn't (see "Scheduling")
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Supersede in-flight runs for the same PR; never cancel main/dispatch runs.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+  AVALONIA_TELEMETRY_OPTOUT: "1"
+  # global.json only selects the test runner (no sdk.version), so pin the SDK here.
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  # Nightly only: which develop commit to build, and whether it's new.
+  nightly-gate:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.gate.outputs.sha }}
+      build: ${{ steps.gate.outputs.build }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$GH_REPO/commits/develop" --jq .sha)
+          last=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || echo none)
+          # When the current nightly was uploaded: its assets are replaced by every build.
+          uploaded=$(gh api "repos/$GH_REPO/releases/tags/nightly" --jq '[.assets[].created_at] | max // ""' 2>/dev/null || true)
+          today=$(date -u +%F)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            build=true; why="manual run"
+          elif [ "$sha" = "$last" ]; then
+            build=false; why="develop hasn't changed since the last nightly ($sha)"
+          elif [ "${uploaded:0:10}" = "$today" ]; then
+            build=false; why="a nightly was already built today ($uploaded); tomorrow's picks up $sha"
+          else
+            build=true; why="develop moved to $sha (last nightly: $last, uploaded ${uploaded:-never})"
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          if [ "$build" = true ]; then
+            echo "Building develop: $why."
+          else
+            echo "::notice::Skipping the nightly: $why."
+          fi
+
+  # Keeps one draft release up to date; publishing it (by hand) makes the release.
+  release-draft:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
+    concurrency:
+      group: release-draft
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { draftRelease } = require('./.github/scripts/release-notes.js');
+            await draftRelease({ github, context, core });
+
+  release-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const { checkPullRequest } = require('./.github/scripts/release-notes.js');
+            await checkPullRequest({ github, context, core });
+
+  build-and-test:
+    needs: nightly-gate
+    # nightly-gate only runs for nightlies; otherwise it's skipped and we build anyway.
+    # A published release that isn't a vX.Y.Z tag (e.g. nightly) needs no build.
+    if: >-
+      ${{ !cancelled() && needs.nightly-gate.result != 'failure'
+      && (needs.nightly-gate.result == 'skipped' || needs.nightly-gate.outputs.build == 'true')
+      && (github.event_name != 'release' || (startsWith(github.ref_name, 'v') && !github.event.release.prerelease)) }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      # Full history + tags: MinVer derives the version from the latest vX.Y.Z tag.
+      # Nightlies build develop's commit; everything else the triggering ref.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.nightly-gate.outputs.sha }}
+
+      - id: sha
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # No packages.lock.json in the repo, so cache on the project files.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build Stanley.slnx -c Release
+
+      # Only used for file names and release titles; the binaries get the same
+      # version from MinVer during their own build.
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(dotnet msbuild src/Stanley.App -t:MinVer -getProperty:MinVerVersion)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+      - name: Test
+        shell: bash
+        run: |
+          set -euo pipefail
+          for proj in \
+            tests/Stanley.App.HeadlessTests/Stanley.App.HeadlessTests.csproj \
+            tests/Stanley.App.Tests/Stanley.App.Tests.csproj \
+            tests/Stanley.Editing.Tests/Stanley.Editing.Tests.csproj \
+            tests/Stanley.EditorFramework.Tests/Stanley.EditorFramework.Tests.csproj \
+            tests/Stanley.Editors.Tests/Stanley.Editors.Tests.csproj \
+            tests/Stanley.ProjectModel.Tests/Stanley.ProjectModel.Tests.csproj \
+            tests/Stanley.Rendering.Tests/Stanley.Rendering.Tests.csproj
+          do
+            echo "::group::$proj"
+            dotnet test --project "$proj" -c Release --no-build
+            echo "::endgroup::"
+          done
+
+  # Only nightlies and releases ship builds; PRs and pushes to main just test.
+  # Linux only (linux-x64) - Windows and macOS aren't supported targets.
+  publish:
+    needs: build-and-test
+    if: ${{ !cancelled() && needs.build-and-test.result == 'success' && contains(fromJSON('["schedule","workflow_dispatch","release"]'), github.event_name) }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.build-and-test.outputs.version }}
+      RID: linux-x64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.build-and-test.outputs.sha }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ env.RID }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ env.RID }}-
+            nuget-${{ runner.os }}-
+
+      - name: Publish
+        shell: bash
+        run: dotnet publish src/Stanley.App -c Release -r "$RID" --self-contained -o "out/stanley-$VERSION-$RID"
+
+      - name: Smoke test (CLI)
+        shell: bash
+        run: |
+          exe="out/stanley-$VERSION-$RID/stanley"
+          "$exe" --version
+          "$exe" --help
+
+      # vpk needs mksquashfs to build the Linux AppImage.
+      - name: Install squashfs-tools
+        run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+
+      - name: Install vpk
+        shell: bash
+        run: |
+          dotnet tool install --global vpk --version 1.2.158
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      # "-nightly" is appended for a schedule/workflow_dispatch run so the two
+      # tracks never cross-update into each other
+      # (Stanley.App.Updates.VelopackUpdateService computes the same name on
+      # the client side from the same input).
+      - name: Determine the Velopack channel
+        id: channel
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            echo "channel=linux" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=linux-nightly" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pack (Velopack)
+        shell: bash
+        run: |
+          vpk pack --packId Stanley --packVersion "$VERSION" \
+            --packDir "out/stanley-$VERSION-$RID" --mainExe stanley \
+            --packTitle Stanley --channel "${{ steps.channel.outputs.channel }}" \
+            --delta None --outputDir Releases
+
+      # The only build artifact - no separate plain tar.gz. The AppImage is
+      # what people install and run (see docs/automatic-builds.md); the
+      # .nupkg/RELEASES/*.json alongside it are what Velopack's update feed
+      # needs. Kept 30 days so a specific commit's build stays downloadable
+      # from the run itself, same as before.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: stanley-linux-x64
+          path: Releases
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  # Uploads the Linux build's packed Velopack output: a release was just
+  # published from the draft (Stable channel, its own never-reused vX.Y.Z
+  # tag), or this is a nightly build (Nightly channel, the "nightly"
+  # tag/release reused every run). See the file header for why the nightly
+  # release is pruned in place rather than replaced.
+  velopack-release:
+    needs: [build-and-test, publish]
+    if: ${{ !cancelled() && needs.publish.result == 'success' && contains(fromJSON('["schedule","workflow_dispatch","release"]'), github.event_name) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: velopack-release-${{ github.event_name == 'release' && github.event.release.tag_name || 'nightly' }}
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.build-and-test.outputs.version }}
+      SHA: ${{ needs.build-and-test.outputs.sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: stanley-linux-x64
+          path: Releases
+
+      - name: Install vpk
+        shell: bash
+        run: |
+          dotnet tool install --global vpk --version 1.2.158
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Determine the tag, track and channel
+        id: release
+        shell: bash
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "pre=" >> "$GITHUB_OUTPUT"
+            echo "nightly=false" >> "$GITHUB_OUTPUT"
+            echo "channel=linux" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "pre=--pre" >> "$GITHUB_OUTPUT"
+            echo "nightly=true" >> "$GITHUB_OUTPUT"
+            echo "channel=linux-nightly" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The nightly release/tag is never deleted (unlike before - see the file
+      # header), so without this its assets would grow by one package every
+      # single night forever. Only ever touches the "nightly" release: a stable
+      # vX.Y.Z release is a fresh tag every time, so there's nothing to prune.
+      # Also deletes any leftover .tar.gz/.zip - this workflow used to attach
+      # plain archives (three platforms' worth) directly to the release; only
+      # the Velopack package is uploaded now, so any of those are stale.
+      - name: Prune yesterday's nightly package
+        if: steps.release.outputs.nightly == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in $(gh release view nightly --json assets --jq ".assets[].name" 2>/dev/null || true); do
+            case "$name" in
+              *-linux-nightly*|*.linux-nightly.*|RELEASES-linux-nightly|*.tar.gz|*.zip)
+                gh release delete-asset nightly "$name" --yes || true ;;
+            esac
+          done
+
+      - name: Upload (Velopack)
+        shell: bash
+        run: |
+          vpk upload github --outputDir Releases --channel "${{ steps.release.outputs.channel }}" \
+            --repoUrl "$GITHUB_SERVER_URL/$GH_REPO" --token "$GH_TOKEN" \
+            --tag "${{ steps.release.outputs.tag }}" --merge --publish ${{ steps.release.outputs.pre }}
+
+      # vpk creates the tag only with the release (pointing at develop's head at
+      # the time) and never moves it after, so without this nightly-gate would
+      # compare develop against that first commit forever and never skip.
+      - name: Point the nightly tag at this build's commit
+        if: steps.release.outputs.nightly == 'true'
+        shell: bash
+        run: |
+          gh api -X PATCH "repos/$GH_REPO/git/refs/tags/nightly" -f sha="$SHA" -F force=true > /dev/null \
+            || echo "::warning::Couldn't move the nightly tag to $SHA; the next scheduled run will rebuild even if develop hasn't changed."
+
+      - name: Update the nightly release notes
+        if: steps.release.outputs.nightly == 'true'
+        shell: bash
+        run: |
+          notes="Automated build of \`develop\`, not a stable release. Picked up automatically by File > Options > Updates on the Nightly channel.
+
+          - Version: \`$VERSION\`
+          - Commit: $GITHUB_SERVER_URL/$GH_REPO/commit/$SHA
+          - Built: $(date -u +'%Y-%m-%d %H:%M UTC')"
+          gh release edit nightly --notes "$notes" --title "Nightly $VERSION"
+
+      # So develop contains the tag and its nightlies version after this release
+      # (MinVer only sees tags on ancestors). Fails softly if develop is protected
+      # or conflicts - then merge main into develop by hand.
+      - name: Merge the release back into develop
+        if: steps.release.outputs.nightly == 'false'
+        shell: bash
+        run: |
+          gh api "repos/$GH_REPO/merges" -f base=develop -f head="${{ steps.release.outputs.tag }}" \
+            -f commit_message="Merge ${{ steps.release.outputs.tag }} back into develop" \
+            || echo "::warning::Couldn't merge ${{ steps.release.outputs.tag }} into develop automatically; merge main into develop by hand."

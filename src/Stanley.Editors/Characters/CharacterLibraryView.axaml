@@ -1,0 +1,150 @@
+<!--
+  The Characters pane (docked left, a tab beside Pages): every character in the comic
+  with a little figure, its name, height and where it's used. Click to edit its body,
+  double-click to put it on the page, drag onto a panel to place it there, right-click
+  for more (Keep in My Assets among it). At the bottom, "New character" and "Reuse a
+  character": one kept in My Assets or from another recent comic. Like the page navigator it's not an editor - the ribbon keeps showing
+  whatever is being edited. The list's selection only *shows* which character is
+  open: opening happens on a click's release (or Enter), never on press, so pressing
+  to drag a character out leaves the page on screen to drop it onto.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterLibraryView"
+             x:DataType="local:CharacterLibraryViewModel">
+    <UserControl.DataTemplates>
+        <!-- A gallery tile: the figure and name; picking it adds the character (or shows the one already here). -->
+        <DataTemplate x:DataType="local:CharacterChoice">
+            <Button Classes="characterChoice" Width="80" Height="104" Margin="0,0,4,4" Padding="3"
+                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Command="{Binding $parent[UserControl].((local:CharacterLibraryViewModel)DataContext).AddChoiceCommand}"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <Border Background="White" CornerRadius="3" Opacity="{Binding FigureOpacity}">
+                        <local:CharacterFigure Character="{Binding Character}" />
+                    </Border>
+                </DockPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+    <UserControl.Styles>
+        <Style Selector="ListBox#CharacterList ListBoxItem">
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="ListBox#CharacterList ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StanleySelectedTintBrush}" />
+        </Style>
+        <Style
+            Selector="ListBox#CharacterList ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StanleySelectedHoverTintBrush}" />
+        </Style>
+        <Style
+            Selector="ListBox#CharacterList ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource StanleyHoverTintBrush}" />
+        </Style>
+        <Style Selector="ListBox#CharacterList ListBoxItem:selected TextBlock.name">
+            <Setter Property="Foreground" Value="{DynamicResource StanleySelectionBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+        <Border DockPanel.Dock="Bottom" Padding="8" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Spacing="4">
+                <Button Name="NewCharacterButton" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        ToolTip.Tip="Create a character and shape its body">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource NewIcon}" Width="14" Height="14" />
+                        <TextBlock Text="New character" />
+                    </StackPanel>
+                </Button>
+                <!-- Reuse a character: the ones kept in My Assets and the ones in your other recent comics (docs/my-characters.md §4.2). -->
+                <DropDownButton Name="AddCharacterButton" IsVisible="{Binding HasMyAssets}" HorizontalAlignment="Stretch"
+                                ToolTip.Tip="Add a character you kept in My Assets, or one from another of your comics">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Data="{StaticResource StarIcon}" Width="14" Height="14" />
+                        <TextBlock Text="Reuse a character" />
+                    </StackPanel>
+                    <DropDownButton.Flyout>
+                        <Flyout Placement="TopEdgeAlignedLeft" Opening="OnGalleryOpening">
+                            <ScrollViewer MaxHeight="460" Width="360" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Name="CharacterGalleryPanel" Spacing="6">
+                                    <TextBlock Text="My Assets" FontWeight="SemiBold" IsVisible="{Binding HasGalleryMyAssets}" />
+                                    <ItemsControl Name="MyAssetsCharacters" ItemsSource="{Binding GalleryMyAssets}" IsVisible="{Binding HasGalleryMyAssets}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                    <ItemsControl Name="OtherComicsCharacters" ItemsSource="{Binding GalleryOtherComics}" IsVisible="{Binding HasGalleryOtherComics}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="local:OtherComicCharacters">
+                                                <StackPanel Spacing="4" Margin="0,4,0,0">
+                                                    <TextBlock Text="{Binding Title, StringFormat='From {0}'}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <ItemsControl ItemsSource="{Binding Characters}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock IsVisible="{Binding IsGalleryEmpty}" TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                                               Text="Nothing to add yet. Right-click a character and choose Keep in My Assets to use them in any comic - characters in your other recent comics show up here too." />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Flyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+            </StackPanel>
+        </Border>
+        <Grid>
+            <TextBlock Text="No characters yet. Create one, then double-click it or drag it onto a panel."
+                       TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                       Margin="12" IsVisible="{Binding HasNoCharacters}" />
+            <ListBox Name="CharacterList" ItemsSource="{Binding Items}" SelectedItem="{Binding Current, Mode=OneWay}"
+                     Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="local:CharacterItem">
+                        <DockPanel
+                            ToolTip.Tip="Click to edit this character's body · double-click to put it on the page · drag onto a panel to place it there">
+                            <Border DockPanel.Dock="Left" Width="40" Height="56" Margin="0,0,8,0" CornerRadius="3"
+                                    Background="White"
+                                    BorderBrush="{DynamicResource StanleyThumbBorderBrush}" BorderThickness="1">
+                                <local:CharacterFigure Character="{Binding Character}" />
+                            </Border>
+                            <PathIcon DockPanel.Dock="Right" Data="{StaticResource StarIcon}" Width="12" Height="12" Margin="4,0,0,0"
+                                      VerticalAlignment="Center" IsVisible="{Binding IsKept}" Foreground="{DynamicResource StanleySelectionBrush}"
+                                      ToolTip.Tip="Kept in My Assets - you can add this character to any comic" />
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock
+                                    IsVisible="{Binding IsNotEditingName}"
+                                    Classes="name"
+                                    Text="{Binding Name}"
+                                    FontWeight="SemiBold"
+                                    TextTrimming="CharacterEllipsis" />
+                                
+                                <TextBox
+                                    IsVisible="{Binding IsEditingName}"
+                                    Classes="name"
+                                    Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                                    FontWeight="SemiBold"
+                                    PropertyChanged="TextboxPropertyChanged"
+                                    KeyDown="InputElement_OnKeyDown"
+                                    Focusable="True"
+                                    />
+                                <TextBlock Text="{Binding Details}" FontSize="11" Opacity="0.7"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+    </DockPanel>
+</UserControl>

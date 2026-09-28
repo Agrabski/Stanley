@@ -10,12 +10,11 @@ namespace Stanley.Editing.Abstractions;
 /// </summary>
 public readonly struct EditResult<T>
 {
-    private readonly T? _value;
 
     private EditResult(bool isValid, T? value, string? error)
     {
         IsValid = isValid;
-        _value = value;
+        Value = value;
         Error = error;
     }
 
@@ -26,7 +25,7 @@ public readonly struct EditResult<T>
 
     /// <summary>The accepted value. Throws if <see cref="IsValid"/> is false - check that first.</summary>
     public T Value => IsValid
-        ? _value!
+        ? field!
         : throw new InvalidOperationException($"Cannot read Value of a failed EditResult: {Error}");
 
     public static EditResult<T> Success(T value) => new(true, value, null);

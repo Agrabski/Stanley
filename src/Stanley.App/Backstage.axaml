@@ -1,34 +1,38 @@
 <!--
   The File view, after Word's "backstage": a full-window page with a coloured command
-  rail on the left (New, Open, Info, Save, Save As, Export, Close) and the chosen page
+  rail on the left (New, Open, Info, Save, Save As, Export, Close, My Assets) and the chosen page
   on the right. It's also what the window shows when no comic is open.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:app="using:Stanley.App"
              xmlns:documents="using:Stanley.App.Documents"
+             xmlns:editors="using:Stanley.Editors"
              x:Class="Stanley.App.Backstage"
              x:DataType="app:MainWindowViewModel">
-  <Grid ColumnDefinitions="200,*" Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
+  <Grid ColumnDefinitions="200,*" Background="{DynamicResource StanleyBackstageBrush}">
     <Border Classes="backstageRail">
       <StackPanel Margin="0,12,0,0">
-        <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page (Esc)" Padding="20,10" Margin="0,0,0,12">
+        <Button Name="BackButton" Command="{Binding CloseBackstageCommand}" IsVisible="{Binding HasDocument}" ToolTip.Tip="Back to the page" editors:Shortcut.Keys="Esc" Padding="20,10" Margin="0,0,0,12">
           <PathIcon Data="{StaticResource BackIcon}" Width="22" Height="22" />
         </Button>
-        <RadioButton Name="NewPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsNewPage}">
+        <RadioButton Name="NewPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsNewPage}"
+                     ToolTip.Tip="Start a new comic - the shortcut starts a blank one straight away" editors:Shortcut.Keys="Ctrl+N">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource NewIcon}" /><TextBlock Text="New" /></StackPanel>
         </RadioButton>
-        <RadioButton Name="OpenPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOpenPage}">
+        <RadioButton Name="OpenPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOpenPage}"
+                     ToolTip.Tip="Open a comic" editors:Shortcut.Keys="Ctrl+O">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Open" /></StackPanel>
         </RadioButton>
         <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
         <RadioButton Name="InfoPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsInfoPage}" IsEnabled="{Binding HasDocument}">
           <TextBlock Text="Info" Margin="26,0,0,0" />
         </RadioButton>
-        <Button Name="SaveButton" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
+        <Button Name="SaveButton" Command="{Binding SaveCommand}" ToolTip.Tip="Save" editors:Shortcut.Keys="Ctrl+S">
           <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource SaveIcon}" /><TextBlock Text="Save" /></StackPanel>
         </Button>
-        <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}">
+        <RadioButton Name="SaveAsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSaveAsPage}" IsEnabled="{Binding HasDocument}"
+                     ToolTip.Tip="Save the comic under another name or somewhere else" editors:Shortcut.Keys="Ctrl+Shift+S">
           <TextBlock Text="Save As" Margin="26,0,0,0" />
         </RadioButton>
         <RadioButton Name="ExportPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsExportPage}" IsEnabled="{Binding HasDocument}">
@@ -38,23 +42,40 @@
         <Button Name="CloseButton" Command="{Binding CloseDocumentCommand}">
           <TextBlock Text="Close" Margin="26,0,0,0" />
         </Button>
+        <Rectangle Height="1" Fill="#40FFFFFF" Margin="20,8" />
+        <RadioButton Name="MyAssetsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsMyAssetsPage}" IsVisible="{Binding HasMyAssets}"
+                     ToolTip.Tip="Everything you've kept to use again in any comic">
+          <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource StarIcon}" /><TextBlock Text="My Assets" /></StackPanel>
+        </RadioButton>
+        <RadioButton Name="OptionsPageButton" GroupName="Backstage" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsOptionsPage}">
+          <TextBlock Text="Options" Margin="26,0,0,0" />
+        </RadioButton>
       </StackPanel>
     </Border>
 
     <ScrollViewer Grid.Column="1">
       <StackPanel Margin="48,32,48,32" MaxWidth="920" HorizontalAlignment="Left">
         <TextBlock Name="MessageText" Text="{Binding Message}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
-                   Foreground="#B3261E" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
+                   Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
 
-        <!-- New -->
+        <!-- New: comic book pages (paper + layout), then strip and webcomic templates. -->
         <StackPanel IsVisible="{Binding IsNewPage}">
           <TextBlock Classes="backstageHeading" Text="New" />
+          <TextBlock Classes="backstageSubheading" Text="Comic book" Margin="0,0,0,8" />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
             <TextBlock Text="Paper" VerticalAlignment="Center" />
             <ComboBox Name="PaperSizeBox" ItemsSource="{Binding PaperSizes}" SelectedItem="{Binding NewPaperSize}" MinWidth="90" />
             <TextBlock Text="Pick a starting layout - you can change it any time from the Layout tab." Opacity="0.7" VerticalAlignment="Center" Margin="12,0,0,0" />
           </StackPanel>
           <WrapPanel Name="NewTiles" />
+
+          <TextBlock Classes="backstageSubheading" Text="Comic strips" />
+          <TextBlock Text="Each page is one strip, and every new page starts with the same panels." Opacity="0.7" Margin="0,0,0,12" />
+          <WrapPanel Name="StripTiles" />
+
+          <TextBlock Classes="backstageSubheading" Text="Webcomics" />
+          <TextBlock Text="Made to read on screen: File › Export › PNG gives each page at the size shown, ready to post." Opacity="0.7" Margin="0,0,0,12" TextWrapping="Wrap" />
+          <WrapPanel Name="WebcomicTiles" />
         </StackPanel>
 
         <!-- Open -->
@@ -62,7 +83,7 @@
           <TextBlock Classes="backstageHeading" Text="Open" />
 
           <!-- Crash recovery, like Word's Document Recovery pane. -->
-          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="#FFF4E0" BorderBrush="#F0B35A" BorderThickness="1"
+          <Border Name="RecoveredSection" IsVisible="{Binding HasRecovered}" Background="{DynamicResource StanleyNoticeBackgroundBrush}" BorderBrush="{DynamicResource StanleyNoticeBorderBrush}" BorderThickness="1"
                   CornerRadius="4" Padding="16,12" Margin="0,0,0,24" MaxWidth="720" HorizontalAlignment="Left">
             <StackPanel Spacing="8">
               <TextBlock Text="Recovered" FontSize="15" FontWeight="SemiBold" />
@@ -114,18 +135,47 @@
         <!-- Info -->
         <StackPanel IsVisible="{Binding IsInfoPage}">
           <TextBlock Classes="backstageHeading" Text="Info" />
-          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="12" MaxWidth="640" HorizontalAlignment="Left">
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="12" MaxWidth="640" HorizontalAlignment="Left">
             <TextBlock Text="Title" VerticalAlignment="Center" Opacity="0.7" />
             <TextBox Name="TitleBox" Grid.Column="1" Text="{Binding DocumentTitle}" MinWidth="320" />
-            <TextBlock Grid.Row="1" Text="Location" Opacity="0.7" />
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LocationText}" TextWrapping="Wrap" />
-            <TextBlock Grid.Row="2" Text="Page size" Opacity="0.7" />
-            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PageSizeText}" />
-            <TextBlock Grid.Row="3" Text="Contents" Opacity="0.7" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PanelCountText}" />
-            <TextBlock Grid.Row="4" Text="Status" Opacity="0.7" />
-            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DocumentCaption}" />
+            <TextBlock Grid.Row="1" Text="Issue" VerticalAlignment="Center" Opacity="0.7" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <TextBox Name="IssueNumberBox" Text="{Binding IssueNumber}" Width="80" ToolTip.Tip="The issue's number - 1, 0, 1.5 or whatever you print" />
+              <TextBox Name="IssueTitleBox" Text="{Binding IssueTitle}" Width="220" PlaceholderText="Issue title (optional)" ToolTip.Tip="The issue's own title, if it has one - e.g. Annual" />
+            </StackPanel>
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="Texts on the pages show these wherever they have {title} or {issue} - a title page does, and Text › Fields adds them to any text."
+                       TextWrapping="Wrap" FontSize="12" Opacity="0.7" Margin="0,-6,0,0" />
+            <TextBlock Grid.Row="3" Text="Location" Opacity="0.7" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LocationText}" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4" Text="Page size" Opacity="0.7" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding PageSizeText}" />
+            <TextBlock Grid.Row="5" Text="Contents" Opacity="0.7" />
+            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PanelCountText}" />
+            <TextBlock Grid.Row="6" Text="Status" Opacity="0.7" />
+            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding DocumentCaption}" />
           </Grid>
+
+          <TextBlock Classes="backstageSubheading" Text="Issues" Margin="0,24,0,8" />
+          <ItemsControl Name="IssuesList" ItemsSource="{Binding Issues}" MaxWidth="640" HorizontalAlignment="Left">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="app:IssueEntry">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Caption}" FontWeight="SemiBold" />
+                      <TextBlock Text="(current)" FontSize="12" Opacity="0.7" IsVisible="{Binding IsCurrent}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding PageCountText}" FontSize="12" Opacity="0.75" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="Open" VerticalAlignment="Center" IsVisible="{Binding !IsCurrent}"
+                          Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).SwitchIssueCommand}" CommandParameter="{Binding Id}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Name="NewIssueInfoButton" Command="{Binding NewIssueCommand}" Padding="14,10" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource NewIcon}" /><TextBlock Text="New issue" /></StackPanel>
+          </Button>
         </StackPanel>
 
         <!-- Save As -->
@@ -134,9 +184,9 @@
           <TextBlock Text="Current location" Opacity="0.7" />
           <TextBlock Text="{Binding LocationText}" Margin="0,4,0,20" TextWrapping="Wrap" />
           <Button Name="BrowseSaveAsButton" Command="{Binding SaveAsCommand}" Padding="14,10">
-            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Choose a folder…" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="10"><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Browse…" /></StackPanel>
           </Button>
-          <TextBlock Text="Pick an empty folder, or any folder to save the comic into a new folder inside it, named after its title. The whole comic is copied - nothing at the old location changes."
+          <TextBlock Text="Name the comic and choose where it goes: it's saved as a folder of that name (a new comic takes the name as its title, too). The whole comic is copied - nothing at the old location changes."
                      Opacity="0.7" Margin="0,8,0,0" TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" />
         </StackPanel>
 
@@ -153,9 +203,124 @@
             <Button Name="ExportPngButton" Classes="tile" Command="{Binding ExportPngCommand}" Width="180" Height="110">
               <StackPanel Spacing="6">
                 <TextBlock Text="PNG" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                <TextBlock Text="The current page at 300 dpi. For the web and social media." TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
+                <TextBlock Text="{Binding PngExportText}" TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.75" />
               </StackPanel>
             </Button>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- My Assets (docs/asset-packs.md §6.2): everything kept, with kind chips. Keeping happens where the thing is. -->
+        <Panel IsVisible="{Binding IsMyAssetsPage}">
+          <StackPanel Name="MyAssetsPanel" DataContext="{Binding MyAssetsPage}" x:DataType="editors:MyAssetsPageViewModel">
+            <TextBlock Classes="backstageHeading" Text="My Assets" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,16"
+                       Text="Things you keep here can go into any comic: right-click a group on a page or a character in the Characters pane and choose Keep in My Assets. Each comic keeps its own copy, so nothing here is needed to open one." />
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,12">
+              <RadioButton Name="MyAssetsAllChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsAll}" Content="{Binding AllText}" />
+              <RadioButton Name="MyAssetsObjectGroupsChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsObjectGroups}" Content="{Binding ObjectGroupsText}" />
+              <RadioButton Name="MyAssetsCharactersChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsCharacters}" Content="{Binding CharactersText}" />
+            </StackPanel>
+            <TextBlock Text="{Binding Problem}" IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <Border Name="MyAssetsRemoveBar" IsVisible="{Binding HasPendingRemoval}" Padding="12,8" Margin="0,0,0,12" CornerRadius="4"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+                  <Button Name="ConfirmRemoveAssetButton" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelRemoveCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding RemovalQuestion}" TextWrapping="Wrap" VerticalAlignment="Center" />
+              </DockPanel>
+            </Border>
+            <TextBlock Name="MyAssetsEmptyText" IsVisible="{Binding IsEmpty}" Opacity="0.7" TextWrapping="Wrap" MaxWidth="640"
+                       Text="Nothing kept yet. Group a few shapes, texts or pictures on a page (select them, then Ctrl+G) and right-click the group - or right-click a character - and choose Keep in My Assets." />
+            <TextBlock IsVisible="{Binding IsFilteredEmpty}" Opacity="0.7" Text="None of these kept yet." />
+            <ItemsControl Name="MyAssetsGrid" ItemsSource="{Binding Tiles}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="editors:MyAssetTile">
+                  <Border Width="140" Height="176" Margin="0,0,10,10" Padding="8" CornerRadius="4" Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1">
+                    <Border.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Rename" IsVisible="{Binding CanRename}"
+                                  Command="{Binding $parent[ItemsControl].((editors:MyAssetsPageViewModel)DataContext).RenameCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Remove from My Assets"
+                                  Command="{Binding $parent[ItemsControl].((editors:MyAssetsPageViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                      </ContextMenu>
+                    </Border.ContextMenu>
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Bottom" Spacing="1" Margin="0,6,0,0">
+                        <TextBlock Text="{Binding Name}" IsVisible="{Binding IsNotEditingName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                        <TextBox Classes="assetName" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" IsVisible="{Binding IsEditingName}"
+                                 PropertyChanged="AssetNamePropertyChanged" KeyDown="AssetNameKeyDown" />
+                        <TextBlock Text="{Binding KindText}" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+                      </StackPanel>
+                      <Border Background="White" CornerRadius="3">
+                        <Panel>
+                          <editors:CharacterFigure Character="{Binding Character}" IsVisible="{Binding IsCharacter}" />
+                          <editors:ObjectGroupPreview Group="{Binding ObjectGroup}" IsVisible="{Binding IsObjectGroup}" />
+                        </Panel>
+                      </Border>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Opacity="0.6" FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap"
+                       Text="{Binding FolderText, StringFormat='Kept in {0} - change where in Options.'}" />
+          </StackPanel>
+        </Panel>
+
+        <!-- Options -->
+        <StackPanel IsVisible="{Binding IsOptionsPage}">
+          <TextBlock Classes="backstageHeading" Text="Options" />
+          <TextBlock Classes="backstageSubheading" Text="Appearance" Margin="0,0,0,8" />
+          <StackPanel Spacing="4">
+            <RadioButton Name="SystemThemeButton" GroupName="Theme" IsChecked="{Binding IsSystemTheme}" Content="Match my system (light or dark)" />
+            <RadioButton Name="LightThemeButton" GroupName="Theme" IsChecked="{Binding IsLightTheme}" Content="Light" />
+            <RadioButton Name="DarkThemeButton" GroupName="Theme" IsChecked="{Binding IsDarkTheme}" Content="Dark" />
+          </StackPanel>
+          <TextBlock Text="Pages always stay white, so what you see is what prints." Opacity="0.7" Margin="0,8,0,0" />
+
+          <TextBlock Classes="backstageSubheading" Text="Updates" Margin="0,24,0,8" />
+          <CheckBox Name="AutoCheckForUpdatesBox" Content="Check for updates automatically" IsChecked="{Binding AutoCheckForUpdates}" />
+          <StackPanel Spacing="4" Margin="0,8,0,0">
+            <RadioButton Name="StableChannelButton" GroupName="UpdateChannel" IsChecked="{Binding IsStableChannel}" Content="Stable - tagged releases only" />
+            <RadioButton Name="NightlyChannelButton" GroupName="UpdateChannel" IsChecked="{Binding IsNightlyChannel}" Content="Nightly - every change to develop, for testers" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <TextBlock Text="GitHub token (optional)" VerticalAlignment="Center" />
+            <TextBox Name="GithubTokenBox" Text="{Binding GithubToken}" PasswordChar="•" Width="320"
+                      PlaceholderText="Only needed to avoid GitHub's rate limit, or for a private fork" />
+          </StackPanel>
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,4,0,0"
+                      Text="Stanley is a public repository, so checking for updates works out of the box. Add a personal access token only if you hit GitHub's rate limit for anonymous requests, or if you're running a private fork. It's kept on this machine only, and only ever sent to GitHub." />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
+            <Button Name="CheckForUpdatesButton" Content="Check now" Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding CanCheckForUpdates}" />
+            <Button Name="InstallUpdateButton" Content="Install and restart" Command="{Binding InstallUpdateCommand}" IsVisible="{Binding HasUpdateAvailable}" />
+            <TextBlock Name="UpdateStatusText" Text="{Binding UpdateStatus}" VerticalAlignment="Center" Opacity="0.8" />
+          </StackPanel>
+
+          <TextBlock Classes="backstageSubheading" Text="SVG editor" Margin="0,24,0,8" />
+          <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,8"
+                      Text="What Character &gt; Look &gt; Draw your own... and Edit drawing... open sticker art in - a vector editor, such as Inkscape. Stanley never guesses at the operating system's default app for SVG files, which is often just a viewer." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Name="SvgEditorPathText" Text="{Binding SvgEditorPath, TargetNullValue='Not set up yet', FallbackValue='Not set up yet'}" VerticalAlignment="Center" />
+            <Button Name="ChooseSvgEditorButton" Content="Change..." Command="{Binding ChooseSvgEditorCommand}" />
+          </StackPanel>
+
+          <StackPanel IsVisible="{Binding HasMyAssets}">
+            <TextBlock Classes="backstageSubheading" Text="My Assets" Margin="0,24,0,8" />
+            <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,8"
+                        Text="The folder the things you keep for every comic live in. Put it somewhere that's backed up or synced - or in a git repository, if you'd like its history. What's already in the old folder stays there." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Name="MyAssetsFolderText" Text="{Binding MyAssetsFolderText}" VerticalAlignment="Center" />
+              <Button Name="ChooseMyAssetsFolderButton" Content="Change..." Command="{Binding ChooseMyAssetsFolderCommand}" />
+              <Button Content="Show folder" Command="{Binding ShowMyAssetsFolderCommand}" />
+            </StackPanel>
           </StackPanel>
         </StackPanel>
       </StackPanel>

@@ -1,0 +1,38 @@
+{
+  "colors": {
+    "bottom": "#3a5a8c"
+  },
+  "fabrics": {
+    "bottom": {
+      "texture": {
+        "kind": "denim"
+      }
+    }
+  },
+  "id": "library",
+  "name": "Jeans",
+  "parts": [
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0.6,
+        "to": 1
+      },
+      "name": "seat",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0,
+        "to": 1
+      },
+      "name": "legs",
+      "region": "leg"
+    }
+  ],
+  "slot": "bottom",
+  "variants": [
+    "default"
+  ]
+}

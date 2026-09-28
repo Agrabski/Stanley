@@ -260,3 +260,68 @@ public readonly record struct BubbleId : IStrongId<BubbleId>, IParsable<BubbleId
     public int CompareTo(BubbleId other) => string.CompareOrdinal(Value, other.Value);
     public override string ToString() => Value;
 }
+
+/// <summary>
+/// Identifies a drawn shape, text or picture within the one panel that embeds it
+/// (<c>Panel.Elements</c>) - stable only within that panel, the same way a
+/// <see cref="BubbleId"/> is.
+/// </summary>
+[JsonConverter(typeof(StrongIdJsonConverter<ElementId>))]
+public readonly record struct ElementId : IStrongId<ElementId>, IParsable<ElementId>, IComparable<ElementId>
+{
+    public string Value { get; }
+    private ElementId(string value) => Value = value;
+    public static ElementId New() => new(EntityIdValue.NewToken());
+    public static ElementId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static ElementId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out ElementId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new ElementId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(ElementId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}
+
+/// <summary>
+/// Identifies an <c>objects/&lt;id&gt;-slug/</c> object group (docs/asset-packs.md §3, §7.1) -
+/// the out-of-line, canonical copy of a kept <see cref="Issues.GroupElement"/>, which a
+/// panel's inline copy references via <see cref="Issues.GroupElement.SourceId"/>.
+/// </summary>
+[JsonConverter(typeof(StrongIdJsonConverter<ObjectGroupId>))]
+public readonly record struct ObjectGroupId : IStrongId<ObjectGroupId>, IParsable<ObjectGroupId>, IComparable<ObjectGroupId>
+{
+    public string Value { get; }
+    private ObjectGroupId(string value) => Value = value;
+    public static ObjectGroupId New() => new(EntityIdValue.NewToken());
+    public static ObjectGroupId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static ObjectGroupId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out ObjectGroupId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new ObjectGroupId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(ObjectGroupId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}
+
+/// <summary>Identifies a <c>packs/&lt;id&gt;-slug.json</c> My Assets pack (docs/asset-packs.md §6.2, §7.2).</summary>
+[JsonConverter(typeof(StrongIdJsonConverter<AssetPackId>))]
+public readonly record struct AssetPackId : IStrongId<AssetPackId>, IParsable<AssetPackId>, IComparable<AssetPackId>
+{
+    public string Value { get; }
+    private AssetPackId(string value) => Value = value;
+    public static AssetPackId New() => new(EntityIdValue.NewToken());
+    public static AssetPackId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static AssetPackId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out AssetPackId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new AssetPackId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(AssetPackId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}

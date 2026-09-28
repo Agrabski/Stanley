@@ -1,0 +1,18 @@
+{
+  "colors": {},
+  "id": "library",
+  "name": "Button",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "nose",
+      "region": "head"
+    }
+  ],
+  "slot": "nose",
+  "variants": [
+    "default"
+  ]
+}

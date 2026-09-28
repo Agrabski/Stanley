@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="headwear">
+  <g id="seams" inkscape:groupmode="layer" inkscape:label="seams">
+    <path class="slot-hat" d="M0,-1011.4 L0,-967.9" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M7.2,-1011.4 C12.1,-1009.9 17.1,-1009 21.8,-1006.7 C26.4,-1004.4 30.9,-1001.2 35,-997.5 C39,-993.7 42.8,-989.2 46,-984.2 C49.2,-979.3 51.5,-973.3 54.2,-967.9" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M-7.2,-1011.4 C-12.1,-1009.9 -17.1,-1009 -21.8,-1006.7 C-26.4,-1004.4 -30.9,-1001.2 -35,-997.5 C-39,-993.7 -42.8,-989.2 -46,-984.2 C-49.2,-979.3 -51.5,-973.3 -54.2,-967.9" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M-7,-1011 C-7,-1016 7,-1016 7,-1011 Z" fill="#2f8a57" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g id="brim" inkscape:groupmode="layer" inkscape:label="brim">
+    <path class="slot-hat" d="M-76,-967 C-76,-970.2 -55.2,-970 -42.6,-971 C-29.9,-972 -14.2,-973 0,-973 C14.2,-973 29.9,-972 42.6,-971 C55.2,-970 76,-970.2 76,-967 C76,-963.8 55.2,-954 42.6,-952 C29.9,-950 14.2,-955 0,-955 C-14.2,-955 -29.9,-950 -42.6,-952 C-55.2,-954 -76,-963.8 -76,-967 Z" fill="#2f8a57" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hat" d="M-68,-966 C-58,-962.7 -49.3,-957.2 -38,-956 C-26.7,-954.8 -12.7,-959 0,-959 C12.7,-959 26.7,-954.8 38,-956 C49.3,-957.2 58,-962.7 68,-966" fill="none" stroke="#216541" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

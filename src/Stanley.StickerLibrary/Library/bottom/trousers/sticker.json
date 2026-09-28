@@ -1,0 +1,31 @@
+{
+  "colors": {
+    "bottom": "#34495e"
+  },
+  "id": "library",
+  "name": "Trousers",
+  "parts": [
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0.6,
+        "to": 1
+      },
+      "name": "seat",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0,
+        "to": 1
+      },
+      "name": "legs",
+      "region": "leg"
+    }
+  ],
+  "slot": "bottom",
+  "variants": [
+    "default"
+  ]
+}

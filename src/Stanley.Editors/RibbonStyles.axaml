@@ -3,13 +3,68 @@
   editor's ribbon content. Included once, application-wide, from App.axaml.
 -->
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Stanley.Editors">
   <Styles.Resources>
+    <ResourceDictionary>
+    <!-- Stanley's own colours, per theme. Everything else comes from FluentTheme's
+         system brushes, which already follow light/dark. -->
+    <ResourceDictionary.ThemeDictionaries>
+      <ResourceDictionary x:Key="Light">
+        <SolidColorBrush x:Key="StanleyChromeBrush" Color="#1E5AA8" />
+        <SolidColorBrush x:Key="StanleyChromeHoverBrush" Color="#2A6FC9" />
+        <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#174A8C" />
+        <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#1D63C2" />
+        <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#B86500" />
+        <SolidColorBrush x:Key="StanleyCharacterTextBrush" Color="#1E7A45" />
+        <SolidColorBrush x:Key="StanleyShapeTextBrush" Color="#7D3C98" />
+        <SolidColorBrush x:Key="StanleyLetteringTextBrush" Color="#0E6E8C" />
+        <SolidColorBrush x:Key="StanleyErrorBrush" Color="#B3261E" />
+        <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#FFF4E0" />
+        <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#F0B35A" />
+        <SolidColorBrush x:Key="StanleySelectionBrush" Color="#1E5AA8" />
+        <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#1A1E5AA8" />
+        <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#261E5AA8" />
+        <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#0F000000" />
+        <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#C8C8C8" />
+        <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="StanleyGroupLabelBrush" Color="#1A1A1A" />
+        <SolidColorBrush x:Key="StanleyTabHeaderBrush" Color="#000000" />
+      </ResourceDictionary>
+      <ResourceDictionary x:Key="Dark">
+        <SolidColorBrush x:Key="StanleyChromeBrush" Color="#1F3F66" />
+        <SolidColorBrush x:Key="StanleyChromeHoverBrush" Color="#2C5687" />
+        <SolidColorBrush x:Key="StanleyChromeCheckedBrush" Color="#162E4D" />
+        <SolidColorBrush x:Key="StanleyPanelTextBrush" Color="#7DB3FF" />
+        <SolidColorBrush x:Key="StanleyBubbleTextBrush" Color="#FFB35C" />
+        <SolidColorBrush x:Key="StanleyCharacterTextBrush" Color="#7FDCA4" />
+        <SolidColorBrush x:Key="StanleyShapeTextBrush" Color="#D7A8F0" />
+        <SolidColorBrush x:Key="StanleyLetteringTextBrush" Color="#7FD3F0" />
+        <SolidColorBrush x:Key="StanleyErrorBrush" Color="#FF8A80" />
+        <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#3A2F1C" />
+        <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#8C6A2E" />
+        <SolidColorBrush x:Key="StanleySelectionBrush" Color="#6FA8F0" />
+        <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#2E5B9BEA" />
+        <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#405B9BEA" />
+        <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#14FFFFFF" />
+        <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#5A5A5A" />
+        <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#232427" />
+        <SolidColorBrush x:Key="StanleyGroupLabelBrush" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="StanleyTabHeaderBrush" Color="#FFFFFF" />
+      </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
     <StreamGeometry x:Key="SpeechIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z</StreamGeometry>
     <StreamGeometry x:Key="ShoutIcon">M12,1 L14.5,6.5 L20.5,4 L18.5,10 L23,13 L17,14.5 L18.5,21 L12,17.5 L5.5,21 L7,14.5 L1,13 L5.5,10 L3.5,4 L9.5,6.5 Z</StreamGeometry>
     <StreamGeometry x:Key="WhisperIcon">M12,3 A10,8 0 0 1 17,4 L16.2,5.8 A8,6 0 0 0 12,5 Z M19.5,6 A10,8 0 0 1 22,11 L20,11 A8,6 0 0 0 18,7.3 Z M22,12.5 A10,8 0 0 1 18.5,17.3 L17.3,15.7 A8,6 0 0 0 20,12.5 Z M15.5,18.5 A10,8 0 0 1 8.5,18.5 L9.2,16.7 A8,6 0 0 0 14.8,16.7 Z M5.5,17.3 A10,8 0 0 1 2,12.5 L4,12.5 A8,6 0 0 0 6.7,15.7 Z M2,11 A10,8 0 0 1 4.5,6 L6,7.3 A8,6 0 0 0 4,11 Z M7,4 A10,8 0 0 1 10.5,3.1 L10.8,5.1 A8,6 0 0 0 7.8,5.8 Z</StreamGeometry>
+    <!-- A scalloped thought cloud with a trail of three shrinking dots leading down to the thinker. -->
+    <StreamGeometry x:Key="ThoughtCloudIcon">M5,15.5 A2.6,2.6 0 1 1 6.3,10.6 A3.4,3.4 0 1 1 13.2,8.3 A3,3 0 1 1 18.6,10.8 A2.6,2.6 0 1 1 17.5,15.5 Z M8,18.5 A1.3,1.3 0 1 1 8,21.1 A1.3,1.3 0 1 1 8,18.5 Z M6,22 A0.8,0.8 0 1 1 6,23.6 A0.8,0.8 0 1 1 6,22 Z</StreamGeometry>
     <StreamGeometry x:Key="AddBubbleIcon">M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z M11,7 V10 H8 V12 H11 V15 H13 V12 H16 V10 H13 V7 Z</StreamGeometry>
     <StreamGeometry x:Key="TextIcon">M4,3 H20 V8 H18 V5 H13 V19 H16 V21 H8 V19 H11 V5 H6 V8 H4 Z</StreamGeometry>
+    <StreamGeometry x:Key="PasteIcon">M5,4 H8 V6 H16 V4 H19 C19.6,4 20,4.4 20,5 V21 C20,21.6 19.6,22 19,22 H5 C4.4,22 4,21.6 4,21 V5 C4,4.4 4.4,4 5,4 Z M6,8 V20 H18 V8 Z M9,2 H15 V5.5 H9 Z M8,10 H16 V12 H8 Z M8,14 H14 V16 H8 Z</StreamGeometry>
+    <StreamGeometry x:Key="CutIcon">F1 M2.5,18 A3.5,3.5 0 1 1 9.5,18 A3.5,3.5 0 1 1 2.5,18 Z M4.2,18 A1.8,1.8 0 1 0 7.8,18 A1.8,1.8 0 1 0 4.2,18 Z M14.5,18 A3.5,3.5 0 1 1 21.5,18 A3.5,3.5 0 1 1 14.5,18 Z M16.2,18 A1.8,1.8 0 1 0 19.8,18 A1.8,1.8 0 1 0 16.2,18 Z M8,15.5 L17.5,2 L19,3 L10,16.5 Z M16,15.5 L14,16.5 L5,3 L6.5,2 Z</StreamGeometry>
+    <StreamGeometry x:Key="CopyIcon">M8,2 H20 V16 H18 V4 H8 Z M4,6 H16 V22 H4 Z M6,8 V20 H14 V8 Z</StreamGeometry>
+    <StreamGeometry x:Key="DuplicateIcon">M8,3 H21 V16 H19 V5 H8 Z M3,8 H16 V21 H3 Z M5,10 V19 H14 V10 Z M8.5,11.5 H10.5 V13.5 H12.5 V15.5 H10.5 V17.5 H8.5 V15.5 H6.5 V13.5 H8.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="CheckIcon">M9,16.2 L4.8,12 L3.4,13.4 L9,19 L21,7 L19.6,5.6 Z</StreamGeometry>
     <StreamGeometry x:Key="DeleteIcon">M6,19 C6,20.1 6.9,21 8,21 H16 C17.1,21 18,20.1 18,19 V7 H6 Z M19,4 H15.5 L14.5,3 H9.5 L8.5,4 H5 V6 H19 Z</StreamGeometry>
     <StreamGeometry x:Key="ColumnsIcon">M2,3 H11 V21 H2 Z M13,3 H22 V21 H13 Z</StreamGeometry>
     <StreamGeometry x:Key="RowsIcon">M3,2 H21 V11 H3 Z M3,13 H21 V22 H3 Z</StreamGeometry>
@@ -19,7 +74,35 @@
     <StreamGeometry x:Key="FolderIcon">M10,4 H4 C2.9,4 2,4.9 2,6 V18 C2,19.1 2.9,20 4,20 H20 C21.1,20 22,19.1 22,18 V8 C22,6.9 21.1,6 20,6 H12 Z</StreamGeometry>
     <StreamGeometry x:Key="NewIcon">M14,2 H6 C4.9,2 4,2.9 4,4 V20 C4,21.1 4.9,22 6,22 H18 C19.1,22 20,21.1 20,20 V8 Z M13,9 V3.5 L18.5,9 Z</StreamGeometry>
     <StreamGeometry x:Key="PageNumberIcon">M5,2 H19 V22 H5 Z M7,4 V20 H17 V4 Z M11,15 H12.5 V11 L11.3,11.6 L10.9,10.7 L12.8,9.6 H13.9 V15 H15 V16.4 H11 Z</StreamGeometry>
+    <StreamGeometry x:Key="CharacterIcon">M12,2 A3,3 0 1 1 11.99,2 Z M8,8.5 H16 A2,2 0 0 1 18,10.5 V15 H16 V22 H13 V16 H11 V22 H8 V15 H6 V10.5 A2,2 0 0 1 8,8.5 Z</StreamGeometry>
+    <!-- My Assets (docs/asset-packs.md): a star, like a favourite - kept for every comic. -->
+    <StreamGeometry x:Key="StarIcon">M12,17.27 L18.18,21 L16.54,13.97 L22,9.24 L14.81,8.63 L12,2 L9.19,8.63 L2,9.24 L7.46,13.97 L5.82,21 Z</StreamGeometry>
+    <StreamGeometry x:Key="SideViewIcon">M11,2 A3,3 0 1 1 10.99,2 Z M13.6,4.4 L15.4,5.3 L13.6,6 Z M9,8.5 H12.5 A2.5,2.5 0 0 1 15,11 V14 A1.5,1.5 0 0 1 13.5,15.5 H13 V22 H9.5 V15.5 H9 A1.5,1.5 0 0 1 7.5,14 V10 A1.5,1.5 0 0 1 9,8.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="FlipIcon">M11,2 H13 V22 H11 Z M9,6 V18 L2,18 Z M15,6 L22,18 H15 Z M16.5,11 V16.5 H19.7 Z</StreamGeometry>
+    <StreamGeometry x:Key="CloseIcon">M5.6,4.2 L12,10.6 L18.4,4.2 L19.8,5.6 L13.4,12 L19.8,18.4 L18.4,19.8 L12,13.4 L5.6,19.8 L4.2,18.4 L10.6,12 L4.2,5.6 Z</StreamGeometry>
     <StreamGeometry x:Key="BackIcon">M20,11 H7.8 L13.4,5.4 L12,4 L4,12 L12,20 L13.4,18.6 L7.8,13 H20 Z</StreamGeometry>
+    <StreamGeometry x:Key="PenIcon">M3,21 L3.9,16.4 L15.6,4.7 L19.3,8.4 L7.6,20.1 Z M16.8,3.5 L18.4,1.9 C18.9,1.4 19.7,1.4 20.2,1.9 L22.1,3.8 C22.6,4.3 22.6,5.1 22.1,5.6 L20.5,7.2 Z</StreamGeometry>
+    <StreamGeometry x:Key="LineIcon">M3.3,19.3 L19.3,3.3 L20.7,4.7 L4.7,20.7 Z</StreamGeometry>
+    <StreamGeometry x:Key="RectangleIcon">M3,5 H21 V19 H3 Z M5,7 V17 H19 V7 Z</StreamGeometry>
+    <StreamGeometry x:Key="EllipseIcon">M12,4 C17,4 21,7.6 21,12 C21,16.4 17,20 12,20 C7,20 3,16.4 3,12 C3,7.6 7,4 12,4 Z M12,6 C8.1,6 5,8.7 5,12 C5,15.3 8.1,18 12,18 C15.9,18 19,15.3 19,12 C19,8.7 15.9,6 12,6 Z</StreamGeometry>
+    <StreamGeometry x:Key="CaptionIcon">M2,5 H22 V19 H2 Z M4,7 V17 H20 V7 Z M6,9 H18 V11 H6 Z M6,13 H14 V15 H6 Z</StreamGeometry>
+    <StreamGeometry x:Key="BehindIcon">M3,3 H15 V15 H3 Z M17,9 H21 V21 H9 V17 H11 V19 H19 V11 H17 Z</StreamGeometry>
+    <StreamGeometry x:Key="InFrontIcon">M3,3 H15 V7 H13 V5 H5 V13 H7 V15 H3 Z M9,9 H21 V21 H9 Z</StreamGeometry>
+    <StreamGeometry x:Key="BackgroundIcon">M2,4 H22 V20 H2 Z M4,6 V14.5 L9,10 L13,14 L16,11 L20,15 V6 Z</StreamGeometry>
+    <StreamGeometry x:Key="AlignLeftIcon">M3,4 H21 V6 H3 Z M3,9 H15 V11 H3 Z M3,14 H21 V16 H3 Z M3,19 H15 V21 H3 Z</StreamGeometry>
+    <StreamGeometry x:Key="AlignCenterIcon">M3,4 H21 V6 H3 Z M6,9 H18 V11 H6 Z M3,14 H21 V16 H3 Z M6,19 H18 V21 H6 Z</StreamGeometry>
+    <StreamGeometry x:Key="AlignRightIcon">M3,4 H21 V6 H3 Z M9,9 H21 V11 H9 Z M3,14 H21 V16 H3 Z M9,19 H21 V21 H9 Z</StreamGeometry>
+    <StreamGeometry x:Key="ShapeFillIcon">M7,1 L13,7 L7,13 L1,7 Z M7,3.8 L10.2,7 L3.8,7 Z M6.2,0.2 L7.6,1.6 L4.4,4.8 L3,3.4 Z M15,7.5 C15,7.5 13.3,9.8 13.3,11 C13.3,12 14.1,12.8 15,12.8 C15.9,12.8 16.7,12 16.7,11 C16.7,9.8 15,7.5 15,7.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="ShapeOutlineIcon">M1,15 L2,11 L11,2 L14,5 L5,14 Z M12,1 L13,0 L16,3 L15,4 Z</StreamGeometry>
+    <StreamGeometry x:Key="TextFillIcon">M6,0 H9 L15,15 H12 L10.6,11 H4.4 L3,15 H0 Z M5.3,8.5 H9.7 L7.5,2.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="TitlePageIcon">M5,2 H19 V22 H5 Z M7,4 V20 H17 V4 Z M8,6 H16 V10 H8 Z M9.5,12 H14.5 V13.5 H9.5 Z M9,17 H15 V18.5 H9 Z</StreamGeometry>
+    <StreamGeometry x:Key="PanelBorderIcon">M2,2 H22 V22 H2 Z M5,5 V19 H19 V5 Z</StreamGeometry>
+    <StreamGeometry x:Key="LockIcon">M12,2 A5,5 0 0 0 7,7 V10 H6 C4.9,10 4,10.9 4,12 V20 C4,21.1 4.9,22 6,22 H18 C19.1,22 20,21.1 20,20 V12 C20,10.9 19.1,10 18,10 H17 V7 A5,5 0 0 0 12,2 Z M12,4.5 A2.5,2.5 0 0 1 14.5,7 V10 H9.5 V7 A2.5,2.5 0 0 1 12,4.5 Z</StreamGeometry>
+    <!-- A burst of tapered wedges radiating out from a small clear gap in the middle - speed lines, in miniature. -->
+    <StreamGeometry x:Key="SpeedLinesIcon">M15,12 L23,13.3 L23,10.7 Z M14.1,14.1 L18.9,20.7 L20.7,18.9 Z M12,15 L10.7,23 L13.3,23 Z M9.9,14.1 L3.3,18.9 L5.1,20.7 Z M9,12 L1,10.7 L1,13.3 Z M9.9,9.9 L5.1,3.3 L3.3,5.1 Z M12,9 L13.3,1 L10.7,1 Z M14.1,9.9 L20.7,5.1 L18.9,3.3 Z</StreamGeometry>
+    <!-- A die's three-pip face, punched out of a solid square - Shuffle. -->
+    <StreamGeometry x:Key="ShuffleIcon">M3,3 H21 V21 H3 Z M7,7 V9.6 H9.6 V7 Z M10.7,10.7 V13.3 H13.3 V10.7 Z M14.4,14.4 V17 H17 V14.4 Z</StreamGeometry>
+    </ResourceDictionary>
   </Styles.Resources>
   <Style Selector="Border.ribbon">
     <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}" />
@@ -47,7 +130,8 @@
   <Style Selector="TextBlock.groupLabel">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="HorizontalAlignment" Value="Center" />
-    <Setter Property="Opacity" Value="0.65" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyGroupLabelBrush}" />
+    <Setter Property="Opacity" Value="0.85" />
   </Style>
   <Style Selector="Rectangle.divider">
     <Setter Property="Width" Value="1" />
@@ -77,10 +161,10 @@
     <Setter Property="Margin" Value="8,1,0,0" />
   </Style>
   <Style Selector="Border.context.panel TextBlock.contextTitle">
-    <Setter Property="Foreground" Value="#257AE8" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyPanelTextBrush}" />
   </Style>
   <Style Selector="Border.context.bubble TextBlock.contextTitle">
-    <Setter Property="Foreground" Value="#C96F00" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
   </Style>
 
   <!-- Word-style tab strip: compact headers, the content row a fixed height so the page
@@ -90,26 +174,162 @@
   </Style>
   <Style Selector="TabControl.ribbonTabs TabItem">
     <Setter Property="FontSize" Value="13" />
-    <Setter Property="MinHeight" Value="30" />
-    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Height" Value="40" />
     <Setter Property="Padding" Value="12,0" />
     <Setter Property="Margin" Value="0" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyTabHeaderBrush}" />
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="TabControl.ribbonTabs TabItem.contextual.panel">
     <Setter Property="Background" Value="#1A257AE8" />
   </Style>
   <Style Selector="TextBlock.panelHeader">
-    <Setter Property="Foreground" Value="#1D63C2" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyPanelTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
   <Style Selector="TabControl.ribbonTabs TabItem.contextual.bubble">
     <Setter Property="Background" Value="#1FF58A07" />
   </Style>
   <Style Selector="TextBlock.bubbleHeader">
-    <Setter Property="Foreground" Value="#B86500" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.character">
+    <Setter Property="Background" Value="#1A2E9E5B" />
+  </Style>
+  <Style Selector="TextBlock.characterHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyCharacterTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.shape">
+    <Setter Property="Background" Value="#1A8E44AD" />
+  </Style>
+  <Style Selector="TextBlock.shapeHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyShapeTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.lettering">
+    <Setter Property="Background" Value="#1A117A9C" />
+  </Style>
+  <Style Selector="TextBlock.letteringHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyLetteringTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <!-- Word's colour buttons (Shape Fill, Shape Outline, Text Fill, Text Outline): a small split
+       button - icon over a colour bar, and a name; the arrow opens the colour menu. -->
+  <Style Selector="SplitButton.colorMenu">
+    <Setter Property="Height" Value="26" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="MinWidth" Value="132" />
+    <Setter Property="Padding" Value="5,0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="SplitButton.colorMenu /template/ Button">
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <!-- The colour menu's palette: one menu row holding the swatches, which light up (orange,
+       as in Word) under the pointer - the row itself doesn't. -->
+  <Style Selector="MenuItem.palette">
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+  <Style Selector="MenuItem.palette:pointerover /template/ Border">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="MenuItem.palette:selected /template/ Border">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.swatch">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Button.swatch:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="BorderBrush" Value="#50000000" />
+    <Setter Property="BorderThickness" Value="0.8" />
+  </Style>
+  <Style Selector="Border.chip.current, Button.swatch:pointerover Border.chip">
+    <Setter Property="BorderBrush" Value="#F58A07" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="TabControl.ribbonTabs TabItem.contextual.sticker">
+    <Setter Property="Background" Value="#1FF58A07" />
+  </Style>
+  <Style Selector="TextBlock.stickerHeader">
+    <Setter Property="Foreground" Value="{DynamicResource StanleyBubbleTextBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <!-- A slot's gallery on the Look tab: label and what's worn, opening the choices. -->
+  <Style Selector="DropDownButton.slotGallery">
+    <Setter Property="Width" Value="84" />
+    <Setter Property="Height" Value="64" />
+    <Setter Property="Padding" Value="4,2" />
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="DropDownButton.slotGallery.compact">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="31" />
+    <Setter Property="Margin" Value="0,0,2,2" />
+    <Setter Property="Padding" Value="2,0" />
+  </Style>
+  <Style Selector="DropDownButton.colorSlot">
+    <Setter Property="Height" Value="26" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="Button.choice.worn">
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <!-- A labelled slider row in the character ribbon: name, slider, value. -->
+  <Style Selector="Slider.body">
+    <Setter Property="Width" Value="130" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <!-- Word's font box: every font by name, each shown in its own face. -->
+  <Style Selector="ComboBox.fontBox">
+    <Setter Property="Width" Value="170" />
+    <Setter Property="Height" Value="26" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="6,0,0,0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="MaxDropDownHeight" Value="380" />
+    <Setter Property="ItemTemplate">
+      <DataTemplate x:DataType="local:FontChoice">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding Note}" FontSize="10" Opacity="0.6" Margin="8,0,0,0" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Name}" FontFamily="{Binding Preview}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        </DockPanel>
+      </DataTemplate>
+    </Setter>
+  </Style>
+  <!-- The note after File › Export (and anything like it): a card over the corner of the page, above the status bar. -->
+  <Style Selector="Border.toast">
+    <Setter Property="Background" Value="{DynamicResource StanleyBackstageBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyThumbBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="BoxShadow" Value="0 4 16 0 #40000000" />
   </Style>
   <Style Selector="StackPanel.tabContent">
     <Setter Property="Orientation" Value="Horizontal" />
@@ -119,7 +339,7 @@
 
   <!-- Title row with the quick access toolbar. -->
   <Style Selector="Border.titleBar">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
     <Setter Property="Height" Value="32" />
   </Style>
   <Style Selector="ToggleSwitch.autoSave">
@@ -145,7 +365,7 @@
     <Setter Property="Height" Value="15" />
   </Style>
   <Style Selector="Button.qat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Button.qat:disabled /template/ ContentPresenter#PART_ContentPresenter">
@@ -155,7 +375,7 @@
 
   <!-- The File button: Word's coloured tab that opens the backstage view. -->
   <Style Selector="Button.fileTab">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
     <Setter Property="Foreground" Value="White" />
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Width" Value="58" />
@@ -168,13 +388,13 @@
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="Button.fileTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
 
   <!-- Backstage (File) view -->
   <Style Selector="Border.backstageRail">
-    <Setter Property="Background" Value="#1E5AA8" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeBrush}" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button)">
     <Setter Property="Foreground" Value="White" />
@@ -188,11 +408,11 @@
     <Setter Property="Focusable" Value="False" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#2A6FC9" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeHoverBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):checked /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="#174A8C" />
+    <Setter Property="Background" Value="{DynamicResource StanleyChromeCheckedBrush}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
   <Style Selector="Border.backstageRail :is(Button):disabled /template/ ContentPresenter#PART_ContentPresenter">
@@ -208,6 +428,12 @@
     <Setter Property="FontSize" Value="30" />
     <Setter Property="FontWeight" Value="Light" />
     <Setter Property="Margin" Value="0,0,0,18" />
+  </Style>
+  <!-- Filter chips (File › My Assets' kinds): a pill each, the chosen one filled. -->
+  <Style Selector="RadioButton.chip">
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="12,4" />
+    <Setter Property="FontSize" Value="12" />
   </Style>
   <Style Selector="TextBlock.backstageSubheading">
     <Setter Property="FontSize" Value="15" />
@@ -267,5 +493,31 @@
   <Style Selector=":is(Button).small PathIcon">
     <Setter Property="Width" Value="14" />
     <Setter Property="Height" Value="14" />
+  </Style>
+  <!-- A sticker on offer in a slot's gallery: a full figure, or a head close-up. After
+       .small, whose height it overrides. -->
+  <Style Selector=":is(Button).small.choice.sticker">
+    <Setter Property="Width" Value="66" />
+    <Setter Property="Height" Value="104" />
+  </Style>
+  <Style Selector=":is(Button).small.choice.sticker.closeup">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="Height" Value="80" />
+  </Style>
+  <!-- The expression gallery's tiny draw buttons (+, pen) under a mix-your-own row's name. -->
+  <Style Selector=":is(Button).small.faceDraw">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="MinWidth" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector=":is(Button).small.faceDraw PathIcon">
+    <Setter Property="Width" Value="11" />
+    <Setter Property="Height" Value="11" />
+  </Style>
+  <!-- A smaller close-up, for a row of eyes, brows or mouths in the expression gallery's "mix your own". -->
+  <Style Selector=":is(Button).small.choice.sticker.closeup.mini">
+    <Setter Property="Width" Value="46" />
+    <Setter Property="Height" Value="56" />
   </Style>
 </Styles>

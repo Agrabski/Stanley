@@ -139,6 +139,41 @@ public class BubbleEditingTests
     }
 
     [Fact]
+    public void Move_WithTails_CarriesTheTipsAlong()
+    {
+        var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(0, 0, 60, 40)), new Point2D(30, 100)).Value;
+
+        var moved = BubbleEditing.Move(bubble, 10, 5, withTails: true).Value;
+
+        Assert.Equal(10, AnchorRing.BoundingBox(moved.Shape.Anchors).Left, 6);
+        Assert.Equal(new Point2D(40, 105), moved.Tails[0].Target);
+        Assert.Equal(bubble.Tails[0].AttachmentT, moved.Tails[0].AttachmentT);
+    }
+
+    [Fact]
+    public void OutOfTheWay_StepsANewBubbleAsideFromOneInTheSameSpot()
+    {
+        var panel = new Rect2D(0, 0, 200, 150);
+        var spot = new Rect2D(50, 30, 42, 26);
+
+        Assert.Equal(spot, BubbleEditing.OutOfTheWay(spot, [new Rect2D(120, 30, 42, 26)], panel)); // clear already
+        var second = BubbleEditing.OutOfTheWay(spot, [spot], panel);
+        Assert.Equal(spot with { X = 56, Y = 36 }, second);
+        var third = BubbleEditing.OutOfTheWay(spot, [spot, second], panel);
+        Assert.Equal(spot with { X = 62, Y = 42 }, third);
+    }
+
+    [Fact]
+    public void OutOfTheWay_StepsBackUpWhenThereIsNoRoomBelow()
+    {
+        var panel = new Rect2D(0, 0, 100, 60);
+        var corner = new Rect2D(58, 34, 42, 26); // in the bottom right corner
+
+        Assert.Equal(corner with { X = 52, Y = 28 }, BubbleEditing.OutOfTheWay(corner, [corner], panel));
+        Assert.Equal(panel, BubbleEditing.OutOfTheWay(panel, [panel], panel)); // no room anywhere
+    }
+
+    [Fact]
     public void KeepInside_SlidesTheBubbleAndClampsTailTargetsIntoTheContainer()
     {
         var bubble = BubbleEditing.AddTail(NewBubble(new Rect2D(90, -10, 60, 40)), new Point2D(300, 300)).Value;
@@ -172,5 +207,72 @@ public class BubbleEditingTests
         Assert.Equal(100, bounds.MidX, 6);
         Assert.Equal(50, bounds.MidY, 6);
         Assert.Equal(20, bounds.Width, 6);
+    }
+
+    [Fact]
+    public void GrowToFit_AtScale1_ChangesNothing()
+    {
+        var bubble = NewBubble(new Rect2D(10, 10, 60, 40));
+
+        var grown = BubbleEditing.GrowToFit(bubble, 1);
+
+        Assert.Same(bubble, grown);
+    }
+
+    [Theory]
+    [InlineData(0.5)]
+    [InlineData(0.999)]
+    public void GrowToFit_NeverShrinks(double scale)
+    {
+        var bubble = NewBubble(new Rect2D(10, 10, 60, 40));
+
+        var grown = BubbleEditing.GrowToFit(bubble, scale);
+
+        Assert.Same(bubble, grown);
+    }
+
+    [Fact]
+    public void GrowToFit_ScalesAroundItsOwnCentreKeepingAspectRatio()
+    {
+        var bounds = new Rect2D(10, 20, 60, 40);
+        var bubble = NewBubble(bounds);
+
+        var grown = BubbleEditing.GrowToFit(bubble, 1.5);
+
+        var newBounds = AnchorRing.BoundingBox(grown.Shape.Anchors);
+        Assert.Equal(bounds.MidX, newBounds.MidX, 6); // same centre
+        Assert.Equal(bounds.MidY, newBounds.MidY, 6);
+        Assert.Equal(90, newBounds.Width, 6); // 60 * 1.5
+        Assert.Equal(60, newBounds.Height, 6); // 40 * 1.5, so a 60x40 oval stays 3:2
+        Assert.Equal(bounds.Width / bounds.Height, newBounds.Width / newBounds.Height, 6);
+    }
+
+    [Fact]
+    public void GrowToFit_KeepsEveryTailsTargetAndItsFractionAlongTheOutline()
+    {
+        var bubble = NewBubble(new Rect2D(0, 0, 60, 40));
+        bubble = BubbleEditing.AddTail(bubble, new Point2D(-40, 100)).Value;
+        var attachmentT = bubble.Tails[0].AttachmentT;
+        var target = bubble.Tails[0].Target;
+        var attachmentPoint = AnchorRing.PointAt(bubble.Shape.Anchors, attachmentT);
+
+        var grown = BubbleEditing.GrowToFit(bubble, 2);
+
+        Assert.Equal(target, grown.Tails[0].Target); // untouched - resizing shouldn't drag whoever it points at
+        Assert.Equal(attachmentT, grown.Tails[0].AttachmentT, 9); // same fraction along the ring
+        var grownAttachmentPoint = AnchorRing.PointAt(grown.Shape.Anchors, attachmentT);
+        Assert.NotEqual(attachmentPoint, grownAttachmentPoint); // but it slid out to the bigger outline
+    }
+
+    [Fact]
+    public void GrowToFit_LargerScaleGrowsFurther()
+    {
+        var bubble = NewBubble(new Rect2D(0, 0, 60, 40));
+
+        var grownALittle = AnchorRing.BoundingBox(BubbleEditing.GrowToFit(bubble, 1.2).Shape.Anchors);
+        var grownALot = AnchorRing.BoundingBox(BubbleEditing.GrowToFit(bubble, 2).Shape.Anchors);
+
+        Assert.True(grownALot.Width > grownALittle.Width);
+        Assert.True(grownALot.Height > grownALittle.Height);
     }
 }

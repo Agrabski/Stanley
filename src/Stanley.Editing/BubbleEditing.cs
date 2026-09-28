@@ -92,12 +92,49 @@ public static class BubbleEditing
         return EditResult<Bubble>.Success(bubble with { Tails = tails });
     }
 
-    /// <summary>Translates the shape (and with it every tail's base). Tail targets stay put, so a tail keeps pointing at whoever is speaking while the bubble moves.</summary>
-    public static EditResult<Bubble> Move(Bubble bubble, double dx, double dy)
+    /// <summary>
+    /// Translates the shape (and with it every tail's base). Tail targets stay put, so a tail
+    /// keeps pointing at whoever is speaking while the bubble moves - unless
+    /// <paramref name="withTails"/>, which carries the tips along too: the whole bubble moves as one.
+    /// </summary>
+    public static EditResult<Bubble> Move(Bubble bubble, double dx, double dy, bool withTails = false)
     {
         var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
         var moved = bounds with { X = bounds.X + dx, Y = bounds.Y + dy };
-        return EditResult<Bubble>.Success(bubble with { Shape = new BubbleShape(AnchorRing.Rescale(bubble.Shape.Anchors, bounds, moved)) });
+        var tails = withTails ? bubble.Tails.Select(t => t with { Target = new Point2D(t.Target.X + dx, t.Target.Y + dy) }).ToList() : bubble.Tails;
+        return EditResult<Bubble>.Success(bubble with { Shape = new BubbleShape(AnchorRing.Rescale(bubble.Shape.Anchors, bounds, moved)), Tails = tails });
+    }
+
+    /// <summary>How far a new bubble steps aside from one already in its spot (<see cref="OutOfTheWay"/>), in mm.</summary>
+    public const double CascadeStepMm = 6;
+
+    /// <summary>
+    /// Where a new bubble of <paramref name="bounds"/> should go so it doesn't land exactly on
+    /// top of one already there (adding two in a row would otherwise stack them, the second
+    /// hiding the first): stepped diagonally aside by <see cref="CascadeStepMm"/> until its
+    /// corner is clear of every one in <paramref name="taken"/>, as Office cascades pasted
+    /// shapes - down and right, else up and left, staying inside <paramref name="container"/>.
+    /// Returns <paramref name="bounds"/> itself when it's clear already or there's no room.
+    /// </summary>
+    public static Rect2D OutOfTheWay(Rect2D bounds, IReadOnlyCollection<Rect2D> taken, Rect2D container, double step = CascadeStepMm)
+    {
+        bool Clear(Rect2D r) => taken.All(t => Math.Abs(t.Left - r.Left) >= step / 2 || Math.Abs(t.Top - r.Top) >= step / 2);
+        bool Fits(Rect2D r) => r.Left >= container.Left - 1e-9 && r.Top >= container.Top - 1e-9 && r.Right <= container.Right + 1e-9 && r.Bottom <= container.Bottom + 1e-9;
+
+        if (Clear(bounds))
+            return bounds;
+        foreach (var direction in new[] { 1, -1 })
+        {
+            for (var k = 1; k <= 50; k++)
+            {
+                var candidate = bounds with { X = bounds.X + direction * k * step, Y = bounds.Y + direction * k * step };
+                if (!Fits(candidate))
+                    break;
+                if (Clear(candidate))
+                    return candidate;
+            }
+        }
+        return bounds;
     }
 
     /// <summary>
@@ -148,6 +185,30 @@ public static class BubbleEditing
         Math.Clamp(point.X, container.Left, container.Right),
         Math.Clamp(point.Y, container.Top, container.Bottom));
 
+    /// <summary>
+    /// Grows the shape around its own centre by <paramref name="scale"/> (from the renderer's
+    /// measurement - see <c>Stanley.Rendering.BubbleTextRenderer.NeededScale</c>), keeping its
+    /// aspect ratio so an oval stays an oval, so typed text never has to shrink to fit; never
+    /// shrinks a bubble the user made bigger, the same rule <c>TextEditing.GrowToFit</c> follows
+    /// for free text. Tails keep their targets - resizing a bubble shouldn't drag whatever it
+    /// points at - and their attachment stays the same fraction along the outline, so it slides
+    /// out to the bigger shape rather than jumping.
+    /// </summary>
+    public static Bubble GrowToFit(Bubble bubble, double scale)
+    {
+        if (scale <= 1 + 1e-9)
+            return bubble;
+
+        var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
+        var grown = new Rect2D(
+            bounds.MidX - bounds.Width * scale / 2,
+            bounds.MidY - bounds.Height * scale / 2,
+            bounds.Width * scale,
+            bounds.Height * scale);
+        var rescaled = AnchorRing.Rescale(bubble.Shape.Anchors, bounds, grown);
+        return bubble with { Shape = new BubbleShape(rescaled) };
+    }
+
     public static EditResult<Bubble> SetText(Bubble bubble, string text)
     {
         if (text.Length > MaxTextLength)
@@ -155,6 +216,16 @@ public static class BubbleEditing
 
         return EditResult<Bubble>.Success(bubble with { Text = text });
     }
+
+    /// <summary>Letters the bubble in <paramref name="family"/> (null or blank: the default lettering font).</summary>
+    public static EditResult<Bubble> SetFont(Bubble bubble, string? family) =>
+        SetLettering(bubble, LetteringFont.Of(bubble) with { Family = family });
+
+    /// <summary>Letters the bubble in <paramref name="font"/> - typeface, size, bold, italic, alignment - or says why it can't.</summary>
+    public static EditResult<Bubble> SetLettering(Bubble bubble, LetteringFont font) =>
+        font.Validate() is { IsValid: true } valid
+            ? EditResult<Bubble>.Success(valid.Value.ApplyTo(bubble))
+            : EditResult<Bubble>.Failure(font.Validate().Error!);
 
     private static double NextAttachmentT(IReadOnlyList<BubbleTail> tails)
     {

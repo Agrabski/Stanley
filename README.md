@@ -3,8 +3,7 @@
 Stanley is a comic editor built on .NET. It aims to be easy to use and quick to
 learn, with escape hatches for advanced users.
 
-> **Status:** early design stage. There is no code yet; this repository
-> currently holds the licence and design notes.
+> **Status:** very early stage
 
 ## Goals
 
@@ -35,6 +34,12 @@ three-quarter and profile views. You pose a character by dragging its limbs, and
 the rest of the limb follows (inverse kinematics). A library of ready-made poses
 and expressions will be included. A 3D backend (glTF/VRM with toon shading) may
 come later behind the same interfaces.
+
+## Builds and releases
+
+Test builds come out nightly; see
+[Getting and installing Stanley](docs/automatic-builds.md) for how to
+download, install and self-update.
 
 ## Licence
 

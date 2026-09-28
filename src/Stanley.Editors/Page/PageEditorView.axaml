@@ -1,0 +1,61 @@
+<!--
+  The page editor pane: the zoomable page, an inline text editor that opens over a
+  bubble, and a status bar. Its ribbon is not in here - it's PageEditorRibbon, shown in
+  the window's ribbon bar above the dock area whenever this pane is the active one.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PageEditorView"
+             x:DataType="local:PageEditorViewModel">
+  <UserControl.Styles>
+    <!-- The inline text editor is see-through and borderless in every state, so the bubble
+         under it stays fully visible while typing: only the text and caret are drawn. -->
+    <Style Selector="TextBox#InlineTextEditor">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TextBox#InlineTextEditor /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox#InlineTextEditor:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox#InlineTextEditor:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="*,Auto">
+    <!-- Page -->
+    <Grid Grid.Row="0">
+      <local:PageCanvasControl x:Name="PageCanvas" />
+      <!-- The text editor sits inside the bubble's (or text box's) text area on the (always white) paper, so it stays light in dark mode too. -->
+      <ThemeVariantScope RequestedThemeVariant="Light">
+      <Canvas Name="Overlay">
+        <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
+                 VerticalContentAlignment="Center" Background="Transparent" Foreground="Black" BorderThickness="0" MaxLength="500"
+                 PlaceholderText="Type…" />
+      </Canvas>
+      </ThemeVariantScope>
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,3">
+      <!-- A DockPanel rather than a StackPanel, so a long hint is cut short (…) before the page info instead of running under it. -->
+      <DockPanel>
+        <TextBlock Name="PageInfoText" DockPanel.Dock="Right" Margin="12,0,0,0" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+        <TextBlock Name="ErrorText" DockPanel.Dock="Left" Margin="0,0,12,0" Text="{Binding LastError}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12" VerticalAlignment="Center"
+                   IsVisible="{Binding LastError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <Panel>
+          <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="TextEditHintText" IsVisible="False"
+                     FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </Panel>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

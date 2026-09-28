@@ -14,12 +14,25 @@ public enum SaveChangesChoice
 /// </summary>
 public interface IFileDialogs
 {
-    /// <summary>A folder to open a project from or save one into; null if cancelled.</summary>
+    /// <summary>A project folder to open; null if cancelled.</summary>
     Task<string?> PickFolderAsync(string title);
+
+    /// <summary>
+    /// Where to save the comic and what to call it, as any program's Save As asks: a name box
+    /// starting as <paramref name="suggestedName"/>, and a place. Returns the place joined with
+    /// the name typed - the comic's folder to be; null if cancelled.
+    /// </summary>
+    Task<string?> PickSaveLocationAsync(string title, string suggestedName);
 
     /// <summary>A file path to export to; null if cancelled.</summary>
     Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName);
 
     /// <summary>Word's "Want to save your changes to …?" prompt.</summary>
     Task<SaveChangesChoice> AskSaveChangesAsync(string documentTitle);
+
+    /// <summary>File &gt; Options &gt; SVG editor's picker (detected programs, or Browse... to any executable); null if cancelled.</summary>
+    Task<string?> PickSvgEditorAsync(string? currentPath);
+
+    /// <summary>The startup update check's "a new version is available" popup. True to install and restart now; false to leave it for File &gt; Options &gt; Updates later.</summary>
+    Task<bool> AskInstallUpdateAsync(string version, string? notes);
 }

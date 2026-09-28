@@ -1,0 +1,47 @@
+<!--
+  The character editor pane: the character standing on a height grid, with the comic's
+  other characters faded beside it for comparison, and a status bar with the Front/Side
+  switch (always to hand, whichever ribbon tab is open). Its other controls are on
+  CharacterEditorRibbon, in the window's ribbon bar.
+-->
+
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterEditorView"
+             x:DataType="local:CharacterEditorViewModel">
+  <UserControl.Styles>
+    <!-- The status bar's view switch: shorter than a ribbon's small button, so the bar stays thin. -->
+    <Style Selector=":is(Button).small.statusView">
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="6,0" />
+    </Style>
+    <Style Selector=":is(Button).small.statusView PathIcon">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+    </Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="*,Auto">
+    <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
+      <local:CharacterFigure Name="Stage" Character="{Binding LookWorking}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
+                             Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}" />
+    </Border>
+    <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,1">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding HeightText}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+        <!-- The view switch, like Word's view buttons: in the status bar so it's there whichever ribbon tab is open. -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="1" Margin="12,0,0,0">
+          <RadioButton Name="StatusFrontButton" Classes="small statusView" GroupName="StatusPreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsFrontPreview}" ToolTip.Tip="Look at the character from the front">
+            <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
+          </RadioButton>
+          <RadioButton Name="StatusSideButton" Classes="small statusView" GroupName="StatusPreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsSidePreview}" ToolTip.Tip="Look at the character from the side - the same body, seen side on">
+            <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
+          </RadioButton>
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

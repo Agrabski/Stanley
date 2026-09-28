@@ -7,89 +7,153 @@
         x:DataType="app:MainWindowViewModel"
         Title="{Binding WindowTitle}"
         Width="1360" Height="900">
-  <Window.DataTemplates>
-    <!-- Pane content inside the dock area. -->
-    <DataTemplate DataType="editors:PageEditorViewModel">
-      <editors:PageEditorView />
-    </DataTemplate>
-    <!-- Side pane: the page navigator. -->
-    <DataTemplate DataType="editors:PageNavigatorViewModel">
-      <editors:PageNavigatorView />
-    </DataTemplate>
-  </Window.DataTemplates>
+    <Window.DataTemplates>
+        <!-- Pane content inside the dock area. -->
+        <DataTemplate DataType="editors:PageEditorViewModel">
+            <editors:PageEditorView />
+        </DataTemplate>
+        <DataTemplate DataType="editors:CharacterEditorViewModel">
+            <editors:CharacterEditorView />
+        </DataTemplate>
+        <!-- Side panes: the page navigator and the Characters pane. -->
+        <DataTemplate DataType="editors:PageNavigatorViewModel">
+            <editors:PageNavigatorView />
+        </DataTemplate>
+        <DataTemplate DataType="editors:CharacterLibraryViewModel">
+            <editors:CharacterLibraryView />
+        </DataTemplate>
+    </Window.DataTemplates>
 
-  <Grid>
-    <DockPanel>
-      <!-- Title row with the quick access toolbar (Save / Undo / Redo), as in Word. -->
-      <Border Name="TitleBar" DockPanel.Dock="Top" Classes="titleBar">
-        <Grid ColumnDefinitions="*,Auto,*">
-          <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
-            <TextBlock Text="AutoSave" Foreground="White" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <ToggleSwitch Name="AutoSaveSwitch" Classes="autoSave" IsChecked="{Binding AutoSaveEnabled}" IsEnabled="{Binding HasDocument}"
-                          OnContent="On" OffContent="Off" ToolTip.Tip="{Binding AutoSaveTip}" Focusable="False">
-              <ToggleSwitch.Resources>
-                <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#26FFFFFF" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#40FFFFFF" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressed" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#E6FFFFFF" />
-                <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#CCFFFFFF" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1E5AA8" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1E5AA8" />
-                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1E5AA8" />
-                <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="White" />
-                <SolidColorBrush x:Key="ToggleSwitchContentForegroundDisabled" Color="#80FFFFFF" />
-                <SolidColorBrush x:Key="ToggleSwitchHeaderForeground" Color="White" />
-              </ToggleSwitch.Resources>
-            </ToggleSwitch>
-            <Rectangle Width="1" Height="16" Fill="#50FFFFFF" Margin="6,0" VerticalAlignment="Center" />
-            <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)">
-              <PathIcon Data="{StaticResource SaveIcon}" />
-            </Button>
-            <Button Name="QuickUndoButton" Classes="qat" Command="{Binding UndoCommand}" ToolTip.Tip="Undo (Ctrl+Z)">
-              <PathIcon Data="{StaticResource UndoIcon}" />
-            </Button>
-            <Button Name="QuickRedoButton" Classes="qat" Command="{Binding RedoCommand}" ToolTip.Tip="Redo (Ctrl+Y)">
-              <PathIcon Data="{StaticResource RedoIcon}" />
-            </Button>
-          </StackPanel>
-          <TextBlock Grid.Column="1" Name="CaptionText" Text="{Binding DocumentCaption}" Foreground="White" FontSize="13" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Right"
-                     Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
-        </Grid>
-      </Border>
+    <Grid>
+        <DockPanel>
+            <!-- Title row with the quick access toolbar (Save / Undo / Redo), as in Word. -->
+            <Border Name="TitleBar" DockPanel.Dock="Top" Classes="titleBar">
+                <Grid ColumnDefinitions="*,Auto,*">
+                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0">
+                        <TextBlock Text="AutoSave" Foreground="White" FontSize="12" VerticalAlignment="Center"
+                                   Margin="0,0,6,0" />
+                        <ToggleSwitch Name="AutoSaveSwitch" Classes="autoSave" IsChecked="{Binding AutoSaveEnabled}"
+                                      IsEnabled="{Binding HasDocument}"
+                                      OnContent="On" OffContent="Off" ToolTip.Tip="{Binding AutoSaveTip}"
+                                      Focusable="False">
+                            <ToggleSwitch.Resources>
+                                <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchStrokeOffPressed" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="Transparent" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#26FFFFFF" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOffPressed" Color="#40FFFFFF" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPressed" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#E6FFFFFF" />
+                                <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#CCFFFFFF" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#1E5AA8" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#1E5AA8" />
+                                <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#1E5AA8" />
+                                <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="White" />
+                                <SolidColorBrush x:Key="ToggleSwitchContentForegroundDisabled" Color="#80FFFFFF" />
+                                <SolidColorBrush x:Key="ToggleSwitchHeaderForeground" Color="White" />
+                            </ToggleSwitch.Resources>
+                        </ToggleSwitch>
+                        <Rectangle Width="1" Height="16" Fill="#50FFFFFF" Margin="6,0" VerticalAlignment="Center" />
+                        <Button Name="QuickSaveButton" Classes="qat" Command="{Binding SaveCommand}" ToolTip.Tip="Save"
+                                editors:Shortcut.Keys="Ctrl+S">
+                            <PathIcon Data="{StaticResource SaveIcon}" />
+                        </Button>
+                        <Button Name="QuickUndoButton" Classes="qat" Command="{Binding UndoCommand}" ToolTip.Tip="Undo"
+                                editors:Shortcut.Keys="Ctrl+Z">
+                            <PathIcon Data="{StaticResource UndoIcon}" />
+                        </Button>
+                        <Button Name="QuickRedoButton" Classes="qat" Command="{Binding RedoCommand}" ToolTip.Tip="Redo"
+                                editors:Shortcut.Keys="Ctrl+Y">
+                            <PathIcon Data="{StaticResource RedoIcon}" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <TextBlock Name="CaptionText" Text="{Binding DocumentCaption}" Foreground="White" FontSize="13"
+                                   VerticalAlignment="Center" />
+                        <!-- Quick issue switcher: shows up once the comic has more than one issue; "New issue" stays reachable either way. -->
+                        <ComboBox Name="IssueSwitcherBox" IsVisible="{Binding HasMultipleIssues}"
+                                  ItemsSource="{Binding Issues}" SelectedItem="{Binding SelectedIssue}"
+                                  MinWidth="110" MaxWidth="220" FontSize="12" ToolTip.Tip="Switch issue">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="app:IssueEntry">
+                                    <TextBlock Text="{Binding Caption}" TextTrimming="CharacterEllipsis" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Name="NewIssueButton" Classes="qat" Command="{Binding NewIssueCommand}"
+                                IsVisible="{Binding HasDocument}" Width="NaN" Padding="6,0"
+                                ToolTip.Tip="Add a new issue to this comic - its own pages, the same characters">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Data="{StaticResource NewIcon}" />
+                                <TextBlock Text="New issue" Foreground="White" FontSize="12" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12"
+                               VerticalAlignment="Center" HorizontalAlignment="Right"
+                               Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Border>
 
-      <!--
+            <!--
         The ribbon: the File button (window-level - it acts on the comic, not a pane) laid
         over the left end of the active pane's tab strip. The pane's tabs come from the
         DataTemplates scoped to the ribbon host, so they win over the pane templates
         above for the same view-model type. Fixed height, so switching tabs or
         contextual tabs appearing never moves the page.
       -->
-      <Border Name="RibbonBar" DockPanel.Dock="Top" Classes="ribbon" Height="130" Padding="0">
-        <Grid>
-          <ContentControl Name="RibbonHost" Content="{Binding Workspace.ActiveEditor}">
-            <ContentControl.DataTemplates>
-              <DataTemplate DataType="editors:PageEditorViewModel">
-                <editors:PageEditorRibbon />
-              </DataTemplate>
-            </ContentControl.DataTemplates>
-          </ContentControl>
-          <Button Name="FileButton" Classes="fileTab" Command="{Binding OpenBackstageCommand}" HorizontalAlignment="Left" VerticalAlignment="Top"
-                  ToolTip.Tip="New, open, save, export (Alt+F)">File</Button>
-        </Grid>
-      </Border>
+            <Border Name="RibbonBar" DockPanel.Dock="Top" Classes="ribbon" Height="150" Padding="0">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <Grid>
+                        <ContentControl Name="RibbonHost" Content="{Binding Workspace.ActiveEditor}">
+                            <ContentControl.DataTemplates>
+                                <DataTemplate DataType="editors:PageEditorViewModel">
+                                    <editors:PageEditorRibbon />
+                                </DataTemplate>
+                                <DataTemplate DataType="editors:CharacterEditorViewModel">
+                                    <editors:CharacterEditorRibbon />
+                                </DataTemplate>
+                            </ContentControl.DataTemplates>
+                        </ContentControl>
+                        <Button Name="FileButton" Classes="fileTab" Command="{Binding OpenBackstageCommand}"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"
+                                ToolTip.Tip="New, open, save, export" editors:Shortcut.Keys="Alt+F">
+                            File
+                        </Button>
+                    </Grid>
+                </ScrollViewer>
+            </Border>
 
-      <dock:DockControl x:Name="EditorDock" />
-    </DockPanel>
+            <dock:DockControl x:Name="EditorDock" />
+        </DockPanel>
 
-    <app:Backstage Name="BackstageView" IsVisible="{Binding IsBackstageOpen}" />
-  </Grid>
+        <!-- After File › Export: what was written, and the two things you usually want next - open it, or find it in its folder. -->
+        <Border Name="ExportNotice" Classes="toast" IsVisible="{Binding HasExportNotice}" HorizontalAlignment="Right"
+                VerticalAlignment="Bottom" Margin="0,0,20,40">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <PathIcon Data="{StaticResource CheckIcon}" Width="16" Height="16" Foreground="#2E8B57"
+                          VerticalAlignment="Center" />
+                <TextBlock Name="ExportNoticeText" Text="{Binding ExportNoticeText}" VerticalAlignment="Center"
+                           MaxWidth="320" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding ExportedPath}" />
+                <Button Name="OpenExportButton" Classes="accent" Content="Open" Command="{Binding OpenExportCommand}"
+                        ToolTip.Tip="Open it in the app your computer uses for this kind of file" />
+                <Button Name="ShowExportInFolderButton" Content="Show in folder"
+                        Command="{Binding ShowExportInFolderCommand}" ToolTip.Tip="See it in its folder" />
+                <Button Name="DismissExportNoticeButton" Command="{Binding DismissExportNoticeCommand}"
+                        Background="Transparent" Padding="6" VerticalAlignment="Center"
+                        ToolTip.Tip="Close">
+                    <PathIcon Data="{StaticResource CloseIcon}" Width="10" Height="10" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <app:Backstage Name="BackstageView" IsVisible="{Binding IsBackstageOpen}" />
+    </Grid>
 </Window>

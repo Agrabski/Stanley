@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Stanley.App.Commands;
 using Stanley.App.Diagnostics;
+using Stanley.Editors;
+using Velopack;
 
 namespace Stanley.App;
 
@@ -14,11 +16,17 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Must run first: Velopack intercepts its own install/update/uninstall lifecycle
+        // through specific recognised args and returns immediately for anything else, so it
+        // needs first refusal on `args` before the no-args-vs-CLI dispatch below ever sees them.
+        VelopackApp.Build().Run();
+
         if (args.Length == 0)
             return RunGui(args);
 
         var root = new RootCommand("Stanley - a comic editor.");
         root.Add(InitCommand.Build());
+        root.Add(IssueCommand.Build());
         return root.Parse(args).Invoke();
     }
 
@@ -54,5 +62,6 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .WithLetteringFonts()
             .LogToTrace();
 }

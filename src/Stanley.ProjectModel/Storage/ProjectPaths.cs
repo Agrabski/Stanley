@@ -22,6 +22,11 @@ internal static class ProjectPaths
     public const string PropsDirName = "props";
     public const string BackgroundsDirName = "backgrounds";
     public const string IssuesDirName = "issues";
+    public const string ObjectsDirName = "objects";
+    public const string PacksDirName = "packs";
+
+    /// <summary>The comic's title page, which every issue opens with unless it has its own: <c>title-page/page.json</c>, <c>panels/</c> and <c>art/</c>.</summary>
+    public const string TitlePageDirName = "title-page";
 
     public const string RevisionsDirName = "revisions";
     public const string StickersDirName = "stickers";
@@ -30,14 +35,15 @@ internal static class ProjectPaths
     public const string PagesDirName = "pages";
     public const string PanelsDirName = "panels";
     public const string ArtDirName = "art";
+    public const string PatternsDirName = "patterns";
 
     public const string CharacterFileName = "character.json";
     public const string StickerFileName = "sticker.json";
-    public const string StretchFileName = "stretch.json";
     public const string PropFileName = "prop.json";
     public const string BackgroundFileName = "background.json";
     public const string IssueFileName = "issue.json";
     public const string PageFileName = "page.json";
+    public const string GroupFileName = "group.json";
 
     public const string JsonExtension = "json";
 
@@ -121,6 +127,14 @@ internal static class ProjectPaths
 
         Directory.CreateDirectory(parentDir);
         return Path.Combine(parentDir, EntityFileName(id, name, extension));
+    }
+
+    /// <summary>The id part of an `&lt;id&gt;-slug` folder or file name (everything before the first '-', minus any extension).</summary>
+    public static string EntityIdPart(string fileName)
+    {
+        var dash = fileName.IndexOf('-');
+        var stem = dash >= 0 ? fileName[..dash] : Path.GetFileNameWithoutExtension(fileName);
+        return stem;
     }
 
     /// <summary>Panels are the one entity with no slug: `panels/&lt;id&gt;.json`, since panels aren't user-named.</summary>

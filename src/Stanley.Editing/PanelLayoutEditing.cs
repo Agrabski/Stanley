@@ -14,8 +14,9 @@ namespace Stanley.Editing;
 /// is still the escape hatch for panel outlines beyond what this editor covers; it just
 /// isn't draggable through these operations.
 ///
-/// A panel's bubbles belong to it: every operation here carries them along
-/// (<see cref="BubbleEditing.Refit"/>) and keeps them inside the panel's new bounds.
+/// A panel's bubbles, characters and elements belong to it: every operation here carries
+/// them along (<see cref="BubbleEditing.Refit"/>, <see cref="CharacterPlacementEditing.Refit"/>,
+/// <see cref="ElementEditing.Refit"/>) and keeps bubbles inside the panel's new bounds.
 /// </summary>
 public static class PanelLayoutEditing
 {
@@ -34,8 +35,14 @@ public static class PanelLayoutEditing
         var oldBounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
         return EditResult<Panel>.Success(panel with
         {
-            Shape = PanelShapes.Rectangle(newBounds),
-            Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList()
+            // A thought cloud regenerates its scallops at the new bounds instead of stretching
+            // them into ovals (PanelShapes.Cloud is deterministic, so this is exactly what
+            // drawing a fresh cloud at newBounds would give).
+            Shape = panel.Kind == PanelKind.Cloud ? PanelShapes.Cloud(newBounds) : PanelShapes.Rectangle(newBounds),
+            CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Refit(c, oldBounds, newBounds)).ToList(),
+            Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList(),
+            Elements = panel.Elements.Select(e => ElementEditing.Refit(e, oldBounds, newBounds)).ToList(),
+            Trail = ThoughtCloudEditing.RefitTrail(panel.Trail, oldBounds, newBounds)
         });
     }
 
@@ -52,11 +59,16 @@ public static class PanelLayoutEditing
     /// Divides one panel into two rectangles along <paramref name="orientation"/>, at
     /// <paramref name="fraction"/> of its current bounds, leaving <paramref name="gutter"/>
     /// between them. Each bubble goes to whichever half its centre lies in (clamped inside
-    /// it); characters and the background stay with the first half, which keeps the
-    /// original id.
+    /// it), each character to the half its feet are in and each element to the half its
+    /// centre is in (both staying where they were on the page). A colour or gradient
+    /// background fills both halves, as does the border (or its absence); any other background
+    /// stays with the first, which keeps the original id.
     /// </summary>
     public static EditResult<(Panel First, Panel Second)> Split(Panel panel, BoundaryOrientation orientation, double fraction, double gutter = 0)
     {
+        if (panel.Kind == PanelKind.Cloud)
+            return EditResult<(Panel, Panel)>.Failure("A thought cloud can't be split.");
+
         if (fraction <= 0 || fraction >= 1)
             return EditResult<(Panel, Panel)>.Failure("Split fraction must be strictly between 0 and 1.");
 
@@ -86,17 +98,33 @@ public static class PanelLayoutEditing
             return orientation == BoundaryOrientation.Vertical ? bb.MidX >= secondBounds.Left - halfGutter : bb.MidY >= secondBounds.Top - halfGutter;
         }
 
+        bool CharacterInSecond(CharacterInstance c) =>
+            orientation == BoundaryOrientation.Vertical
+                ? c.Placement.Ground.X >= secondBounds.Left - halfGutter
+                : c.Placement.Ground.Y >= secondBounds.Top - halfGutter;
+
+        bool ElementInSecond(PanelElement e)
+        {
+            var box = PanelElements.Bounds(e);
+            return orientation == BoundaryOrientation.Vertical ? box.MidX >= secondBounds.Left - halfGutter : box.MidY >= secondBounds.Top - halfGutter;
+        }
+
         var first = panel with
         {
             Shape = PanelShapes.Rectangle(firstBounds),
-            Bubbles = panel.Bubbles.Where(b => !InSecond(b)).Select(b => BubbleEditing.KeepInside(b, firstBounds)).ToList()
+            CharacterInstances = panel.CharacterInstances.Where(c => !CharacterInSecond(c)).ToList(),
+            Bubbles = panel.Bubbles.Where(b => !InSecond(b)).Select(b => BubbleEditing.KeepInside(b, firstBounds)).ToList(),
+            Elements = panel.Elements.Where(e => !ElementInSecond(e)).Select(e => ElementEditing.KeepReachable(e, firstBounds)).ToList()
         };
         var second = new Panel(
             PanelId.New(),
             PanelShapes.Rectangle(secondBounds),
-            Background: null,
-            CharacterInstances: [],
-            Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList());
+            Background: panel.Background is ColorBackground or GradientBackground ? panel.Background : null,
+            CharacterInstances: panel.CharacterInstances.Where(CharacterInSecond).ToList(),
+            Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList(),
+            Elements: panel.Elements.Where(ElementInSecond).Select(e => ElementEditing.KeepReachable(e, secondBounds)).ToList(),
+            Borderless: panel.Borderless,
+            BorderStyle: panel.BorderStyle);
         return EditResult<(Panel, Panel)>.Success((first, second));
     }
 
@@ -172,5 +200,45 @@ public static class PanelLayoutEditing
             return EditResult<IReadOnlyList<Rect2D>>.Failure($"That layout would leave panels under {MinPanelSizeMm}x{MinPanelSizeMm}mm.");
 
         return EditResult<IReadOnlyList<Rect2D>>.Success(rects);
+    }
+
+    /// <summary>
+    /// A new page margin, applied to the layout: every panel edge lying on the old margin
+    /// line moves onto the new one, the panel and what's in it resized along, so the
+    /// layout keeps hugging the margin. Edges anywhere else - gutters, a panel bleeding to
+    /// the page edge - stay put, and a panel that would end up too small is left alone.
+    /// Returns <paramref name="panels"/> itself when nothing moved.
+    /// </summary>
+    public static IReadOnlyDictionary<PanelId, Panel> MoveMargin(IReadOnlyDictionary<PanelId, Panel> panels, Rect2D pageBounds, double oldMarginMm, double newMarginMm)
+    {
+        const double onLine = 0.5;
+        var oldLive = new PanelGrid(oldMarginMm, 0).LiveArea(pageBounds);
+        var newLive = new PanelGrid(newMarginMm, 0).LiveArea(pageBounds);
+        if (Math.Abs(newMarginMm - oldMarginMm) < 1e-9)
+            return panels;
+
+        Dictionary<PanelId, Panel>? moved = null;
+        foreach (var (id, panel) in panels)
+        {
+            var bounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+            var follows = false;
+            double Follow(double edge, double oldLine, double newLine)
+            {
+                if (Math.Abs(edge - oldLine) >= onLine)
+                    return edge;
+                follows = true;
+                return newLine;
+            }
+            var target = Rect2D.FromEdges(
+                Follow(bounds.Left, oldLive.Left, newLive.Left),
+                Follow(bounds.Top, oldLive.Top, newLive.Top),
+                Follow(bounds.Right, oldLive.Right, newLive.Right),
+                Follow(bounds.Bottom, oldLive.Bottom, newLive.Bottom));
+            if (!follows || Resize(panel, target, pageBounds) is not { IsValid: true } resized)
+                continue;
+            moved ??= new Dictionary<PanelId, Panel>(panels);
+            moved[id] = resized.Value;
+        }
+        return moved ?? panels;
     }
 }

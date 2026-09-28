@@ -1,20 +1,83 @@
+using System.Text.Json.Serialization;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 
 namespace Stanley.ProjectModel.Characters;
 
-/// <summary>A sticker slot's fixed z-order and the full catalogue of stickers ever available for it.</summary>
-public sealed record StickerSlotDefinition(int ZOrder, IReadOnlyList<StickerId> Catalogue);
-
 /// <summary>
-/// <c>characters/&lt;id&gt;-slug/character.json</c> - the "wardrobe": skeleton, named
-/// colour slots, and the sticker catalogue per slot. Nothing here is issue-specific; it
-/// only grows as the series goes. Which stickers/colours are actually active on a given
-/// look lives in a <see cref="CharacterRevision"/>, not here.
+/// <c>characters/&lt;id&gt;-slug/character.json</c> - a character: body, skeleton, named
+/// colour slots (with their fabrics), and what it wears by default. Nothing here is
+/// issue-specific. A named look (<see cref="CharacterRevision"/>) or a single panel can
+/// swap what's worn per slot.
 /// </summary>
+/// <param name="Body">The numbers the body is generated from (<see cref="BodyRig"/>). Every placed instance draws from it, so changing it changes the character everywhere.</param>
+/// <param name="Skeleton">Manual joint overrides on top of the rest layout <see cref="BodyRig"/> generates from <paramref name="Body"/> - the rig-editor escape hatch; empty for a body made only with sliders.</param>
+/// <param name="ColorSlots">Named colours the user picked; <see cref="SkinSlot"/> fills the body. A slot the character hasn't set falls back to its stickers' defaults.</param>
+/// <param name="Stickers">Slot -&gt; the stickers worn by default, bottom to top (ids in <see cref="Wardrobe"/>).</param>
+/// <param name="Fabrics">Colour slot -&gt; pattern/texture on top of its colour; absent when there are none.</param>
+/// <param name="Expressions">Faces saved to use again in any panel, in the order they were saved; absent when there are none.</param>
+/// <param name="StickerVariants">Sticker id -&gt; the style it's worn in: one of its variants (a hood up, a cap's brim back). A sticker worn its default way has no entry, and the map is absent when none has.</param>
+/// <param name="StickerSides">
+/// Sticker id -&gt; the one side of a symmetric head slot it's restricted to (docs/sticker-system.md
+/// §21: split eyes). Absent for a sticker means it draws on both sides, as every sticker did
+/// before this existed. Only meaningful for a sticker worn in <see cref="StickerSlots.Eyes"/>
+/// today; character-level only (not per look or per panel), and absent when nothing is split.
+/// </param>
+/// <param name="MyAssetsVersion">
+/// The My Assets fingerprint this character last matched (docs/asset-packs.md §7.1) - absent
+/// for a character that was never kept. It changes only through a deliberate keep/save/update
+/// action, never by opening a comic.
+/// </param>
 public sealed record CharacterDefinition(
     CharacterId Id,
     string Name,
+    BodyShape Body,
     Skeleton Skeleton,
     SortedDictionary<string, ColorValue> ColorSlots,
-    SortedDictionary<string, StickerSlotDefinition> StickerSlots);
+    SortedDictionary<string, IReadOnlyList<StickerId>> Stickers,
+    SortedDictionary<string, Fabric>? Fabrics = null,
+    IReadOnlyList<SavedExpression>? Expressions = null,
+    SortedDictionary<StickerId, string>? StickerVariants = null,
+    SortedDictionary<StickerId, LimbSide>? StickerSides = null,
+    string? MyAssetsVersion = null)
+{
+    /// <summary>
+    /// The character's stickers (worn or not) and pattern tiles, loaded from its folder -
+    /// not part of <c>character.json</c> (each sticker is its own folder), but part of the
+    /// character in memory, so the editor's undo and every renderer see them.
+    /// </summary>
+    [JsonIgnore]
+    public Wardrobe Wardrobe { get; init; } = Wardrobe.Empty;
+
+    /// <summary>The named looks (<c>revisions/</c>), loaded with the character, by id.</summary>
+    [JsonIgnore]
+    public IReadOnlyDictionary<CharacterRevisionId, CharacterRevision> Revisions { get; init; } = new Dictionary<CharacterRevisionId, CharacterRevision>();
+
+    /// <summary>A character read from a file with missing collections gets empty ones.</summary>
+    public CharacterDefinition Normalized() =>
+        Body is not null && Skeleton is not null && ColorSlots is not null && Stickers is not null
+            ? this
+            : this with
+            {
+                Body = Body ?? BodyShape.Default,
+                Skeleton = Skeleton ?? new Skeleton([]),
+                ColorSlots = ColorSlots ?? new SortedDictionary<string, ColorValue>(),
+                Stickers = Stickers ?? new SortedDictionary<string, IReadOnlyList<StickerId>>()
+            };
+
+    /// <summary>The colour slot the body is filled with.</summary>
+    public const string SkinSlot = "skin";
+
+    public static ColorValue DefaultSkin { get; } = ColorValue.FromHex("#f2c9a4");
+
+    public ColorValue Skin => ColorSlots.TryGetValue(SkinSlot, out var skin) ? skin : DefaultSkin;
+
+    /// <summary>A brand-new character: default body, default skin, no overrides or stickers.</summary>
+    public static CharacterDefinition Create(string name, BodyShape? body = null) => new(
+        CharacterId.New(),
+        name,
+        body ?? BodyShape.Default,
+        new Skeleton([]),
+        new SortedDictionary<string, ColorValue> { [SkinSlot] = DefaultSkin },
+        new SortedDictionary<string, IReadOnlyList<StickerId>>());
+}

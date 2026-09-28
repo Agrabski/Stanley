@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Stanley.Rendering\Stanley.Rendering.csproj" />
     <ProjectReference Include="..\..\src\Stanley.ProjectModel\Stanley.ProjectModel.csproj" />
+    <ProjectReference Include="..\..\src\Stanley.StickerLibrary\Stanley.StickerLibrary.csproj" />
   </ItemGroup>
 
 </Project>

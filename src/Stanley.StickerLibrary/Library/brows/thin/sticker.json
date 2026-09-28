@@ -1,0 +1,24 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Thin",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "brows",
+      "region": "head"
+    }
+  ],
+  "slot": "brows",
+  "variants": [
+    "neutral",
+    "raised",
+    "angry",
+    "sad",
+    "skeptical"
+  ]
+}

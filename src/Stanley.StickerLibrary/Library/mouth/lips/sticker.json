@@ -1,0 +1,27 @@
+{
+  "colors": {
+    "lips": "#c0616a"
+  },
+  "id": "library",
+  "name": "Lips",
+  "parts": [
+    {
+      "art": {
+        "mapping": "pin"
+      },
+      "name": "mouth",
+      "region": "head"
+    }
+  ],
+  "slot": "mouth",
+  "variants": [
+    "neutral",
+    "smile",
+    "grin",
+    "open",
+    "shout",
+    "frown",
+    "o",
+    "smirk"
+  ]
+}

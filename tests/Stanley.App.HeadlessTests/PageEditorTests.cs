@@ -234,18 +234,17 @@ public class PageEditorTests
         var bounds = window.Editor.PanelBounds(panelId);
 
         var point = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
-        window.MouseDown(point, MouseButton.Left);
-        window.MouseUp(point, MouseButton.Left);
+        window.DoubleClick(point);
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible, "the inline text editor should open over the new bubble");
+        AssertEditorLeavesBubbleVisible(view, window.Editor.Working.Panels[panelId].Bubbles[0]);
         window.KeyTextInput("Hello there");
         window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(view.TextEditor.IsVisible);
+        Assert.Null(view.Canvas.EditingBubble);
         var bubble = Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
         Assert.Equal("Hello there", bubble.Text);
     }
@@ -386,7 +385,8 @@ public class PageEditorTests
     {
         var window = new MainWindow();
         window.Show();
-        GetPageCanvasControl(window);
+        var canvas = GetPageCanvasControl(window)!;
+        canvas.Focus(); // the page keeps focus under the File view, and handles Escape itself
         var file = window.RibbonBarControl.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "FileButton");
 
         file.Command!.Execute(file.CommandParameter);
@@ -399,7 +399,7 @@ public class PageEditorTests
         Assert.False(window.BackstageControl.IsVisible);
     }
 
-    /// <summary>Ctrl+S on a new comic asks for a folder (Save As), saves there, and the title bar stops showing unsaved changes.</summary>
+    /// <summary>Ctrl+S on a new comic asks where to save it and under what name (Save As), saves there, and the title bar stops showing unsaved changes.</summary>
     [Fact]
     public void CtrlS_OnANewComic_SavesToThePickedFolder()
     {
@@ -426,6 +426,35 @@ public class PageEditorTests
         {
             if (Directory.Exists(folder))
                 Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>File &gt; Options &gt; Dark switches the whole app, Stanley's own chrome colours included, and back again.</summary>
+    [Fact]
+    public void DarkTheme_AppliesToTheApp_AndTheTitleBarFollows()
+    {
+        var app = Application.Current!;
+        try
+        {
+            var window = new MainWindow(new MainWindowViewModel(new ScriptedDialogs(Path.GetTempPath()), new Stanley.App.Documents.RecentProjects(null)));
+            window.Show();
+            var titleBar = window.FindControl<Border>("TitleBar")!;
+            var lightBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+
+            window.ViewModel.IsDarkTheme = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(Avalonia.Styling.ThemeVariant.Dark, app.ActualThemeVariant);
+            var darkBrush = ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color;
+            Assert.NotEqual(lightBrush, darkBrush);
+
+            window.ViewModel.IsLightTheme = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(lightBrush, ((Avalonia.Media.ISolidColorBrush)titleBar.Background!).Color);
+        }
+        finally
+        {
+            app.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Default;
         }
     }
 
@@ -476,8 +505,43 @@ public class PageEditorTests
     private sealed class ScriptedDialogs(string folder) : Stanley.App.Documents.IFileDialogs
     {
         public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(folder);
+        public Task<string?> PickSaveLocationAsync(string title, string suggestedName) => Task.FromResult<string?>(folder);
         public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) => Task.FromResult<string?>(null);
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
+        public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
+        public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
+    }
+
+    /// <summary>Clicking a panel on a locked layout selects it (issue #67) without moving it - a drag from it only pans the view, like the pasteboard - while double-click still adds a bubble.</summary>
+    [Fact]
+    public void ClickingAPanel_WhileLayoutIsLocked_SelectsItWithoutMovingIt()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var panelId = window.Editor.Working.PanelOrder[0];
+        var bounds = window.Editor.PanelBounds(panelId);
+        window.Editor.IsLayoutLocked = true;
+        Dispatcher.UIThread.RunJobs();
+
+        foreach (var pagePoint in new[] { new Point2D(bounds.MidX, bounds.MidY), new Point2D(bounds.Left + 0.5, bounds.MidY) })
+        {
+            var point = canvas.TranslatePoint(canvas.PageToControl(pagePoint), window)!.Value;
+            window.MouseDown(point, MouseButton.Left);
+            window.MouseMove(new Point(point.X + 30, point.Y + 30));
+            window.MouseUp(new Point(point.X + 30, point.Y + 30), MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal(panelId, window.Editor.SelectedPanelId);
+            Assert.True(window.Editor.IsPanelContext);
+            Assert.Equal(bounds, window.Editor.PanelBounds(panelId)); // the drag panned the view, not the panel
+        }
+
+        var centre = canvas.TranslatePoint(canvas.PageToControl(new Point2D(bounds.MidX, bounds.MidY)), window)!.Value;
+        window.DoubleClick(centre);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(window.Editor.Working.Panels[panelId].Bubbles);
+        Assert.True(window.Editor.IsBubbleContext);
     }
 
     /// <summary>A ribbon command outside the pane still reaches the pane's view: Add bubble opens the inline text editor.</summary>
@@ -495,7 +559,28 @@ public class PageEditorTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(view.TextEditor.IsVisible);
-        Assert.Single(window.Editor.Working.Panels[window.Editor.Working.PanelOrder[0]].Bubbles);
+        var bubble = Assert.Single(window.Editor.Working.Panels[window.Editor.Working.PanelOrder[0]].Bubbles);
+        AssertEditorLeavesBubbleVisible(view, bubble);
+    }
+
+    /// <summary>
+    /// While typing, nothing may cover the bubble: the text box is see-through and
+    /// borderless (focused, too), sits inside the bubble's outline, and the canvas drops
+    /// that bubble's handles and lettering.
+    /// </summary>
+    private static void AssertEditorLeavesBubbleVisible(PageEditorView view, Stanley.ProjectModel.Bubbles.Bubble bubble)
+    {
+        Assert.True(view.TextEditor.IsFocused);
+        var border = view.TextEditor.GetVisualDescendants().OfType<Border>().First(b => b.Name == "PART_BorderElement");
+        Assert.True(border.Background is null or Avalonia.Media.ISolidColorBrush { Color.A: 0 }, $"text box background should be transparent, was {border.Background}");
+        Assert.Equal(default, border.BorderThickness);
+
+        var bubbleRect = view.Canvas.PageToControl(AnchorRing.BoundingBox(bubble.Shape.Anchors));
+        Dispatcher.UIThread.RunJobs();
+        var editorRect = view.TextEditor.Bounds;
+        Assert.True(bubbleRect.Contains(editorRect), $"text box {editorRect} should sit inside the bubble {bubbleRect}");
+
+        Assert.Equal(bubble.Id, view.Canvas.EditingBubble?.Bubble);
     }
 
     /// <summary>

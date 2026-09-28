@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "outer": "#556b2f"
+  },
+  "id": "library",
+  "name": "Gilet",
+  "parts": [
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.024,
+        "from": 0.04,
+        "to": 0.9
+      },
+      "name": "body",
+      "region": "torso"
+    }
+  ],
+  "slot": "outer",
+  "variants": [
+    "default"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "colors": {
+    "bottom": "#8a7a5a"
+  },
+  "id": "library",
+  "name": "Shorts",
+  "parts": [
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0.6,
+        "to": 1
+      },
+      "name": "seat",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "bottom",
+        "from": 0,
+        "to": 0.3
+      },
+      "name": "legs",
+      "region": "leg"
+    }
+  ],
+  "slot": "bottom",
+  "variants": [
+    "default"
+  ]
+}

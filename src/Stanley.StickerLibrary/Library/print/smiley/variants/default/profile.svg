@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="65" height="75" viewBox="-25 -758 65 75" data-stanley-view="profile" data-stanley-slot="print">
+  <g id="print" inkscape:groupmode="layer" inkscape:label="print">
+    <circle class="slot-print" cx="10.37" cy="-721.59" r="27.6" fill="#f1c40f"/>
+    <circle cx="0.77" cy="-728.79" r="4.2" fill="#1a1a1a"/>
+    <circle cx="19.97" cy="-728.79" r="4.2" fill="#1a1a1a"/>
+    <path d="M-1.63,-715.59 Q10.37,-703.59 22.37,-715.59" fill="none" stroke="#1a1a1a" stroke-width="3.6" stroke-linecap="round"/>
+  </g>
+</svg>

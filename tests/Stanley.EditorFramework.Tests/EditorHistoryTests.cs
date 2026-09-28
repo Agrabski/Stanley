@@ -109,4 +109,43 @@ public class EditorHistoryDirtyTests
 
         Assert.True(history.IsDirty);
     }
+    [Fact]
+    public void Group_MakesEverythingPushedInsideOneUndoStep_UndoneInReverse()
+    {
+        var history = new EditorHistory();
+        var log = new List<string>();
+        var source = new object();
+        object? restoredFrom = null;
+        history.Restored += s => restoredFrom = s;
+
+        using (history.Group("Margins", source))
+        {
+            history.Push("a", () => log.Add("undo a"), () => log.Add("redo a"));
+            using (history.Group("inner"))
+                history.Push("b", () => log.Add("undo b"), () => log.Add("redo b"));
+            Assert.False(history.CanUndo); // nothing lands until the group closes
+        }
+
+        Assert.True(history.CanUndo);
+        history.Undo();
+        Assert.False(history.CanUndo);
+        Assert.Equal(["undo b", "undo a"], log);
+        Assert.Same(source, restoredFrom);
+        history.Redo();
+        Assert.Equal(["undo b", "undo a", "redo a", "redo b"], log);
+    }
+
+    [Fact]
+    public void AnEmptyGroup_LeavesNoStep()
+    {
+        var history = new EditorHistory();
+        history.MarkSaved();
+
+        using (history.Group("Nothing"))
+        {
+        }
+
+        Assert.False(history.CanUndo);
+        Assert.False(history.IsDirty);
+    }
 }

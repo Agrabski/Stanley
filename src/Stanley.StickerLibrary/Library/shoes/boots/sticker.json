@@ -1,0 +1,33 @@
+{
+  "colors": {
+    "shoes": "#4a3322"
+  },
+  "id": "library",
+  "name": "Boots",
+  "parts": [
+    {
+      "cover": {
+        "color": "shoes",
+        "ease": 0.014,
+        "from": 0,
+        "to": 1
+      },
+      "name": "shoes",
+      "region": "foot"
+    },
+    {
+      "cover": {
+        "color": "shoes",
+        "ease": 0.014,
+        "from": 0.72,
+        "to": 1
+      },
+      "name": "shafts",
+      "region": "leg"
+    }
+  ],
+  "slot": "shoes",
+  "variants": [
+    "default"
+  ]
+}

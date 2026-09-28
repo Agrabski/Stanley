@@ -4,6 +4,11 @@
     <OutputType>WinExe</OutputType>
     <AssemblyName>stanley</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Releases are tagged vX.Y.Z by release-please; any other commit gets
+         <next patch>-alpha.0.<commits since the tag>, e.g. 0.1.1-alpha.0.7. -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+    <MinVerDefaultPreReleaseIdentifiers>alpha.0</MinVerDefaultPreReleaseIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +25,11 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
     <PackageReference Include="Dock.Avalonia" Version="12.1.0.6" />
     <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="12.1.0.6" />
+    <!-- Build-time only: sets Version from the latest vX.Y.Z git tag (see "Versioning" in CLAUDE.md). -->
+    <PackageReference Include="MinVer" Version="8.0.0" PrivateAssets="all" />
     <PackageReference Include="System.CommandLine" Version="2.0.12" />
+    <!-- Self-update (File > Options > Updates); MIT-licensed, AGPL-compatible. -->
+    <PackageReference Include="Velopack" Version="1.2.158" />
   </ItemGroup>
 
 </Project>
