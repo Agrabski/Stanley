@@ -43,6 +43,13 @@ public partial class CharacterLibraryView : UserControl
 	{
 		if (!e.GetCurrentPoint(CharacterList).Properties.IsLeftButtonPressed || ReferenceEquals(e, _placedBy))
 			return;
+		// A press inside the rename box is text editing (placing the caret, dragging out a
+		// selection) - leave it to the TextBox instead of tracking it as a drag/click on the item.
+		if (e.Source is Visual pressed && pressed.GetSelfAndVisualAncestors().OfType<TextBox>().Any())
+			return;
+		// A press anywhere else while a name is being edited closes that editor first, the way
+		// losing focus would - so clicking another character (or empty space) gets you out of it.
+		CommitActiveRename();
 		var item = ItemFrom(e.Source);
 		// A double-click puts the character on the page. Its first click opened the
 		// character already; placing it goes back to the page. Handled here, on the way
@@ -119,6 +126,7 @@ public partial class CharacterLibraryView : UserControl
 	{
 		if (ViewModel is not { } vm || ItemFrom(e.Source) is not { } item)
 			return;
+		CommitActiveRename();
 
 		var menu = new ContextMenu
 		{
@@ -176,10 +184,32 @@ public partial class CharacterLibraryView : UserControl
 	}
 	private void InputElement_OnKeyDown(object? sender, KeyEventArgs e)
 	{
+		if (sender is not TextBox { DataContext: CharacterItem item } textBox)
+			return;
 		if (e.Key == Key.Enter)
 		{
-			TopLevel.GetTopLevel(sender as TextBox)?.FocusManager.TryMoveFocus(NavigationDirection.Down);
+			// Commits directly instead of moving focus off the box: with a single character (no
+			// next control to move focus to) that move used to fail silently, leaving the box open.
+			item.Name = textBox.Text ?? item.Name;
+			CharacterList.Focus();
 			e.Handled = true;
 		}
+		else if (e.Key == Key.Escape)
+		{
+			// Cancels: whatever was typed is discarded and the name is left as it was.
+			textBox.Text = item.Name;
+			item.IsEditingName = false;
+			CharacterList.Focus();
+			e.Handled = true;
+		}
+	}
+
+	/// <summary>Commits whichever character's name is currently being edited, if any - the same outcome losing focus gives, for callers that close the editor another way.</summary>
+	private void CommitActiveRename()
+	{
+		var textBox = CharacterList.GetVisualDescendants().OfType<TextBox>()
+			.FirstOrDefault(t => t.DataContext is CharacterItem { IsEditingName: true });
+		if (textBox?.DataContext is CharacterItem item)
+			item.Name = textBox.Text ?? item.Name;
 	}
 }
