@@ -61,11 +61,21 @@ individual library items internally (`StickerAsset`).
 8. **Git compatibility comes from the file format**, never from a feature the
    user has to operate. Stanley doesn't run git.
 9. **Copies keep ids.** *Duplicate* (new id) stays the way to fork anything.
-10. **Groups sort My Assets like albums**, and can now mix kinds. A group can
-    be added to a comic in one step and shared as one file. Deleting a group
-    never deletes what's in it. Groups exist only in My Assets — a comic's own
-    folders don't change.
-11. **Grouping objects on a page (#86) is a separate, smaller feature that
+10. **Packs sort My Assets like albums**, and can mix kinds freely — this is
+    the "group" from `my-characters.md` §2.9, renamed so it stops colliding
+    with the page-level *group* from #86 (§3): a **pack** lives in My Assets
+    and can hold characters, object groups, stickers, patterns, backgrounds
+    and poses in any combination; a **group** lives on a page and only holds
+    panel elements. A pack can be added to a comic in one step and shared as
+    one file. Deleting a pack never deletes what's in it. Packs exist only in
+    My Assets — a comic's own folders don't change.
+11. **Building a pack is deliberate and happens in the gallery.** The My
+    Assets page lets the user multi-select across every kind at once (an
+    object group here, two characters there, a background) and name the
+    result — not just something that falls out of keeping items one at a
+    time. §6.2 spells this out; it's the direct answer to "a gallery for
+    creating a named pack of anything, in any combination."
+12. **Grouping objects on a page (#86) is a separate, smaller feature that
     this depends on.** It ships first, on its own, because it's useful with
     no asset-pack machinery at all (a rocket ship you can drag as one object
     in *this* comic).
@@ -101,13 +111,14 @@ This slice alone closes #86 and is useful with zero asset-pack UI.
 
 | The user sees | Under the hood |
 |---|---|
-| My Assets | `Documents/Stanley/My Assets/`, one subfolder per kind, plus `groups/` |
+| My Assets | `Documents/Stanley/My Assets/`, one subfolder per kind, plus `packs/` |
 | Group (on the page) | `GroupElement`, a `PanelElement` (§3) |
 | *Keep in My Assets*, the star | Copy the asset's files there; record its fingerprint in the comic |
 | *Just in this comic* / *Everywhere* | Whether saving the comic also writes My Assets |
 | "Updated in My Assets", *Update* / *Keep as is* | Fingerprint comparison, replacing the comic's copy |
-| A group (in My Assets) | `groups/<id>-slug.json`: a name and a list of `(kind, id)` refs, any mix of kinds |
-| *Share…*, a `.stpack` file | A zip of the referenced assets, plus the group when one is shared |
+| A pack | `packs/<id>-slug.json`: a name and a list of `(kind, id)` refs, any mix of kinds |
+| *New pack…*, *Add to pack ›* | Create/append a `packs/*.json` entry from whatever's multi-selected in the gallery, or from one kept item's menu |
+| *Share…*, a `.stpack` file | A zip of the referenced assets, plus the pack definition when a named pack is shared |
 
 Words the user never sees: pack, package, path, tag, commit, version, sync,
 fingerprint, manifest.
@@ -137,15 +148,41 @@ design is spelled out here.
 Wherever an asset of one of the six kinds is selected, its context menu gets
 **Keep in My Assets** (a star). Once kept: **Save to My Assets** (when
 changed), **Remove from My Assets** (with the same "comics that use it keep
-their own copy" confirmation), and **Add to group ›** (listing My Assets
-groups plus *New group…*). Writing happens immediately, with an **Undo**
-toast, same as `my-characters.md` §4.1.
+their own copy" confirmation), and **Add to pack ›** (listing My Assets packs
+plus *New pack…*). Writing happens immediately, with an **Undo** toast, same
+as `my-characters.md` §4.1.
 
 **Keep all in My Assets**, on the page and on the Characters pane, keeps
 everything selected (or, on the Characters pane, every character) at once
-into one named group — the likely on-ramp for "save my whole scene as a kit".
+into one named pack — a quick on-ramp for "save my whole scene as a kit", but
+still just one instance of the general mechanism in §6.2.
 
-### 6.2 Adding an asset to a comic
+### 6.2 Building a pack deliberately, in the gallery
+
+Keeping things one at a time (§6.1) is how a pack usually *starts*, but the
+My Assets page (the File-view page from §9) is where one is built on purpose:
+
+- The page shows every kept asset in one grid, with kind filter chips (*All*,
+  *Object groups*, *Characters*, *Stickers*, *Patterns*, *Backgrounds*,
+  *Poses*) above it — chips narrow what's shown, they don't limit selection.
+- **Multi-select works across chips.** Switching from *Characters* to
+  *Backgrounds* keeps whatever was already ticked, so picking two characters,
+  an object group and a background for one pack means: tick two, switch
+  chip, tick one, switch chip, tick one.
+- **New pack…** (toolbar, or right-click on a selection) names the current
+  selection and saves it to `packs/`, in any combination of kinds — this is
+  the literal "gallery allows for deliberately creating a named pack
+  containing groups of objects, character designs or individual assets, or
+  any combination of these" behaviour this section exists to spell out.
+- An existing pack is just a saved chip of its own (*My packs* in the filter
+  row): opening one selects its members, so **Add to selection**, remove a
+  member, and **Save as new pack…** / overwrite the open pack all fall out of
+  the same multi-select, no separate "edit pack" UI needed.
+- Dragging a tile onto a pack tile in the pack list adds it, matching
+  `my-characters.md` §4.5's "drag characters onto a group on the My
+  Characters page", generalised to any kind.
+
+### 6.3 Adding an asset to a comic
 
 Each kind's existing picker (Characters pane's *Add character*, the sticker
 picker, Shape Fill, the background editor, the pose gallery) gains a **My
@@ -155,15 +192,15 @@ comics** and **Add from file…** — same three sources as `my-characters.md`
 gets an **Insert from My Assets…** command for object groups, since there's
 no existing "picker" for arbitrary panel content to extend.
 
-Picking a tile copies the asset in, keeping its id, and (for a group) drops
-it in placement mode the way pasting does.
+Picking a tile copies the asset in, keeping its id, and (for an object group)
+drops it in placement mode the way pasting does.
 
-### 6.3 Staying in step, and sharing
+### 6.4 Staying in step, and sharing
 
 Unchanged from `my-characters.md` §4.3–§4.6: the Just-here/Everywhere bar,
 the before/after badge with Update/Keep as is, and Share…/**Add from
 file…**/drag-and-drop for `.stpack` files — all generalised to work over any
-kind and over mixed-kind groups. A shared group's before/after view shows a
+kind and over mixed-kind packs. A shared pack's before/after view shows a
 strip of thumbnails (one per member) rather than one character figure when
 it's mixed-kind.
 
@@ -197,15 +234,15 @@ Documents/Stanley/My Assets/
   patterns/<id>-.../tile art
   backgrounds/<id>-.../background.json + art
   poses/<id>-....json
-  groups/<id>-slug.json                  # { name, members: [{kind, id}, ...] }
+  packs/<id>-slug.json                   # { name, members: [{kind, id}, ...] }
 ```
 
 Each kind's folder is read/written by the same store code a comic uses for
 that kind — `objects/` by whatever `Stanley.ProjectModel` uses to persist a
 panel's elements today, `characters/` by `CharacterStore` (`my-characters.md`
 §9), and so on — so the format can never drift between "in a comic" and "in
-My Assets". A My Assets group file is the same shape as `my-characters.md`'s
-character group, with a `kind` tag added to each member entry.
+My Assets". A pack file is the same shape as `my-characters.md`'s character
+group, with a `kind` tag added to each member entry so it can mix kinds.
 
 ### 7.3 Fingerprints
 
@@ -228,14 +265,19 @@ Space Cats crew.stpack
   characters/<id>-alice/...
   objects/<id>-rocket-ship/...
   backgrounds/<id>-nebula/...
-  groups/<id>-space-cats-crew.json   # only when a group was shared
+  packs/<id>-space-cats-crew.json   # only when a named pack was shared
 ```
 
 Import validation is unchanged from `my-characters.md` §6.5: relative paths
-under the six known top-level folders only, no `..`, a group lists only
+under the seven known top-level folders only, no `..`, a pack file lists only
 members present in the file, a cap on entry count and unpacked size, art
 restricted to the formats each kind already accepts, JSON through the normal
 readers, and any failure refuses the whole file with one plain message.
+
+Sharing a hand-picked gallery selection that was never saved as a named pack
+(§6.2) still works and writes no `packs/*.json` entry, exactly as
+`my-characters.md` §6.5 already allowed for a hand-picked set of characters —
+*New pack…* is for reuse, plain multi-select-and-Share is for a one-off send.
 
 ## 8. Git
 
@@ -250,10 +292,10 @@ Stanley doesn't need to know about.
 
 | Project | What |
 |---|---|
-| `Stanley.ProjectModel` | `GroupElement` and the `objects/` folder (§7.1); generalise `CharacterStore`'s pattern into per-kind stores; `AssetFingerprint`, `AssetShareFile` (the `.stpack` zip), `AssetGroup`/`AssetGroupId`, `myAssetsVersion` on each kind's definition. Avalonia-free, as `my-characters.md` §9 already specifies for the character slice. |
-| `Stanley.Editing` | Pure functions: `Grouping` (group/ungroup, §3), the kept/changed state machine and `Update`'s keep-what's-used rule, generalised over kind. |
-| `Stanley.Editors` | Group/ungroup ribbon + right-click + ‘enter group’ on the page canvas; each picker's My Assets section; the Just-here/Everywhere bar; the before/after view (thumbnail strip for mixed groups); `MyAssetsLibraryViewModel` (renamed/generalised from `CharacterLibraryViewModel`). |
-| `Stanley.App` | `AppPaths.MyAssetsDirectory` + settings entry, the My Assets File-view page (kind filter chips alongside the group list), `Program.Main` dispatch for a `.stpack` argument, file-type registration. |
+| `Stanley.ProjectModel` | `GroupElement` and the `objects/` folder (§7.1); generalise `CharacterStore`'s pattern into per-kind stores; `AssetFingerprint`, `AssetShareFile` (the `.stpack` zip), `AssetPack`/`AssetPackId`, `myAssetsVersion` on each kind's definition. Avalonia-free, as `my-characters.md` §9 already specifies for the character slice. |
+| `Stanley.Editing` | Pure functions: `Grouping` (page-level group/ungroup, §3), the kept/changed state machine and `Update`'s keep-what's-used rule, generalised over kind. |
+| `Stanley.Editors` | Group/ungroup ribbon + right-click + ‘enter group’ on the page canvas; each picker's My Assets section; the Just-here/Everywhere bar; the before/after view (thumbnail strip for mixed packs); `MyAssetsLibraryViewModel` (renamed/generalised from `CharacterLibraryViewModel`), including the gallery's cross-kind multi-select and *New pack…* (§6.2). |
+| `Stanley.App` | `AppPaths.MyAssetsDirectory` + settings entry, the My Assets File-view page (kind filter chips alongside the pack list), `Program.Main` dispatch for a `.stpack` argument, file-type registration. |
 
 ## 10. Delivery slices (each a PR, each green on its own)
 
@@ -268,24 +310,29 @@ Stanley doesn't need to know about.
    `CharacterStore`'s pattern generically; `AssetFingerprint` for object
    groups and characters first (the two kinds #99 and `my-characters.md`
    actually need); `MyAssets` read/write for those two kinds plus generic
-   `AssetGroup`.
+   `AssetPack`.
    - Tests: as `my-characters.md` §10 slice 1, plus: a group saved to
      `objects/` and referenced from a panel round-trips byte-for-byte; the
      fingerprint changes when a child element changes and not on an
      unrelated panel edit.
 3. **Keep and add — object groups + characters.** *Keep in My Assets* on a
    page group and on a character; the two pickers' My Assets sections;
-   `AppPaths`, settings, File-view page skeleton.
+   `AppPaths`, settings, File-view page skeleton (grid + kind chips, no
+   multi-select/pack creation yet).
    - Tests: as `my-characters.md` §10 slice 2, run for both kinds.
 4. **Staying in step.** The bar, Everywhere-on-save, before/after with
    Update/Keep as is, the open/focus check — generalised, tested against
    object groups and characters.
    - Tests: as `my-characters.md` §10 slice 3.
-5. **Groups (My Assets albums), mixed-kind.** New/rename/delete/drag-onto,
-   *Add to group ›*, *Keep all in My Assets*, gallery chips and *Add all* —
-   now allowing a group to mix an object group with characters.
-   - Tests: as `my-characters.md` §10 slice 4, plus a mixed-kind group's
-     *Add all* adds both kinds as one undo step.
+5. **Packs (My Assets albums), mixed-kind, built deliberately (§6.2).**
+   Cross-chip multi-select on the gallery page, *New pack…*, *Add to pack ›*,
+   *Keep all in My Assets*, rename/delete/drag-onto, and *Add all* on a pack
+   from any other picker — a pack mixing an object group with characters
+   throughout.
+   - Tests: as `my-characters.md` §10 slice 4, plus: selecting across two
+     kind chips and choosing *New pack…* saves both kinds into one pack file;
+     *Add all* from a mixed-kind pack adds every member as one undo step and
+     skips ones the comic already has.
 6. **Sharing files (`.stpack`).** Share…/Add from file…/drop-onto-window/
    import view — generalised validation over the two kinds.
    - Tests: as `my-characters.md` §10 slice 5.
@@ -297,13 +344,13 @@ Stanley doesn't need to know about.
    Lowest priority: object groups and characters are what #99 and the
    existing design actually ask for.
 9. **CLI, optional.** `stanley assets list`, `export`, `import` (any kind or
-   a group), superseding `my-characters.md` §10 slice 7's narrower command.
+   a pack), superseding `my-characters.md` §10 slice 7's narrower command.
 
 ## 11. Later, and open questions
 
 **Later** (unchanged from `my-characters.md` §11 unless noted):
 - Groups inside a comic's own Characters/page panes for a large cast or a
-  busy panel — the My Assets group already covers the cross-comic case.
+  busy panel — the My Assets pack already covers the cross-comic case.
 - A creator name and plain-language credit/licence in `.stpack` files.
   Matters more now that packs can carry drawn art and props, not just
   character sliders — worth revisiting sooner than "later" once sharing
