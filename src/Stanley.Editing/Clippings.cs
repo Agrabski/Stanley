@@ -34,7 +34,11 @@ public static class Clippings
 
     public static Bubble Copy(Bubble bubble) => bubble with { Id = BubbleId.New() };
 
-    public static PanelElement Copy(PanelElement element) => element with { Id = ElementId.New() };
+    public static PanelElement Copy(PanelElement element) => element switch
+    {
+        GroupElement group => group with { Id = ElementId.New(), Children = group.Children.Select(Copy).ToList() },
+        _ => element with { Id = ElementId.New() }
+    };
 
     /// <summary>A panel under a new id, its bubbles and elements under new ones too.</summary>
     public static Panel Copy(Panel panel) => panel with
