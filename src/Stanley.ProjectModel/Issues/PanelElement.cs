@@ -29,6 +29,7 @@ public enum ElementLayer
 [JsonDerivedType(typeof(TextElement), "text")]
 [JsonDerivedType(typeof(PictureElement), "picture")]
 [JsonDerivedType(typeof(SpeedLinesElement), "speedLines")]
+[JsonDerivedType(typeof(GroupElement), "group")]
 public abstract record PanelElement(ElementId Id, ElementLayer Layer);
 
 /// <summary>The pattern a line is drawn in - Word's "Dashes" - each scaled to the line's thickness.</summary>
@@ -137,4 +138,16 @@ public sealed record SpeedLinesStyle(ColorValue Color, int Count = 80, double Wi
 /// other element's box moves and resizes (<see cref="PanelElements.Bounds"/>).
 /// </summary>
 public sealed record SpeedLinesElement(ElementId Id, ElementLayer Layer, Rect2D Focus, SpeedLinesStyle Style)
+    : PanelElement(Id, Layer);
+
+/// <summary>
+/// Several elements welded into one selectable, draggable, resizable object (issue #86) -
+/// what today's transient Shift+click multi-selection becomes once it's made persistent.
+/// <see cref="Children"/> keep their own absolute geometry, the same as when they were loose
+/// in <see cref="Panel.Elements"/>; there's no separate position, rotation or scale on the
+/// group itself, matching every other <see cref="PanelElement"/>. All children share the
+/// group's <see cref="PanelElement.Layer"/> - grouping across background and foreground
+/// isn't offered, since a group would otherwise have to split across both drawing passes.
+/// </summary>
+public sealed record GroupElement(ElementId Id, ElementLayer Layer, IReadOnlyList<PanelElement> Children)
     : PanelElement(Id, Layer);

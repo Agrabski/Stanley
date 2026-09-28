@@ -40,6 +40,26 @@ public class PanelElementJsonTests
     }
 
     [Fact]
+    public void A_group_round_trips_with_its_nested_children_kinds()
+    {
+        var shape = new ShapeElement(ElementId.New(), ElementLayer.Foreground, [Corner(20, 20), Corner(60, 30), Corner(40, 70)], Closed: true,
+            new ShapeStyle(ColorValue.FromHex("#1c1c1c"), ColorValue.FromHex("#27ae60"), 0.7));
+        var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(12, 12, 40, 10), "Meanwhile...",
+            new TextStyle(10, ColorValue.FromHex("#000000")));
+        var group = new GroupElement(ElementId.New(), ElementLayer.Foreground, [shape, text]);
+        var panel = PanelWith(null, group);
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"kind\": \"group\"", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        var readGroup = Assert.IsType<GroupElement>(read.Elements[0]);
+        Assert.IsType<ShapeElement>(readGroup.Children[0]);
+        Assert.IsType<TextElement>(readGroup.Children[1]);
+    }
+
+    [Fact]
     public void Unset_style_colours_are_left_out_of_the_file()
     {
         var text = new TextElement(ElementId.New(), ElementLayer.Foreground, new Rect2D(0, 0, 30, 8), "Hi", new TextStyle(10, ColorValue.FromHex("#000000")));

@@ -446,6 +446,74 @@ public class ElementEditingTests
 
         Assert.Equal(new Rect2D(25, 15, 20, 20), PanelElements.Bounds(moved.Elements[0]));
     }
+
+    [Fact]
+    public void Move_on_a_group_moves_every_child_including_nested_groups()
+    {
+        var a = Blob(new Rect2D(0, 0, 10, 10));
+        var b = Blob(new Rect2D(20, 0, 10, 10));
+        var inner = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [b]);
+        var outer = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [a, inner]);
+
+        var moved = (GroupElement)ElementEditing.Move(outer, 5, -3);
+
+        var movedA = (ShapeElement)moved.Children[0];
+        var movedInner = (GroupElement)moved.Children[1];
+        var movedB = (ShapeElement)movedInner.Children[0];
+        Assert.Equal(new Rect2D(5, -3, 10, 10), AnchorRing.BoundingBox(movedA.Anchors));
+        Assert.Equal(new Rect2D(25, -3, 10, 10), AnchorRing.BoundingBox(movedB.Anchors));
+    }
+
+    [Fact]
+    public void Resize_on_a_group_rescales_each_child_proportionally()
+    {
+        var a = Blob(new Rect2D(0, 0, 10, 10));
+        var b = Blob(new Rect2D(10, 0, 10, 10));
+        var group = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [a, b]);
+
+        var resized = (GroupElement)ElementEditing.Resize(group, new Rect2D(0, 0, 40, 20)).Value;
+
+        Assert.Equal(new Rect2D(0, 0, 20, 20), PanelElements.Bounds(resized.Children[0]));
+        Assert.Equal(new Rect2D(20, 0, 20, 20), PanelElements.Bounds(resized.Children[1]));
+    }
+
+    [Fact]
+    public void Resize_on_a_group_with_degenerate_bounds_is_refused()
+    {
+        var line1 = ShapeEditing.Line(new Point2D(0, 0), new Point2D(0, 10), ShapeEditing.DefaultStyle, ElementLayer.Background).Value;
+        var line2 = ShapeEditing.Line(new Point2D(0, 5), new Point2D(0, 15), ShapeEditing.DefaultStyle, ElementLayer.Background).Value;
+        var group = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [line1, line2]);
+
+        var result = ElementEditing.Resize(group, new Rect2D(0, 0, 10, 10));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Resize_on_a_group_fails_and_propagates_when_a_childs_own_minimum_size_would_be_broken()
+    {
+        var a = Blob(new Rect2D(0, 0, 10, 10));
+        var b = Blob(new Rect2D(10, 0, 10, 10));
+        var group = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [a, b]);
+
+        var result = ElementEditing.Resize(group, new Rect2D(0, 0, 0.5, 10));
+
+        Assert.False(result.IsValid);
+        Assert.Contains("at least", result.Error);
+    }
+
+    [Fact]
+    public void SetLayer_on_a_group_changes_the_group_and_every_child()
+    {
+        var a = Blob(new Rect2D(0, 0, 10, 10));
+        var b = Blob(new Rect2D(20, 0, 10, 10));
+        var group = new GroupElement(Stanley.ProjectModel.Ids.ElementId.New(), ElementLayer.Background, [a, b]);
+
+        var moved = (GroupElement)ElementEditing.SetLayer(group, ElementLayer.Foreground);
+
+        Assert.Equal(ElementLayer.Foreground, moved.Layer);
+        Assert.All(moved.Children, c => Assert.Equal(ElementLayer.Foreground, c.Layer));
+    }
 }
 
 public class PictureEditingTests

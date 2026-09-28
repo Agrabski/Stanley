@@ -1,5 +1,12 @@
 # My Characters — sharing characters between comics
 
+**Superseded by [`asset-packs.md`](asset-packs.md).** That doc generalises this
+design (#99 needs to share more than characters — object groups, stickers,
+backgrounds, poses — via one mechanism instead of a character-only one) and is
+now the working plan; this file is kept for the character-specific detail
+`asset-packs.md` points back to, but treat `asset-packs.md` as authoritative
+where the two differ.
+
 **Status: proposed, not implemented.** This came out of a design discussion about
 sharing a set of characters between projects. It went through "a cast is any
 project", then dedicated cast packages referenced by relative path or git tag, before

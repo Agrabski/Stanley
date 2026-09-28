@@ -22,6 +22,7 @@ public static class ElementEditing
         TextElement text => TextEditing.Move(text, dx, dy),
         PictureElement picture => PictureEditing.Move(picture, dx, dy),
         SpeedLinesElement speedLines => SpeedLinesEditing.Move(speedLines, dx, dy),
+        GroupElement group => group with { Children = group.Children.Select(c => Move(c, dx, dy)).ToList() },
         _ => element
     };
 
@@ -31,11 +32,51 @@ public static class ElementEditing
         TextElement text => Widen(TextEditing.Resize(text, bounds)),
         PictureElement picture => Widen(PictureEditing.Resize(picture, bounds)),
         SpeedLinesElement speedLines => Widen(SpeedLinesEditing.Resize(speedLines, bounds)),
+        GroupElement group => ResizeGroup(group, bounds),
         _ => EditResult<PanelElement>.Failure("This can't be resized.")
     };
 
-    public static PanelElement SetLayer(PanelElement element, ElementLayer layer) =>
-        element.Layer == layer ? element : element with { Layer = layer };
+    /// <summary>
+    /// Rescales every child proportionally from the group's current bounding box into
+    /// <paramref name="newBounds"/> - the same linear remap <see cref="ShapeEditing.Resize"/>
+    /// applies to a shape's anchors, applied here to each child's own bounds (which maps a
+    /// child's axis-aligned box to another axis-aligned box), then recursing into
+    /// <see cref="Resize"/> so nested groups and every leaf type resize correctly for free.
+    /// </summary>
+    private static EditResult<PanelElement> ResizeGroup(GroupElement group, Rect2D newBounds)
+    {
+        var from = PanelElements.Bounds(group);
+        if (from.Width <= 1e-9 || from.Height <= 1e-9)
+            return EditResult<PanelElement>.Failure("This group has no size to resize from.");
+
+        Point2D Map(Point2D p) => new(
+            newBounds.Left + (p.X - from.Left) * newBounds.Width / from.Width,
+            newBounds.Top + (p.Y - from.Top) * newBounds.Height / from.Height);
+
+        var resizedChildren = new List<PanelElement>(group.Children.Count);
+        foreach (var child in group.Children)
+        {
+            var childBounds = PanelElements.Bounds(child);
+            var topLeft = Map(new Point2D(childBounds.Left, childBounds.Top));
+            var bottomRight = Map(new Point2D(childBounds.Right, childBounds.Bottom));
+
+            var childResult = Resize(child, Rect2D.FromEdges(topLeft.X, topLeft.Y, bottomRight.X, bottomRight.Y));
+            if (!childResult.IsValid)
+                return EditResult<PanelElement>.Failure(childResult.Error!);
+            resizedChildren.Add(childResult.Value);
+        }
+
+        return EditResult<PanelElement>.Success(group with { Children = resizedChildren });
+    }
+
+    /// <summary>Changes an element's layer - and, for a group, every child's too, since all of a group's children must share its layer.</summary>
+    public static PanelElement SetLayer(PanelElement element, ElementLayer layer)
+    {
+        if (element.Layer == layer) return element;
+        return element is GroupElement group
+            ? group with { Layer = layer, Children = group.Children.Select(c => SetLayer(c, layer)).ToList() }
+            : element with { Layer = layer };
+    }
 
     /// <summary>Slides the element back until at least <see cref="MinVisibleMm"/> of its box overlaps the panel each way (less for something smaller than that).</summary>
     public static PanelElement KeepReachable(PanelElement element, Rect2D panel)
@@ -77,7 +118,7 @@ public static class ElementEditing
         var list = elements.ToList();
         list.RemoveAt(index);
         var newIndex = toFront ? list.Count : 0;
-        list.Insert(newIndex, item.Layer == layer ? item : item with { Layer = layer });
+        list.Insert(newIndex, SetLayer(item, layer));
         return (list, newIndex);
     }
 

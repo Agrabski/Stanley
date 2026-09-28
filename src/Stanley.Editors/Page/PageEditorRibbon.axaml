@@ -66,6 +66,26 @@
                 </DockPanel>
                 <Rectangle Classes="divider" />
 
+                <!-- Welds several selected panel elements into one persistent object (issue #86), and takes one apart again. -->
+                <DockPanel Classes="group">
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                        <Button Name="GroupButton" Classes="small" Command="{Binding GroupSelectionCommand}"
+                                local:Shortcut.Keys="Ctrl+G"
+                                ToolTip.Tip="Weld what's selected into one object, so it moves, resizes and reorders together"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                            Group
+                        </Button>
+                        <Button Name="UngroupButton" Classes="small" Command="{Binding UngroupSelectionCommand}"
+                                local:Shortcut.Keys="Ctrl+Shift+G"
+                                ToolTip.Tip="Take a group back apart into its separate pieces"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                            Ungroup
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Classes="groupLabel" Text="Arrange" />
+                </DockPanel>
+                <Rectangle Classes="divider" />
+
                 <DockPanel Classes="group">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton Name="SelectToolButton" Classes="tool" GroupName="Tool"
