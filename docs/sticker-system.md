@@ -773,7 +773,9 @@ the outline (Warp) or stay fixed to the page (a printed-paper look), three-quart
 get it free once the rig does), per-part z overrides, arms behind the body, "turn
 around" as distinct from mirror, gaze (the VRM `LeftEye`/`RightEye` bones moving the
 pupils), a talking mouth when a bubble's tail points at the character (after
-character-bound tails), a user library shared across projects (for whole
+character-bound tails), hair built from pieces (fringe, top, sides, back, extras), each
+in its own colour, with dyes (planned in [`modular-hair.md`](modular-hair.md), #59), a
+user library shared across projects (for whole
 characters and for individual stickers, designed in
 [`asset-packs.md`](asset-packs.md)), flatten to editable layers, and
 `stanley sticker import` on the CLI.
