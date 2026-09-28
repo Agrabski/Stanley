@@ -4,6 +4,7 @@ using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Objects;
 using Stanley.ProjectModel.Poses;
 using Stanley.ProjectModel.Props;
 using Stanley.ProjectModel.Storage;
@@ -96,6 +97,44 @@ public class ProjectRepositoryTests : IDisposable
         Assert.False(File.Exists(Path.Combine(characterDir, "patterns", "tartan.svg")));
         Assert.Empty(Directory.EnumerateFiles(Path.Combine(characterDir, "revisions")));
         Assert.Equivalent(trimmed, repository.LoadCharacter(characterId), strict: true);
+    }
+
+    [Fact]
+    public void An_object_group_round_trips_and_lands_on_the_documented_layout()
+    {
+        var repository = ProjectRepository.Initialize(_root, "My Comic", new PageTrim(new PageSize(210, 297), 3));
+
+        var groupId = ObjectGroupId.New();
+        var leaf = new ShapeElement(ElementId.New(), ElementLayer.Background,
+            [new ShapeAnchor(new Point2D(0, 0), new Point2D(0, 0), new Point2D(0, 0), AnchorHandleKind.Corner),
+             new ShapeAnchor(new Point2D(10, 0), new Point2D(10, 0), new Point2D(10, 0), AnchorHandleKind.Corner),
+             new ShapeAnchor(new Point2D(10, 10), new Point2D(10, 10), new Point2D(10, 10), AnchorHandleKind.Corner)],
+            Closed: true, new ShapeStyle(null, ColorValue.FromHex("#335577"), 0));
+        var picture = new PictureElement(ElementId.New(), ElementLayer.Background, new Rect2D(0, 0, 10, 10), "nose.svg");
+        var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- nose --></svg>\n";
+        var group = new ObjectGroup(groupId, "Rocket ship", [leaf, picture])
+        {
+            ArtFiles = new Dictionary<string, ArtFile> { ["nose.svg"] = ArtFile.Svg(svg) }
+        };
+        repository.SaveObjectGroup(group);
+
+        Assert.Equivalent(group, repository.LoadObjectGroup(groupId), strict: true);
+        Assert.Contains(repository.ListObjectGroups(), g => g.Id == groupId);
+
+        var groupDir = Path.Combine(_root, "objects", $"{groupId.Value}-rocket-ship");
+        Assert.True(File.Exists(Path.Combine(groupDir, "group.json")));
+        Assert.DoesNotContain("myAssetsVersion", File.ReadAllText(Path.Combine(groupDir, "group.json")), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(svg, File.ReadAllText(Path.Combine(groupDir, "art", "nose.svg")));
+
+        // Take the picture (and its art) away: the file goes too.
+        var trimmed = group with { Children = [leaf], ArtFiles = new Dictionary<string, ArtFile>() };
+        repository.SaveObjectGroup(trimmed);
+
+        Assert.False(File.Exists(Path.Combine(groupDir, "art", "nose.svg")));
+        Assert.Equivalent(trimmed, repository.LoadObjectGroup(groupId), strict: true);
+
+        repository.DeleteObjectGroup(groupId);
+        Assert.False(Directory.Exists(groupDir));
     }
 
     [Fact]

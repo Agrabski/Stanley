@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Stanley.ProjectModel.Backgrounds;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Objects;
 using Stanley.ProjectModel.Poses;
 using Stanley.ProjectModel.Props;
 
@@ -30,4 +31,6 @@ namespace Stanley.ProjectModel.Serialization;
 [JsonSerializable(typeof(Issue))]
 [JsonSerializable(typeof(Page))]
 [JsonSerializable(typeof(Panel))]
+[JsonSerializable(typeof(ObjectGroup))]
+[JsonSerializable(typeof(AssetPack))]
 public sealed partial class StanleyJsonContext : JsonSerializerContext;
