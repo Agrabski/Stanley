@@ -505,6 +505,35 @@ public sealed class PageCanvasControl : Control
         return new Hit(HitKind.None);
     }
 
+    /// <summary>The single panel edge of <paramref name="gutter"/> nearest <paramref name="p"/>: the panel on the pointer's side of the gap that spans the pointer across it.</summary>
+    private Hit? SingleEdgeOfGutter(GutterHit gutter, Point2D p)
+    {
+        var vm = _viewModel!;
+        var vertical = gutter.Drag.Orientation == BoundaryOrientation.Vertical;
+        var along = vertical ? p.X : p.Y;
+        var across = vertical ? p.Y : p.X;
+        Hit? best = null;
+        var bestScore = double.MaxValue;
+        void Consider(PanelId id, bool before)
+        {
+            var b = vm.PanelBounds(id);
+            var lo = vertical ? b.Top : b.Left;
+            var hi = vertical ? b.Bottom : b.Right;
+            var edge = before ? (vertical ? b.Right : b.Bottom) : (vertical ? b.Left : b.Top);
+            var score = Math.Abs(along - edge) + (across < lo ? lo - across : across > hi ? across - hi : 0) * 1000;
+            if (score >= bestScore)
+                return;
+            bestScore = score;
+            var edges = vertical ? (before ? RectEdges.Right : RectEdges.Left) : (before ? RectEdges.Bottom : RectEdges.Top);
+            best = new Hit(HitKind.PanelEdge, id, Edges: edges);
+        }
+        foreach (var id in gutter.Drag.PanelsBefore)
+            Consider(id, true);
+        foreach (var id in gutter.Drag.PanelsAfter)
+            Consider(id, false);
+        return best;
+    }
+
     /// <summary>The topmost element of <paramref name="layer"/> under <paramref name="p"/> - only where it shows, inside its panel.</summary>
     private Hit? ElementAt(Point2D p, ProjectModel.Issues.ElementLayer layer, PanelId? only = null)
     {
@@ -795,6 +824,12 @@ public sealed class PageCanvasControl : Control
             vm.ToggleSelect(shiftPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
             return;
         }
+
+        // Ctrl on a gutter moves just the one panel edge under the pointer, leaving the gap
+        // and the neighbour alone (a plain drag moves the whole gutter, margins intact).
+        if (hit.Kind == HitKind.Gutter && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
+            && SingleEdgeOfGutter(hit.Gutter!, page) is { } singleEdge)
+            hit = singleEdge;
 
         _dragPanelId = hit.PanelId;
         _dragBubbleIndex = hit.BubbleIndex;
