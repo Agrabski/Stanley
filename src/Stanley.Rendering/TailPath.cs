@@ -9,6 +9,9 @@ public static class TailPath
 {
     public static SKPath Generate(BubbleTail tail, BubbleShape shape, float baseHalfWidth = 16f)
     {
+        if (tail.Kind == TailKind.ThoughtDots)
+            return ThoughtDotsPath(tail, shape);
+
         // The widened spread (see SpreadFor) can absorb a concave stretch of a jagged
         // outline (e.g. a Shout tooth's inner notch) that no jag orientation can route
         // around without the tail crossing itself; retry at UniformSpread's narrower,
@@ -26,6 +29,26 @@ public static class TailPath
         for (var i = 1; i < points.Count; i++)
             builder.LineTo(points[i]);
         builder.Close();
+        return builder.Detach();
+    }
+
+    /// <summary>Radius of each thought dot as a fraction of the bubble's diagonal, biggest nearest the bubble (same look as <see cref="ThoughtTrailRenderer"/>, a little larger since a bubble is smaller than a panel).</summary>
+    private static readonly double[] DotRadiusFractions = [0.06, 0.04, 0.025];
+
+    /// <summary>Three separate circles, shrinking from the outline towards the target; unioned with the outline they stay detached dots.</summary>
+    private static SKPath ThoughtDotsPath(BubbleTail tail, BubbleShape shape)
+    {
+        var basePoint = AnchorRing.PointAt(shape.Anchors, tail.AttachmentT);
+        var box = AnchorRing.BoundingBox(shape.Anchors);
+        var scale = Math.Sqrt(box.Width * box.Width + box.Height * box.Height);
+        using var builder = new SKPathBuilder();
+        for (var i = 0; i < DotRadiusFractions.Length; i++)
+        {
+            var t = (i + 1.0) / DotRadiusFractions.Length;
+            var x = basePoint.X + (tail.Target.X - basePoint.X) * t;
+            var y = basePoint.Y + (tail.Target.Y - basePoint.Y) * t;
+            builder.AddCircle((float)x, (float)y, (float)(scale * DotRadiusFractions[i]));
+        }
         return builder.Detach();
     }
 
