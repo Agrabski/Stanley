@@ -57,21 +57,69 @@ public class BubbleEditingTests
     }
 
     [Fact]
-    public void SetStyle_RegeneratesShapeButKeepsTailPlacement()
+    public void SetStyle_RegeneratesShapeAndRestylesTails()
     {
         var bubble = NewBubble();
         bubble = BubbleEditing.AddTail(bubble, new Point2D(100, 300)).Value;
-        var attachmentBefore = bubble.Tails[0].AttachmentT;
         var targetBefore = bubble.Tails[0].Target;
 
         var result = BubbleEditing.SetStyle(bubble, BubbleStylePreset.Shout);
 
         Assert.True(result.IsValid);
         Assert.Equal(BubbleStylePreset.Shout, result.Value.Style);
+        Assert.Equal(BubbleStylePresets.GenerateShape(BubbleStylePreset.Shout, new Rect2D(0, 0, 60, 40)), result.Value.Shape, ShapeComparer);
         Assert.Equal(TailKind.JaggedTriangle, result.Value.Tails[0].Kind);
-        Assert.Equal(attachmentBefore, result.Value.Tails[0].AttachmentT);
         Assert.Equal(targetBefore, result.Value.Tails[0].Target);
     }
+
+    // #122: the four switches that used to throw a tail's base somewhere else on the bubble.
+    [Theory]
+    [InlineData(BubbleStylePreset.Speech, BubbleStylePreset.Shout)]
+    [InlineData(BubbleStylePreset.Whisper, BubbleStylePreset.Shout)]
+    [InlineData(BubbleStylePreset.Shout, BubbleStylePreset.Speech)]
+    [InlineData(BubbleStylePreset.Shout, BubbleStylePreset.Whisper)]
+    [InlineData(BubbleStylePreset.Speech, BubbleStylePreset.Whisper)]
+    public void SetStyle_KeepsEachTailLeavingTheBubbleWhereItDid(BubbleStylePreset from, BubbleStylePreset to)
+    {
+        var bubble = NewBubble(style: from);
+        bubble = bubble with
+        {
+            Tails = [.. new[] { 0, 0.05, 0.3, 0.5, 0.55, 0.75, 0.9 }.Select(t => new BubbleTail(t, new Point2D(100, 300), BubbleStylePresets.TailKindFor(from)))]
+        };
+        var centre = new Point2D(30, 20);
+
+        var restyled = BubbleEditing.SetStyle(bubble, to).Value;
+
+        for (var i = 0; i < bubble.Tails.Count; i++)
+        {
+            var before = AnchorRing.PointAt(bubble.Shape.Anchors, bubble.Tails[i].AttachmentT);
+            var after = AnchorRing.PointAt(restyled.Shape.Anchors, restyled.Tails[i].AttachmentT);
+            var turn = Math.IEEERemainder(Direction(centre, after) - Direction(centre, before), 2 * Math.PI);
+            Assert.True(Math.Abs(turn) < 1e-6, $"the tail at t={bubble.Tails[i].AttachmentT} swung {turn} rad round the bubble");
+        }
+    }
+
+    [Fact]
+    public void SetStyle_ThereAndBackAgain_GivesBackTheSameBubble()
+    {
+        var bubble = NewBubble();
+        bubble = BubbleEditing.AddTail(bubble, new Point2D(100, 300)).Value;
+        bubble = bubble with { Tails = [bubble.Tails[0] with { AttachmentT = 0.62 }] };
+
+        var roundTrip = bubble;
+        for (var i = 0; i < 5; i++)
+            roundTrip = BubbleEditing.SetStyle(BubbleEditing.SetStyle(roundTrip, BubbleStylePreset.Shout).Value, BubbleStylePreset.Speech).Value;
+
+        Assert.Equal(bubble.Shape, roundTrip.Shape, ShapeComparer);
+        Assert.Equal(bubble.Tails[0].AttachmentT, roundTrip.Tails[0].AttachmentT, 6);
+        Assert.Equal(bubble.Tails[0].Target, roundTrip.Tails[0].Target);
+    }
+
+    private static double Direction(Point2D centre, Point2D p) => Math.Atan2(p.Y - centre.Y, p.X - centre.X);
+
+    private static readonly IEqualityComparer<BubbleShape> ShapeComparer = EqualityComparer<BubbleShape>.Create((a, b) =>
+        a!.Anchors.Count == b!.Anchors.Count && a.Anchors.Zip(b.Anchors).All(p =>
+            Math.Abs(p.First.Point.X - p.Second.Point.X) < 1e-6 && Math.Abs(p.First.Point.Y - p.Second.Point.Y) < 1e-6));
 
     [Fact]
     public void RemoveTail_TakesItOutOfTheList()
