@@ -342,113 +342,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="local:ColorSlotEditor">
-                <DropDownButton Classes="colorSlot" Margin="1" ToolTip.Tip="{Binding Tip}">
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <local:FabricSwatch Width="18" Height="14" Color="{Binding Color}" Fabric="{Binding Fabric}" Tiles="{Binding Tiles}" />
-                    <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <DropDownButton.Flyout>
-                    <Flyout Placement="BottomEdgeAlignedLeft">
-                      <StackPanel Spacing="6" Width="340">
-                        <TextBlock Text="Colour" FontSize="11" FontWeight="SemiBold" />
-                        <StackPanel Spacing="4">
-                          <ItemsControl ItemsSource="{Binding Swatches}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="local:ColorSwatchChoice">
-                                <Button Classes="small" Width="38" Height="24" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetColor}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
-                                  <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
-                                </Button>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <Button Name="MoreSlotColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
-                                  Command="{Binding PickCustomColor}" CommandParameter="{Binding $self}">More Colors…</Button>
-                        </StackPanel>
-
-                        <StackPanel Spacing="6" IsVisible="{Binding CanHaveFabric}">
-                          <TextBlock Text="Pattern" FontSize="11" FontWeight="SemiBold" />
-                          <ItemsControl ItemsSource="{Binding PatternChoices}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="local:FabricChoice">
-                                <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="46" Height="46" Padding="2" Margin="1"
-                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPattern}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Label}">
-                                  <DockPanel>
-                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="8" HorizontalAlignment="Center" />
-                                    <Panel>
-                                      <local:FabricSwatch Color="{Binding Ground}" Fabric="{Binding Preview}" Tiles="{Binding Tiles}" IsVisible="{Binding !IsCustom}" />
-                                      <TextBlock Text="+" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsCustom}" />
-                                    </Panel>
-                                  </DockPanel>
-                                </Button>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <StackPanel Spacing="4" IsVisible="{Binding HasPattern}">
-                            <StackPanel Spacing="4">
-                              <ItemsControl ItemsSource="{Binding PatternSwatches}">
-                                <ItemsControl.ItemsPanel>
-                                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                  <DataTemplate x:DataType="local:ColorSwatchChoice">
-                                    <Button Classes="small" Width="19" Height="16" Padding="2" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                            Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetPatternColor}" CommandParameter="{Binding}"
-                                            ToolTip.Tip="{Binding Name, StringFormat='Pattern in {0}'}">
-                                      <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="1" />
-                                    </Button>
-                                  </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                              </ItemsControl>
-                              <Button Name="MorePatternColorsButton" Classes="small" HorizontalAlignment="Left" ToolTip.Tip="Pick any colour"
-                                      Command="{Binding PickCustomPatternColor}" CommandParameter="{Binding $self}">More Colors…</Button>
-                            </StackPanel>
-                            <Grid ColumnDefinitions="54,*" RowDefinitions="22,22" ColumnSpacing="4">
-                              <TextBlock Text="Size" FontSize="11" VerticalAlignment="Center" />
-                              <Slider Grid.Column="1" Classes="body" Width="250" Minimum="1" Maximum="25" Value="{Binding PatternSize}" local:DragGesture.Target="{Binding}"
-                                      ToolTip.Tip="One repeat, as a share of the character's height" />
-                              <TextBlock Grid.Row="1" Text="Angle" FontSize="11" VerticalAlignment="Center" />
-                              <Slider Grid.Row="1" Grid.Column="1" Classes="body" Width="250" Minimum="0" Maximum="180" Value="{Binding PatternAngle}" local:DragGesture.Target="{Binding}" />
-                            </Grid>
-                          </StackPanel>
-
-                          <TextBlock Text="Texture" FontSize="11" FontWeight="SemiBold" />
-                          <ItemsControl ItemsSource="{Binding TextureChoices}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="local:FabricChoice">
-                                <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="40" Height="46" Padding="2" Margin="1"
-                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                                        Command="{Binding $parent[ItemsControl].((local:ColorSlotEditor)DataContext).SetTexture}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Label}">
-                                  <DockPanel>
-                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="8" HorizontalAlignment="Center" />
-                                    <Panel>
-                                      <local:FabricSwatch Color="{Binding Ground}" Fabric="{Binding Preview}" Tiles="{Binding Tiles}" IsVisible="{Binding !IsCustom}" />
-                                      <TextBlock Text="+" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsCustom}" />
-                                    </Panel>
-                                  </DockPanel>
-                                </Button>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                          <Grid ColumnDefinitions="54,*" RowDefinitions="22" ColumnSpacing="4" IsVisible="{Binding HasTexture}">
-                            <TextBlock Text="Strength" FontSize="11" VerticalAlignment="Center" />
-                            <Slider Grid.Column="1" Classes="body" Width="250" Minimum="0" Maximum="100" Value="{Binding TextureStrength}" local:DragGesture.Target="{Binding}" />
-                          </Grid>
-                        </StackPanel>
-                      </StackPanel>
-                    </Flyout>
-                  </DropDownButton.Flyout>
-                </DropDownButton>
+                <local:ColorSlotDropdown />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -493,6 +387,31 @@
           <TextBlock Classes="groupLabel" Text="Worn" ToolTip.Tip="How it's worn - kept with the look you're editing; right-click it on a page for one panel only" />
         </DockPanel>
         <Rectangle Classes="divider" IsVisible="{Binding HasSelectedStickerStyles}" />
+
+        <!-- Hair (a whole hairstyle, a piece or a streak): its colour and dye - a piece follows the Hair colour until it's given its own here -
+             and whether it paints over glasses. -->
+        <DockPanel Classes="group" IsVisible="{Binding HasSelectedHairColor}">
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+            <StackPanel Spacing="2">
+              <ContentControl Name="StickerColor" Content="{Binding SelectedColorEditor}" HorizontalAlignment="Left">
+                <ContentControl.ContentTemplate>
+                  <DataTemplate x:DataType="local:ColorSlotEditor">
+                    <local:ColorSlotDropdown />
+                  </DataTemplate>
+                </ContentControl.ContentTemplate>
+              </ContentControl>
+              <CheckBox Name="OverGlassesBox" IsChecked="{Binding SelectedOverGlasses}" IsVisible="{Binding CanSetOverGlasses}" FontSize="12"
+                        ToolTip.Tip="Paint it over glasses too - a long fringe over one eye covers that lens">Over glasses</CheckBox>
+            </StackPanel>
+            <StackPanel Spacing="2" MaxWidth="170" IsVisible="{Binding CanFollowHair}">
+              <Button Name="SameAsHairButton" Classes="small" Command="{Binding SameAsHairCommand}" HorizontalAlignment="Left"
+                      ToolTip.Tip="Drop its own colour and dye, so it follows the Hair colour again">Same as hair</Button>
+              <TextBlock Name="SameAsHairNote" Text="{Binding SameAsHairNote}" IsVisible="{Binding HasSameAsHairNote}" FontSize="9" Opacity="0.7" TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Hair" />
+        </DockPanel>
+        <Rectangle Classes="divider" IsVisible="{Binding HasSelectedHairColor}" />
 
         <DockPanel Classes="group" IsVisible="{Binding HasArtParts}">
           <StackPanel Spacing="2">
