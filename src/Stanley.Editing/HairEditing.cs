@@ -102,7 +102,9 @@ public static class HairEditing
                 return StickerSlots.StreakColorKey(id);
             if (StickerSlots.Get(slot).SharesColor is not null)
                 return slot;
-            return slot == StickerSlots.Hair ? StickerSlots.Hair : null;
+            if (slot == StickerSlots.Hair)
+                return StickerSlots.Hair;
+            return StickerSlots.HasOwnColorKey(slot) ? StickerSlots.StickerColorKey(slot, id) : null;
         }
         return null;
     }
@@ -125,10 +127,12 @@ public static class HairEditing
         var fabrics = new SortedDictionary<string, Fabric>(character.Fabrics ?? new SortedDictionary<string, Fabric>(), StringComparer.Ordinal);
         colors.Remove(key);
         fabrics.Remove(key);
-        if (baseline is not null && baseline.ColorSlots.ContainsKey(key) && look.Colors.TryGetValue(StickerSlots.Hair, out var hair))
+        // What the key follows: the hair for a piece, the slot's colour for a sticker's own key ("top@id" -> "top").
+        var follows = StickerSlots.IsStickerColorKey(key) ? StickerSlots.SharedColorOf(key) : StickerSlots.Hair;
+        if (baseline is not null && baseline.ColorSlots.ContainsKey(key) && look.Colors.TryGetValue(follows, out var hair))
             colors[key] = hair;
         if (baseline?.Fabrics?.ContainsKey(key) == true)
-            fabrics[key] = look.Fabrics.TryGetValue(StickerSlots.Hair, out var hairFabric) ? hairFabric : new Fabric();
+            fabrics[key] = look.Fabrics.TryGetValue(follows, out var hairFabric) ? hairFabric : new Fabric();
         return character with { ColorSlots = colors, Fabrics = fabrics.Count == 0 ? null : fabrics };
     }
 
@@ -203,8 +207,7 @@ public static class HairEditing
     /// </summary>
     public static CharacterDefinition DropOrphanStreakColors(CharacterDefinition character)
     {
-        bool Orphan(string key) => StickerSlots.IsStreakColorKey(key)
-            && character.Wardrobe.Find(StickerId.FromValue(key[(StickerSlots.StreakColor.Length + 1)..])) is null;
+        bool Orphan(string key) => StickerSlots.StickerOfKey(key) is { } id && character.Wardrobe.Find(id) is null;
         var colors = Without(character.ColorSlots, Orphan);
         var fabrics = Without(character.Fabrics, Orphan);
         var revisionsChanged = false;

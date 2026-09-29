@@ -6,49 +6,12 @@ using Stanley.ProjectModel.Characters;
 
 namespace Stanley.Editors;
 
-/// <summary>The character editor's ribbon; see CharacterEditorRibbon.axaml. Everything goes through <see cref="CharacterEditorViewModel"/>.</summary>
+/// <summary>The character editor's ribbon; see CharacterEditorRibbon.axaml. Each tab lives in its own control under Ribbon/ (<see cref="BodyRibbonTab"/>, <see cref="LookRibbonTab"/>, <see cref="StickerRibbonTab"/>); this owns the tab strip and the file pickers. Everything goes through <see cref="CharacterEditorViewModel"/>.</summary>
 public partial class CharacterEditorRibbon : UserControl
 {
     public CharacterEditorRibbon()
     {
         InitializeComponent();
-
-        // One slider drag = one undo step: the gesture opens on press (before the slider
-        // jumps to the pointer) and commits on release.
-        foreach (var slider in new[] { HeightSlider, WeightSlider, MuscleSlider, HeadSlider, FrameSlider, LengthSlider, SleevesSlider, FitSlider, ArtScaleSlider, ArtTurnSlider })
-        {
-            slider.AddHandler(PointerPressedEvent, (_, _) => ViewModel?.BeginSliderDrag(), RoutingStrategies.Tunnel, handledEventsToo: true);
-            slider.AddHandler(PointerReleasedEvent, (_, _) => ViewModel?.EndSliderDrag(), RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
-            slider.AddHandler(PointerCaptureLostEvent, (_, _) => ViewModel?.EndSliderDrag(), RoutingStrategies.Bubble, handledEventsToo: true);
-        }
-
-        PrintTextBox.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter && ViewModel is { } vm)
-            {
-                vm.SelectedText = PrintTextBox.Text ?? "";
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape && ViewModel is { } current)
-            {
-                PrintTextBox.Text = current.SelectedText;
-                e.Handled = true;
-            }
-        };
-
-        NameBox.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter && ViewModel is { } vm)
-            {
-                vm.Name = NameBox.Text ?? "";
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape && ViewModel is { } current)
-            {
-                NameBox.Text = current.Name;
-                e.Handled = true;
-            }
-        };
     }
 
     private CharacterEditorViewModel? ViewModel => DataContext as CharacterEditorViewModel;
@@ -89,11 +52,7 @@ public partial class CharacterEditorRibbon : UserControl
     private void OnTextPrintWorn(object? sender, EventArgs e)
     {
         Tabs.SelectedItem = StickerTab;
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            PrintTextBox.Focus();
-            PrintTextBox.SelectAll();
-        });
+        (StickerTab.Content as StickerRibbonTab)?.FocusPrintText();
     }
 
     /// <summary>"Custom..." in a pattern or texture gallery: pick an SVG or PNG and hand it to the editor.</summary>
@@ -149,6 +108,14 @@ public partial class CharacterEditorRibbon : UserControl
             return null;
         }
     }
+
+    /// <summary>
+    /// Finds a named control anywhere in the ribbon. Each tab's controls are named inside that
+    /// tab's own control, so a plain lookup from here wouldn't see them; this one looks in every tab as well.
+    /// </summary>
+    public T? FindControl<T>(string name) where T : Control =>
+        NameScopeExtensions.Find<T>(this, name) ?? Tabs.Items.OfType<TabItem>()
+            .Select(tab => tab.Content).OfType<Control>().Select(content => NameScopeExtensions.Find<T>(content, name)).FirstOrDefault(found => found is not null);
 
     /// <summary>Exposed for headless UI tests.</summary>
     public TabControl TabControl => Tabs;

@@ -174,17 +174,26 @@ public sealed class HairColorTests : IDisposable
     }
 
     [Fact]
-    public void Only_worn_hair_has_a_colour_dropdown_on_the_Sticker_tab()
+    public void A_worn_sticker_has_a_colour_dropdown_on_the_Sticker_tab_and_an_unworn_one_does_not()
     {
         var (_, editor, _, fringe, _) = NewHead();
         editor.WearCommand.Execute(editor.Gallery(StickerSlots.Top).Choices.Single(c => c.Label == "T-shirt"));
         Assert.True(editor.HasSelectedSticker); // the T-shirt, put on and selected
 
-        Assert.False(editor.HasSelectedHairColor);
-        Assert.Null(editor.SelectedColorEditor);
+        Assert.True(editor.HasSelectedHairColor); // any worn sticker can take a colour of its own (#127)
+        Assert.True(StickerSlots.IsStickerColorKey(editor.SelectedColorEditor!.Slot));
+        Assert.Equal("Colour", editor.SelectedColorGroupLabel);
+        Assert.False(editor.CanFollowHair); // none of its own yet
         Assert.False(editor.CanSetOverGlasses);
+        editor.SelectedColorEditor.SetColor.Execute(new ColorSwatchChoice(editor.SelectedColorEditor.Slot, "Custom", Purple));
+        Assert.Equal(Purple, editor.SelectedColorEditor.Color);
+        Assert.True(editor.CanFollowHair);
+        Assert.Equal("Same as slot", editor.FollowLabel);
+        editor.SameAsHairCommand.Execute(null);
+        Assert.False(editor.CanFollowHair);
 
         editor.SelectSticker(fringe.Id);
+        Assert.Equal("Hair", editor.SelectedColorGroupLabel);
         Assert.True(editor.HasSelectedHairColor);
         editor.TakeOffSelectedCommand.Execute(null); // still selected, but not worn any more
         Assert.False(editor.HasSelectedHairColor);

@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.PictureRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <RadioButton Name="PictureBehindButton" Classes="tool" GroupName="PictureLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementBehind}"
+                           ToolTip.Tip="Scenery: drawn behind the panel's characters">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="PictureInFrontButton" Classes="tool" GroupName="PictureLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementInFront}"
+                           ToolTip.Tip="Foreground: drawn in front of the panel's characters (bubbles stay on top)">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Layer" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Classes="small" Command="{Binding BringToFrontCommand}"
+                          ToolTip.Tip="In front of everything in the panel except bubbles"
+                          HorizontalAlignment="Stretch">
+                      To front
+                  </Button>
+                  <Button Classes="small" Command="{Binding SendToBackCommand}"
+                          ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
+                      To back
+                  </Button>
+              </StackPanel>
+              <Button Name="DeletePictureButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete this picture" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

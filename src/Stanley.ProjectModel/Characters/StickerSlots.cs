@@ -107,6 +107,37 @@ public static class StickerSlots
     public static bool IsStreakColorKey(string key) => key.StartsWith(StreakColor + "-", StringComparison.Ordinal);
 
     /// <summary>
+    /// Whether a sticker worn in <paramref name="slot"/> can be given a colour of its own,
+    /// apart from every other sticker in the slot (clothes, glasses, hats, accessories...):
+    /// not hair (pieces and streaks have their own keys) and not the face, whose colours
+    /// belong to the character (skin, eyes).
+    /// </summary>
+    public static bool HasOwnColorKey(string slot)
+    {
+        var info = Get(slot);
+        return info.ColorSlot is not null && !IsHair(slot) && !info.IsFace;
+    }
+
+    /// <summary>The colour key one worn sticker is coloured under, apart from its slot: "top@&lt;id&gt;". It follows the slot's colour until it's given one.</summary>
+    public static string StickerColorKey(string wornSlot, StickerId id) => Get(wornSlot).ColorSlot + StickerKeySeparator + id.Value;
+
+    public const char StickerKeySeparator = '@';
+
+    /// <summary>Whether <paramref name="key"/> is one sticker's own colour key (<see cref="StickerColorKey"/>).</summary>
+    public static bool IsStickerColorKey(string key) => key.Contains(StickerKeySeparator);
+
+    /// <summary>The slot colour a sticker's own key (<see cref="StickerColorKey"/>) follows ("top"), or the key itself when it isn't one.</summary>
+    public static string SharedColorOf(string key) => key.Contains(StickerKeySeparator) ? key[..key.IndexOf(StickerKeySeparator)] : key;
+
+    /// <summary>The sticker a colour key of one sticker's own (<see cref="IsStreakColorKey"/> or <see cref="IsStickerColorKey"/>) belongs to, or null for any other key.</summary>
+    public static StickerId? StickerOfKey(string key)
+    {
+        if (IsStreakColorKey(key))
+            return StickerId.FromValue(key[(StreakColor.Length + 1)..]);
+        return IsStickerColorKey(key) ? StickerId.FromValue(key[(key.IndexOf(StickerKeySeparator) + 1)..]) : null;
+    }
+
+    /// <summary>
     /// The colour key an element tagged <paramref name="tagged"/> (its <c>slot-*</c> class) is
     /// coloured from, on sticker <paramref name="id"/> worn in <paramref name="wornSlot"/>: a hair
     /// piece's own key for its shared colour (<see cref="StickerSlotInfo.SharesColor"/>), a
@@ -118,6 +149,8 @@ public static class StickerSlots
             return null;
         if (wornSlot == HairStreaks && tagged == StreakColor)
             return StreakColorKey(id);
+        if (HasOwnColorKey(wornSlot) && tagged == Get(wornSlot).ColorSlot)
+            return StickerColorKey(wornSlot, id);
         return Get(wornSlot).SharesColor == tagged ? wornSlot : tagged;
     }
 
