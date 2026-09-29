@@ -520,6 +520,7 @@ public sealed partial class CharacterEditorViewModel
         StickerSlots.HairBack => "Back",
         StickerSlots.HairExtras => "Extras",
         _ when StickerSlots.IsStreakColorKey(slot) => "Streak",
+        _ when StickerSlots.IsStickerColorKey(slot) => "This one",
         _ => slot.Length == 0 ? slot : char.ToUpperInvariant(slot[0]) + slot[1..]
     };
 
@@ -528,6 +529,7 @@ public sealed partial class CharacterEditorViewModel
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
         "hair" or "brows" => HairColors,
         _ when IsHairColorKey(slot) => HairColors,
+        _ when StickerSlots.IsStickerColorKey(slot) => Palette(StickerSlots.SharedColorOf(slot)),
         StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight => EyeColors,
         _ => ClothColors
     };

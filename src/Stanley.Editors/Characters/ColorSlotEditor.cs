@@ -98,6 +98,7 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	/// <summary>What the dropdown's button says it colours.</summary>
 	public string Tip =>
 		StickerSlots.IsStreakColorKey(Slot) ? "This streak - its own colour and dye"
+		: StickerSlots.IsStickerColorKey(Slot) ? "This sticker - its own colour and fabric; Same as slot on the Sticker tab gives it back"
 		: StickerSlots.HairPieces.Contains(Slot) ? $"{Label} of the hair - its own colour and dye; Same as hair on the Sticker tab gives it back"
 		: $"{Label} - colour and fabric; everything this character wears in it follows";
 

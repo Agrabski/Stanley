@@ -17,7 +17,7 @@ public sealed partial class CharacterEditorViewModel
 {
     private ColorSlotEditor? _stickerColorEditor;
 
-    /// <summary>The colour key the selected sticker is coloured under ("hairFringe", "streak-…", "hair"), or null when it isn't worn hair.</summary>
+    /// <summary>The colour key the selected sticker is coloured under ("hairFringe", "streak-…", "hair"), or null when the sticker has no colour of its own to pick.</summary>
     private string? SelectedColorKey => _selectedSticker is { } id ? HairEditing.ColorKeyOf(LookWorking, id) : null;
 
     /// <summary>The selected hair sticker's colour-and-dye dropdown, kept alive across edits so it stays open while you drag its sliders; null for anything that isn't worn hair.</summary>
@@ -51,7 +51,18 @@ public sealed partial class CharacterEditorViewModel
     private CharacterDefinition? HairBaseline => _currentLook is null ? null : Committed;
 
     /// <summary>Whether the Sticker tab offers "Same as hair": the selected sticker is a hair piece that has a colour or dye of its own.</summary>
-    public bool CanFollowHair => SelectedColorKey is { } key && StickerSlots.HairPieces.Contains(key) && HairEditing.HasOwnColor(LookWorking, key);
+    public bool CanFollowHair =>
+        SelectedColorKey is { } key && (StickerSlots.HairPieces.Contains(key) || StickerSlots.IsStickerColorKey(key)) && HairEditing.HasOwnColor(LookWorking, key);
+
+    /// <summary>The Sticker tab's colour group: "Hair" for hair, "Colour" for any other sticker with a colour of its own to pick.</summary>
+    public string SelectedColorGroupLabel => SelectedColorKey is { } key && StickerSlots.IsStickerColorKey(key) ? "Colour" : "Hair";
+
+    /// <summary>What the "back to shared" button says: the hair for a piece, the slot for a sticker (a hat follows every hat's colour).</summary>
+    public string FollowLabel => SelectedColorKey is { } key && StickerSlots.IsStickerColorKey(key) ? "Same as slot" : "Same as hair";
+
+    public string FollowTip => SelectedColorKey is { } key && StickerSlots.IsStickerColorKey(key)
+        ? $"Drop its own colour, so it follows the {ColorSlotLabel(StickerSlots.SharedColorOf(key))} colour again"
+        : "Drop its own colour and dye, so it follows the Hair colour again";
 
     /// <summary>"Same as hair": the selected piece follows the hair's colour and dye again - one undo step.</summary>
     public IRelayCommand SameAsHairCommand => field ??= new RelayCommand(FollowHair, () => CanFollowHair);
@@ -76,7 +87,7 @@ public sealed partial class CharacterEditorViewModel
     /// </summary>
     public string? SameAsHairNote =>
         CanFollowHair && _currentLook is not null && SelectedColorKey is { } key && HairEditing.HasOwnColor(Committed, key)
-            ? "The default look gives this its own colour, so here it copies the hair colour as it is now and won't follow later changes."
+            ? "The default look gives this its own colour, so here it copies the shared colour as it is now and won't follow later changes."
             : null;
 
     public bool HasSameAsHairNote => SameAsHairNote is not null;
@@ -140,6 +151,9 @@ public sealed partial class CharacterEditorViewModel
         if (RefreshStickerColorEditor())
             OnPropertyChanged(nameof(SelectedColorEditor));
         OnPropertyChanged(nameof(HasSelectedHairColor));
+        OnPropertyChanged(nameof(SelectedColorGroupLabel));
+        OnPropertyChanged(nameof(FollowLabel));
+        OnPropertyChanged(nameof(FollowTip));
         OnPropertyChanged(nameof(CanFollowHair));
         OnPropertyChanged(nameof(SameAsHairNote));
         OnPropertyChanged(nameof(HasSameAsHairNote));

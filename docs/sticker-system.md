@@ -1081,3 +1081,24 @@ any harder: one Hair button, a gallery of hairstyles, one Hair colour.
 - **Later**: a length slider per piece (a vertical stretch of Back and Sides from the crown),
   hair that reacts to a pose (wind, a tilt's gravity), three-quarter art, and keeping a
   whole hairdo - pieces, styles and colours - in My Assets as one item (`asset-packs.md`).
+
+## 23. A colour for one sticker (#127)
+
+Any worn sticker outside hair and the face can be coloured apart from the others in its
+slot (two hats, two prints). The mechanism is the streaks' one, generalised:
+
+- **Key.** `StickerSlots.StickerColorKey(slot, id)` = `"<slot's colour slot>@<id>"`
+  (`top@abc123`). `StickerSlots.HasOwnColorKey(slot)` says which slots qualify: a colour
+  slot, not hair (pieces and streaks keep their own keys), not `IsFace` (skin/eyes belong
+  to the character). `ColorKey(wornSlot, id, tagged)` returns it for art tagged with the
+  slot's colour slot, so the renderer needs no other change.
+- **Resolution.** `CharacterLooks.Resolve` gives each such sticker its key with the slot's
+  colour and fabric as fallback (`TryAdd`), so a sticker follows the slot until it is given
+  a colour, and the key is only *stored* in `ColorSlots`/`Fabrics` once the user picks one.
+- **UI.** The Sticker tab's colour group (`HasSelectedHairColor`, label
+  `SelectedColorGroupLabel`) shows for any such sticker; "Same as slot" (`FollowHair`,
+  `HairEditing.FollowHair` follows `SharedColorOf(key)`) drops the own colour. The Look tab's
+  Colours group doesn't list these keys (`ColorGroupSlots` only adds hair pieces). The
+  page's right-click Colour menu is still per slot.
+- **Tidying.** `HairEditing.DropOrphanStreakColors` drops any key whose sticker
+  (`StickerSlots.StickerOfKey`) has left the wardrobe, streaks' and stickers' alike.

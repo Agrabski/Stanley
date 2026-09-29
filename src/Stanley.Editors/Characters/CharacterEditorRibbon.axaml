@@ -469,11 +469,11 @@
             </StackPanel>
             <StackPanel Spacing="2" MaxWidth="170" IsVisible="{Binding CanFollowHair}">
               <Button Name="SameAsHairButton" Classes="small" Command="{Binding SameAsHairCommand}" HorizontalAlignment="Left"
-                      ToolTip.Tip="Drop its own colour and dye, so it follows the Hair colour again">Same as hair</Button>
+                      ToolTip.Tip="{Binding FollowTip}" Content="{Binding FollowLabel}" />
               <TextBlock Name="SameAsHairNote" Text="{Binding SameAsHairNote}" IsVisible="{Binding HasSameAsHairNote}" FontSize="9" Opacity="0.7" TextWrapping="Wrap" />
             </StackPanel>
           </StackPanel>
-          <TextBlock Classes="groupLabel" Text="Hair" />
+          <TextBlock Classes="groupLabel" Text="{Binding SelectedColorGroupLabel}" />
         </DockPanel>
         <Rectangle Classes="divider" IsVisible="{Binding HasSelectedHairColor}" />
 

@@ -114,7 +114,7 @@ public class HairEditingTests
         Assert.Equal(StickerSlots.HairFringe, HairEditing.ColorKeyOf(character, fringe.Id));
         Assert.Equal(StickerSlots.StreakColorKey(streak.Id), HairEditing.ColorKeyOf(character, streak.Id));
         Assert.Equal(StickerSlots.Hair, HairEditing.ColorKeyOf(character, legacy.Id));
-        Assert.Null(HairEditing.ColorKeyOf(character, tee.Id)); // not hair
+        Assert.Equal(StickerSlots.StickerColorKey(StickerSlots.Top, tee.Id), HairEditing.ColorKeyOf(character, tee.Id)); // a T-shirt has its own key too (#127)
         Assert.Null(HairEditing.ColorKeyOf(character, notWorn.Id)); // in the wardrobe, not worn
         Assert.Null(HairEditing.ColorKeyOf(character, StickerId.New()));
     }
