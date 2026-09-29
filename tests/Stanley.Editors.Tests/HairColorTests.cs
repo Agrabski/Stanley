@@ -267,6 +267,23 @@ public sealed class HairColorTests : IDisposable
     }
 
     [Fact]
+    public void A_dye_picked_on_a_purple_fringe_starts_in_a_colour_that_shows_on_it()
+    {
+        var (_, editor, _, _, _) = NewHead();
+        editor.SetColorCommand.Execute(Swatch(StickerSlots.HairFringe, Purple));
+        var fringe = editor.ColorEditors.Single(e => e.Slot == StickerSlots.HairFringe);
+
+        // Purple tips on a purple fringe would show nothing - in the gallery or on the character.
+        Assert.All(fringe.DyeChoices.Where(c => c.Pattern is PatternKind.Tips or PatternKind.Roots or PatternKind.Streaks or PatternKind.Ombre),
+            c => Assert.NotEqual(Purple, c.Preview.Pattern!.Colors[0]));
+        fringe.SetDye.Execute(fringe.DyeChoices.Single(c => c.Label == "Tips"));
+
+        Assert.NotEqual(Purple, DyeOf(editor, StickerSlots.HairFringe)!.Colors[0]);
+        // On hair it stands out from, the dye is the usual purple.
+        Assert.Equal(ColorSlotEditor.DefaultDyeColor, ColorSlotEditor.DyeColorFor(Red));
+    }
+
+    [Fact]
     public void Tips_take_a_colour_and_a_Length_and_each_pick_or_drag_is_one_undo_step()
     {
         var (session, editor, _, _, _) = NewHead();

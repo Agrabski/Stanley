@@ -42,7 +42,7 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 		SetDye = new RelayCommand<FabricChoice>(c =>
 		{
 			if (c != null)
-				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? (f.Pattern is { } was && was.Kind == kind ? was : NewDye(kind, f.Pattern)) : null });
+				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? (f.Pattern is { } was && was.Kind == kind ? was : NewDye(kind, f.Pattern, _color)) : null });
 		});
 		SetScheme = new RelayCommand<HairSchemeChoice>(c =>
 		{
@@ -165,18 +165,38 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
 	public bool HasDye => Dye is not null;
 
-	/// <summary>The dye picked when none was: a vivid purple.</summary>
+	/// <summary>The dye picked when none was: a vivid purple - unless the hair is purple already (see <see cref="DyeColorFor"/>).</summary>
 	public static ColorValue DefaultDyeColor { get; } = ColorValue.FromHex("#8e24aa");
+
+	/// <summary>Dye colours to fall back on, in order, when the one before is too close to the hair it would dye.</summary>
+	private static readonly ColorValue[] DyeFallbacks = [DefaultDyeColor, ColorValue.FromHex("#d6409f"), ColorValue.FromHex("#e0c068"), ColorValue.FromHex("#1e88e5")];
+
+	/// <summary>
+	/// The colour a fresh dye starts in on <paramref name="ground"/>: <see cref="DefaultDyeColor"/>,
+	/// or the first fallback that stands out from the ground - Tips in purple on a purple fringe
+	/// would show nothing, in the gallery or on the character.
+	/// </summary>
+	public static ColorValue DyeColorFor(ColorValue ground) =>
+		DyeFallbacks.FirstOrDefault(c => Distance(c, ground) > 80, DyeFallbacks[0]);
+
+	private static double Distance(ColorValue a, ColorValue b)
+	{
+		static (int R, int G, int B) Rgb(ColorValue c) => c.Hex is { Length: >= 7 } h
+			? (Convert.ToInt32(h.Substring(1, 2), 16), Convert.ToInt32(h.Substring(3, 2), 16), Convert.ToInt32(h.Substring(5, 2), 16))
+			: (-1000, -1000, -1000); // no colour yet: anything stands out
+		var (x, y) = (Rgb(a), Rgb(b));
+		return Math.Sqrt((x.R - y.R) * (x.R - y.R) + (x.G - y.G) * (x.G - y.G) + (x.B - y.B) * (x.B - y.B));
+	}
 
 	/// <summary>How much of a piece a dye covers when it has no <see cref="PatternFill.Weight"/> of its own - what the renderer draws, so the sliders agree with it.</summary>
 	public static double DefaultDyeWeight(PatternKind kind) => PatternFill.DefaultDyeWeight(kind);
 
-	/// <summary>A fresh dye of <paramref name="kind"/> in place of <paramref name="previous"/>: its colour carries over, Rainbow starts with its own six.</summary>
-	internal static PatternFill NewDye(PatternKind kind, PatternFill? previous)
+	/// <summary>A fresh dye of <paramref name="kind"/> in place of <paramref name="previous"/> on <paramref name="ground"/>: its colour carries over, else one that shows on the ground; Rainbow starts with its own six.</summary>
+	internal static PatternFill NewDye(PatternKind kind, PatternFill? previous, ColorValue ground)
 	{
 		if (kind == PatternKind.Rainbow)
 			return new PatternFill(kind, previous is { Kind: PatternKind.Rainbow, Colors.Count: > 1 } ? previous.Colors : PatternFill.RainbowColors);
-		var color = previous is { Colors.Count: > 0 } && previous.Kind != PatternKind.Rainbow ? previous.Colors[0] : DefaultDyeColor;
+		var color = previous is { Colors.Count: > 0 } && previous.Kind != PatternKind.Rainbow ? previous.Colors[0] : DyeColorFor(ground);
 		return new PatternFill(kind, [color], Weight: DefaultDyeWeight(kind));
 	}
 
@@ -191,7 +211,7 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 			var current = _fabric?.Pattern;
 			return new (string Label, PatternKind? Kind)[] { ("None", null), ("Streaks", PatternKind.Streaks), ("Tips", PatternKind.Tips), ("Roots", PatternKind.Roots),
 					("Ombré", PatternKind.Ombre), ("Rainbow", PatternKind.Rainbow) }
-				.Select(d => new FabricChoice(d.Label, _color, new(d.Kind is { } kind ? NewDye(kind, current is { IsDye: true } ? current : null) : null), d.Kind, null, current?.Kind == d.Kind))
+				.Select(d => new FabricChoice(d.Label, _color, new(d.Kind is { } kind ? NewDye(kind, current is { IsDye: true } ? current : null, _color) : null), d.Kind, null, current?.Kind == d.Kind))
 				.ToList();
 		}
 	}
