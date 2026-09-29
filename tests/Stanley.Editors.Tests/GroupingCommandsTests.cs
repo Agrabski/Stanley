@@ -38,7 +38,7 @@ public class GroupingCommandsTests
     }
 
     [Fact]
-    public void GroupSelectionCommand_CannotExecute_WhenTheSelectionIncludesABubbleOrACharacter()
+    public void GroupSelectionCommand_CanExecute_WhenTheSelectionIncludesABubbleOrACharacter()
     {
         var (editor, _, panel) = NewEditor();
         var shape = DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
@@ -47,17 +47,17 @@ public class GroupingCommandsTests
         var bubbleIndex = editor.CreateBubble(panel, new Point2D(100, 100));
         editor.ToggleSelect(panel, elementIndex: shapeIndex);
         Assert.True(editor.HasMultiSelection);
-        Assert.False(editor.GroupSelectionCommand.CanExecute(null)); // a bubble is part of the selection
+        Assert.True(editor.GroupSelectionCommand.CanExecute(null)); // a bubble is part of the selection
 
         editor.ToggleSelect(panel, bubbleIndex: bubbleIndex); // drop the bubble
         var characterIndex = editor.InsertCharacter(CharacterId.New(), panel); // becomes sole primary
         editor.ToggleSelect(panel, elementIndex: shapeIndex);
         Assert.True(editor.HasMultiSelection);
-        Assert.False(editor.GroupSelectionCommand.CanExecute(null)); // a character is part of the selection
+        Assert.True(editor.GroupSelectionCommand.CanExecute(null)); // a character is part of the selection (issue #125)
     }
 
     [Fact]
-    public void GroupSelectionCommand_CannotExecute_WhenSelectedElementsAreOnDifferentLayers()
+    public void GroupSelectionCommand_CanExecute_WhenSelectedElementsAreOnDifferentLayers()
     {
         var (editor, _, panel) = NewEditor();
         var a = DrawRectangle(editor, panel, new Rect2D(20, 20, 20, 20));
@@ -69,7 +69,7 @@ public class GroupingCommandsTests
         editor.SelectElement(panel, aIndex);
         editor.ToggleSelect(panel, elementIndex: bIndex);
         Assert.True(editor.HasMultiSelection);
-        Assert.False(editor.GroupSelectionCommand.CanExecute(null));
+        Assert.True(editor.GroupSelectionCommand.CanExecute(null)); // a GroupElement can't span both, so they're tied together instead
     }
 
     [Fact]

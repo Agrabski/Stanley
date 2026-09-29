@@ -285,6 +285,31 @@ public readonly record struct ElementId : IStrongId<ElementId>, IParsable<Elemen
 }
 
 /// <summary>
+/// Ties together the bubbles, characters and elements of one panel that were grouped as one
+/// (<see cref="Issues.PanelElement.Link"/>, <see cref="Issues.CharacterInstance.Link"/>,
+/// <see cref="Bubbles.Bubble.Link"/>): everything in a panel carrying the same one is selected,
+/// dragged and deleted as a single thing. Stable only within the one panel that holds them, the
+/// same way an <see cref="ElementId"/> is.
+/// </summary>
+[JsonConverter(typeof(StrongIdJsonConverter<GroupLinkId>))]
+public readonly record struct GroupLinkId : IStrongId<GroupLinkId>, IParsable<GroupLinkId>, IComparable<GroupLinkId>
+{
+    public string Value { get; }
+    private GroupLinkId(string value) => Value = value;
+    public static GroupLinkId New() => new(EntityIdValue.NewToken());
+    public static GroupLinkId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static GroupLinkId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out GroupLinkId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new GroupLinkId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(GroupLinkId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}
+
+/// <summary>
 /// Identifies an <c>objects/&lt;id&gt;-slug/</c> object group (docs/asset-packs.md §3, §7.1) -
 /// the out-of-line, canonical copy of a kept <see cref="Issues.GroupElement"/>, which a
 /// panel's inline copy references via <see cref="Issues.GroupElement.SourceId"/>.

@@ -2,6 +2,7 @@ using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
+using Stanley.ProjectModel.Poses;
 using Stanley.ProjectModel.Serialization;
 
 namespace Stanley.ProjectModel.Tests;
@@ -262,5 +263,44 @@ public class LineStyleJsonTests
 
         var older = ProjectJson.Deserialize<Panel>(json.Replace("\"dash\": \"longDashDot\",", "", StringComparison.Ordinal));
         Assert.Equal(LineDash.Solid, ((ShapeElement)older.Elements[0]).Style.Dash);
+    }
+}
+
+/// <summary>What ties a panel's things into a group (issue #125) is saved with each of them, and costs a file nothing when nothing is grouped.</summary>
+public class GroupLinkJsonTests
+{
+    private static Panel GroupedPanel(GroupLinkId? link)
+    {
+        var shape = new ShapeElement(ElementId.New(), ElementLayer.Background,
+            [new ShapeAnchor(new Point2D(20, 20), new Point2D(20, 20), new Point2D(20, 20), AnchorHandleKind.Corner)], Closed: false,
+            new ShapeStyle(ColorValue.FromHex("#1c1c1c"), Fill: null, 1)) { Link = link };
+        var character = new CharacterInstance(CharacterId.New(), new CharacterPlacement(new Point2D(50, 90), 70, false), null,
+            new PoseData(ViewAngle.Front, [], []), null, link);
+        var bubble = new Bubble(BubbleId.New(), new BubbleShape(PanelShapes.Rectangle(new Rect2D(30, 10, 40, 20)).Anchors), BubbleStylePreset.Speech, [], "Hi!", Link: link);
+        return new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 100, 80)), null, [character], [bubble], [shape]);
+    }
+
+    [Fact]
+    public void A_group_link_round_trips_on_elements_characters_and_bubbles()
+    {
+        var panel = GroupedPanel(GroupLinkId.New());
+
+        var json = ProjectJson.Serialize(panel);
+        var read = ProjectJson.Deserialize<Panel>(json);
+
+        Assert.Contains("\"link\":", json, StringComparison.Ordinal);
+        Assert.Equivalent(panel, read, strict: true);
+        Assert.NotNull(read.Elements[0].Link);
+        Assert.Equal(read.Elements[0].Link, read.CharacterInstances[0].Link);
+        Assert.Equal(read.Elements[0].Link, read.Bubbles[0].Link);
+    }
+
+    [Fact]
+    public void Nothing_is_written_for_things_that_are_not_grouped()
+    {
+        var json = ProjectJson.Serialize(GroupedPanel(link: null));
+
+        Assert.DoesNotContain("link", json, StringComparison.Ordinal);
+        Assert.Null(ProjectJson.Deserialize<Panel>(json).Elements[0].Link);
     }
 }

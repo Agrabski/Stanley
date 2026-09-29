@@ -176,10 +176,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public IRelayCommand BringToFrontCommand { get; }
     public IRelayCommand SendToBackCommand { get; }
 
-    /// <summary>Home tab's Arrange group: welds the current multi-selection of panel elements into one <see cref="GroupElement"/> (issue #86). Unavailable when the selection includes a bubble or character, or mixes background and foreground elements.</summary>
+    /// <summary>Home tab's Arrange group: groups the current multi-selection - into one <see cref="GroupElement"/> when it's elements alone on one side of the characters (issue #86), else by tying whatever it holds (characters, bubbles, elements) together (issue #125).</summary>
     public IRelayCommand GroupSelectionCommand { get; }
 
-    /// <summary>Home tab's Arrange group: takes the selected <see cref="GroupElement"/> back apart into its loose children.</summary>
+    /// <summary>Home tab's Arrange group: takes the selected group back apart - a <see cref="GroupElement"/> into its loose children, a tied-together group into its parts.</summary>
     public IRelayCommand UngroupSelectionCommand { get; }
     public IRelayCommand<PanelLayoutPreset> ApplyLayoutCommand { get; }
 
@@ -732,6 +732,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _selectedCharacterIndex = characterIndex;
         _selectedElementIndex = elementIndex;
         _notice = null;
+        AddGroupedSiblings();
         RaiseSelectionChanged();
     }
 
@@ -764,6 +765,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             return;
         }
 
+        if (SelectedPanel is { } linkedPanel && GroupMembers(linkedPanel, item) is { Count: > 1 } group)
+        {
+            ToggleGroup(item, group);
+            return;
+        }
+
         if (PrimaryItem is { } primary && primary == item)
         {
             // Toggling off the primary: the most recently added extra (if any) takes over.
@@ -791,6 +798,90 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         if (PrimaryItem is { } current)
             _extraSelection.Add(current);
         SetPrimaryIndex(item);
+    }
+
+    /// <summary>
+    /// Shift+click on one member of a group (<see cref="PanelElement.Link"/>): the whole group goes
+    /// in or out of the selection together, the clicked member becoming the primary item when it
+    /// goes in - a group is one thing to click, whatever it's made of.
+    /// </summary>
+    private void ToggleGroup(SelectedItem clicked, IReadOnlyList<SelectedItem> group)
+    {
+        var next = AllSelected().Where(item => !group.Contains(item)).ToList();
+        if (!AllSelected().Contains(clicked))
+        {
+            next.AddRange(group.Where(item => item != clicked));
+            next.Add(clicked);
+        }
+
+        if (next.Count == 0)
+        {
+            Select(null);
+            return;
+        }
+        _extraSelection.Clear();
+        _extraSelection.AddRange(next.Take(next.Count - 1));
+        SetPrimaryIndex(next[^1]);
+    }
+
+    /// <summary>The link tying <paramref name="item"/> to the other things grouped with it in <paramref name="panel"/>, or null for something ungrouped (or an index that's no longer there).</summary>
+    private static GroupLinkId? LinkOf(Panel panel, SelectedItem item)
+    {
+        if (!IsValidIndex(panel, item))
+            return null;
+        return item.Kind switch
+        {
+            SelectionKind.Bubble => panel.Bubbles[item.Index].Link,
+            SelectionKind.Character => panel.CharacterInstances[item.Index].Link,
+            _ => panel.Elements[item.Index].Link
+        };
+    }
+
+    /// <summary>Everything grouped with <paramref name="item"/> in <paramref name="panel"/> - itself included - or empty for something ungrouped.</summary>
+    private static List<SelectedItem> GroupMembers(Panel panel, SelectedItem item)
+    {
+        if (LinkOf(panel, item) is not { } link)
+            return [];
+        var members = Grouping.MembersOf(panel, link);
+        return
+        [
+            .. members.Bubbles.Select(i => new SelectedItem(SelectionKind.Bubble, i)),
+            .. members.Characters.Select(i => new SelectedItem(SelectionKind.Character, i)),
+            .. members.Elements.Select(i => new SelectedItem(SelectionKind.Element, i))
+        ];
+    }
+
+    /// <summary>Selecting one member of a group selects all of it (drag, nudge, Alt+drag and delete already treat a multi-selection as one): adds whatever is grouped with what's selected.</summary>
+    private void AddGroupedSiblings()
+    {
+        if (SelectedPanel is not { } panel)
+            return;
+        foreach (var item in AllSelected().ToList())
+        {
+            foreach (var member in GroupMembers(panel, item))
+            {
+                if (PrimaryItem != member && !_extraSelection.Contains(member))
+                    _extraSelection.Add(member);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A press or right-click on something that's part of a group, when it isn't selected yet: selects
+    /// the whole group first, so the click that follows drags or menus all of it rather than the one
+    /// member under the pointer. False (and nothing changes) for something ungrouped or already selected.
+    /// </summary>
+    public bool SelectGroupOf(PanelId panelId, int bubbleIndex = -1, int characterIndex = -1, int elementIndex = -1)
+    {
+        if (IsPartOfSelection(panelId, bubbleIndex, characterIndex, elementIndex) || !Working.Panels.TryGetValue(panelId, out var panel))
+            return false;
+        var item = bubbleIndex >= 0 ? new SelectedItem(SelectionKind.Bubble, bubbleIndex)
+            : characterIndex >= 0 ? new SelectedItem(SelectionKind.Character, characterIndex)
+            : new SelectedItem(SelectionKind.Element, elementIndex);
+        if (GroupMembers(panel, item).Count < 2)
+            return false;
+        Select(panelId, bubbleIndex, characterIndex, elementIndex);
+        return true;
     }
 
     /// <summary>Sets the primary item's index within the current panel, keeping <see cref="_extraSelection"/> as it is - the multi-selection half of what <see cref="Select"/> does for a plain single selection.</summary>
@@ -978,7 +1069,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
         PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
         PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
-        _ when HasMultiSelection => $"{SelectionCount} selected - drag to move them together, Delete removes them, Shift+click adds or removes.",
+        _ when SelectionIsOneGroup => $"A group of {SelectionCount} - drag to move it together, Delete removes it, Ctrl+Shift+G takes it apart.",
+        _ when HasMultiSelection => $"{SelectionCount} selected - drag to move them together, Ctrl+G groups them, Delete removes them, Shift+click adds or removes.",
         _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
         _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",

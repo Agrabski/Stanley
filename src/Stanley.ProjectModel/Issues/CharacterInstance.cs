@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -32,9 +33,11 @@ public sealed record CharacterInstanceOverrides(
 /// addressed by its index in <see cref="Panel.CharacterInstances"/> (which is also its
 /// z-order, back to front) - the same way bubbles are.
 /// </summary>
+/// <param name="Link">Set when the character was grouped with other things in its panel (see <see cref="PanelElement.Link"/>); null otherwise.</param>
 public sealed record CharacterInstance(
     CharacterId CharacterId,
     CharacterPlacement Placement,
     CharacterRevisionId? RevisionOverride,
     PoseData Pose,
-    CharacterInstanceOverrides? Overrides);
+    CharacterInstanceOverrides? Overrides,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupLinkId? Link = null);

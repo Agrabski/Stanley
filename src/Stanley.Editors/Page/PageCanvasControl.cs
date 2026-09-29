@@ -803,6 +803,11 @@ public sealed class PageCanvasControl : Control
         _dragElementIndex = hit.ElementIndex;
         _dragEdges = hit.Edges;
 
+        // Something grouped with other things (Ctrl+G) is one thing to press: select all of it first,
+        // so the press below drags it as the multi-selection it is.
+        if (hit.PanelId is { } linkedPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody)
+            vm.SelectGroupOf(linkedPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
+
         // A plain press on something already part of a multi-selection drags the whole group
         // without collapsing it first; released without moving, it falls back to a plain click
         // (see the DragKind.PendingMoveGroup case in FinishDrag).
@@ -1421,16 +1426,22 @@ public sealed class PageCanvasControl : Control
         var hit = HitTest(page);
         var items = new List<Control>();
 
+        // Right-clicking something grouped with other things means the whole group, as a press does.
+        if (hit.PanelId is { } linkedPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody)
+            vm.SelectGroupOf(linkedPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
+
         // Right-clicking something still part of the current multi-selection offers Group for
-        // the whole selection, without collapsing it first (every branch below starts by calling
-        // Select/SelectElement, which would). The same "still in the selection" check PointerPressed
-        // uses to drag a multi-selection as one group (see OnPointerPressed).
+        // the whole selection (and Ungroup, if it holds a group), without collapsing it first (every
+        // branch below starts by calling Select/SelectElement, which would). The same "still in the
+        // selection" check PointerPressed uses to drag a multi-selection as one group (see OnPointerPressed).
         if (hit.PanelId is { } multiPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody
             && vm.IsPartOfSelection(multiPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex) && vm.HasMultiSelection)
         {
             var group = Item("Group", () => vm.GroupSelectionCommand.Execute(null), "Ctrl+G");
             group.IsEnabled = vm.GroupSelectionCommand.CanExecute(null);
             items.Add(group);
+            if (vm.UngroupSelectionCommand.CanExecute(null))
+                items.Add(Item("Ungroup", () => vm.UngroupSelectionCommand.Execute(null), "Ctrl+Shift+G"));
             return items;
         }
 

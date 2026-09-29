@@ -50,12 +50,12 @@
       </DockPanel>
       <Rectangle Classes="divider" />
 
-      <!-- Welds several selected panel elements into one persistent object (issue #86), and takes one apart again. -->
+      <!-- Groups whatever is selected - shapes, text, characters, bubbles - into one persistent object (issues #86, #125), and takes one apart again. -->
       <DockPanel Classes="group">
           <StackPanel VerticalAlignment="Center" Spacing="1">
               <Button Name="GroupButton" Classes="small" Command="{Binding GroupSelectionCommand}"
                       local:Shortcut.Keys="Ctrl+G"
-                      ToolTip.Tip="Weld what's selected into one object, so it moves, resizes and reorders together"
+                      ToolTip.Tip="Group what's selected - shapes, text, characters, bubbles - so it is picked, moved and deleted as one"
                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                   Group
               </Button>
