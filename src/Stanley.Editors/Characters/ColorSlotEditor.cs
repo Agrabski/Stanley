@@ -63,6 +63,15 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
 	public string Label { get; }
 
+	/// <summary>Whether this colours hair - the hair itself, one of its pieces or one streak: its pattern section is a hair "Dye", not a clothing "Pattern".</summary>
+	public bool IsHairKey => CharacterEditorViewModel.IsHairColorKey(Slot);
+
+	/// <summary>What the dropdown's button says it colours.</summary>
+	public string Tip =>
+		StickerSlots.IsStreakColorKey(Slot) ? "This streak - its own colour and dye"
+		: StickerSlots.HairPieces.Contains(Slot) ? $"{Label} of the hair - its own colour and dye; Same as hair on the Sticker tab gives it back"
+		: $"{Label} - colour and fabric; everything this character wears in it follows";
+
 	/// <summary>Clothes get fabrics; skin and eyes (split left/right or not) are just colours.</summary>
 	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight);
 

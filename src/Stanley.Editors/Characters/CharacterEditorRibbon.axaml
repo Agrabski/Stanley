@@ -342,7 +342,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="local:ColorSlotEditor">
-                <DropDownButton Classes="colorSlot" Margin="1" ToolTip.Tip="{Binding Label, StringFormat='{}{0} - colour and fabric; everything this character wears in it follows'}">
+                <DropDownButton Classes="colorSlot" Margin="1" ToolTip.Tip="{Binding Tip}">
                   <StackPanel Orientation="Horizontal" Spacing="4">
                     <local:FabricSwatch Width="18" Height="14" Color="{Binding Color}" Fabric="{Binding Fabric}" Tiles="{Binding Tiles}" />
                     <TextBlock Text="{Binding Label}" FontSize="11" VerticalAlignment="Center" />

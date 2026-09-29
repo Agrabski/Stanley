@@ -52,7 +52,8 @@ public sealed partial class CharacterEditorViewModel
             if (_selectedSticker is { } id)
             {
                 SelectSticker(null);
-                Apply(EditResult<CharacterDefinition>.Success(LookEditing.RemoveFromWardrobe(Committed, id)));
+                // A removed streak leaves its colour behind otherwise.
+                Apply(EditResult<CharacterDefinition>.Success(HairEditing.DropOrphanStreakColors(LookEditing.RemoveFromWardrobe(Committed, id))));
             }
         }, () => HasSelectedSticker);
         MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, +1)), () => SelectedStickerIsWorn);
@@ -400,7 +401,8 @@ public sealed partial class CharacterEditorViewModel
     {
         var character = LookWorking;
         var look = CharacterLooks.Resolve(character);
-        var slots = LookEditing.ColorSlotsInUse(character);
+        // A hair piece is listed once it has a colour of its own (docs: modular hair); a streak never is.
+        var slots = HairEditing.ColorGroupSlots(character, LookEditing.ColorSlotsInUse(character));
         var changed = !slots.SequenceEqual(_colorEditors.Select(e => e.Slot));
         if (changed)
             _colorEditors = slots.Select(slot => new ColorSlotEditor(this, slot, Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList())).ToList();
@@ -500,6 +502,12 @@ public sealed partial class CharacterEditorViewModel
         "accent" => "Accents",
         StickerSlots.EyesLeft => "Left eye",
         StickerSlots.EyesRight => "Right eye",
+        StickerSlots.HairTop => "Top",
+        StickerSlots.HairFringe => "Fringe",
+        StickerSlots.HairSides => "Sides",
+        StickerSlots.HairBack => "Back",
+        StickerSlots.HairExtras => "Extras",
+        _ when StickerSlots.IsStreakColorKey(slot) => "Streak",
         _ => slot.Length == 0 ? slot : char.ToUpperInvariant(slot[0]) + slot[1..]
     };
 
@@ -507,6 +515,7 @@ public sealed partial class CharacterEditorViewModel
     {
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
         "hair" or "brows" => HairColors,
+        _ when IsHairColorKey(slot) => HairColors,
         StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight => EyeColors,
         _ => ClothColors
     };
@@ -526,7 +535,13 @@ public sealed partial class CharacterEditorViewModel
         C("Black", "#1f1a17"), C("Dark brown", "#3b2a20"), C("Brown", "#5a3a22"), C("Auburn", "#8b3a1f"),
         C("Ginger", "#c25e20"), C("Blonde", "#e0c068"), C("Platinum", "#efe6c8"), C("Grey", "#a0a0a0"),
         C("White", "#f2f2f2"), C("Blue", "#3a6fd8"), C("Pink", "#e57fb0"), C("Green", "#4caf50"),
+        // Vivid dyes.
+        C("Purple", "#8e24aa"), C("Magenta", "#d6409f"), C("Red", "#d32f2f"), C("Orange", "#f57c00"), C("Teal", "#00897b"),
     ];
+
+    /// <summary>Whether <paramref name="key"/> colours hair: the hair itself, one of its pieces or one streak (<see cref="ColorSlotEditor.IsHairKey"/>) - these are dyed, not patterned.</summary>
+    internal static bool IsHairColorKey(string key) =>
+        key == StickerSlots.Hair || StickerSlots.HairPieces.Contains(key) || StickerSlots.IsStreakColorKey(key);
 
     private static readonly IReadOnlyList<(string Name, ColorValue Color)> EyeColors =
     [
