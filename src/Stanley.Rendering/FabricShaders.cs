@@ -9,7 +9,9 @@ namespace Stanley.Rendering;
 /// region's frame, so stripes on a sleeve turn with the arm. Patterns are drawn as one
 /// repeat - a unit tile, recorded as a picture - over the slot's colour; textures are
 /// greyscale and multiplied on top, so they survive any recolour. All generated here,
-/// no art files, except a drawn tile (<see cref="PatternKind.Tile"/>).
+/// no art files, except a drawn tile (<see cref="PatternKind.Tile"/>). A dye
+/// (<see cref="PatternFill.IsDye"/>) isn't repeated at all: it is laid once across a part
+/// (<see cref="DyeLayout"/>), so it has no shader here.
 /// </summary>
 public static class FabricShaders
 {
@@ -18,11 +20,13 @@ public static class FabricShaders
     /// <summary>
     /// The pattern's shader for a piece whose region frame is <paramref name="frame"/>
     /// (figure space), for a character <paramref name="height"/> tall, over
-    /// <paramref name="ground"/>; null if there's no pattern (or its tile is missing).
+    /// <paramref name="ground"/>; null if its tile is missing, or it's a dye (<see cref="PatternFill.IsDye"/>): that isn't repeated, see <see cref="DyeLayout"/>.
     /// </summary>
     /// <param name="tiles">The character's tile files by name, for <see cref="PatternKind.Tile"/>.</param>
     public static SKShader? Pattern(PatternFill pattern, SKColor ground, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
+        if (pattern.IsDye)
+            return null;
         var size = (float)(Math.Max(pattern.Size ?? PatternFill.DefaultSize, 0.005) * height);
         var local = SKMatrix.CreateScale(size, size)
             .PostConcat(SKMatrix.CreateRotationDegrees((float)(pattern.Angle ?? 0)))
@@ -66,12 +70,16 @@ public static class FabricShaders
         return SKShader.CreateLocalMatrix(combined, local);
     }
 
-    /// <summary>Fills <paramref name="path"/> with <paramref name="ground"/>, then the fabric's pattern and texture in <paramref name="frame"/>.</summary>
+    /// <summary>Fills <paramref name="path"/> with <paramref name="ground"/>, then the fabric's pattern and texture in <paramref name="frame"/> - a dye fitted across the path.</summary>
     public static void Fill(SKCanvas canvas, SKPath path, SKColor ground, Fabric? fabric, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
         using (var paint = new SKPaint { Color = ground, Style = SKPaintStyle.Fill, IsAntialias = true })
             canvas.DrawPath(path, paint);
-        if (fabric?.Pattern is { } pattern)
+        if (fabric?.Pattern is { IsDye: true } dye)
+        {
+            DyeLayout.Fit(dye, [path], frame, ground, seed: 0)?.Draw(canvas, path);
+        }
+        else if (fabric?.Pattern is { } pattern)
         {
             using var shader = Pattern(pattern, ground, frame, height, tiles);
             if (shader != null)
@@ -218,6 +226,6 @@ public static class FabricShaders
     }
 
     /// <summary>A default pattern colour that reads on <paramref name="ground"/>: white on dark, dark on light.</summary>
-    private static SKColor Contrast(SKColor ground) =>
+    internal static SKColor Contrast(SKColor ground) =>
         0.3 * ground.Red + 0.59 * ground.Green + 0.11 * ground.Blue < 140 ? new SKColor(0xF4, 0xF4, 0xF4) : new SKColor(0x2B, 0x2B, 0x2B);
 }
