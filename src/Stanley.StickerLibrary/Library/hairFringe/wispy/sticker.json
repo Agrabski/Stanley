@@ -1,0 +1,20 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Wispy",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairFringe",
+  "variants": [
+    "default"
+  ]
+}

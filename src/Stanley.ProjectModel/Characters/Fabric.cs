@@ -16,7 +16,25 @@ public enum PatternKind
     Chevron,
 
     /// <summary>A drawn tile (SVG or PNG) from the character's <c>patterns/</c> folder.</summary>
-    Tile
+    Tile,
+
+    // Dyes (docs: modular hair): laid once across each drawn part, not repeated - "the
+    // ends" means the ends of that piece, however long it is. See PatternFill.IsDye.
+
+    /// <summary>Uneven stripes running down the part, in <see cref="PatternFill.Colors"/>[0]: <see cref="PatternFill.Size"/> spacing, <see cref="PatternFill.Weight"/> width.</summary>
+    Streaks,
+
+    /// <summary>The ends of the part in <see cref="PatternFill.Colors"/>[0] (dip-dye): <see cref="PatternFill.Weight"/> is how far up.</summary>
+    Tips,
+
+    /// <summary>The roots of the part in <see cref="PatternFill.Colors"/>[0]: <see cref="PatternFill.Weight"/> is how far down.</summary>
+    Roots,
+
+    /// <summary>A gradient from the ground colour at the top to <see cref="PatternFill.Colors"/>[0] at the bottom: <see cref="PatternFill.Weight"/> is where it starts.</summary>
+    Ombre,
+
+    /// <summary>Bands of every colour in <see cref="PatternFill.Colors"/> (2-7) running down the part, side by side.</summary>
+    Rainbow
 }
 
 /// <summary>A greyscale surface multiplied over the colour and pattern, so it survives any recolour. All but <see cref="Tile"/> are procedural.</summary>
@@ -45,6 +63,31 @@ public enum TextureKind
 public sealed record PatternFill(PatternKind Kind, IReadOnlyList<ColorValue> Colors, double? Size = null, double? Angle = null, double? Weight = null, string? Tile = null)
 {
     public const double DefaultSize = 0.05;
+
+    /// <summary>Whether this is a dye (docs: modular hair) - fitted once across each drawn part instead of repeated in its region's frame.</summary>
+    public bool IsDye => IsDyeKind(Kind);
+
+    public static bool IsDyeKind(PatternKind kind) => kind is PatternKind.Streaks or PatternKind.Tips or PatternKind.Roots or PatternKind.Ombre or PatternKind.Rainbow;
+
+    /// <summary>
+    /// How much of a piece a dye of <paramref name="kind"/> covers when it has no
+    /// <see cref="Weight"/> of its own: how far up the tips reach, how far down the roots,
+    /// where an ombre starts fading (fractions of the piece's height), how wide a streak is
+    /// (a fraction of its spacing). The renderer and the editor's sliders both go by this.
+    /// </summary>
+    public static double DefaultDyeWeight(PatternKind kind) => kind switch
+    {
+        PatternKind.Roots => 0.25,
+        PatternKind.Streaks => 0.4,
+        _ => 0.3
+    };
+
+    /// <summary>The Rainbow dye's colours when none are picked: red, orange, yellow, green, blue, violet.</summary>
+    public static IReadOnlyList<ColorValue> RainbowColors { get; } =
+    [
+        ColorValue.FromHex("#e53935"), ColorValue.FromHex("#fb8c00"), ColorValue.FromHex("#fdd835"),
+        ColorValue.FromHex("#43a047"), ColorValue.FromHex("#1e88e5"), ColorValue.FromHex("#8e24aa"),
+    ];
 }
 
 /// <summary>A texture at <paramref name="Strength"/> (0-1, default <see cref="DefaultStrength"/>), one repeat <paramref name="Size"/> (fraction of height).</summary>

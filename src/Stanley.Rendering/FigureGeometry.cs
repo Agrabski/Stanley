@@ -37,17 +37,54 @@ internal static class FigureGeometry
             return a;
         }
         var merged = a.Op(b, SKPathOp.Union);
-        if (merged is null)
+        if (merged is null || !Covers(merged, a) || !Covers(merged, b))
         {
-            // Pathological input (degenerate shapes): keep both, drawn with a winding fill.
-            using var builder = new SKPathBuilder();
-            builder.AddPath(a);
-            builder.AddPath(b);
-            merged = builder.Detach();
+            // Skia's path ops can fail - or, on warped art whose lines run along its own fills'
+            // edges, silently drop a shape or its inside. Union the two as regions instead.
+            merged?.Dispose();
+            merged = RegionUnion(a, b);
         }
         a.Dispose();
         b.Dispose();
         return merged;
+    }
+
+    /// <summary>Whether <paramref name="union"/> contains <paramref name="part"/>, going by a 3 x 3 grid of sample points inside it.</summary>
+    private static bool Covers(SKPath union, SKPath part)
+    {
+        var box = part.Bounds;
+        for (var i = 1; i <= 3; i++)
+        {
+            for (var j = 1; j <= 3; j++)
+            {
+                var x = box.Left + box.Width * i / 4;
+                var y = box.Top + box.Height * j / 4;
+                if (part.Contains(x, y) && !union.Contains(x, y))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Cells across the larger side of a <see cref="RegionUnion"/> - fine enough that its steps never show.</summary>
+    private const float RegionCells = 512;
+
+    /// <summary><paramref name="a"/> and <paramref name="b"/> unioned as rasterised regions (which never fail), traced back into a path.</summary>
+    private static SKPath RegionUnion(SKPath a, SKPath b)
+    {
+        var box = SKRect.Union(a.Bounds, b.Bounds);
+        var scale = RegionCells / Math.Max(Math.Max(box.Width, box.Height), 1e-6f);
+        var toCells = SKMatrix.CreateTranslation(-box.Left, -box.Top).PostConcat(SKMatrix.CreateScale(scale, scale));
+        using var cellsA = Transformed(a, toCells);
+        using var cellsB = Transformed(b, toCells);
+        using var clip = new SKRegion(new SKRectI(-2, -2, (int)Math.Ceiling(box.Width * scale) + 2, (int)Math.Ceiling(box.Height * scale) + 2));
+        using var region = new SKRegion();
+        region.SetPath(cellsA, clip);
+        using var other = new SKRegion();
+        other.SetPath(cellsB, clip);
+        region.Op(other, SKRegionOperation.Union);
+        using var boundary = region.GetBoundaryPath();
+        return Transformed(boundary, toCells.Invert());
     }
 
     /// <summary>A new path: <paramref name="a"/> combined with <paramref name="b"/> by <paramref name="op"/> (neither is disposed).</summary>

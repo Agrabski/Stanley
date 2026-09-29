@@ -1,0 +1,20 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Chin",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairSides",
+  "variants": [
+    "default"
+  ]
+}

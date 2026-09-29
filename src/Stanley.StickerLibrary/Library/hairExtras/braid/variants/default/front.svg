@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="hairExtras">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back">
+    <path class="slot-hair" d="M74.7,-786.7 C77.2,-782.3 76,-775.4 73.5,-768.6 C70.2,-771.6 67.7,-766.8 67.6,-764.7 C65.7,-767.7 63.8,-770.6 62.3,-769.3 C60.7,-776.5 60.5,-783.5 63.5,-787.5 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M41.4,-947.7 C41.3,-943.5 45.9,-933.3 49.1,-930.7 C47.8,-926.5 50.8,-916.2 54.1,-913.5 C52.1,-909.4 54.2,-898.8 57.5,-895.8 C55,-891.8 56.4,-881 59.8,-877.9 C57.2,-873.9 58.4,-862.9 61.8,-859.5 C59.4,-855.7 60.2,-844.7 63.1,-841.1 C60.5,-837.4 60.9,-826.3 63.7,-822.6 C61.3,-819 61.4,-807.9 63.9,-804.1 C61.6,-800.5 61.1,-789.3 63,-785.4 C62.6,-779.1 74.6,-778.4 75,-784.6 C77.5,-788.2 78.5,-799.5 76.7,-803.4 C79.5,-807.1 80.4,-818.5 78.3,-822.5 C81.1,-826.3 81.2,-837.7 78.6,-841.5 C81.2,-845.5 80.9,-857 78.1,-860.7 C80.9,-864.7 80.1,-876.2 76.9,-879.8 C79.2,-884.1 77.2,-895.6 73.6,-899 C75.1,-903.4 71.8,-914.6 68.1,-917.8 C68.7,-922.2 63.8,-933 60,-935.8 C59.7,-939.9 54.1,-949.8 50.6,-952.3 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M49.1,-930.7 Q60.5,-920.5 60,-935.8" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M54.1,-913.5 Q65.1,-902.2 68.1,-917.8" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M57.5,-895.8 Q68.2,-883.6 73.6,-899" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M59.8,-877.9 Q69.9,-864.8 76.9,-879.8" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M61.8,-859.5 Q70.9,-846 78.1,-860.7" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M63.1,-841.1 Q71.2,-827.2 78.6,-841.5" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M63.7,-822.6 Q70.9,-808.4 78.3,-822.5" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M63.9,-804.1 Q69.4,-789.7 76.7,-803.4" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M68.9,-784.3 L67.9,-768.9" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M72,-783.4 L70.8,-770.8" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M65.8,-783.8 L65.2,-771.2" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <ellipse class="slot-accent" cx="69.1" cy="-787.1" rx="7.4" ry="5" fill="#c0392b" stroke="#1a1a1a" stroke-width="2" transform="rotate(-176.0 69.1 -787.1)"/>
+  </g>
+</svg>

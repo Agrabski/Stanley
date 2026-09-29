@@ -564,7 +564,13 @@ public sealed class PageCanvasControl : Control
                             () => vm.SetPanelStyle(panelId, index, s.Sticker, style.Variant))).ToList()
                     }).ToList()
                 });
-            var slots = LookEditing.ColorSlotsInUse(shown);
+            // Each worn hair piece can take its own colour for this panel (a fringe that's purple
+            // in one flashback), right after Hair; streaks are each coloured on their own, not here.
+            var inUse = LookEditing.ColorSlotsInUse(shown).Where(slot => slot != ProjectModel.Characters.StickerSlots.StreakColor).ToList();
+            var pieces = ProjectModel.Characters.StickerSlots.HairPieces
+                .Where(slot => shown.Stickers.TryGetValue(slot, out var ids) && ids.Count > 0 && !inUse.Contains(slot)).ToList();
+            var hairAt = inUse.IndexOf(ProjectModel.Characters.StickerSlots.Hair);
+            var slots = inUse.Take(hairAt + 1).Concat(pieces).Concat(inUse.Skip(hairAt + 1)).ToList();
             items.Add(new MenuItem
             {
                 Header = "Colour",
@@ -583,13 +589,9 @@ public sealed class PageCanvasControl : Control
                     ItemsSource = fabricSlots.Select(slot => new MenuItem
                     {
                         Header = CharacterEditorViewModel.ColorSlotLabel(slot),
-                        ItemsSource = new (string Name, ProjectModel.Characters.PatternKind? Kind)[]
-                            {
-                                ("Plain", null), ("Stripes", ProjectModel.Characters.PatternKind.Stripes), ("Checks", ProjectModel.Characters.PatternKind.Checks),
-                                ("Plaid", ProjectModel.Characters.PatternKind.Plaid), ("Dots", ProjectModel.Characters.PatternKind.Dots),
-                            }
+                        ItemsSource = PanelPatterns(slot)
                             .Select(p => Item(p.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.SetFabric(c, slot,
-                                p.Kind is { } kind ? new ProjectModel.Characters.Fabric(new ProjectModel.Characters.PatternFill(kind, [])) : new ProjectModel.Characters.Fabric()))))
+                                p.Kind is { } kind ? new ProjectModel.Characters.Fabric(new ProjectModel.Characters.PatternFill(kind, DyeColors(kind))) : new ProjectModel.Characters.Fabric()))))
                             .ToList()
                     }).ToList()
                 });
@@ -601,6 +603,28 @@ public sealed class PageCanvasControl : Control
         menu.ItemsSource = items;
         return menu;
     }
+
+    /// <summary>The patterns "This panel only" offers a colour slot: hair gets its dyes (docs: modular hair), clothes their patterns.</summary>
+    private static (string Name, ProjectModel.Characters.PatternKind? Kind)[] PanelPatterns(string slot) =>
+        slot == ProjectModel.Characters.StickerSlots.Hair || ProjectModel.Characters.StickerSlots.HairPieces.Contains(slot)
+            ?
+            [
+                ("Plain", null), ("Streaks", ProjectModel.Characters.PatternKind.Streaks), ("Tips", ProjectModel.Characters.PatternKind.Tips),
+                ("Roots", ProjectModel.Characters.PatternKind.Roots), ("Ombré", ProjectModel.Characters.PatternKind.Ombre), ("Rainbow", ProjectModel.Characters.PatternKind.Rainbow),
+            ]
+            :
+            [
+                ("Plain", null), ("Stripes", ProjectModel.Characters.PatternKind.Stripes), ("Checks", ProjectModel.Characters.PatternKind.Checks),
+                ("Plaid", ProjectModel.Characters.PatternKind.Plaid), ("Dots", ProjectModel.Characters.PatternKind.Dots),
+            ];
+
+    /// <summary>A dye picked from the menu comes in a vivid purple (Rainbow in its own six); a pattern takes its default colours.</summary>
+    private static IReadOnlyList<ProjectModel.Geometry.ColorValue> DyeColors(ProjectModel.Characters.PatternKind kind) => kind switch
+    {
+        ProjectModel.Characters.PatternKind.Rainbow => ProjectModel.Characters.PatternFill.RainbowColors,
+        _ when ProjectModel.Characters.PatternFill.IsDyeKind(kind) => [ProjectModel.Geometry.ColorValue.FromHex("#8e24aa")],
+        _ => []
+    };
 
     /// <summary>The figure's actual silhouette, not its box - characters stand close together and overlap.</summary>
     private bool HitsCharacter(ProjectModel.Issues.CharacterInstance instance, Point2D p)
