@@ -192,7 +192,6 @@ internal sealed class FabricFill
 {
     private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
     private readonly DyeLayout? _dye;
-    private readonly float _strength;
 
     /// <param name="dye">The dye already fitted across the whole part these pieces are some of; null to fit it across the pieces (using <paramref name="seed"/> for streaks).</param>
     public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles, DyeLayout? dye = null, int seed = 0)
@@ -202,7 +201,6 @@ internal sealed class FabricFill
             fabric.Texture is { } texture ? FabricShaders.Texture(texture, p.Frame, height, tiles) : null)).ToList();
         if (fabric.Pattern is { IsDye: true } dyed)
             _dye = dye ?? (pieces.Count > 0 ? DyeLayout.Fit(dyed, pieces.Select(p => p.Path), pieces[0].Frame, ground, seed) : null);
-        _strength = (float)Math.Clamp(fabric.Texture?.Strength ?? TextureFill.DefaultStrength, 0, 1);
     }
 
     public void Draw(SKCanvas canvas, SKColor ground)
@@ -211,7 +209,6 @@ internal sealed class FabricFill
         foreach (var (path, pattern, texture) in _pieces)
         {
             paint.Shader = null;
-            paint.BlendMode = SKBlendMode.SrcOver;
             paint.Color = ground;
             canvas.DrawPath(path, paint);
             if (pattern != null)
@@ -223,9 +220,9 @@ internal sealed class FabricFill
             _dye?.Draw(canvas, path);
             if (texture != null)
             {
+                // A shade drawn plainly, not multiplied: see FabricShaders.Texture.
+                paint.Color = SKColors.Black;
                 paint.Shader = texture;
-                paint.BlendMode = SKBlendMode.Multiply;
-                paint.Color = SKColors.White.WithAlpha((byte)(_strength * 255));
                 canvas.DrawPath(path, paint);
             }
         }

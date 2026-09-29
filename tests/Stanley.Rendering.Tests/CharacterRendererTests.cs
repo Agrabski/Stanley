@@ -509,4 +509,56 @@ public class FabricRenderingTests
         Assert.True(stream.Length > 1000);
         Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(stream.ToArray(), 0, 4));
     }
+
+    [Fact]
+    public void A_textured_pdf_asks_the_viewer_for_no_blending()
+    {
+        // #60: poppler (Linux viewers and file thumbnails) drew a multiplied texture as
+        // opaque grey or pale instead of over the colour; every viewer paints plain alpha alike.
+        var character = Wearing(new Fabric(Texture: new TextureFill(TextureKind.Leather)), new StickerPart("body", BodyRegion.Torso, Cover: new PartCover("top", 0, 1)));
+        var instance = new CharacterInstance(character.Id, new CharacterPlacement(new Point2D(50, 90), 70, false), null, new PoseData(ViewAngle.Front, [], []), null);
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(0, 0, 100, 100)), null, [instance], []);
+        using var stream = new MemoryStream();
+
+        PageRenderer.ExportPdf(stream, new Rect2D(0, 0, 100, 100), [panel], characters: new Dictionary<CharacterId, CharacterDefinition> { [character.Id] = character });
+
+        var pdf = System.Text.Encoding.Latin1.GetString(stream.ToArray());
+        Assert.Contains("/Pattern", pdf);
+        Assert.DoesNotMatch(@"/BM\s*/(?!Normal)", pdf);
+    }
+
+    [Theory]
+    [InlineData(TextureKind.Leather, 0.5)]
+    [InlineData(TextureKind.Denim, 1.0)]
+    [InlineData(TextureKind.Wool, 0.2)]
+    public void A_textures_shade_darkens_as_multiplying_by_it_would(TextureKind kind, double strength)
+    {
+        var ground = new SKColor(0xC0, 0x30, 0x30);
+        var texture = new TextureFill(kind, strength);
+        using var path = SKPath.ParseSvgPathData("M 0 0 H 64 V 64 H 0 Z");
+        using var shaded = new SKBitmap(64, 64);
+        using (var canvas = new SKCanvas(shaded))
+            FabricShaders.Fill(canvas, path, ground, new Fabric(Texture: texture), SKMatrix.Identity, 400);
+
+        // The grey texture itself, at full strength: undo the shade's alpha (s × (1 - g)).
+        using var greyShade = FabricShaders.Texture(texture with { Strength = 1 }, SKMatrix.Identity, 400)!;
+        using var grey = new SKBitmap(64, 64);
+        using (var canvas = new SKCanvas(grey))
+        {
+            canvas.Clear(SKColors.White);
+            using var paint = new SKPaint { Shader = greyShade };
+            canvas.DrawPath(path, paint);
+        }
+
+        for (var x = 0; x < 64; x += 7)
+            for (var y = 0; y < 64; y += 7)
+            {
+                var g = grey.GetPixel(x, y).Red / 255.0;
+                var factor = 1 - strength * (1 - g);
+                var c = shaded.GetPixel(x, y);
+                Assert.InRange(c.Red, ground.Red * factor - 3, ground.Red * factor + 3);
+                Assert.InRange(c.Green, ground.Green * factor - 3, ground.Green * factor + 3);
+                Assert.InRange(c.Blue, ground.Blue * factor - 3, ground.Blue * factor + 3);
+            }
+    }
 }
