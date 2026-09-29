@@ -1,0 +1,22 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Side-swept",
+  "overGlasses": true,
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairFringe",
+  "variants": [
+    "left",
+    "right"
+  ]
+}
