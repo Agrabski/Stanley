@@ -2,6 +2,7 @@ using SkiaSharp;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
 using Stanley.ProjectModel.Poses;
 using Xunit;
 using Library = Stanley.StickerLibrary.StickerLibrary;
