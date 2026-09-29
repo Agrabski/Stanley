@@ -45,6 +45,62 @@ public static class AnchorRing
     }
 
     /// <summary>
+    /// The t where the ray from <paramref name="centre"/> through <paramref name="towards"/>
+    /// crosses the ring: "the same direction from the middle" on another outline. A t on its
+    /// own is only a fraction along one particular ring (an oval's four anchors count from the
+    /// top, a Shout star's twenty from the right), so it means a different spot on a different
+    /// shape; a direction means the same on any, which makes this what carries a point across a
+    /// change of outline. Where the ray crosses more than once (a ring that bulges back past the
+    /// centre's line of sight) the crossing nearest <paramref name="towards"/> wins; a ring it
+    /// never crosses (the centre outside it) falls back to <see cref="NearestT"/>.
+    /// </summary>
+    public static double TowardsT(IReadOnlyList<ShapeAnchor> anchors, Point2D centre, Point2D towards, int samples = 400)
+    {
+        var aim = Math.Atan2(towards.Y - centre.Y, towards.X - centre.X);
+        double Off(double t)
+        {
+            var p = PointAt(anchors, t);
+            return WrapAngle(Math.Atan2(p.Y - centre.Y, p.X - centre.X) - aim);
+        }
+        double DistSq(double t)
+        {
+            var p = PointAt(anchors, t);
+            return (p.X - towards.X) * (p.X - towards.X) + (p.Y - towards.Y) * (p.Y - towards.Y);
+        }
+
+        double? best = null;
+        var prev = Off(0);
+        for (var i = 1; i <= samples; i++)
+        {
+            double lo = (double)(i - 1) / samples, hi = (double)i / samples;
+            var next = Off(hi);
+            double? hit = null;
+            if (prev == 0)
+                hit = lo;
+            // The offset changing sign is the ring crossing the ray - unless it jumps by about a
+            // whole turn, which is the ring crossing the ray's opposite (+pi wrapping to -pi).
+            else if (Math.Sign(prev) != Math.Sign(next) && next != 0 && Math.Abs(next - prev) < Math.PI)
+            {
+                var loOff = prev;
+                for (var k = 0; k < 60; k++)
+                {
+                    var mid = (lo + hi) / 2;
+                    var midOff = Off(mid);
+                    if (Math.Sign(midOff) == Math.Sign(loOff))
+                        (lo, loOff) = (mid, midOff);
+                    else
+                        hi = mid;
+                }
+                hit = (lo + hi) / 2;
+            }
+            if (hit is { } h && (best is not { } b || DistSq(h) < DistSq(b)))
+                best = h;
+            prev = next;
+        }
+        return best is { } found ? Wrap01(found) : NearestT(anchors, towards);
+    }
+
+    /// <summary>
     /// The ring's own anchor points whose parametric position lies strictly between
     /// <paramref name="fromT"/> and <paramref name="toT"/>, walking forward (wrapping if
     /// <paramref name="toT"/> is "before" <paramref name="fromT"/>), ordered along that walk.
@@ -141,6 +197,13 @@ public static class AnchorRing
     {
         t %= 1.0;
         return t < 0 ? t + 1.0 : t;
+    }
+
+    /// <summary>An angle brought into (-pi, pi].</summary>
+    private static double WrapAngle(double a)
+    {
+        a %= 2 * Math.PI;
+        return a > Math.PI ? a - 2 * Math.PI : a <= -Math.PI ? a + 2 * Math.PI : a;
     }
 
     private static Point2D CubicPoint(Point2D p0, Point2D c0, Point2D c1, Point2D p1, double t)

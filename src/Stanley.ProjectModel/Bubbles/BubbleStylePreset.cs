@@ -72,6 +72,10 @@ public static class BubbleStylePresets
             // Handles coincide with the point itself: a straight edge, no curve.
             anchors.Add(new ShapeAnchor(p, p, p, AnchorHandleKind.Corner));
         }
-        return anchors;
+        // No spike points straight up or down, so the star falls short of its box's top and
+        // bottom; stretch it to reach them. Then, as for an oval, its bounding box is the box it
+        // was made for, and switching Speech -> Shout -> Speech gives back the same bubble
+        // rather than one a little shorter every round trip.
+        return [.. AnchorRing.Rescale(anchors, AnchorRing.BoundingBox(anchors), b)];
     }
 }
