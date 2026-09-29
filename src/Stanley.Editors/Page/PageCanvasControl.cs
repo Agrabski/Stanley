@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Stanley.Editing;
 using Stanley.ProjectModel.Bubbles;
@@ -76,7 +77,8 @@ public sealed class PageCanvasControl : Control
         Focusable = true;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
 
-        // A character dragged out of the Characters pane is placed where it's dropped.
+        // A character dragged out of the Characters pane, or a picture file dragged in from
+        // outside the app, is placed where it's dropped.
         DragDrop.SetAllowDrop(this, true);
         DragDrop.AddDragOverHandler(this, OnDragOver);
         DragDrop.AddDropHandler(this, OnDrop);
@@ -84,25 +86,56 @@ public sealed class PageCanvasControl : Control
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
+        var vm = _viewModel;
         var page = ControlToPage(e.GetPosition(this));
-        e.DragEffects = _viewModel != null && e.DataTransfer.Contains(CharacterDrag.Format) && PanelAt(page) != null
+        e.DragEffects = vm != null && PanelAt(page) != null
+            && (e.DataTransfer.Contains(CharacterDrag.Format) || (vm.CanImportPictures && e.DataTransfer.Contains(DataFormat.File)))
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private void OnDrop(object? sender, DragEventArgs e)
+    private async void OnDrop(object? sender, DragEventArgs e)
     {
-        if (_viewModel is not { } vm || e.DataTransfer.TryGetValue(CharacterDrag.Format) is not { } value
-            || !ProjectModel.Ids.CharacterId.TryParse(value, null, out var id))
+        if (_viewModel is not { } vm)
             return;
         var page = ControlToPage(e.GetPosition(this));
-        if (PanelAt(page) is { } panelId)
+
+        if (e.DataTransfer.TryGetValue(CharacterDrag.Format) is { } characterId
+            && ProjectModel.Ids.CharacterId.TryParse(characterId, null, out var id))
         {
-            vm.InsertCharacter(id, panelId, page);
-            Focus();
+            if (PanelAt(page) is { } panelId)
+            {
+                vm.InsertCharacter(id, panelId, page);
+                Focus();
+            }
+            e.Handled = true;
+            return;
         }
+
+        // A picture dragged in from the OS (a file manager, a browser download) lands in the
+        // panel under the pointer, just like Insert > Picture would place it.
+        if (!vm.CanImportPictures || PanelAt(page) is not { } dropPanel || e.DataTransfer.TryGetFiles() is not { Length: > 0 } files)
+            return;
         e.Handled = true;
+
+        var request = new PictureImportRequest(dropPanel, AsBackground: false);
+        foreach (var item in files)
+        {
+            if (item is not IStorageFile file)
+                continue;
+            try
+            {
+                await using var stream = await file.OpenReadAsync();
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory);
+                vm.ImportPicture(request, file.Name, memory.ToArray());
+            }
+            catch (IOException)
+            {
+            }
+        }
+        Focus();
     }
 
     /// <summary>Raised when zoom or pan changes, so the ribbon's zoom readout and any overlay (the inline text editor) can follow.</summary>
@@ -472,6 +505,35 @@ public sealed class PageCanvasControl : Control
         return new Hit(HitKind.None);
     }
 
+    /// <summary>The single panel edge of <paramref name="gutter"/> nearest <paramref name="p"/>: the panel on the pointer's side of the gap that spans the pointer across it.</summary>
+    private Hit? SingleEdgeOfGutter(GutterHit gutter, Point2D p)
+    {
+        var vm = _viewModel!;
+        var vertical = gutter.Drag.Orientation == BoundaryOrientation.Vertical;
+        var along = vertical ? p.X : p.Y;
+        var across = vertical ? p.Y : p.X;
+        Hit? best = null;
+        var bestScore = double.MaxValue;
+        void Consider(PanelId id, bool before)
+        {
+            var b = vm.PanelBounds(id);
+            var lo = vertical ? b.Top : b.Left;
+            var hi = vertical ? b.Bottom : b.Right;
+            var edge = before ? (vertical ? b.Right : b.Bottom) : (vertical ? b.Left : b.Top);
+            var score = Math.Abs(along - edge) + (across < lo ? lo - across : across > hi ? across - hi : 0) * 1000;
+            if (score >= bestScore)
+                return;
+            bestScore = score;
+            var edges = vertical ? (before ? RectEdges.Right : RectEdges.Left) : (before ? RectEdges.Bottom : RectEdges.Top);
+            best = new Hit(HitKind.PanelEdge, id, Edges: edges);
+        }
+        foreach (var id in gutter.Drag.PanelsBefore)
+            Consider(id, true);
+        foreach (var id in gutter.Drag.PanelsAfter)
+            Consider(id, false);
+        return best;
+    }
+
     /// <summary>The topmost element of <paramref name="layer"/> under <paramref name="p"/> - only where it shows, inside its panel.</summary>
     private Hit? ElementAt(Point2D p, ProjectModel.Issues.ElementLayer layer, PanelId? only = null)
     {
@@ -531,7 +593,13 @@ public sealed class PageCanvasControl : Control
                             () => vm.SetPanelStyle(panelId, index, s.Sticker, style.Variant))).ToList()
                     }).ToList()
                 });
-            var slots = LookEditing.ColorSlotsInUse(shown);
+            // Each worn hair piece can take its own colour for this panel (a fringe that's purple
+            // in one flashback), right after Hair; streaks are each coloured on their own, not here.
+            var inUse = LookEditing.ColorSlotsInUse(shown).Where(slot => slot != ProjectModel.Characters.StickerSlots.StreakColor).ToList();
+            var pieces = ProjectModel.Characters.StickerSlots.HairPieces
+                .Where(slot => shown.Stickers.TryGetValue(slot, out var ids) && ids.Count > 0 && !inUse.Contains(slot)).ToList();
+            var hairAt = inUse.IndexOf(ProjectModel.Characters.StickerSlots.Hair);
+            var slots = inUse.Take(hairAt + 1).Concat(pieces).Concat(inUse.Skip(hairAt + 1)).ToList();
             items.Add(new MenuItem
             {
                 Header = "Colour",
@@ -550,13 +618,9 @@ public sealed class PageCanvasControl : Control
                     ItemsSource = fabricSlots.Select(slot => new MenuItem
                     {
                         Header = CharacterEditorViewModel.ColorSlotLabel(slot),
-                        ItemsSource = new (string Name, ProjectModel.Characters.PatternKind? Kind)[]
-                            {
-                                ("Plain", null), ("Stripes", ProjectModel.Characters.PatternKind.Stripes), ("Checks", ProjectModel.Characters.PatternKind.Checks),
-                                ("Plaid", ProjectModel.Characters.PatternKind.Plaid), ("Dots", ProjectModel.Characters.PatternKind.Dots),
-                            }
+                        ItemsSource = PanelPatterns(slot)
                             .Select(p => Item(p.Name, () => vm.EditPanelLook(panelId, index, c => LookEditing.SetFabric(c, slot,
-                                p.Kind is { } kind ? new ProjectModel.Characters.Fabric(new ProjectModel.Characters.PatternFill(kind, [])) : new ProjectModel.Characters.Fabric()))))
+                                p.Kind is { } kind ? new ProjectModel.Characters.Fabric(new ProjectModel.Characters.PatternFill(kind, DyeColors(kind))) : new ProjectModel.Characters.Fabric()))))
                             .ToList()
                     }).ToList()
                 });
@@ -568,6 +632,28 @@ public sealed class PageCanvasControl : Control
         menu.ItemsSource = items;
         return menu;
     }
+
+    /// <summary>The patterns "This panel only" offers a colour slot: hair gets its dyes (docs: modular hair), clothes their patterns.</summary>
+    private static (string Name, ProjectModel.Characters.PatternKind? Kind)[] PanelPatterns(string slot) =>
+        slot == ProjectModel.Characters.StickerSlots.Hair || ProjectModel.Characters.StickerSlots.HairPieces.Contains(slot)
+            ?
+            [
+                ("Plain", null), ("Streaks", ProjectModel.Characters.PatternKind.Streaks), ("Tips", ProjectModel.Characters.PatternKind.Tips),
+                ("Roots", ProjectModel.Characters.PatternKind.Roots), ("Ombré", ProjectModel.Characters.PatternKind.Ombre), ("Rainbow", ProjectModel.Characters.PatternKind.Rainbow),
+            ]
+            :
+            [
+                ("Plain", null), ("Stripes", ProjectModel.Characters.PatternKind.Stripes), ("Checks", ProjectModel.Characters.PatternKind.Checks),
+                ("Plaid", ProjectModel.Characters.PatternKind.Plaid), ("Dots", ProjectModel.Characters.PatternKind.Dots),
+            ];
+
+    /// <summary>A dye picked from the menu comes in a vivid purple (Rainbow in its own six); a pattern takes its default colours.</summary>
+    private static IReadOnlyList<ProjectModel.Geometry.ColorValue> DyeColors(ProjectModel.Characters.PatternKind kind) => kind switch
+    {
+        ProjectModel.Characters.PatternKind.Rainbow => ProjectModel.Characters.PatternFill.RainbowColors,
+        _ when ProjectModel.Characters.PatternFill.IsDyeKind(kind) => [ProjectModel.Geometry.ColorValue.FromHex("#8e24aa")],
+        _ => []
+    };
 
     /// <summary>The figure's actual silhouette, not its box - characters stand close together and overlap.</summary>
     private bool HitsCharacter(ProjectModel.Issues.CharacterInstance instance, Point2D p)
@@ -738,6 +824,12 @@ public sealed class PageCanvasControl : Control
             vm.ToggleSelect(shiftPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex);
             return;
         }
+
+        // Ctrl on a gutter moves just the one panel edge under the pointer, leaving the gap
+        // and the neighbour alone (a plain drag moves the whole gutter, margins intact).
+        if (hit.Kind == HitKind.Gutter && (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
+            && SingleEdgeOfGutter(hit.Gutter!, page) is { } singleEdge)
+            hit = singleEdge;
 
         _dragPanelId = hit.PanelId;
         _dragBubbleIndex = hit.BubbleIndex;

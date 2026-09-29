@@ -1,0 +1,158 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.TextRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Spacing="1" VerticalAlignment="Center">
+              <Button Name="CaptionKindButton" Classes="small" Command="{Binding ApplyTextPresetCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.Caption}"
+                      ToolTip.Tip="Narration in a box" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource CaptionIcon}" /><TextBlock Text="Caption" />
+                  </StackPanel>
+              </Button>
+              <Button Name="PlainKindButton" Classes="small" Command="{Binding ApplyTextPresetCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.Plain}"
+                      ToolTip.Tip="Bare lettering" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Plain" />
+                  </StackPanel>
+              </Button>
+              <Button Name="SoundEffectKindButton" Classes="small" Command="{Binding ApplyTextPresetCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.SoundEffect}"
+                      ToolTip.Tip="Big, bold and outlined" HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Sound effect" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="{Binding TextPresetName, StringFormat='Kind: {0}'}" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <local:FontGroup Name="TextFontGroup" />
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+              <local:ColorMenuButton Name="TextBoxFillButton" Label="Shape Fill"
+                                     Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                     Command="{Binding SetBoxFillCommand}" NoneLabel="No Fill"
+                                     MoreLabel="More Fill Colors…"
+                                     CurrentColor="{Binding CurrentTextStyle.BoxFill}"
+                                     ToolTip.Tip="Shape Fill - a box behind the text, as for a caption, or none" />
+              <local:ColorMenuButton Name="TextBoxOutlineButton" Label="Shape Outline"
+                                     Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                     Command="{Binding SetBoxOutlineCommand}" NoneLabel="No Outline"
+                                     MoreLabel="More Outline Colors…"
+                                     CurrentColor="{Binding CurrentTextStyle.BoxStroke}"
+                                     WeightCommand="{Binding SetBoxWeightCommand}"
+                                     CurrentWeight="{Binding CurrentTextStyle.BoxStrokeWidthMm}"
+                                     DashCommand="{Binding SetBoxDashCommand}"
+                                     CurrentDash="{Binding CurrentTextStyle.BoxDash}"
+                                     ToolTip.Tip="Shape Outline - the border round the text's box: colour, weight and dashes" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+              <local:ColorMenuButton Name="TextFillButton" Label="Text Fill"
+                                     Icon="{StaticResource TextFillIcon}" DefaultColor="#ff0000"
+                                     Command="{Binding SetTextColorCommand}" NoneLabel="No Fill"
+                                     MoreLabel="More Fill Colors…"
+                                     CurrentColor="{Binding CurrentTextStyle.Color}"
+                                     ToolTip.Tip="Text Fill - the letters' colour (No Fill leaves hollow letters, only their outline showing)" />
+              <local:ColorMenuButton Name="TextOutlineButton" Label="Text Outline"
+                                     Icon="{StaticResource TextFillIcon}" IconOutlined="True"
+                                     DefaultColor="#000000"
+                                     Command="{Binding SetTextOutlineCommand}" NoneLabel="No Outline"
+                                     MoreLabel="More Outline Colors…"
+                                     CurrentColor="{Binding CurrentTextStyle.Outline}"
+                                     WeightCommand="{Binding SetTextOutlineWeightCommand}"
+                                     CurrentWeight="{Binding CurrentTextStyle.OutlineWidthMm}"
+                                     ToolTip.Tip="Text Outline - an outline round every letter, as for a sound effect: colour and weight" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text Styles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="EditElementTextButton" Classes="tool" Command="{Binding EditTextCommand}"
+                      ToolTip.Tip="Edit the words - or double-click the text" local:Shortcut.Keys="Enter">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" />
+                  </StackPanel>
+              </Button>
+              <RadioButton Name="TextBehindButton" Classes="tool" GroupName="TextLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementBehind}"
+                           ToolTip.Tip="Behind the panel's characters - a sign on a wall">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="TextInFrontButton" Classes="tool" GroupName="TextLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementInFront}"
+                           ToolTip.Tip="In front of the panel's characters (bubbles stay on top)">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <!-- Fields, like Word's: Stanley fills them in from File › Info. The buttons don't take the keyboard, so while typing they go in at the caret. -->
+      <DockPanel Classes="group">
+          <ItemsControl Name="FieldButtons" ItemsSource="{Binding TextFieldChoices}"
+                        VerticalAlignment="Center">
+              <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="local:TextFieldChoice">
+                      <Button Classes="small" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                              ToolTip.Tip="{Binding Description}"
+                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertFieldCommand}"
+                              CommandParameter="{Binding}">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                              <TextBlock Text="{Binding Token}" FontFamily="monospace" Opacity="0.6" />
+                              <TextBlock Text="{Binding Name}" />
+                          </StackPanel>
+                      </Button>
+                  </DataTemplate>
+              </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="groupLabel" Text="Fields" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Classes="small" Command="{Binding BringToFrontCommand}"
+                          ToolTip.Tip="In front of everything in the panel except bubbles"
+                          HorizontalAlignment="Stretch">
+                      To front
+                  </Button>
+                  <Button Classes="small" Command="{Binding SendToBackCommand}"
+                          ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
+                      To back
+                  </Button>
+              </StackPanel>
+              <Button Name="DeleteTextButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete this text" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

@@ -296,6 +296,31 @@ public sealed class ComicProject
     }
 
     /// <summary>
+    /// Deletes one of this (already-saved) comic's other issues: its folder under
+    /// <c>issues/</c>, and its entry in the manifest's issue order. Refuses to delete the
+    /// issue currently open (switch to another with <see cref="Open"/> first) or the
+    /// comic's last remaining issue. Never touches another issue's files.
+    /// </summary>
+    public void DeleteIssue(IssueId id)
+    {
+        if (Location is null)
+            throw new InvalidOperationException("This comic hasn't been saved yet - save it first.");
+        if (id == _issue.Id)
+            throw new InvalidOperationException("Can't delete the open issue - switch to another one first.");
+
+        var repository = new ProjectRepository(Location);
+        var manifest = repository.LoadManifest();
+        if (manifest.IssueIds.Count <= 1)
+            throw new InvalidOperationException("A comic must keep at least one issue.");
+
+        repository.DeleteIssue(id);
+        repository.SaveManifest(manifest with { IssueIds = manifest.IssueIds.Where(x => x != id).ToList() });
+
+        _issueOrder.Remove(id);
+        _otherIssues.Remove(id);
+    }
+
+    /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
     /// manifest title, the issue's page list, every page and panel - and deletes the
     /// folders/files of pages and panels removed since the last save. A page that's the
@@ -394,14 +419,14 @@ public sealed class ComicProject
     /// The characters as they're written: without library stickers that were tried on but
     /// aren't worn anywhere - not by the character, a named look or any panel - and without
     /// library pattern tiles no fabric uses, so trying things on leaves no files behind
-    /// (docs/sticker-system.md §11).
+    /// (docs/sticker-system.md §11) - nor colours of streaks that were removed.
     /// </summary>
     private static IReadOnlyList<CharacterDefinition> Tidied(IReadOnlyList<CharacterDefinition> characters, IReadOnlyList<(PageId Id, PageDocument Document)> pages)
     {
         var instances = pages.SelectMany(p => p.Document.Panels.Values.SelectMany(panel => panel.CharacterInstances)).ToList();
         return characters.Select(c =>
         {
-            var tidied = LookEditing.TidyWardrobe(c, LookEditing.WornElsewhere(c, instances));
+            var tidied = HairEditing.DropOrphanStreakColors(LookEditing.TidyWardrobe(c, LookEditing.WornElsewhere(c, instances)));
             return LookEditing.TidyTiles(tidied, LookEditing.TilesInUse(tidied, instances), IsLibraryTile);
         }).ToList();
     }

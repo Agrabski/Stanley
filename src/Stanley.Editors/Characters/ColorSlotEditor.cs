@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.Input;
+using Stanley.Editing;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 namespace Stanley.Editors;
@@ -27,7 +28,7 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 		SetPatternColor = new RelayCommand<ColorSwatchChoice>(c =>
 		{
 			if (c != null)
-				owner.EditFabric(Slot, f => f with { Pattern = f.Pattern is { } p ? p with { Colors = [c.Color, .. p.Colors.Skip(1)] } : null });
+				owner.EditFabric(Slot, f => f with { Pattern = f.Pattern is { } p ? p with { Colors = WithColor(p, c.Color) } : null });
 		});
 		SetPattern = new RelayCommand<FabricChoice>(c =>
 		{
@@ -36,7 +37,35 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 			else if (c is { Tile: { } tile, TileFile: { } file })
 				owner.SetTile(Slot, tile, file, texture: false);
 			else if (c != null)
-				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? new PatternFill(kind, f.Pattern?.Colors is { Count: > 0 } colors ? colors : [], f.Pattern?.Size, f.Pattern?.Angle) : null });
+				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? new PatternFill(kind, f.Pattern is { } was ? CarriedColors(was) : [], f.Pattern?.Size, f.Pattern?.Angle) : null });
+		});
+		SetDye = new RelayCommand<FabricChoice>(c =>
+		{
+			if (c != null)
+				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? (f.Pattern is { } was && was.Kind == kind ? was : NewDye(kind, f.Pattern, _color)) : null });
+		});
+		SetScheme = new RelayCommand<HairSchemeChoice>(c =>
+		{
+			if (c != null)
+				owner.ApplyHairScheme(c.Scheme);
+		});
+		SetAccent = new RelayCommand<AccentChoice>(c =>
+		{
+			if (c != null)
+				owner.SetHairAccent(c.Color);
+		});
+		PickCustomAccent = new RelayCommand<Control>(control =>
+		{
+			if (control != null)
+				ColorMenus.ShowMoreColors(control, owner.HairAccent, color => owner.SetHairAccent(color));
+		});
+		SelectBand = new RelayCommand<RainbowBand>(band =>
+		{
+			if (band != null && band.Index != _band)
+			{
+				_band = band.Index;
+				OnPropertyChanged(nameof(RainbowBands));
+			}
 		});
 		SetTexture = new RelayCommand<FabricChoice>(c =>
 		{
@@ -55,13 +84,23 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 		PickCustomPatternColor = new RelayCommand<Control>(control =>
 		{
 			if (control != null)
-				ColorMenus.ShowMoreColors(control, _fabric?.Pattern?.Colors.FirstOrDefault(), color => SetPatternColor.Execute(new ColorSwatchChoice(Slot, "Custom", color)));
+				ColorMenus.ShowMoreColors(control, PatternColorInEdit, color => SetPatternColor.Execute(new ColorSwatchChoice(Slot, "Custom", color)));
 		});
 	}
 
 	public string Slot { get; }
 
 	public string Label { get; }
+
+	/// <summary>Whether this colours hair - the hair itself, one of its pieces or one streak: its pattern section is a hair "Dye", not a clothing "Pattern".</summary>
+	public bool IsHairKey => CharacterEditorViewModel.IsHairColorKey(Slot);
+
+	/// <summary>What the dropdown's button says it colours.</summary>
+	public string Tip =>
+		StickerSlots.IsStreakColorKey(Slot) ? "This streak - its own colour and dye"
+		: StickerSlots.IsStickerColorKey(Slot) ? "This sticker - its own colour and fabric; Same as slot on the Sticker tab gives it back"
+		: StickerSlots.HairPieces.Contains(Slot) ? $"{Label} of the hair - its own colour and dye; Same as hair on the Sticker tab gives it back"
+		: $"{Label} - colour and fabric; everything this character wears in it follows";
 
 	/// <summary>Clothes get fabrics; skin and eyes (split left/right or not) are just colours.</summary>
 	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight);
@@ -74,6 +113,11 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	public System.Windows.Input.ICommand SetColor { get; }
 	public System.Windows.Input.ICommand SetPatternColor { get; }
 	public System.Windows.Input.ICommand SetPattern { get; }
+	public System.Windows.Input.ICommand SetDye { get; }
+	public System.Windows.Input.ICommand SetScheme { get; }
+	public System.Windows.Input.ICommand SetAccent { get; }
+	public System.Windows.Input.ICommand PickCustomAccent { get; }
+	public System.Windows.Input.ICommand SelectBand { get; }
 	public System.Windows.Input.ICommand SetTexture { get; }
 	public System.Windows.Input.ICommand PickCustomColor { get; }
 	public System.Windows.Input.ICommand PickCustomPatternColor { get; }
@@ -87,7 +131,157 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 
 	public bool HasPattern => _fabric?.Pattern is not null;
 
+	/// <summary>A clothing-style pattern (stripes, plaid, a tile...) is on: its colours, size and angle show.</summary>
+	public bool HasClothingPattern => _fabric?.Pattern is { IsDye: false };
+
 	public bool HasTexture => _fabric?.Texture is not null;
+
+	// ---------------------------------------------------------------- schemes (the Hair colour only)
+
+	/// <summary>Whether the dropdown starts with a row of schemes: the Hair colour's does, a piece's or a streak's doesn't.</summary>
+	public bool HasSchemes => Slot == StickerSlots.Hair;
+
+	/// <summary>Natural, Two-tone, Peekaboo, Fringe only, Dip-dye, Ombré and Rainbow, each as a close-up of the character with it applied.</summary>
+	public IReadOnlyList<HairSchemeChoice> SchemeChoices => HasSchemes ? _owner.HairSchemeChoices : [];
+
+	/// <summary>The colours a scheme can take as its second: the hair palette, the one picked marked.</summary>
+	public IReadOnlyList<AccentChoice> AccentChoices => HasSchemes ? Swatches.Select(s => new AccentChoice(s.Name, s.Color, s.Color == _owner.HairAccent)).ToList() : [];
+
+	/// <summary>Redraws the scheme previews and marks the accent: they show the whole head, so any edit (or a new accent) can change them.</summary>
+	internal void RefreshSchemes()
+	{
+		if (!HasSchemes)
+			return;
+		OnPropertyChanged(nameof(SchemeChoices));
+		OnPropertyChanged(nameof(AccentChoices));
+	}
+
+	// ---------------------------------------------------------------- dyes (hair)
+
+	/// <summary>"Dye" for hair - a pattern laid once across each piece - "Pattern" for everything else.</summary>
+	public string PatternTitle => IsHairKey ? "Dye" : "Pattern";
+
+	/// <summary>The slot's dye, or null if it has none (or wears a clothing pattern).</summary>
+	public PatternFill? Dye => _fabric?.Pattern is { IsDye: true } dye ? dye : null;
+
+	public bool HasDye => Dye is not null;
+
+	/// <summary>The dye picked when none was: a vivid purple - unless the hair is purple already (see <see cref="DyeColorFor"/>).</summary>
+	public static ColorValue DefaultDyeColor { get; } = ColorValue.FromHex("#8e24aa");
+
+	/// <summary>Dye colours to fall back on, in order, when the one before is too close to the hair it would dye.</summary>
+	private static readonly ColorValue[] DyeFallbacks = [DefaultDyeColor, ColorValue.FromHex("#d6409f"), ColorValue.FromHex("#e0c068"), ColorValue.FromHex("#1e88e5")];
+
+	/// <summary>
+	/// The colour a fresh dye starts in on <paramref name="ground"/>: <see cref="DefaultDyeColor"/>,
+	/// or the first fallback that stands out from the ground - Tips in purple on a purple fringe
+	/// would show nothing, in the gallery or on the character.
+	/// </summary>
+	public static ColorValue DyeColorFor(ColorValue ground) =>
+		DyeFallbacks.FirstOrDefault(c => Distance(c, ground) > 80, DyeFallbacks[0]);
+
+	private static double Distance(ColorValue a, ColorValue b)
+	{
+		static (int R, int G, int B) Rgb(ColorValue c) => c.Hex is { Length: >= 7 } h
+			? (Convert.ToInt32(h.Substring(1, 2), 16), Convert.ToInt32(h.Substring(3, 2), 16), Convert.ToInt32(h.Substring(5, 2), 16))
+			: (-1000, -1000, -1000); // no colour yet: anything stands out
+		var (x, y) = (Rgb(a), Rgb(b));
+		return Math.Sqrt((x.R - y.R) * (x.R - y.R) + (x.G - y.G) * (x.G - y.G) + (x.B - y.B) * (x.B - y.B));
+	}
+
+	/// <summary>How much of a piece a dye covers when it has no <see cref="PatternFill.Weight"/> of its own - what the renderer draws, so the sliders agree with it.</summary>
+	public static double DefaultDyeWeight(PatternKind kind) => PatternFill.DefaultDyeWeight(kind);
+
+	/// <summary>A fresh dye of <paramref name="kind"/> in place of <paramref name="previous"/> on <paramref name="ground"/>: its colour carries over, else one that shows on the ground; Rainbow starts with its own six.</summary>
+	internal static PatternFill NewDye(PatternKind kind, PatternFill? previous, ColorValue ground)
+	{
+		if (kind == PatternKind.Rainbow)
+			return new PatternFill(kind, previous is { Kind: PatternKind.Rainbow, Colors.Count: > 1 } ? previous.Colors : PatternFill.RainbowColors);
+		var color = previous is { Colors.Count: > 0 } && previous.Kind != PatternKind.Rainbow ? previous.Colors[0] : DyeColorFor(ground);
+		return new PatternFill(kind, [color], Weight: DefaultDyeWeight(kind));
+	}
+
+	/// <summary>The colours a clothing pattern starts with when it replaces <paramref name="was"/>: a dye's one colour (a Rainbow's first band) carries over, a pattern's own stay.</summary>
+	private static IReadOnlyList<ColorValue> CarriedColors(PatternFill was) => was.IsDye ? was.Colors.Take(1).ToList() : was.Colors;
+
+	/// <summary>The dyes on offer: None, then Streaks, Tips, Roots, Ombré and Rainbow, each previewed on the slot's colour.</summary>
+	public IReadOnlyList<FabricChoice> DyeChoices
+	{
+		get
+		{
+			var current = _fabric?.Pattern;
+			return new (string Label, PatternKind? Kind)[] { ("None", null), ("Streaks", PatternKind.Streaks), ("Tips", PatternKind.Tips), ("Roots", PatternKind.Roots),
+					("Ombré", PatternKind.Ombre), ("Rainbow", PatternKind.Rainbow) }
+				.Select(d => new FabricChoice(d.Label, _color, new(d.Kind is { } kind ? NewDye(kind, current is { IsDye: true } ? current : null, _color) : null), d.Kind, null, current?.Kind == d.Kind))
+				.ToList();
+		}
+	}
+
+	/// <summary>The clothing patterns and tiles, behind "More patterns" in a hair dropdown - the pattern gallery without its None (that's the dye gallery's).</summary>
+	public IReadOnlyList<FabricChoice> MorePatternChoices => PatternChoices.Skip(1).ToList();
+
+	/// <summary>What the dye's slider sets: "Length" of tips and roots, "Blend" of an ombré, "Width" of streaks - empty for a rainbow, which has none.</summary>
+	public string DyeAmountLabel => Dye?.Kind switch
+	{
+		PatternKind.Tips or PatternKind.Roots => "Length",
+		PatternKind.Ombre => "Blend",
+		PatternKind.Streaks => "Width",
+		_ => ""
+	};
+
+	public string DyeAmountTip => Dye?.Kind switch
+	{
+		PatternKind.Tips => "How far up the ends reach",
+		PatternKind.Roots => "How far down the roots reach",
+		PatternKind.Ombre => "How much of the hair the fade takes in",
+		PatternKind.Streaks => "How wide the streaks are",
+		_ => ""
+	};
+
+	public bool HasDyeAmount => Dye is { Kind: not PatternKind.Rainbow };
+
+	/// <summary>
+	/// The dye's slider, 5-95: <see cref="PatternFill.Weight"/> as a percentage - except an
+	/// ombré, whose weight is where the fade starts, so its "Blend" is the rest (more blend, higher up).
+	/// </summary>
+	public double DyeAmount
+	{
+		get => Dye is { } dye ? Math.Round(100 * AmountOf(dye.Kind, dye.Weight ?? DefaultDyeWeight(dye.Kind))) : 0;
+		set => _owner.EditFabric(Slot, f => f.Pattern is { IsDye: true } dye ? f with { Pattern = dye with { Weight = WeightOf(dye.Kind, Math.Clamp(value, 5, 95) / 100) } } : f);
+	}
+
+	private static double AmountOf(PatternKind kind, double weight) => kind == PatternKind.Ombre ? 1 - weight : weight;
+
+	private static double WeightOf(PatternKind kind, double amount) => Math.Round(kind == PatternKind.Ombre ? 1 - amount : amount, 2);
+
+	// ---------------------------------------------------------------- rainbow bands
+
+	private int _band;
+
+	public bool IsRainbow => Dye is { Kind: PatternKind.Rainbow };
+
+	/// <summary>A rainbow's colours to show and edit: its own, or the six it starts with.</summary>
+	private static IReadOnlyList<ColorValue> BandColors(PatternFill rainbow) => rainbow.Colors.Count > 1 ? rainbow.Colors : PatternFill.RainbowColors;
+
+	/// <summary>One small swatch per band of a rainbow, the one being recoloured marked; empty for any other dye.</summary>
+	public IReadOnlyList<RainbowBand> RainbowBands => Dye is { Kind: PatternKind.Rainbow } rainbow
+		? BandColors(rainbow).Select((color, i) => new RainbowBand(i, color, i == Math.Min(_band, BandColors(rainbow).Count - 1))).ToList()
+		: [];
+
+	/// <summary>The colour the pattern's colour swatches change: a rainbow's marked band, else its first colour.</summary>
+	private ColorValue? PatternColorInEdit => _fabric?.Pattern is { } pattern
+		? pattern.Kind == PatternKind.Rainbow ? BandColors(pattern)[Math.Min(_band, BandColors(pattern).Count - 1)] : pattern.Colors.FirstOrDefault()
+		: null;
+
+	/// <summary><paramref name="pattern"/>'s colours with <paramref name="color"/> in place of the one being edited: a rainbow's marked band, else the first.</summary>
+	private IReadOnlyList<ColorValue> WithColor(PatternFill pattern, ColorValue color)
+	{
+		if (pattern.Kind != PatternKind.Rainbow)
+			return [color, .. pattern.Colors.Skip(1)];
+		var bands = BandColors(pattern).ToList();
+		bands[Math.Min(_band, bands.Count - 1)] = color;
+		return bands;
+	}
 
 	/// <summary>The character's tiles, for drawing this slot's swatch.</summary>
 	public IReadOnlyDictionary<string, ArtFile> Tiles => _owner.Working.Wardrobe.Tiles;
@@ -176,6 +370,17 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 			OnPropertyChanged(nameof(Tiles));
 			OnPropertyChanged(nameof(Fabric));
 			OnPropertyChanged(nameof(HasPattern));
+			OnPropertyChanged(nameof(HasClothingPattern));
+			OnPropertyChanged(nameof(Dye));
+			OnPropertyChanged(nameof(HasDye));
+			OnPropertyChanged(nameof(DyeChoices));
+			OnPropertyChanged(nameof(MorePatternChoices));
+			OnPropertyChanged(nameof(DyeAmountLabel));
+			OnPropertyChanged(nameof(DyeAmountTip));
+			OnPropertyChanged(nameof(HasDyeAmount));
+			OnPropertyChanged(nameof(DyeAmount));
+			OnPropertyChanged(nameof(IsRainbow));
+			OnPropertyChanged(nameof(RainbowBands));
 			OnPropertyChanged(nameof(HasTexture));
 			OnPropertyChanged(nameof(PatternChoices));
 			OnPropertyChanged(nameof(TextureChoices));

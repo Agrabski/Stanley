@@ -7,7 +7,6 @@ using Stanley.Editing;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Avalonia.Platform.Storage;
-using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Issues;
 using Stanley.ProjectModel.Storage;
 using Stanley.Rendering;
@@ -179,9 +178,7 @@ public partial class PageEditorView : UserControl
             await using var stream = await picked.OpenReadAsync();
             using var memory = new MemoryStream();
             await stream.CopyToAsync(memory);
-            var bytes = memory.ToArray();
-            var file = IssueArt.IsSvg(picked.Name) ? ArtFile.Svg(System.Text.Encoding.UTF8.GetString(bytes)) : ArtFile.Png(bytes);
-            vm.ImportPicture(request, picked.Name, file);
+            vm.ImportPicture(request, picked.Name, memory.ToArray());
         }
         catch (IOException e)
         {

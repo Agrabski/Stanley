@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="300" height="220" viewBox="-150 -1060 300 220" data-stanley-view="profile" data-stanley-slot="hairFringe">
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" fill="#5a3a22" stroke="none" d="M58,-993 C60.3,-990.7 63.1,-988.7 65,-986 C67.4,-982.6 69.4,-978.9 71,-975 C72.7,-970.8 74,-966.4 75,-962 C76,-957.4 76.8,-952.7 77,-948 C77.1,-944.3 76.3,-940.7 76,-937 C73.3,-939.3 70.9,-942 68,-944 C64.6,-946.4 60.9,-948.5 57,-950 C53.2,-951.5 49.1,-952.8 45,-953 C40.9,-953.2 37,-951.7 33,-951 C31.3,-954 28.8,-956.7 28,-960 C27.1,-963.9 27,-968.1 28,-972 C29.1,-976.3 31.2,-980.5 34,-984 C36.7,-987.3 40.4,-989.8 44,-992 C46.4,-993.5 49.2,-994.8 52,-995 C54.1,-995.2 56,-993.7 58,-993 Z"/>
+    <path class="slot-hair" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" d="M58,-993 C60.3,-990.7 63.1,-988.7 65,-986 C67.4,-982.6 69.4,-978.9 71,-975 C72.7,-970.8 74,-966.4 75,-962 C76,-957.4 76.8,-952.7 77,-948 C77.1,-944.3 76.3,-940.7 76,-937 C73.3,-939.3 70.9,-942 68,-944 C64.6,-946.4 60.9,-948.5 57,-950 C53.2,-951.5 49.1,-952.8 45,-953 C40.9,-953.2 37,-951.7 33,-951"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M29,-960 C29,-964 28.2,-968.1 29,-972 C29.9,-975.9 31.6,-979.8 34,-983 C36.4,-986.2 39.6,-988.9 43,-991 C45.7,-992.6 49,-993 52,-994"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M56,-990 C64,-978 70,-962 72,-946"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M45,-988 C54,-976 60,-964 62,-952"/>
+  </g>
+</svg>

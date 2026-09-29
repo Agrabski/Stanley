@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.ShapeRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+              <local:ColorMenuButton Name="ShapeFillButton" Label="Shape Fill"
+                                     Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                     Command="{Binding SetFillColorCommand}" NoneLabel="No Fill"
+                                     MoreLabel="More Fill Colors…"
+                                     CurrentColor="{Binding CurrentShapeStyle.Fill}"
+                                     ToolTip.Tip="Shape Fill - the colour inside the shape (a closed one)" />
+              <local:ColorMenuButton Name="ShapeOutlineButton" Label="Shape Outline"
+                                     Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                     Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline"
+                                     MoreLabel="More Outline Colors…"
+                                     CurrentColor="{Binding CurrentShapeStyle.Stroke}"
+                                     WeightCommand="{Binding SetStrokeWeightCommand}"
+                                     CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}"
+                                     DashCommand="{Binding SetStrokeDashCommand}"
+                                     CurrentDash="{Binding CurrentShapeStyle.Dash}"
+                                     ToolTip.Tip="Shape Outline - the line's colour, weight and dashes" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <RadioButton Name="ShapeBehindButton" Classes="tool" GroupName="ShapeLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementBehind}"
+                           ToolTip.Tip="Scenery: drawn behind the panel's characters">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="ShapeInFrontButton" Classes="tool" GroupName="ShapeLayer"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsElementInFront}"
+                           ToolTip.Tip="Foreground: drawn in front of the panel's characters (bubbles stay on top)">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Layer" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Classes="small" Command="{Binding BringToFrontCommand}"
+                          ToolTip.Tip="In front of everything in the panel except bubbles"
+                          HorizontalAlignment="Stretch">
+                      To front
+                  </Button>
+                  <Button Classes="small" Command="{Binding SendToBackCommand}"
+                          ToolTip.Tip="Behind everything in the panel" HorizontalAlignment="Stretch">
+                      To back
+                  </Button>
+              </StackPanel>
+              <Button Name="DeleteShapeButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete this shape" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,332 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.InsertRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <!-- Word's Cover Page gallery: a title page at the front of the comic; picking again redoes it, keeping its words. -->
+      <DockPanel Classes="group" IsVisible="{Binding HasTitlePageHost}">
+          <DropDownButton Name="TitlePageButton" Classes="slotGallery"
+                          ToolTip.Tip="Start every issue with the comic's title page: pick a design, then double-click its words to retype them. Picking another design redoes it and keeps its words.">
+              <StackPanel Spacing="2">
+                  <PathIcon Data="{StaticResource TitlePageIcon}" Width="20" Height="20" />
+                  <TextBlock Text="Title page" FontSize="11" HorizontalAlignment="Center" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Spacing="8">
+                          <TextBlock Text="Title page" FontWeight="SemiBold" />
+                          <ItemsControl Name="TitlePageGallery" ItemsSource="{Binding TitlePageChoices}">
+                              <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                      <StackPanel Orientation="Horizontal" Spacing="6" />
+                                  </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:TitlePageChoice">
+                                      <Button Classes="small" Width="112" Height="156" Padding="6"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Stretch"
+                                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertTitlePageCommand}"
+                                              CommandParameter="{Binding}"
+                                              ToolTip.Tip="{Binding Description}">
+                                          <DockPanel>
+                                              <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}"
+                                                         FontSize="11" HorizontalAlignment="Center"
+                                                         Margin="0,4,0,0" />
+                                              <local:TitlePagePreview Design="{Binding Design}"
+                                                      Page="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext)}" />
+                                          </DockPanel>
+                                      </Button>
+                                  </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock
+                              Text="The comic's title page opens every issue, each showing its own issue number. Everything on it stays editable - words, colours, the background."
+                              FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350"
+                              HorizontalAlignment="Left" />
+                          <CheckBox Name="OwnTitlePageBox" IsChecked="{Binding IsOwnTitlePage, Mode=TwoWay}"
+                                    IsEnabled="{Binding HasTitlePage}" Focusable="False"
+                                    ToolTip.Tip="This issue gets a title page of its own - a copy of the comic's to change freely. Untick to go back to the comic's.">
+                              <TextBlock
+                                  Text="Only this issue - the other issues keep the comic's title page"
+                                  TextWrapping="Wrap" MaxWidth="320" />
+                          </CheckBox>
+                          <Button Name="RemoveTitlePageButton" Classes="small"
+                                  Command="{Binding RemoveTitlePageCommand}" HorizontalAlignment="Left">
+                              <StackPanel Orientation="Horizontal" Spacing="4">
+                                  <PathIcon Data="{StaticResource DeleteIcon}" />
+                                  <TextBlock Text="{Binding RemoveTitlePageText}" />
+                              </StackPanel>
+                          </Button>
+                      </StackPanel>
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Pages" />
+      </DockPanel>
+      <Rectangle Classes="divider" IsVisible="{Binding HasTitlePageHost}" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="DrawPanelButton" Classes="tool" Command="{Binding DrawPanelCommand}"
+                      ToolTip.Tip="Drag on the page to draw a new panel" local:Shortcut.Keys="P">
+                  <StackPanel>
+                      <PathIcon
+                          Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" />
+                      <TextBlock Text="Panel" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertThoughtCloudButton" Classes="tool" Command="{Binding InsertThoughtCloudCommand}"
+                      ToolTip.Tip="A cloud-shaped panel for what a character imagines - floats over the layout, and works like any other panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ThoughtCloudIcon}" />
+                      <TextBlock Text="Thought cloud" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Panels" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="InsertSpeechButton" Classes="tool" Command="{Binding InsertBubbleCommand}"
+                      CommandParameter="{x:Static bubbles:BubbleStylePreset.Speech}"
+                      ToolTip.Tip="Insert a speech bubble into the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertShoutButton" Classes="tool" Command="{Binding InsertBubbleCommand}"
+                      CommandParameter="{x:Static bubbles:BubbleStylePreset.Shout}"
+                      ToolTip.Tip="Insert a shout bubble into the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertWhisperButton" Classes="tool" Command="{Binding InsertBubbleCommand}"
+                      CommandParameter="{x:Static bubbles:BubbleStylePreset.Whisper}"
+                      ToolTip.Tip="Insert a whisper bubble into the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertThoughtBubbleButton" Classes="tool" Command="{Binding InsertBubbleCommand}"
+                      CommandParameter="{x:Static bubbles:BubbleStylePreset.Thought}"
+                      ToolTip.Tip="Insert a thought bubble into the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ThoughtIcon}" /><TextBlock Text="Thought" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Bubbles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="InsertCaptionButton" Classes="tool" Command="{Binding InsertTextCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.Caption}"
+                      ToolTip.Tip="A narration box in the corner of the selected panel - start typing">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource CaptionIcon}" /><TextBlock Text="Caption" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertPlainTextButton" Classes="tool" Command="{Binding InsertTextCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.Plain}"
+                      ToolTip.Tip="Plain lettering in the selected panel - a sign, a label, a note">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Text" />
+                  </StackPanel>
+              </Button>
+              <Button Name="InsertSoundEffectButton" Classes="tool" Command="{Binding InsertTextCommand}"
+                      CommandParameter="{x:Static editing:TextStylePreset.SoundEffect}"
+                      ToolTip.Tip="Big outlined lettering - BLAM! - in the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Sound effect" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <RadioButton Name="InsertDrawButton" Classes="tool" GroupName="InsertShapeTool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsDrawTool}" ToolTip.Tip="Draw freehand inside a panel"
+                           local:Shortcut.Keys="D">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource PenIcon}" /><TextBlock Text="Draw" />
+                  </StackPanel>
+              </RadioButton>
+              <StackPanel Spacing="1" VerticalAlignment="Center">
+                  <RadioButton Name="InsertLineButton" Classes="small" GroupName="InsertShapeTool"
+                               Theme="{StaticResource {x:Type ToggleButton}}"
+                               IsChecked="{Binding IsLineTool}"
+                               ToolTip.Tip="Drag to draw a straight line - Shift keeps it level or at 45°"
+                               local:Shortcut.Keys="L" HorizontalAlignment="Stretch"
+                               HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource LineIcon}" /><TextBlock Text="Line" />
+                      </StackPanel>
+                  </RadioButton>
+                  <RadioButton Name="InsertRectangleButton" Classes="small" GroupName="InsertShapeTool"
+                               Theme="{StaticResource {x:Type ToggleButton}}"
+                               IsChecked="{Binding IsRectangleTool}"
+                               ToolTip.Tip="Drag to draw a rectangle - Shift for a square"
+                               local:Shortcut.Keys="R" HorizontalAlignment="Stretch"
+                               HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource RectangleIcon}" /><TextBlock Text="Rectangle" />
+                      </StackPanel>
+                  </RadioButton>
+                  <RadioButton Name="InsertEllipseButton" Classes="small" GroupName="InsertShapeTool"
+                               Theme="{StaticResource {x:Type ToggleButton}}"
+                               IsChecked="{Binding IsEllipseTool}"
+                               ToolTip.Tip="Drag to draw an ellipse - Shift for a circle"
+                               local:Shortcut.Keys="E" HorizontalAlignment="Stretch"
+                               HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource EllipseIcon}" /><TextBlock Text="Ellipse" />
+                      </StackPanel>
+                  </RadioButton>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shapes" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <Button Name="InsertPictureButton" Classes="tool" Command="{Binding InsertPictureCommand}"
+                  ToolTip.Tip="Place a picture from a file (PNG, JPEG, SVG...) in the selected panel - behind or in front of the characters">
+              <StackPanel>
+                  <PathIcon Data="{StaticResource BackgroundIcon}" /><TextBlock Text="Picture" />
+              </StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Pictures" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <!-- Insert › From My Assets (docs/asset-packs.md §6.3): a group kept from any comic, dropped in the selected panel as Paste would. -->
+      <DockPanel Classes="group" IsVisible="{Binding HasMyAssets}">
+          <DropDownButton Name="InsertFromMyAssetsButton" Classes="slotGallery" Width="96"
+                          ToolTip.Tip="Put something you kept in My Assets - from this comic or any other - in the selected panel">
+              <StackPanel Spacing="2">
+                  <PathIcon Data="{StaticResource StarIcon}" Width="20" Height="20" />
+                  <TextBlock Text="My Assets" FontSize="11" HorizontalAlignment="Center" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Spacing="8" MaxWidth="420">
+                          <TextBlock Text="Object groups" FontWeight="SemiBold" />
+                          <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasMyAssetsObjectGroups}">
+                              <ItemsControl Name="MyAssetsGroupGallery" ItemsSource="{Binding MyAssetsObjectGroups}">
+                                  <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                  </ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="objects:ObjectGroup">
+                                          <Button Classes="small" Width="96" Height="96" Padding="4" Margin="0,0,4,4"
+                                                  HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                                  Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertObjectGroupCommand}"
+                                                  CommandParameter="{Binding}"
+                                                  ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel'}">
+                                              <DockPanel>
+                                                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11"
+                                                             HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                  <Border Background="White" CornerRadius="2">
+                                                      <local:ObjectGroupPreview Group="{Binding}" />
+                                                  </Border>
+                                              </DockPanel>
+                                          </Button>
+                                      </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                          </ScrollViewer>
+                          <TextBlock IsVisible="{Binding !HasMyAssetsObjectGroups}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"
+                                     Text="Nothing kept yet. Group a few things on a page (Ctrl+G), right-click the group and choose Keep in My Assets - it'll be here in every comic." />
+                      </StackPanel>
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Reuse" />
+      </DockPanel>
+      <Rectangle Classes="divider" IsVisible="{Binding HasMyAssets}" />
+
+      <DockPanel Classes="group">
+          <Button Name="InsertSpeedLinesButton" Classes="tool" Command="{Binding InsertSpeedLinesCommand}"
+                  ToolTip.Tip="A burst of lines radiating out from a point, in the selected panel - drag the clear circle to where they should converge">
+              <StackPanel>
+                  <PathIcon Data="{StaticResource SpeedLinesIcon}" /><TextBlock Text="Speed lines" />
+              </StackPanel>
+          </Button>
+          <TextBlock Classes="groupLabel" Text="Effects" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <DropDownButton Name="InsertBackgroundButton" Classes="slotGallery" Width="100"
+                          IsEnabled="{Binding HasSelectedPanel}"
+                          ToolTip.Tip="Fill the selected panel behind everything in it: a colour or a sky (select a panel, or anything in one, first)">
+              <StackPanel Spacing="2">
+                  <PathIcon Data="{StaticResource BackgroundIcon}" Width="20" Height="20" />
+                  <TextBlock Text="Background" FontSize="11" HorizontalAlignment="Center" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <local:BackgroundPicker Command="{Binding SetBackgroundCommand}"
+                                              PictureCommand="{Binding BackgroundPictureCommand}" />
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Backgrounds" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group" IsVisible="{Binding HasCharacterCatalog}">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+              <ScrollViewer MaxWidth="260" HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasCharacterChoices}">
+                  <ItemsControl Name="CharacterGallery" ItemsSource="{Binding CharacterChoices}"
+                                Margin="0,0,0,6">
+                      <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                              <StackPanel Orientation="Horizontal" Spacing="2" />
+                          </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="characters:CharacterDefinition">
+                              <Button Classes="small" MinWidth="48" MaxWidth="104" Height="62" Padding="3,2"
+                                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                      Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertCharacterCommand}"
+                                      CommandParameter="{Binding}"
+                                      ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel (or drag from the Characters pane)'}">
+                                  <DockPanel>
+                                      <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9"
+                                                 HorizontalAlignment="Center"
+                                                 TextTrimming="CharacterEllipsis" />
+                                      <local:CharacterFigure Character="{Binding}" />
+                                  </DockPanel>
+                              </Button>
+                          </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+              </ScrollViewer>
+              <Button Name="NewCharacterButton" Classes="tool" Command="{Binding NewCharacterCommand}"
+                      ToolTip.Tip="Create a new character and put it in the selected panel - double-click it to shape its body">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="New character" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Characters" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

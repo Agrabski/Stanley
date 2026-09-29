@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-152 -1060 320 340" data-stanley-view="profile" data-stanley-slot="hairExtras">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back">
+    <path class="slot-hair" d="M-48,-968 C-53,-971.7 -68.7,-968 -76,-960 C-83.3,-952 -89.7,-936.7 -92,-920 C-94.3,-903.3 -92,-878.3 -90,-860 C-88,-841.7 -83.7,-821.7 -80,-810 C-76.3,-798.3 -70.7,-786.7 -68,-790 C-65.3,-793.3 -63.7,-815 -64,-830 C-64.3,-845 -69.7,-864.2 -70,-880 C-70.3,-895.8 -70,-915.3 -66,-925 C-62,-934.7 -49,-930.8 -46,-938 C-43,-945.2 -43,-964.3 -48,-968 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-78,-930 C-78.3,-920 -80.7,-889.2 -80,-870 C-79.3,-850.8 -75,-824.2 -74,-815" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-86,-940 C-88,-925 -87,-905 -85,-890" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <ellipse class="slot-accent" cx="-58" cy="-952" rx="8" ry="13" fill="#c0392b" stroke="#1a1a1a" stroke-width="2" transform="rotate(-20 -58 -952)"/>
+  </g>
+</svg>

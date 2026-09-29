@@ -22,10 +22,36 @@
     </Style>
   </UserControl.Styles>
   <Grid RowDefinitions="*,Auto">
-    <Border Grid.Row="0" Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
-      <local:CharacterFigure Name="Stage" Character="{Binding LookWorking}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
-                             Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}" />
-    </Border>
+    <Grid Grid.Row="0">
+      <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
+        <local:CharacterFigure Name="Stage" Character="{Binding LookWorking}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
+                               Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}" />
+      </Border>
+      <!-- Two small notes about the hair, over the foot of the stage like the export note over the page; neither is ever a dialog. -->
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,12" Spacing="6">
+        <!-- After a hairstyle click threw away your own mix. Any other edit, or leaving the editor, takes it down. -->
+        <Border Name="HairReplacedBar" Classes="toast" Padding="10,5" IsVisible="{Binding HasHairReplaced}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Name="HairReplacedText" Text="{Binding HairReplacedText}" FontSize="12" VerticalAlignment="Center" />
+            <Button Name="AddToMixButton" Classes="small" Command="{Binding AddToMixCommand}"
+                    ToolTip.Tip="Undo that and put the hairstyle's pieces on over your mix instead">Add to my mix instead</Button>
+            <Button Name="DismissHairReplacedButton" Classes="small" Command="{Binding DismissHairReplacedCommand}" ToolTip.Tip="Close">
+              <PathIcon Data="{StaticResource CloseIcon}" Width="10" Height="10" />
+            </Button>
+          </StackPanel>
+        </Border>
+        <!-- The character wears an old whole-hairstyle sticker that pieces now replace. -->
+        <Border Name="HairUpgradeBar" Classes="toast" Padding="10,5" IsVisible="{Binding HasHairUpgrade}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Name="HairUpgradeText" Text="{Binding HairUpgradeText}" FontSize="12" VerticalAlignment="Center" />
+            <Button Name="SwitchHairButton" Classes="small" Command="{Binding SwitchHairCommand}"
+                    ToolTip.Tip="Change to the hairstyle made of pieces - the colours stay, in every look">Switch</Button>
+            <Button Name="KeepHairButton" Classes="small" Command="{Binding KeepHairCommand}"
+                    ToolTip.Tip="Keep the old hairstyle, and don't ask again for this character">Keep</Button>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Grid>
     <Border Grid.Row="1" Classes="ribbon" BorderThickness="0,1,0,0" Padding="10,1">
       <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Name="HintText" Text="{Binding Hint}" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

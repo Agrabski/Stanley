@@ -51,6 +51,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		);
 		BackToPageCommand = new RelayCommand(() => Library?.ReturnToPage(), () => Library != null);
 		InitializeLook();
+		InitializeHair();
 		InitializeArt();
 		InitializeLooks();
 		PropertyChanged += (_, e) =>

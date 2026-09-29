@@ -43,13 +43,25 @@ public static class BubbleEditing
         return EditResult<Bubble>.Success(bubble with { Shape = new BubbleShape(rescaled) });
     }
 
-    /// <summary>Regenerates the shape from the current bounds under the new preset, and re-styles existing tails, but keeps their attachment/target so they don't jump.</summary>
+    /// <summary>
+    /// Regenerates the shape from the current bounds under the new preset and re-styles existing
+    /// tails, without moving them: each keeps its target, and its base leaves the new outline in
+    /// the same direction from the bubble's middle as it left the old one. Keeping the bare
+    /// <see cref="BubbleTail.AttachmentT"/> wouldn't do that - it's a fraction along the outline,
+    /// and an oval and a Shout star count from different places, so a tail on an oval's left
+    /// would jump to the star's top.
+    /// </summary>
     public static EditResult<Bubble> SetStyle(Bubble bubble, BubbleStylePreset style)
     {
         var bounds = AnchorRing.BoundingBox(bubble.Shape.Anchors);
         var newShape = BubbleStylePresets.GenerateShape(style, bounds);
+        var centre = new Point2D(bounds.MidX, bounds.MidY);
         var kind = BubbleStylePresets.TailKindFor(style);
-        var tails = bubble.Tails.Select(t => t with { Kind = kind }).ToList();
+        var tails = bubble.Tails.Select(t => t with
+        {
+            AttachmentT = AnchorRing.TowardsT(newShape.Anchors, centre, AnchorRing.PointAt(bubble.Shape.Anchors, t.AttachmentT)),
+            Kind = kind
+        }).ToList();
         return EditResult<Bubble>.Success(bubble with { Shape = newShape, Style = style, Tails = tails });
     }
 

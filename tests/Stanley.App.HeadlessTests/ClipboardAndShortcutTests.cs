@@ -147,6 +147,7 @@ public class ClipboardAndShortcutTests
         public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
         public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
         public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
+        public Task<bool> AskDeleteIssueAsync(string caption) => Task.FromResult(false);
     }
 
     private sealed class RecordingLauncher : Stanley.App.Documents.IFileLauncher
@@ -283,20 +284,23 @@ public class ClipboardAndShortcutTests
         window.Editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.MidY));
         canvas.Focus();
 
-        CtrlDown(window); // with the usual delay, nothing yet
-        Dispatcher.UIThread.RunJobs();
-        Assert.Empty(Shortcut.Showing(window));
-        window.KeyPress(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
-        window.KeyRelease(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
-        CtrlUp(window);
-        Dispatcher.UIThread.RunJobs();
-        Assert.Empty(Shortcut.Showing(window));
-        Assert.True(window.Editor.CanPaste); // the Ctrl+C itself went through
-
         var delay = Shortcut.RevealDelay;
-        Shortcut.RevealDelay = TimeSpan.Zero;
+        // A delay no busy test machine can outlast: with the usual 300 ms, a slow RunJobs let
+        // the keycaps come up before the Ctrl+C that should keep them down.
+        Shortcut.RevealDelay = TimeSpan.FromMinutes(1);
         try
         {
+            CtrlDown(window); // before the delay, nothing yet
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Shortcut.Showing(window));
+            window.KeyPress(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
+            window.KeyRelease(Key.C, RawInputModifiers.Control, PhysicalKey.C, null);
+            CtrlUp(window);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Shortcut.Showing(window));
+            Assert.True(window.Editor.CanPaste); // the Ctrl+C itself went through
+
+            Shortcut.RevealDelay = TimeSpan.Zero;
             CtrlDown(window);
             Dispatcher.UIThread.RunJobs();
             Assert.NotEmpty(Shortcut.Showing(window));

@@ -396,8 +396,14 @@ other slot name is allowed and behaves like `accessory`.
 | `brows` | head | 44 | – | `hair` |
 | `mouth` | head | 46 | – | – |
 | `facialHair` | head | 48 | – | `hair` |
+| `hairBack` | head | 49 | – | `hair` → own key (§22) |
 | `hair` | head | 50 | – | `hair` |
+| `hairTop` | head | 51 | – | `hair` → own key (§22) |
+| `hairSides` | head | 52 | – | `hair` → own key (§22) |
+| `hairExtras` | head | 53 | – | `hair` → own key (§22) |
+| `hairFringe` | head | 54 (62 over glasses) | – | `hair` → own key (§22) |
 | `glasses` | head | 60 | – | `glasses` |
+| `hairStreaks` | head | 63 | yes | `streak`, one per streak (§22) |
 | `headwear` | head | 70 | – | `hat` |
 | `accessory` | any | 80 | yes | `accent` |
 
@@ -773,7 +779,8 @@ the outline (Warp) or stay fixed to the page (a printed-paper look), three-quart
 get it free once the rig does), per-part z overrides, arms behind the body, "turn
 around" as distinct from mirror, gaze (the VRM `LeftEye`/`RightEye` bones moving the
 pupils), a talking mouth when a bubble's tail points at the character (after
-character-bound tails), a user library shared across projects (for whole
+character-bound tails), a length slider per hair piece and hair that reacts to a pose
+(§22), a user library shared across projects (for whole
 characters and for individual stickers, designed in
 [`asset-packs.md`](asset-packs.md)), flatten to editable layers, and
 `stanley sticker import` on the CLI.
@@ -834,7 +841,8 @@ open:
   default for each being the first colour drawn in it; a pattern without colours of
   its own keeps the tile's.
 - **Starter library as built**: 23 cover garments; hair (short, bob, long,
-  ponytail, curly, bun); eyes (dots, round, lashes), brows (thin, medium, thick),
+  ponytail, curly, bun - no longer offered since hair is built from pieces, §22, but kept
+  for the comics that wear them); eyes (dots, round, lashes), brows (thin, medium, thick),
   mouth (simple, wide, lips) with the full expression vocabulary as variants, and
   two noses; two drawn hats, their styles as variants - a Hood, up or down (in the
   `top` colour, so it matches the top it's worn with, fabric included; worn after a
@@ -988,3 +996,116 @@ eyes need this, per the issues, so only eyes get it.
   library), so no new gallery UI was needed. *Preview expression* still sets the whole
   face's mood in one click (both eyes, split or not); two small dropdowns next to it, shown
   only once split, preview either eye's expression on its own.
+
+## 22. Modular hair
+
+**Status: implemented** (GitHub issue #59). Hair is put together from pieces, like 2D
+building blocks - a fringe chosen apart from the back - and each piece can be its own
+colour, so multi-colour "scene hair" is a few clicks, without the simple path getting
+any harder: one Hair button, a gallery of hairstyles, one Hair colour.
+
+- **Pieces are ordinary stickers in their own slots** (§8): `hairTop` (the skull down to
+  the hairline), `hairFringe`, `hairSides` (locks framing the face), `hairBack` (behind
+  the head and body: its parts are `depth: back`) and `hairExtras` (ponytail, pigtails,
+  bun, space buns, braid, cowlick). Slots already give each piece its gallery, z-order,
+  per-look and per-panel overrides, styles (§20) and Draw your own. The whole-hairstyle
+  `hair` slot stays for comics made before and for hair drawn in one file.
+- **They fit because they're drawn over the same head.** Warp maps every piece onto the
+  character's real head, and the pieces meet at **join lines** - hairline, partings,
+  temples, brow and eye lines, nape (`HairJoins`) - which every hair template shows as a
+  locked `joins` guide layer, so a piece you draw fits the library's.
+- **Colour per piece.** Piece art is still tagged `slot-hair`; worn in a piece slot it's
+  coloured from the piece's own key, the slot name (`StickerSlots.ColorKey`), and
+  `CharacterLooks.Resolve` falls that key back to `hair` - colour and dye separately, so a
+  fringe given its own purple keeps the hair's dye. Nothing changes colour until asked, and
+  a purple fringe stays purple when the fringe is swapped (decision 5). `character.json`
+  gains a line (`"hairFringe": "#8e24aa"`) only once a piece has a colour of its own.
+  Recolouring under another key keeps the artist's shading: the original is the sticker's
+  default for the tagged slot (split eyes, §21, recoloured flat before this).
+- **Hairstyles are presets** (`StickerLibrary.Hairstyles`): recipes of library pieces with
+  styles - Short, Bob, Long, Ponytail, Curly, Bun (today's six, redrawn as pieces), Pixie,
+  Pigtails, Space buns, Side-swept, Emo and Scene. Picking one swaps the whole hairdo in one
+  undo step (`HairEditing.WearHairdo`) - the one gallery that replaces instead of adding
+  (§8), since two whole hairdos stacked is never wanted - reusing the wardrobe's unmodified
+  copies, each in the preset's style. Colours are kept. When the head wore its own mix of
+  pieces, a bar under the stage says so and offers **Add to my mix instead** (still one
+  undo step); bald, a preset as it came, or an old whole hairstyle lose nothing, so there's
+  no bar. Putting on a fringe, sides, back or extra on a head with nothing on top brings
+  the Smooth top with it, so a piece never floats on a bald crown.
+- **Over glasses**: `Sticker.OverGlasses` paints a sticker at z 62, over glasses (60):
+  the library's Side-swept fringe, which covers an eye, is; the rest aren't. The Sticker tab's
+  **Over glasses** toggle flips any hair sticker (a library copy becomes the character's own,
+  as any edit does).
+- **Dyes** - several colours within one piece: `PatternKind` Streaks, Tips, Roots, Ombre
+  and Rainbow, on the colour of the hair or of one piece. Unlike patterns they're laid once
+  across each drawn part, in its region's frame (`DyeLayout`): Tips is the bottom of *that*
+  piece, the waist on a long back or the brows on a fringe. `Weight` is how far (Tips 0.3,
+  Roots 0.25, where an Ombré starts 0.3) or a streak's width; Rainbow's bands are its
+  `colors` (six by default). They're drawn as vector bands and a gradient, so PDF export
+  stays vector. Clothing patterns stay available to hair (stripes across hair are raccoon
+  tails).
+- **Streaks** (`hairStreaks`): coloured locks put on like prints (§19) - each click stamps
+  another, placed across the fringe (`HairEditing.StreakSpot`) - then dragged, sized and
+  turned. Their art is tagged `slot-streak` and their part is `clip: hair`: drawn only where
+  other hair is drawn in the same layer, so dragging one past the hair's edge never spills.
+  **Each streak has its own colour** (`streak-<id>`, falling back to the streaks' default);
+  a new one starts in the colour of the last one put on, and removing one drops its colour.
+- **Schemes**: the Hair colour's dropdown starts with a row of one-click schemes on one accent
+  colour - Natural, Two-tone (top and fringe), Peekaboo (the back), Fringe only, Dip-dye,
+  Ombré, Rainbow (`HairEditing.ApplyScheme`) - each previewed on the character. A scheme
+  writes ordinary piece colours and dyes, so everything it did can then be changed piece by
+  piece; each starts from Natural, so trying them one after another never piles up.
+- **Character editor**: the Look tab keeps one **Hair** button; its flyout has tabs -
+  **Hairstyles** (Bald, the presets, then the character's own whole hairstyles, each previewed
+  on it), Top, Fringe, Sides, Back, Extras, Streaks (ordinary slot galleries). The button's
+  second line names the hairstyle worn exactly, else "Own mix". Clicking a piece on the stage
+  opens the Sticker tab with that piece's colour and dye, **Same as hair** while it has its
+  own, and Over glasses. The Colours group shows a piece only once it has a colour of its own.
+  A hair colour's dropdown titles its patterns **Dye**, with the clothing patterns under More
+  patterns; Rainbow shows a swatch per band.
+- **Named looks**: every hair edit lands in the look being edited. A look can only override,
+  so *Same as hair* in a named look, where the default look gives the piece its own colour,
+  copies the look's current hair colour - and says it won't follow later changes.
+- **Page editor**: right-click › *This panel only* › Colour lists each worn piece after Hair (a
+  fringe purple in one flashback), and Pattern offers hair its dyes.
+- **Old whole hairstyles**: a character wearing one of the old library hairstyles, unmodified,
+  gets a bar in the character editor - "This is the old Bob - switch to the new Bob made of
+  pieces?" **Switch** swaps it for the preset's pieces in the default look and every named
+  look, colours kept, one undo step; **Keep** stops asking for that character, remembered in
+  the user's settings (`AppSettings.DeclinedHairUpgrades`), not the comic.
+- **Rendering note**: the area of warped art is a union of its fills and ink, and Skia's path
+  ops can silently drop a shape when a line runs along its own fill's edge (the pieces are
+  drawn that way). `FigureGeometry.Union` checks its result against points inside both
+  shapes and falls back to a union of rasterised regions (512 cells across) when one is
+  missing - otherwise a streak's `clip: hair` found no hair to show on.
+- **Later**: a length slider per piece (a vertical stretch of Back and Sides from the crown),
+  hair that reacts to a pose (wind, a tilt's gravity), three-quarter art, and keeping a
+  whole hairdo - pieces, styles and colours - in My Assets as one item (`asset-packs.md`).
+
+## 23. A colour for one sticker (#127)
+
+Any worn sticker outside hair and the face can be coloured apart from the others in its
+slot (two hats, two prints). The mechanism is the streaks' one, generalised:
+
+- **Key.** `StickerSlots.StickerColorKey(slot, id)` = `"<slot's colour slot>@<id>"`
+  (`top@abc123`). `StickerSlots.HasOwnColorKey(slot)` says which slots qualify: a colour
+  slot, not hair (pieces and streaks keep their own keys), not `IsFace` (skin/eyes belong
+  to the character). `ColorKey(wornSlot, id, tagged)` returns it for art tagged with the
+  slot's colour slot, so the renderer needs no other change.
+- **Resolution.** `CharacterLooks.Resolve` gives each such sticker its key with the slot's
+  colour and fabric as fallback (`TryAdd`), so a sticker follows the slot until it is given
+  a colour, and the key is only *stored* in `ColorSlots`/`Fabrics` once the user picks one.
+- **UI.** The Sticker tab's colour group (`HasSelectedHairColor`, label
+  `SelectedColorGroupLabel`) shows for any such sticker; "Same as slot" (`FollowHair`,
+  `HairEditing.FollowHair` follows `SharedColorOf(key)`) drops the own colour. The Look tab's
+  Colours group doesn't list these keys (`ColorGroupSlots` only adds hair pieces). The
+  page's right-click Colour menu is still per slot.
+- **Tidying.** `HairEditing.DropOrphanStreakColors` drops any key whose sticker
+  (`StickerSlots.StickerOfKey`) has left the wardrobe, streaks' and stickers' alike.
+
+The ribbons are split per tab (`Page/Ribbon/*RibbonTab`, `Characters/Ribbon/*RibbonTab`):
+each tab's groups are their own `UserControl`, so their controls are named in *that*
+control's name scope. `PageEditorRibbon.FindControl<T>` / `CharacterEditorRibbon.FindControl<T>`
+look in every tab too (an instance method, so it wins over Avalonia's extension), and
+templates a tab uses (the Look tab's slot galleries) live in that tab's own resources -
+a `StaticResource` can't reach a parent control's resources from a nested XAML.

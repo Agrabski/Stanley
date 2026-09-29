@@ -74,17 +74,66 @@ public sealed class FabricSwatch : Control
             // A few repeats across the swatch, whatever the fabric's own size.
             var repeat = (float)Math.Max(bounds.Height / 2.2, 4);
             var patternHeight = repeat / (fabric?.Pattern?.Size ?? PatternFill.DefaultSize);
+            // A dye (docs: modular hair) isn't a repeat: it's drawn here across the whole swatch, on top of the ground and any texture.
+            var dye = fabric?.Pattern is { IsDye: true } d ? d : null;
             var shown = fabric is null ? null : fabric with
             {
-                Pattern = fabric.Pattern,
+                Pattern = dye is null ? fabric.Pattern : null,
                 Texture = fabric.Texture is { } t ? t with { Size = repeat / 2 / patternHeight } : null
             };
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
             FabricShaders.Fill(canvas, path, ToSk(color), shown, SKMatrix.Identity, patternHeight, name => tiles is not null && tiles.TryGetValue(name, out var file) ? file : null);
+            if (dye is not null)
+                DrawDye(canvas, (float)bounds.Width, (float)bounds.Height, dye, ToSk(color));
             canvas.Restore();
             using var border = new SKPaint { Color = new SKColor(0, 0, 0, 96), Style = SKPaintStyle.Stroke, StrokeWidth = 1, IsAntialias = true };
             canvas.DrawPath(path, border);
+        }
+
+        /// <summary>
+        /// A simple, recognisable drawing of a dye over the ground colour: the ends for Tips,
+        /// the roots for Roots, a fade for Ombré, uneven stripes for Streaks, and side-by-side
+        /// bands of every colour for Rainbow.
+        /// </summary>
+        private static void DrawDye(SKCanvas canvas, float width, float height, PatternFill dye, SKColor ground)
+        {
+            var ink = ToSk(dye.Colors.Count > 0 ? dye.Colors[0] : ColorSlotEditor.DefaultDyeColor);
+            var weight = Math.Clamp((float)(dye.Weight ?? ColorSlotEditor.DefaultDyeWeight(dye.Kind)), 0.05f, 1f);
+            using var paint = new SKPaint { IsAntialias = true, Color = ink };
+            switch (dye.Kind)
+            {
+                case PatternKind.Tips:
+                    canvas.DrawRect(new SKRect(0, height * (1 - weight), width, height), paint);
+                    break;
+                case PatternKind.Roots:
+                    canvas.DrawRect(new SKRect(0, 0, width, height * weight), paint);
+                    break;
+                case PatternKind.Ombre:
+                    // Ground down to where the fade starts, then into the dye at the bottom.
+                    using (var fade = SKShader.CreateLinearGradient(new SKPoint(0, height * Math.Min(weight, 0.95f)), new SKPoint(0, height), [ground, ink], SKShaderTileMode.Clamp))
+                    {
+                        paint.Shader = fade;
+                        canvas.DrawRect(new SKRect(0, 0, width, height), paint);
+                    }
+                    break;
+                case PatternKind.Streaks:
+                    // Uneven on purpose: different widths at uneven spacing, whatever the swatch's size.
+                    foreach (var (at, factor) in new[] { (0.12f, 0.7f), (0.34f, 1.1f), (0.5f, 0.6f), (0.74f, 1f), (0.9f, 0.5f) })
+                    {
+                        var stripe = Math.Max(1.5f, width * 0.3f * weight * factor);
+                        canvas.DrawRect(new SKRect(width * at - stripe / 2, 0, width * at + stripe / 2, height), paint);
+                    }
+                    break;
+                case PatternKind.Rainbow:
+                    var bands = dye.Colors.Count > 1 ? dye.Colors : PatternFill.RainbowColors;
+                    for (var i = 0; i < bands.Count; i++)
+                    {
+                        paint.Color = ToSk(bands[i]);
+                        canvas.DrawRect(new SKRect(width * i / bands.Count, 0, width * (i + 1) / bands.Count, height), paint);
+                    }
+                    break;
+            }
         }
 
         private static SKColor ToSk(ColorValue c) =>

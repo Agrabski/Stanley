@@ -119,6 +119,7 @@ public sealed class MainWindowViewModel : ObservableObject
         CloseDocumentCommand = new AsyncRelayCommand(CloseDocumentAsync, () => HasDocument);
         SwitchIssueCommand = new AsyncRelayCommand<IssueId>(SwitchIssueAsync, _ => HasDocument);
         NewIssueCommand = new AsyncRelayCommand(NewIssueAsync, () => HasDocument);
+        DeleteIssueCommand = new AsyncRelayCommand<IssueId>(DeleteIssueAsync, _ => HasDocument);
         ExportPdfCommand = new AsyncRelayCommand(() => ExportAsync("pdf"), () => HasDocument);
         ExportPngCommand = new AsyncRelayCommand(() => ExportAsync("png"), () => HasDocument);
         OpenExportCommand = new AsyncRelayCommand(() => LaunchExportAsync(open: true), () => CanLaunchExport);
@@ -608,6 +609,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public IAsyncRelayCommand<IssueId> SwitchIssueCommand { get; }
     public IAsyncRelayCommand NewIssueCommand { get; }
+    public IAsyncRelayCommand<IssueId> DeleteIssueCommand { get; }
 
     /// <summary>
     /// Switches to another of the comic's issues: the same Save / Don't Save / Cancel gate as
@@ -670,6 +672,46 @@ public sealed class MainWindowViewModel : ObservableObject
         {
             AppLog.Error($"Couldn't add a new issue to \"{DocumentTitle}\".", e);
             ShowError($"Couldn't add a new issue: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// File &gt; Info's "Delete" button on one of the comic's other issues: its folder -
+    /// pages, panels and pictures - is gone for good, so it's only offered for an issue
+    /// that isn't the one currently open. Refuses to leave the comic with none.
+    /// </summary>
+    public async Task DeleteIssueAsync(IssueId issueId)
+    {
+        if (_project is null || _project.Location is null)
+            return;
+        if (issueId == _project.IssueId)
+        {
+            Message = "Can't delete the issue that's open - switch to another one first.";
+            return;
+        }
+        if (Issues.Count <= 1)
+        {
+            Message = "A comic must keep at least one issue.";
+            return;
+        }
+
+        var entry = Issues.First(i => i.Id == issueId);
+        if (!await _dialogs.AskDeleteIssueAsync(entry.Caption))
+            return;
+
+        try
+        {
+            _project.DeleteIssue(issueId);
+            OnPropertyChanged(nameof(Issues));
+            OnPropertyChanged(nameof(HasMultipleIssues));
+            OnPropertyChanged(nameof(SelectedIssue));
+            Message = $"Issue #{entry.Number} deleted";
+            AppLog.Info($"Deleted issue #{entry.Number} from \"{_project.Title}\".");
+        }
+        catch (Exception e) when (IsFileProblem(e))
+        {
+            AppLog.Error($"Couldn't delete issue {issueId} from \"{DocumentTitle}\".", e);
+            ShowError($"Couldn't delete the issue: {e.Message}");
         }
     }
 
@@ -1095,6 +1137,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _settings.SvgEditorPath = path;
             OnPropertyChanged(nameof(SvgEditorPath));
         });
+        _characters.HairUpgrades = new HairUpgradeMemory(() => _settings.DeclinedHairUpgrades, ids => _settings.DeclinedHairUpgrades = ids);
         _characters.RecentComics = () => _recent.Paths;
         _characters.ComicLocation = project.Location;
         _characters.KeepFailed += ShowError;
@@ -1218,6 +1261,7 @@ public sealed class MainWindowViewModel : ObservableObject
         CloseDocumentCommand.NotifyCanExecuteChanged();
         SwitchIssueCommand.NotifyCanExecuteChanged();
         NewIssueCommand.NotifyCanExecuteChanged();
+        DeleteIssueCommand.NotifyCanExecuteChanged();
         ExportPdfCommand.NotifyCanExecuteChanged();
         ExportPngCommand.NotifyCanExecuteChanged();
         UndoCommand.NotifyCanExecuteChanged();

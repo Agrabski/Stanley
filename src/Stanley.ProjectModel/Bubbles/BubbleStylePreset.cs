@@ -9,7 +9,8 @@ public enum BubbleStylePreset
 {
     Speech,
     Shout,
-    Whisper
+    Whisper,
+    Thought
 }
 
 [JsonConverter(typeof(CamelCaseEnumConverter<TailKind>))]
@@ -22,7 +23,10 @@ public enum TailKind
     JaggedTriangle,
 
     /// <summary>Same shape as <see cref="SmoothTriangle"/>; the dashing is a stroke-time style, not a path difference (Whisper).</summary>
-    DashedTriangle
+    DashedTriangle,
+
+    /// <summary>Three small circles shrinking towards the target instead of a triangle (Thought).</summary>
+    ThoughtDots
 }
 
 /// <summary>
@@ -38,6 +42,7 @@ public static class BubbleStylePresets
         {
             BubbleStylePreset.Speech => Oval(bounds),
             BubbleStylePreset.Whisper => Oval(bounds),
+            BubbleStylePreset.Thought => PanelShapes.Cloud(bounds).Anchors.ToList(),
             BubbleStylePreset.Shout => Zigzag(bounds),
             _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, null)
         });
@@ -48,6 +53,7 @@ public static class BubbleStylePresets
             BubbleStylePreset.Speech => TailKind.SmoothTriangle,
             BubbleStylePreset.Whisper => TailKind.DashedTriangle,
             BubbleStylePreset.Shout => TailKind.JaggedTriangle,
+            BubbleStylePreset.Thought => TailKind.ThoughtDots,
             _ => throw new ArgumentOutOfRangeException(nameof(preset), preset, null)
         };
 
@@ -72,6 +78,10 @@ public static class BubbleStylePresets
             // Handles coincide with the point itself: a straight edge, no curve.
             anchors.Add(new ShapeAnchor(p, p, p, AnchorHandleKind.Corner));
         }
-        return anchors;
+        // No spike points straight up or down, so the star falls short of its box's top and
+        // bottom; stretch it to reach them. Then, as for an oval, its bounding box is the box it
+        // was made for, and switching Speech -> Shout -> Speech gives back the same bubble
+        // rather than one a little shorter every round trip.
+        return [.. AnchorRing.Rescale(anchors, AnchorRing.BoundingBox(anchors), b)];
     }
 }

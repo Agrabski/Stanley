@@ -36,7 +36,14 @@ public enum PartClip
     /// stays on the shirt, not the skin past its edge). Shows unclipped if nothing is worn
     /// there, so a print on bare skin (a tattoo-style use) still draws.
     /// </summary>
-    Clothes
+    Clothes,
+
+    /// <summary>
+    /// Other worn hair stickers' drawn parts in the same layer (docs: modular hair) - a streak
+    /// stays on the hair instead of spilling past its edge. Shows unclipped if no hair is worn
+    /// there.
+    /// </summary>
+    Hair
 }
 
 /// <summary>How drawn art is mapped from its template onto the character's region.</summary>
@@ -118,6 +125,7 @@ public sealed record StickerPart(
 /// <param name="Variants">The variant folders; the first is the fallback. Picked per slot by the pose's expression, else per sticker by the style the character wears it in.</param>
 /// <param name="Source">"library:&lt;key&gt;" while this is an unmodified copy of a library sticker (tidied away on save when nothing wears it); absent once it's the user's own.</param>
 /// <param name="Fabrics">Default pattern/texture per colour slot (the library's jeans come in denim).</param>
+/// <param name="OverGlasses">Paint over glasses (<see cref="StickerSlots.OverGlassesZOrder"/>) instead of at its slot's z-order: a long fringe over one eye covers that lens too. Absent means no.</param>
 public sealed record Sticker(
     StickerId Id,
     string Name,
@@ -126,7 +134,8 @@ public sealed record Sticker(
     SortedDictionary<string, ColorValue> Colors,
     IReadOnlyList<string> Variants,
     string? Source = null,
-    SortedDictionary<string, Fabric>? Fabrics = null)
+    SortedDictionary<string, Fabric>? Fabrics = null,
+    bool? OverGlasses = null)
 {
     public const string DefaultVariant = "default";
 

@@ -70,7 +70,7 @@ public static class CharacterLooks
                 ? new WornSticker(asset, w.Slot, w.Index, styles.GetValueOrDefault(w.Id), sides.TryGetValue(w.Id, out var side) ? side : null)
                 : null)
             .OfType<WornSticker>()
-            .OrderBy(w => StickerSlots.ZOrder(w.Slot))
+            .OrderBy(w => StickerSlots.ZOrder(w.Slot, w.Asset.Sticker))
             .ThenBy(w => w.Slot, StringComparer.Ordinal)
             .ThenBy(w => w.StackIndex)
             .ToList();
@@ -96,6 +96,30 @@ public static class CharacterLooks
         {
             colors.TryAdd(StickerSlots.EyesLeft, eyes);
             colors.TryAdd(StickerSlots.EyesRight, eyes);
+        }
+        // A hair piece (docs: modular hair) with no colour or dye of its own follows the
+        // hair's - each separately, so a fringe given its own purple keeps the hair's dye.
+        foreach (var piece in StickerSlots.All.Where(s => s.SharesColor is not null))
+        {
+            if (colors.TryGetValue(piece.SharesColor!, out var shared))
+                colors.TryAdd(piece.Name, shared);
+            if (fabrics.TryGetValue(piece.SharesColor!, out var sharedFabric))
+                fabrics.TryAdd(piece.Name, sharedFabric);
+        }
+        // Each streak has its own colour; one that hasn't got one yet takes the streaks' default.
+        foreach (var streak in worn.Where(w => w.Slot == StickerSlots.HairStreaks))
+        {
+            if (colors.TryGetValue(StickerSlots.StreakColor, out var streakColor))
+                colors.TryAdd(StickerSlots.StreakColorKey(streak.Asset.Id), streakColor);
+        }
+        // Any other sticker can be given a colour of its own too; until it is, it follows its slot's.
+        foreach (var w in worn.Where(w => StickerSlots.HasOwnColorKey(w.Slot)))
+        {
+            var (slotColor, own) = (StickerSlots.Get(w.Slot).ColorSlot!, StickerSlots.StickerColorKey(w.Slot, w.Asset.Id));
+            if (colors.TryGetValue(slotColor, out var shared))
+                colors.TryAdd(own, shared);
+            if (fabrics.TryGetValue(slotColor, out var sharedFabric))
+                fabrics.TryAdd(own, sharedFabric);
         }
         return new CharacterLook(worn, colors, fabrics);
     }

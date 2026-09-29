@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="hairExtras">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back"/>
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" d="M-60,-1003 C-60,-1014.6 -50.2,-1024 -38,-1024 C-25.8,-1024 -16,-1014.6 -16,-1003 C-16,-991.4 -25.8,-982 -38,-982 C-50.2,-982 -60,-991.4 -60,-1003 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-27,-1011 C-34,-1019 -46,-1018 -52,-1007" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-23,-1000 C-27,-994 -34,-990 -42,-990" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M16,-1003 C16,-1014.6 25.8,-1024 38,-1024 C50.2,-1024 60,-1014.6 60,-1003 C60,-991.4 50.2,-982 38,-982 C25.8,-982 16,-991.4 16,-1003 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M27,-1011 C34,-1019 46,-1018 52,-1007" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M23,-1000 C27,-994 34,-990 42,-990" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

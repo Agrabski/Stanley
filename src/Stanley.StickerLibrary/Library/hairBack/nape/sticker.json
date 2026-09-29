@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Nape",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "depth": "back",
+      "name": "back",
+      "region": "head"
+    }
+  ],
+  "slot": "hairBack",
+  "variants": [
+    "default"
+  ]
+}

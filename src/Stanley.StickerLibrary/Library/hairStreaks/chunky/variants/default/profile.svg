@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="280" viewBox="-152 -1033 320 280" data-stanley-view="profile" data-stanley-slot="hairStreaks">
+  <g id="streak" inkscape:groupmode="layer" inkscape:label="streak">
+    <path class="slot-streak" d="M19.1,-988.2 C21,-987 27,-984 30.7,-981.5 C34.4,-978.9 38.2,-976.5 41.4,-972.9 C44.7,-969.2 47.4,-964 50.2,-959.5 C52.9,-955.1 56.7,-948.3 58,-946 C58.6,-948.7 61.7,-956.3 61.8,-962.5 C61.9,-968.6 61.3,-976.8 58.6,-983.1 C55.8,-989.5 50.3,-996.4 45.3,-1000.5 C40.4,-1004.6 31.7,-1006.6 28.9,-1007.8 C20.1,-1012.3 10.2,-992.6 19.1,-988.2 Z" fill="#d6409f" stroke="#8f1f63" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-streak" d="M25.7,-1001.4 C28.2,-1000.3 36,-997.9 40.6,-994.3 C45.1,-990.7 50.1,-985.3 53,-979.8 C55.9,-974.3 57.2,-967.1 58,-961.5 C58.9,-955.9 58,-948.6 58,-946" fill="none" stroke="#8f1f63" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-streak" d="M22.3,-994.6 C24.5,-993.4 31.3,-990.7 35.4,-987.7 C39.6,-984.6 43.9,-980.7 47,-976.2 C50.1,-971.7 52.8,-963.1 54,-960.5" fill="none" stroke="#8f1f63" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

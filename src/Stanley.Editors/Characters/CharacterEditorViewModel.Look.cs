@@ -4,6 +4,7 @@ using Stanley.Editing.Abstractions;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.StickerLibrary;
 
 namespace Stanley.Editors;
 
@@ -52,7 +53,8 @@ public sealed partial class CharacterEditorViewModel
             if (_selectedSticker is { } id)
             {
                 SelectSticker(null);
-                Apply(EditResult<CharacterDefinition>.Success(LookEditing.RemoveFromWardrobe(Committed, id)));
+                // A removed streak leaves its colour behind otherwise.
+                Apply(EditResult<CharacterDefinition>.Success(HairEditing.DropOrphanStreakColors(LookEditing.RemoveFromWardrobe(Committed, id))));
             }
         }, () => HasSelectedSticker);
         MoveSelectedUpCommand = new RelayCommand(() => EditSelected(id => c => LookEditing.MoveInStack(c, id, +1)), () => SelectedStickerIsWorn);
@@ -77,9 +79,6 @@ public sealed partial class CharacterEditorViewModel
     }
 
     // ---------------------------------------------------------------- galleries
-
-    /// <summary>The hair gallery.</summary>
-    public IReadOnlyList<SlotGallery> HairGalleries => Galleries(StickerSlots.Hair);
 
     /// <summary>
     /// The face's galleries: Eyes (or, split left/right - docs/sticker-system.md §21 - Left
@@ -160,12 +159,15 @@ public sealed partial class CharacterEditorViewModel
         if (choice.StampsCopy)
         {
             // A print or a badge: every click puts on another copy, in the next free spot across the chest.
+            // A hair streak is placed across the fringe instead, and takes the last streak's colour.
             var design = choice.Asset?.Sticker ?? choice.Library!.Asset.Sticker;
-            var spot = StickerCopies.Spot(StickerCopies.WornCopies(character, choice.Slot, design.Name));
+            var copies = StickerCopies.WornCopies(character, choice.Slot, design.Name);
+            var isStreak = choice.Slot == StickerSlots.HairStreaks;
+            var spot = isStreak ? HairEditing.StreakSpot(copies) : StickerCopies.Spot(copies);
             var copy = choice.Asset is { } own
                 ? (worn.Contains(own.Id) ? StickerCopies.Copy(own, spot) : own)
                 : StickerCopies.Copy(choice.Library!.Instantiate(), spot);
-            ApplyLook(c => LookEditing.Wear(c, copy));
+            ApplyLook(c => isStreak ? HairEditing.WearStreak(c, copy) : LookEditing.Wear(c, copy));
             SelectSticker(copy.Id);
         }
         else if (choice.Asset is { } asset && worn.Contains(asset.Id))
@@ -177,7 +179,9 @@ public sealed partial class CharacterEditorViewModel
         else
         {
             var wearing = choice.Asset ?? choice.Library!.Instantiate();
-            ApplyLook(c => LookEditing.Wear(c, wearing));
+            // A fringe, sides, back or extra on a head with nothing on top would float on a bald crown: a top comes with it.
+            var top = HairEditing.NeedsTop(character, choice.Slot) ? Hairstyles.Piece(Hairstyles.DefaultTop, character) : null;
+            ApplyLook(c => top is null ? LookEditing.Wear(c, wearing) : LookEditing.Wear(LookEditing.Wear(c, top), wearing));
             SelectSticker(wearing.Id);
         }
     }
@@ -376,7 +380,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(PreviewRightEye));
         OnPropertyChanged(nameof(ExpressionWarning));
         OnPropertyChanged(nameof(Hint));
-        OnPropertyChanged(nameof(HairGalleries));
+        OnPropertyChanged(nameof(HairTabContent));
         OnPropertyChanged(nameof(FaceGalleries));
         RaiseStylesChanged(); // previewed in the stage's view
     }
@@ -400,13 +404,23 @@ public sealed partial class CharacterEditorViewModel
     {
         var character = LookWorking;
         var look = CharacterLooks.Resolve(character);
-        var slots = LookEditing.ColorSlotsInUse(character);
+        // A hair piece is listed once it has a colour of its own (docs: modular hair); a streak never is.
+        var slots = HairEditing.ColorGroupSlots(character, LookEditing.ColorSlotsInUse(character));
         var changed = !slots.SequenceEqual(_colorEditors.Select(e => e.Slot));
         if (changed)
-            _colorEditors = slots.Select(slot => new ColorSlotEditor(this, slot, Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList())).ToList();
+            _colorEditors = slots.Select(NewColorEditor).ToList();
         foreach (var editor in _colorEditors)
-            editor.Refresh(look.Color(editor.Slot, editor.Slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")), look.FabricOf(editor.Slot));
+            RefreshColorEditor(editor, character, look);
         return changed;
+    }
+
+    private ColorSlotEditor NewColorEditor(string slot) =>
+        new(this, slot, Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList());
+
+    private static void RefreshColorEditor(ColorSlotEditor editor, CharacterDefinition character, CharacterLook look)
+    {
+        editor.Refresh(look.Color(editor.Slot, editor.Slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")), look.FabricOf(editor.Slot));
+        editor.RefreshSchemes(); // the previews show the whole head, which any edit may have changed
     }
 
     internal void SetSlotColor(string slot, ColorValue color) => ApplyLook(c => LookEditing.SetColor(c, slot, color));
@@ -500,6 +514,13 @@ public sealed partial class CharacterEditorViewModel
         "accent" => "Accents",
         StickerSlots.EyesLeft => "Left eye",
         StickerSlots.EyesRight => "Right eye",
+        StickerSlots.HairTop => "Top",
+        StickerSlots.HairFringe => "Fringe",
+        StickerSlots.HairSides => "Sides",
+        StickerSlots.HairBack => "Back",
+        StickerSlots.HairExtras => "Extras",
+        _ when StickerSlots.IsStreakColorKey(slot) => "Streak",
+        _ when StickerSlots.IsStickerColorKey(slot) => "This one",
         _ => slot.Length == 0 ? slot : char.ToUpperInvariant(slot[0]) + slot[1..]
     };
 
@@ -507,6 +528,8 @@ public sealed partial class CharacterEditorViewModel
     {
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
         "hair" or "brows" => HairColors,
+        _ when IsHairColorKey(slot) => HairColors,
+        _ when StickerSlots.IsStickerColorKey(slot) => Palette(StickerSlots.SharedColorOf(slot)),
         StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight => EyeColors,
         _ => ClothColors
     };
@@ -526,7 +549,13 @@ public sealed partial class CharacterEditorViewModel
         C("Black", "#1f1a17"), C("Dark brown", "#3b2a20"), C("Brown", "#5a3a22"), C("Auburn", "#8b3a1f"),
         C("Ginger", "#c25e20"), C("Blonde", "#e0c068"), C("Platinum", "#efe6c8"), C("Grey", "#a0a0a0"),
         C("White", "#f2f2f2"), C("Blue", "#3a6fd8"), C("Pink", "#e57fb0"), C("Green", "#4caf50"),
+        // Vivid dyes.
+        C("Purple", "#8e24aa"), C("Magenta", "#d6409f"), C("Red", "#d32f2f"), C("Orange", "#f57c00"), C("Teal", "#00897b"),
     ];
+
+    /// <summary>Whether <paramref name="key"/> colours hair: the hair itself, one of its pieces or one streak (<see cref="ColorSlotEditor.IsHairKey"/>) - these are dyed, not patterned.</summary>
+    internal static bool IsHairColorKey(string key) =>
+        key == StickerSlots.Hair || StickerSlots.HairPieces.Contains(key) || StickerSlots.IsStreakColorKey(key);
 
     private static readonly IReadOnlyList<(string Name, ColorValue Color)> EyeColors =
     [
@@ -708,6 +737,7 @@ public sealed partial class CharacterEditorViewModel
         MoveSelectedDownCommand.NotifyCanExecuteChanged();
         DuplicateSelectedCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanDuplicateSelected));
+        RaiseHairColorChanged();
     }
 
     private void RaiseLookChanged()
@@ -721,7 +751,7 @@ public sealed partial class CharacterEditorViewModel
         RaiseLooksChanged();
         OnPropertyChanged(nameof(IsEyesSplit));
         OnPropertyChanged(nameof(CanSplitEyes));
-        OnPropertyChanged(nameof(HairGalleries));
+        RaiseHairChanged();
         OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));
         OnPropertyChanged(nameof(AccessoryGalleries));

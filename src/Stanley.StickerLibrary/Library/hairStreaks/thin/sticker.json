@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "streak": "#d6409f"
+  },
+  "id": "library",
+  "name": "Thin",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "clip": "hair",
+      "name": "streak",
+      "region": "head"
+    }
+  ],
+  "slot": "hairStreaks",
+  "variants": [
+    "default"
+  ]
+}

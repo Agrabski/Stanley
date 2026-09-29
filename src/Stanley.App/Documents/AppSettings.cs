@@ -94,6 +94,16 @@ public sealed class AppSettings
         set => Set(nameof(MyAssetsDirectory), value?.Trim() ?? "");
     }
 
+    /// <summary>The characters whose old whole hairstyle the user chose to keep ("Keep" on the character editor's upgrade bar),
+    /// as ids. A preference of this user, so it lives here and not in the comic.</summary>
+    public IReadOnlyCollection<string> DeclinedHairUpgrades
+    {
+        get => _values.TryGetValue(nameof(DeclinedHairUpgrades), out var value)
+            ? value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : [];
+        set => Set(nameof(DeclinedHairUpgrades), string.Join(',', value));
+    }
+
     private void Set(string key, string value)
     {
         _values[key] = value;

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="300" height="220" viewBox="-150 -1060 300 220" data-stanley-view="profile" data-stanley-slot="hairFringe">
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" fill="#5a3a22" stroke="none" d="M58,-993 C59.7,-991 61.6,-989.2 63,-987 C65,-983.8 66.5,-980.4 68,-977 C69.5,-973.4 70.8,-969.7 72,-966 C73,-963 73.8,-960 74.5,-957 C74.9,-955.2 75.9,-953.3 75.3,-951.5 C74.9,-950.3 73.3,-949.7 72,-949.6 C68.7,-949.3 65.3,-950.4 62,-950.4 C58.7,-950.4 55.3,-949.6 52,-949.6 C48.7,-949.6 45.3,-950.4 42,-950.4 C38.7,-950.4 35.3,-949.9 32,-949.6 C30,-949.4 28,-949.2 26,-949 C25.3,-952.3 24,-955.6 24,-959 C24,-962.4 24.9,-965.8 26,-969 C27.2,-972.5 28.9,-975.9 31,-979 C33.3,-982.3 36,-985.3 39,-988 C41.7,-990.4 44.5,-993.1 48,-994 C51.2,-994.9 54.7,-993.3 58,-993 Z"/>
+    <path class="slot-hair" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" d="M58,-993 C59.7,-991 61.6,-989.2 63,-987 C65,-983.8 66.5,-980.4 68,-977 C69.5,-973.4 70.8,-969.7 72,-966 C73,-963 73.8,-960 74.5,-957 C74.9,-955.2 75.9,-953.3 75.3,-951.5 C74.9,-950.3 73.3,-949.7 72,-949.6 C68.7,-949.3 65.3,-950.4 62,-950.4 C58.7,-950.4 55.3,-949.6 52,-949.6 C48.7,-949.6 45.3,-950.4 42,-950.4 C38.7,-950.4 35.3,-949.9 32,-949.6 C30,-949.4 28,-949.2 26,-949"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M26,-952 C25.7,-955.3 24.7,-958.7 25,-962 C25.4,-965.8 26.5,-969.5 28,-973 C29.5,-976.6 31.5,-980 34,-983 C36.6,-986.1 40,-988.3 43,-991"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M46,-990 C40,-978 36,-966 35,-953"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M58,-984 C52,-974 48,-964 46,-953"/>
+  </g>
+</svg>

@@ -183,18 +183,25 @@ internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, Stic
 
 /// <summary>
 /// A fabric (pattern and/or texture) over an item's colour: the pieces it's laid out in,
-/// each with its region's frame. Shaders are made once and shared by every draw.
+/// each with its region's frame. Shaders are made once and shared by every draw. A dye
+/// pattern (<see cref="PatternFill.IsDye"/>) isn't repeated per piece: it is one
+/// <see cref="DyeLayout"/>, fitted across all the pieces together in the first one's frame
+/// (or the part's, when the caller fitted it to more than these pieces).
 /// </summary>
 internal sealed class FabricFill
 {
     private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
+    private readonly DyeLayout? _dye;
     private readonly float _strength;
 
-    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles)
+    /// <param name="dye">The dye already fitted across the whole part these pieces are some of; null to fit it across the pieces (using <paramref name="seed"/> for streaks).</param>
+    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles, DyeLayout? dye = null, int seed = 0)
     {
         _pieces = pieces.Select(p => (p.Path,
             fabric.Pattern is { } pattern ? FabricShaders.Pattern(pattern, ground, p.Frame, height, tiles) : null,
             fabric.Texture is { } texture ? FabricShaders.Texture(texture, p.Frame, height, tiles) : null)).ToList();
+        if (fabric.Pattern is { IsDye: true } dyed)
+            _dye = dye ?? (pieces.Count > 0 ? DyeLayout.Fit(dyed, pieces.Select(p => p.Path), pieces[0].Frame, ground, seed) : null);
         _strength = (float)Math.Clamp(fabric.Texture?.Strength ?? TextureFill.DefaultStrength, 0, 1);
     }
 
@@ -213,6 +220,7 @@ internal sealed class FabricFill
                 paint.Shader = pattern;
                 canvas.DrawPath(path, paint);
             }
+            _dye?.Draw(canvas, path);
             if (texture != null)
             {
                 paint.Shader = texture;
@@ -342,8 +350,9 @@ public sealed class FigureRenderer : ICharacterRenderer
             {
                 var mask = SeamMask(layer, belowOwn[i]);
                 using var clothes = ClothesCoverage(stickers, i, layer.Kind);
+                using var hair = HairCoverage(look.Stickers, stickers, i, layer.Kind);
                 var own = FigureGeometry.Empty();
-                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, clothes, mask, height, tiles))
+                foreach (var item in StickerItems(look.Stickers[i], stickers[i], layer.Kind, look, bodySkin, clothes, hair, mask, height, tiles))
                 {
                     items.Add(item);
                     own = FigureGeometry.Union(own, FigureGeometry.Copy(item.Area));
@@ -400,6 +409,28 @@ public sealed class FigureRenderer : ICharacterRenderer
             {
                 if (piece.Layer == layer && part.Blend != PartBlend.Cut && part.Clip is null)
                     result = FigureGeometry.Union(result, FigureGeometry.Copy(piece.Path));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// What's drawn as hair beside sticker <paramref name="exclude"/> in <paramref name="layer"/>: the
+    /// drawn-art areas of every other sticker worn in a hair slot (<see cref="StickerSlots.IsHair"/>),
+    /// not counting cut or clipped parts (<see cref="PartClip.Hair"/>) - what a streak clips to, so
+    /// it stays on the hair instead of spilling past its edge. The caller disposes it.
+    /// </summary>
+    private static SKPath HairCoverage(IReadOnlyList<WornSticker> worn, List<StickerGeometry> stickers, int exclude, FigureLayerKind layer)
+    {
+        var result = FigureGeometry.Empty();
+        for (var j = 0; j < stickers.Count; j++)
+        {
+            if (j == exclude || !StickerSlots.IsHair(worn[j].Slot))
+                continue;
+            foreach (var piece in stickers[j].Art)
+            {
+                if (piece.Layer == layer && piece.Part.Blend != PartBlend.Cut && piece.Part.Clip is null)
+                    result = FigureGeometry.Union(result, FigureGeometry.Copy(piece.Area));
             }
         }
         return result;
@@ -480,18 +511,34 @@ public sealed class FigureRenderer : ICharacterRenderer
         return builder.Detach();
     }
 
-    /// <summary>What <paramref name="clip"/> keeps a long-lived art or text item inside - an owned copy, since <paramref name="bodySkin"/>, <paramref name="own"/> and <paramref name="clothes"/> are disposed once this layer is done.</summary>
-    private static SKPath? PersistedClip(PartClip? clip, SKPath bodySkin, SKPath own, SKPath clothes) => clip switch
+    /// <summary>
+    /// Where a clipped item can be clicked: its area inside <paramref name="keep"/> - or, if
+    /// that comes out empty (the piece is off the hair it's clipped to, or the intersection
+    /// failed on awkward art), its whole area, so it can still be found and dragged back.
+    /// Its drawing is clipped either way.
+    /// </summary>
+    private static SKPath ClippedArea(SKPath area, SKPath keep)
+    {
+        var clipped = FigureGeometry.Combine(area, keep, SKPathOp.Intersect);
+        if (!clipped.IsEmpty)
+            return clipped;
+        clipped.Dispose();
+        return FigureGeometry.Copy(area);
+    }
+
+    /// <summary>What <paramref name="clip"/> keeps a long-lived art or text item inside - an owned copy, since <paramref name="bodySkin"/>, <paramref name="own"/>, <paramref name="clothes"/> and <paramref name="hair"/> are disposed once this layer is done.</summary>
+    private static SKPath? PersistedClip(PartClip? clip, SKPath bodySkin, SKPath own, SKPath clothes, SKPath hair) => clip switch
     {
         PartClip.Body => FigureGeometry.Copy(bodySkin),
         PartClip.Sticker => FigureGeometry.Copy(own),
         PartClip.Clothes => clothes.IsEmpty ? null : FigureGeometry.Copy(clothes),
+        PartClip.Hair => hair.IsEmpty ? null : FigureGeometry.Copy(hair),
         _ => null
     };
 
     /// <summary>What one worn sticker paints in one layer: its covers merged per colour slot, then its drawn and typed parts - minus its cuts, clipped as asked.</summary>
     private static IEnumerable<FigureItem> StickerItems(WornSticker worn, StickerGeometry geometry, FigureLayerKind layer,
-        CharacterLook look, SKPath bodySkin, SKPath clothes, SKPath? mask, double height, Func<string, ArtFile?> tiles)
+        CharacterLook look, SKPath bodySkin, SKPath clothes, SKPath hair, SKPath? mask, double height, Func<string, ArtFile?> tiles)
     {
         var here = geometry.Covers.Where(p => p.Piece.Layer == layer).ToList();
         var art = geometry.Art.Where(a => a.Layer == layer).ToList();
@@ -521,6 +568,7 @@ public sealed class FigureRenderer : ICharacterRenderer
                     PartClip.Body => FigureGeometry.Combine(piece.Path, bodySkin, SKPathOp.Intersect),
                     PartClip.Sticker => FigureGeometry.Combine(piece.Path, own, SKPathOp.Intersect),
                     PartClip.Clothes => clothes.IsEmpty ? FigureGeometry.Copy(piece.Path) : FigureGeometry.Combine(piece.Path, clothes, SKPathOp.Intersect),
+                    PartClip.Hair => hair.IsEmpty ? FigureGeometry.Copy(piece.Path) : FigureGeometry.Combine(piece.Path, hair, SKPathOp.Intersect),
                     _ => FigureGeometry.Copy(piece.Path)
                 };
                 path = FigureGeometry.Union(path, shape);
@@ -537,14 +585,16 @@ public sealed class FigureRenderer : ICharacterRenderer
                 continue;
             }
             var ground = FigureGeometry.ToSk(look.Color(group.Key, fallback));
-            var fabric = look.FabricOf(group.Key) is { } f ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles) : null;
+            var fabric = look.FabricOf(group.Key) is { } f
+                ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles, seed: DyeLayout.Seed(worn.Asset.Id.Value, group.Key))
+                : null;
             yield return new ShapeItem(path, ground, mask, worn.Asset.Id, fabric);
         }
 
         foreach (var piece in art.Where(a => a.Part.Blend != PartBlend.Cut))
         {
-            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes);
-            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes, hair);
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : ClippedArea(piece.Area, keep);
             if (!cuts.IsEmpty)
             {
                 var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
@@ -562,8 +612,8 @@ public sealed class FigureRenderer : ICharacterRenderer
 
         foreach (var piece in text.Where(t => t.Part.Blend != PartBlend.Cut))
         {
-            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes);
-            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes, hair);
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : ClippedArea(piece.Area, keep);
             if (!cuts.IsEmpty)
             {
                 var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
