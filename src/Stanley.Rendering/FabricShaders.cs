@@ -8,7 +8,8 @@ namespace Stanley.Rendering;
 /// Patterns and textures (docs/sticker-system.md §9): each is a shader laid out in a body
 /// region's frame, so stripes on a sleeve turn with the arm. Patterns are drawn as one
 /// repeat - a unit tile, recorded as a picture - over the slot's colour; textures are
-/// greyscale and multiplied on top, so they survive any recolour. All generated here,
+/// greyscale and multiplied on top, so they survive any recolour (as a shade, see
+/// <see cref="Texture"/>). All generated here,
 /// no art files, except a drawn tile (<see cref="PatternKind.Tile"/>). A dye
 /// (<see cref="PatternFill.IsDye"/>) isn't repeated at all: it is laid once across a part
 /// (<see cref="DyeLayout"/>), so it has no shader here.
@@ -42,15 +43,29 @@ public static class FabricShaders
         return SKShader.CreatePicture(picture, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, local, Unit);
     }
 
-    /// <summary>The texture's greyscale shader, to multiply over the fill; null for none.</summary>
+    /// <summary>
+    /// The texture as a shade to draw over the fill with a plain paint (no blend mode): black,
+    /// as opaque as the greyscale texture at its strength darkens - multiplying by a grey
+    /// <c>g</c> at strength <c>s</c> is the same as laying black at <c>s × (1 − g)</c> over
+    /// it. Null for none. Not a <see cref="SKBlendMode.Multiply"/> paint because PDF export
+    /// rasterises the texture into a tiling pattern, and poppler (Linux PDF viewers and file
+    /// thumbnails) draws a blended one wrong: opaque grey, or pale, instead of the colour (#60).
+    /// </summary>
     public static SKShader? Texture(TextureFill texture, SKMatrix frame, double height, Func<string, ArtFile?>? tiles = null)
     {
         var size = (float)(Math.Max(texture.Size ?? TextureFill.DefaultSize, 0.003) * height);
         var local = SKMatrix.CreateScale(size, size).PostConcat(frame);
+        var strength = (float)Math.Clamp(texture.Strength ?? TextureFill.DefaultStrength, 0, 1);
+        using var shade = SKColorFilter.CreateColorMatrix(ShadeMatrix(strength));
         if (texture.Kind == TextureKind.Tile)
         {
             var tile = texture.Tile is { } name && tiles?.Invoke(name) is { } file ? ArtPictures.Tile(file) : null;
-            return tile is null ? null : SKShader.CreatePicture(tile, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, local, Unit);
+            if (tile is null)
+                return null;
+            using var tiled = SKShader.CreatePicture(tile, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, local, Unit);
+            using var shaded = SKShader.CreateColorFilter(tiled, shade);
+            // Where the tile is see-through, so is its shade: a multiply left the fill be there.
+            return SKShader.CreateBlend(SKBlendMode.SrcIn, tiled, shaded);
         }
         using var lines = Record(canvas => DrawTexture(canvas, texture.Kind));
         using var weave = SKShader.CreatePicture(lines, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat, SKFilterMode.Linear, SKMatrix.Identity, Unit);
@@ -67,7 +82,8 @@ public static class FabricShaders
         using var grey = SKColorFilter.CreateColorMatrix(GreyMatrix(depth));
         using var greyNoise = SKShader.CreateColorFilter(noise, grey);
         using var combined = SKShader.CreateBlend(SKBlendMode.Multiply, weave, greyNoise);
-        return SKShader.CreateLocalMatrix(combined, local);
+        using var shadow = SKShader.CreateColorFilter(combined, shade);
+        return SKShader.CreateLocalMatrix(shadow, local);
     }
 
     /// <summary>Fills <paramref name="path"/> with <paramref name="ground"/>, then the fabric's pattern and texture in <paramref name="frame"/> - a dye fitted across the path.</summary>
@@ -93,8 +109,7 @@ public static class FabricShaders
             using var shader = Texture(texture, frame, height, tiles);
             if (shader != null)
             {
-                var strength = (float)Math.Clamp(texture.Strength ?? TextureFill.DefaultStrength, 0, 1);
-                using var paint = new SKPaint { Shader = shader, Style = SKPaintStyle.Fill, IsAntialias = true, BlendMode = SKBlendMode.Multiply, Color = SKColors.White.WithAlpha((byte)(strength * 255)) };
+                using var paint = new SKPaint { Shader = shader, Style = SKPaintStyle.Fill, IsAntialias = true };
                 canvas.DrawPath(path, paint);
             }
         }
@@ -222,6 +237,22 @@ public static class FabricShaders
             r, g, b, 0, offset,
             r, g, b, 0, offset,
             0, 0, 0, 0, 1,
+        ];
+    }
+
+    /// <summary>
+    /// A colour matrix taking a greyscale texture to its shade: black, with alpha
+    /// <paramref name="strength"/> × (1 − the grey's luminance).
+    /// </summary>
+    private static float[] ShadeMatrix(float strength)
+    {
+        var (r, g, b) = (-0.3f * strength, -0.59f * strength, -0.11f * strength);
+        return
+        [
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            r, g, b, 0, strength,
         ];
     }
 

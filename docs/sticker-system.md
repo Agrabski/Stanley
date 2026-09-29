@@ -517,12 +517,28 @@ public enum TextureKind { Denim, Knit, Corduroy, Wool, Leather, Canvas, Felt, Ti
 Each fabric is a Skia shader, filled inside the part's path:
 - A generated pattern is an `SKPicture` tile, drawn with a repeating picture shader.
 - An SVG tile is its parsed picture. A PNG tile is an image shader.
-- The texture is multiplied on top.
+- The texture darkens it as if multiplied on top, but is drawn as a **shade**, with
+  a plain paint: black, as opaque as the grey at its strength darkens (multiplying by
+  grey `g` at strength `s` is laying black at `s × (1 − g)` over it; a tile's
+  see-through parts shade nothing). See `FabricShaders.Texture`.
 - The shader's local matrix is the region frame × size × angle.
 
 PDF export must keep vector patterns as vector tiling patterns. If Skia's PDF
 backend rasterises picture shaders, export renders them at the export resolution
 instead. Check this in the fabrics slice.
+
+**No blend modes on the page (#60).** Skia's PDF backend rasterises a procedural
+texture (Perlin noise, composed shaders) into an image tiling pattern, and a paint's
+blend mode and alpha become an ExtGState (`/BM /Multiply /ca .5`) on that pattern.
+Poppler, which Linux PDF viewers and file-manager thumbnails use, gets that wrong in
+two different ways: its Cairo backend paints the pattern opaque (grey clothes), and
+Splash applies the alpha but not the multiply (pale clothes). MuPDF and Skia get it
+right, so the viewer and the thumbnail disagreed. A shade with its alpha baked into the
+image (an `/SMask`) and `/BM /Normal` renders the same everywhere. So page drawing
+should stick to `SrcOver`: work any other blend out into a shader (as the texture's
+shade is) rather than a paint's `BlendMode`. `FabricRenderingTests` checks a textured
+PDF asks for no blending. To compare renderers locally, `pdftoppm` (Splash),
+`pdftocairo` (Cairo) and PyMuPDF each render a page to PNG.
 
 ## 10. Data model
 
