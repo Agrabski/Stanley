@@ -1,0 +1,29 @@
+{
+  "colors": {
+    "accent": "#c0392b",
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Braid",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "depth": "back",
+      "name": "back",
+      "region": "head"
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairExtras",
+  "variants": [
+    "default"
+  ]
+}
