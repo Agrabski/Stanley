@@ -35,6 +35,8 @@ public sealed partial class CharacterEditorViewModel
             if (tab != null)
                 HairTabKey = tab.Key;
         });
+        SwitchHairCommand = new RelayCommand(SwitchHair);
+        KeepHairCommand = new RelayCommand(KeepHair);
         AddToMixCommand = new RelayCommand(AddToMix, () => HasHairReplaced);
         DismissHairReplacedCommand = new RelayCommand(DismissHairReplaced);
     }
@@ -214,7 +216,53 @@ public sealed partial class CharacterEditorViewModel
         AddToMixCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Called whenever the character changes: the button's line and tab move on, and a note about an edit that isn't the latest goes away.</summary>
+    // ---------------------------------------------------------------- "This is the old Bob - switch to the new Bob made of pieces?"
+
+    private HairUpgradeMemory? _ownHairUpgrades;
+
+    /// <summary>Who has kept their old hairstyle: the app's settings through the library, else this editor's memory alone.</summary>
+    private HairUpgradeMemory HairUpgrades => Library?.HairUpgrades ?? (_ownHairUpgrades ??= new());
+
+    public IRelayCommand SwitchHairCommand { get; private set; } = null!;
+    public IRelayCommand KeepHairCommand { get; private set; } = null!;
+
+    /// <summary>The old whole-hairstyle sticker the current look wears that a hairstyle now replaces, with that hairstyle - or null when there's none, or the user chose to keep it.</summary>
+    private (StickerAsset Legacy, Hairstyle Preset)? LegacyHair()
+    {
+        if (HairUpgrades.IsDeclined(CharacterId) || !LookWorking.Stickers.TryGetValue(StickerSlots.Hair, out var worn))
+            return null;
+        foreach (var id in worn)
+        {
+            if (LookWorking.Wardrobe.Find(id) is { } asset && Hairstyles.ForLegacy(asset.Sticker) is { } preset)
+                return (asset, preset);
+        }
+        return null;
+    }
+
+    /// <summary>Whether the upgrade bar is up: the current look wears an old library hairstyle that pieces now replace.</summary>
+    public bool HasHairUpgrade => LegacyHair() is not null;
+
+    public string? HairUpgradeText =>
+        LegacyHair() is { } found ? $"This is the old {found.Legacy.Sticker.Name} - switch to the new {found.Preset.Name} made of pieces?" : null;
+
+    /// <summary>"Switch": the old sticker becomes the hairstyle's pieces in the default look and every named look, colours kept. One undo step.</summary>
+    private void SwitchHair()
+    {
+        if (LegacyHair() is not { } found)
+            return;
+        var pieces = Hairstyles.PiecesFor(found.Preset, Committed);
+        Apply(EditResult<CharacterDefinition>.Success(HairEditing.ReplaceLegacy(Committed, found.Legacy.Id, pieces)));
+        RaiseHairChanged();
+    }
+
+    /// <summary>"Keep": this character keeps its old hairstyle and isn't asked again - remembered in the user's settings, not in the comic.</summary>
+    private void KeepHair()
+    {
+        HairUpgrades.Decline(CharacterId);
+        RaiseHairChanged();
+    }
+
+    /// <summary>Called whenever the character changes: the button's line and tab move on, a note about an edit that isn't the latest goes away, and the upgrade bar comes or goes.</summary>
     private void RaiseHairChanged()
     {
         if (_hairReplaced is { } note && !ReferenceEquals(Working, note.After))
@@ -222,5 +270,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(HairCurrent));
         OnPropertyChanged(nameof(HairTip));
         OnPropertyChanged(nameof(HairTabContent));
+        OnPropertyChanged(nameof(HasHairUpgrade));
+        OnPropertyChanged(nameof(HairUpgradeText));
     }
 }

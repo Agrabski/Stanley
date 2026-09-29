@@ -79,6 +79,13 @@ public partial class CharacterEditorView : UserControl
         Stage.PointerCaptureLost += (_, _) => EndDrag(null);
     }
 
+    /// <summary>Leaving the editor takes down the note about what a hairstyle replaced - it's only for the moment after the click.</summary>
+    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        (DataContext as CharacterEditorViewModel)?.DismissHairReplaced();
+    }
+
     private void ClearLineUpHint(CharacterEditorViewModel vm)
     {
         if (_lineUpHint is null)
