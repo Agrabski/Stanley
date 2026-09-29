@@ -35,6 +35,15 @@
                       <PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" />
                   </StackPanel>
               </RadioButton>
+              <RadioButton Name="ThoughtStyleButton" Classes="small" GroupName="BubbleTabStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsThoughtStyle}"
+                           ToolTip.Tip="Cloud-shaped thought bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource ThoughtIcon}" /><TextBlock Text="Thought" />
+                  </StackPanel>
+              </RadioButton>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Style" />
       </DockPanel>

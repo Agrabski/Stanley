@@ -116,6 +116,13 @@
                       <PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" />
                   </StackPanel>
               </Button>
+              <Button Name="InsertThoughtBubbleButton" Classes="tool" Command="{Binding InsertBubbleCommand}"
+                      CommandParameter="{x:Static bubbles:BubbleStylePreset.Thought}"
+                      ToolTip.Tip="Insert a thought bubble into the selected panel">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ThoughtIcon}" /><TextBlock Text="Thought" />
+                  </StackPanel>
+              </Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Bubbles" />
       </DockPanel>
