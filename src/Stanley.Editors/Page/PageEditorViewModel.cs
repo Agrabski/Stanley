@@ -845,6 +845,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         OnPropertyChanged(nameof(IsSpeechStyle));
         OnPropertyChanged(nameof(IsShoutStyle));
         OnPropertyChanged(nameof(IsWhisperStyle));
+        OnPropertyChanged(nameof(IsThoughtStyle));
         RaiseFontChanged();
     }
 
@@ -954,6 +955,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public bool IsSpeechStyle { get => CurrentBubbleStyle == BubbleStylePreset.Speech; set => SetStyleFlag(BubbleStylePreset.Speech, value); }
     public bool IsShoutStyle { get => CurrentBubbleStyle == BubbleStylePreset.Shout; set => SetStyleFlag(BubbleStylePreset.Shout, value); }
     public bool IsWhisperStyle { get => CurrentBubbleStyle == BubbleStylePreset.Whisper; set => SetStyleFlag(BubbleStylePreset.Whisper, value); }
+
+    public bool IsThoughtStyle { get => CurrentBubbleStyle == BubbleStylePreset.Thought; set => SetStyleFlag(BubbleStylePreset.Thought, value); }
 
     private void SetStyleFlag(BubbleStylePreset style, bool value)
     {

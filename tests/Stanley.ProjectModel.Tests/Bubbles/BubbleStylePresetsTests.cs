@@ -10,6 +10,7 @@ public class BubbleStylePresetsTests
     [InlineData(BubbleStylePreset.Speech)]
     [InlineData(BubbleStylePreset.Shout)]
     [InlineData(BubbleStylePreset.Whisper)]
+    [InlineData(BubbleStylePreset.Thought)]
     public void GenerateShape_FillsItsBoundsRoughly(BubbleStylePreset preset)
     {
         var bounds = new Rect2D(0, 0, 200, 120);
@@ -26,6 +27,7 @@ public class BubbleStylePresetsTests
     [InlineData(BubbleStylePreset.Speech)]
     [InlineData(BubbleStylePreset.Shout)]
     [InlineData(BubbleStylePreset.Whisper)]
+    [InlineData(BubbleStylePreset.Thought)]
     public void GenerateShape_ReachesEveryEdgeOfItsBounds(BubbleStylePreset preset)
     {
         var bounds = new Rect2D(10, 20, 200, 120);
