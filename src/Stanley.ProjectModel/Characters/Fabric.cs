@@ -69,6 +69,19 @@ public sealed record PatternFill(PatternKind Kind, IReadOnlyList<ColorValue> Col
 
     public static bool IsDyeKind(PatternKind kind) => kind is PatternKind.Streaks or PatternKind.Tips or PatternKind.Roots or PatternKind.Ombre or PatternKind.Rainbow;
 
+    /// <summary>
+    /// How much of a piece a dye of <paramref name="kind"/> covers when it has no
+    /// <see cref="Weight"/> of its own: how far up the tips reach, how far down the roots,
+    /// where an ombre starts fading (fractions of the piece's height), how wide a streak is
+    /// (a fraction of its spacing). The renderer and the editor's sliders both go by this.
+    /// </summary>
+    public static double DefaultDyeWeight(PatternKind kind) => kind switch
+    {
+        PatternKind.Roots => 0.25,
+        PatternKind.Streaks => 0.4,
+        _ => 0.3
+    };
+
     /// <summary>The Rainbow dye's colours when none are picked: red, orange, yellow, green, blue, violet.</summary>
     public static IReadOnlyList<ColorValue> RainbowColors { get; } =
     [

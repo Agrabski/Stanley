@@ -49,7 +49,13 @@ see "Stickers (implemented)" below and docs/sticker-system.md §19), in any colo
 already holds — a cap under a hood, a shirt over a T-shirt — and a click on a worn one
 takes it off) and **in styles** (a hood up or down, a cap's brim any way; picked on the
 Sticker tab or for one panel — docs/sticker-system.md §8, §20); in the character editor, clicking a compared (faded) character
-switches to it. No three-quarter view yet. Panels also hold **drawn shapes, free
+switches to it. **Hair is built from pieces** (docs/sticker-system.md §22, #59): top, fringe,
+sides, back and extras are stickers in their own slots, each following the Hair colour until
+given its own (`hairFringe`, ...), with hairstyles as one-click presets of pieces
+(`StickerLibrary.Hairstyles`), dyes fitted to each piece (tips, roots, ombré, streaks,
+rainbow), hand-placed streaks clipped to the hair (`clip: hair`), one-click colour schemes,
+and a switch for characters still wearing an old whole hairstyle - all behind one Hair
+button. No three-quarter view yet. Panels also hold **drawn shapes, free
 text, pictures and speed lines** (focus lines radiating from a point you drag)
 behind or in front of the characters, over a colour, gradient or picture
 **background** — see "Panel elements and backgrounds (implemented)" below. A comic

@@ -277,7 +277,7 @@ public sealed class HairColorTests : IDisposable
         var tips = DyeOf(editor, StickerSlots.Hair)!;
         Assert.Equal(PatternKind.Tips, tips.Kind);
         Assert.Equal([ColorSlotEditor.DefaultDyeColor], tips.Colors);
-        Assert.Equal(HairEditing.DipDyeReach, tips.Weight);
+        Assert.Equal(PatternFill.DefaultDyeWeight(PatternKind.Tips), tips.Weight);
         Assert.True(hair.HasDye);
         Assert.False(hair.HasClothingPattern);
         Assert.True(hair.HasDyeAmount);
@@ -294,7 +294,7 @@ public sealed class HairColorTests : IDisposable
         Assert.Equal(0.6, DyeOf(editor, StickerSlots.Hair)!.Weight);
         Assert.Equal(60, hair.DyeAmount);
         session.Workspace.History.Undo(); // the whole drag
-        Assert.Equal(HairEditing.DipDyeReach, DyeOf(editor, StickerSlots.Hair)!.Weight);
+        Assert.Equal(PatternFill.DefaultDyeWeight(PatternKind.Tips), DyeOf(editor, StickerSlots.Hair)!.Weight);
         Assert.Equal([Green], DyeOf(editor, StickerSlots.Hair)!.Colors);
     }
 

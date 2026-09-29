@@ -168,12 +168,8 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	/// <summary>The dye picked when none was: a vivid purple.</summary>
 	public static ColorValue DefaultDyeColor { get; } = ColorValue.FromHex("#8e24aa");
 
-	/// <summary>
-	/// How much of a piece a dye covers when it has no <see cref="PatternFill.Weight"/> of its own:
-	/// how far up the tips reach, how far down the roots, where the ombre starts fading, how wide
-	/// the streaks are (fractions of the piece / of one repeat).
-	/// </summary>
-	public static double DefaultDyeWeight(PatternKind kind) => kind == PatternKind.Tips ? HairEditing.DipDyeReach : 0.3;
+	/// <summary>How much of a piece a dye covers when it has no <see cref="PatternFill.Weight"/> of its own - what the renderer draws, so the sliders agree with it.</summary>
+	public static double DefaultDyeWeight(PatternKind kind) => PatternFill.DefaultDyeWeight(kind);
 
 	/// <summary>A fresh dye of <paramref name="kind"/> in place of <paramref name="previous"/>: its colour carries over, Rainbow starts with its own six.</summary>
 	internal static PatternFill NewDye(PatternKind kind, PatternFill? previous)

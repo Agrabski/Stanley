@@ -100,17 +100,17 @@ internal sealed class DyeLayout
         switch (dye.Kind)
         {
             case PatternKind.Tips:
-                var tips = Weight(dye, 0.3, 0.02, 1);
+                var tips = Weight(dye, 0.02, 1);
                 bands.Add((Band(left - pad, bottom - tips * bounds.Height, right + pad, bottom + pad), color));
                 break;
             case PatternKind.Roots:
-                var roots = Weight(dye, 0.25, 0.02, 1);
+                var roots = Weight(dye, 0.02, 1);
                 bands.Add((Band(left - pad, top - pad, right + pad, top + roots * bounds.Height), color));
                 break;
             case PatternKind.Ombre:
                 // Clear at the start and the dye at the bottom, over the ground: the ground colour
                 // fading into the dye, whatever the ground is.
-                var start = top + Weight(dye, 0.3, 0, 0.95) * bounds.Height;
+                var start = top + Weight(dye, 0, 0.95) * bounds.Height;
                 gradient = SKShader.CreateLinearGradient(toFigure.MapPoint(bounds.MidX, start), toFigure.MapPoint(bounds.MidX, bottom),
                     [color.WithAlpha(0), color], SKShaderTileMode.Clamp);
                 break;
@@ -138,7 +138,7 @@ internal sealed class DyeLayout
     private static void Streaks(PatternFill dye, SKRect bounds, float pad, SKColor color, int seed, List<(SKPath, SKColor)> bands, Func<float, float, float, float, SKPath> band)
     {
         var spacing = (float)Math.Clamp(dye.Size ?? 0.18, 0.03, 1) * bounds.Width;
-        var weight = Weight(dye, 0.4, 0.05, 0.95);
+        var weight = Weight(dye, 0.05, 0.95);
         // xorshift32: the same numbers for the same seed, on any runtime.
         var state = (uint)seed | 1u;
         float Next()
@@ -160,7 +160,7 @@ internal sealed class DyeLayout
         }
     }
 
-    private static float Weight(PatternFill dye, double fallback, double min, double max) => (float)Math.Clamp(dye.Weight ?? fallback, min, max);
+    private static float Weight(PatternFill dye, double min, double max) => (float)Math.Clamp(dye.Weight ?? PatternFill.DefaultDyeWeight(dye.Kind), min, max);
 
     /// <summary>Paints the dye over <paramref name="path"/> (already filled with its ground colour), clipped to it.</summary>
     public void Draw(SKCanvas canvas, SKPath path)
