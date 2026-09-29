@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Stanley.Editing;
 using Stanley.ProjectModel.Bubbles;
@@ -76,7 +77,8 @@ public sealed class PageCanvasControl : Control
         Focusable = true;
         ActualThemeVariantChanged += (_, _) => InvalidateVisual();
 
-        // A character dragged out of the Characters pane is placed where it's dropped.
+        // A character dragged out of the Characters pane, or a picture file dragged in from
+        // outside the app, is placed where it's dropped.
         DragDrop.SetAllowDrop(this, true);
         DragDrop.AddDragOverHandler(this, OnDragOver);
         DragDrop.AddDropHandler(this, OnDrop);
@@ -84,25 +86,56 @@ public sealed class PageCanvasControl : Control
 
     private void OnDragOver(object? sender, DragEventArgs e)
     {
+        var vm = _viewModel;
         var page = ControlToPage(e.GetPosition(this));
-        e.DragEffects = _viewModel != null && e.DataTransfer.Contains(CharacterDrag.Format) && PanelAt(page) != null
+        e.DragEffects = vm != null && PanelAt(page) != null
+            && (e.DataTransfer.Contains(CharacterDrag.Format) || (vm.CanImportPictures && e.DataTransfer.Contains(DataFormat.File)))
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private void OnDrop(object? sender, DragEventArgs e)
+    private async void OnDrop(object? sender, DragEventArgs e)
     {
-        if (_viewModel is not { } vm || e.DataTransfer.TryGetValue(CharacterDrag.Format) is not { } value
-            || !ProjectModel.Ids.CharacterId.TryParse(value, null, out var id))
+        if (_viewModel is not { } vm)
             return;
         var page = ControlToPage(e.GetPosition(this));
-        if (PanelAt(page) is { } panelId)
+
+        if (e.DataTransfer.TryGetValue(CharacterDrag.Format) is { } characterId
+            && ProjectModel.Ids.CharacterId.TryParse(characterId, null, out var id))
         {
-            vm.InsertCharacter(id, panelId, page);
-            Focus();
+            if (PanelAt(page) is { } panelId)
+            {
+                vm.InsertCharacter(id, panelId, page);
+                Focus();
+            }
+            e.Handled = true;
+            return;
         }
+
+        // A picture dragged in from the OS (a file manager, a browser download) lands in the
+        // panel under the pointer, just like Insert > Picture would place it.
+        if (!vm.CanImportPictures || PanelAt(page) is not { } dropPanel || e.DataTransfer.TryGetFiles() is not { Length: > 0 } files)
+            return;
         e.Handled = true;
+
+        var request = new PictureImportRequest(dropPanel, AsBackground: false);
+        foreach (var item in files)
+        {
+            if (item is not IStorageFile file)
+                continue;
+            try
+            {
+                await using var stream = await file.OpenReadAsync();
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory);
+                vm.ImportPicture(request, file.Name, memory.ToArray());
+            }
+            catch (IOException)
+            {
+            }
+        }
+        Focus();
     }
 
     /// <summary>Raised when zoom or pan changes, so the ribbon's zoom readout and any overlay (the inline text editor) can follow.</summary>

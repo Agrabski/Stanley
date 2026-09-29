@@ -378,6 +378,28 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
+    public void Turning_a_posed_character_to_the_front_shows_the_preset_as_the_front_draws_it_in_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        var item = Add(session, "A");
+        page.InsertCharacter(item.Id, left);
+        page.ApplyPosePresetCommand.Execute(page.PoseChoices.Single(c => c.Preset.Preset == PosePreset.Run));
+        var running = page.Working.Panels[left].CharacterInstances[0];
+        Assert.Equal(ViewAngle.Profile, running.Pose.ViewAngle);
+
+        page.IsSelectedCharacterFront = true;
+
+        var turned = page.Working.Panels[left].CharacterInstances[0];
+        Assert.Equal(ViewAngle.Front, turned.Pose.ViewAngle);
+        var expected = PosePresets.Apply(page.CharacterSnapshot[item.Id], turned, PosePresets.Get(PosePreset.Run), ViewAngle.Front);
+        Assert.Equal(expected.Pose.BoneRotations, turned.Pose.BoneRotations);
+        Assert.Equal(expected.Pose.HipsShift, turned.Pose.HipsShift);
+
+        session.Workspace.History.Undo();
+        Assert.Equal(running.Pose, page.Working.Panels[left].CharacterInstances[0].Pose);
+    }
+
+    [Fact]
     public void Dragging_the_hips_ring_crouches_with_the_feet_planted_in_one_undo_step()
     {
         var (session, page, left, _) = NewSession();

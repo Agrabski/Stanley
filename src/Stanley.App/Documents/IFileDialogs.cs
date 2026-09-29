@@ -33,6 +33,12 @@ public interface IFileDialogs
     /// <summary>File &gt; Options &gt; SVG editor's picker (detected programs, or Browse... to any executable); null if cancelled.</summary>
     Task<string?> PickSvgEditorAsync(string? currentPath);
 
+    /// <summary>
+    /// File &gt; Info's "Delete" on an issue: unlike deleting a page or character, this isn't
+    /// an undo step - it removes the issue's folder from disk right away. True to go ahead.
+    /// </summary>
+    Task<bool> AskDeleteIssueAsync(string caption);
+
     /// <summary>The startup update check's "a new version is available" popup. True to install and restart now; false to leave it for File &gt; Options &gt; Updates later.</summary>
     Task<bool> AskInstallUpdateAsync(string version, string? notes);
 }

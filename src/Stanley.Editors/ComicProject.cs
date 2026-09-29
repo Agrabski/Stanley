@@ -296,6 +296,31 @@ public sealed class ComicProject
     }
 
     /// <summary>
+    /// Deletes one of this (already-saved) comic's other issues: its folder under
+    /// <c>issues/</c>, and its entry in the manifest's issue order. Refuses to delete the
+    /// issue currently open (switch to another with <see cref="Open"/> first) or the
+    /// comic's last remaining issue. Never touches another issue's files.
+    /// </summary>
+    public void DeleteIssue(IssueId id)
+    {
+        if (Location is null)
+            throw new InvalidOperationException("This comic hasn't been saved yet - save it first.");
+        if (id == _issue.Id)
+            throw new InvalidOperationException("Can't delete the open issue - switch to another one first.");
+
+        var repository = new ProjectRepository(Location);
+        var manifest = repository.LoadManifest();
+        if (manifest.IssueIds.Count <= 1)
+            throw new InvalidOperationException("A comic must keep at least one issue.");
+
+        repository.DeleteIssue(id);
+        repository.SaveManifest(manifest with { IssueIds = manifest.IssueIds.Where(x => x != id).ToList() });
+
+        _issueOrder.Remove(id);
+        _otherIssues.Remove(id);
+    }
+
+    /// <summary>
     /// Writes <paramref name="pages"/> (in this order) back to <see cref="Location"/>: the
     /// manifest title, the issue's page list, every page and panel - and deletes the
     /// folders/files of pages and panels removed since the last save. A page that's the
