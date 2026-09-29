@@ -78,9 +78,6 @@ public sealed partial class CharacterEditorViewModel
 
     // ---------------------------------------------------------------- galleries
 
-    /// <summary>The hair gallery.</summary>
-    public IReadOnlyList<SlotGallery> HairGalleries => Galleries(StickerSlots.Hair);
-
     /// <summary>
     /// The face's galleries: Eyes (or, split left/right - docs/sticker-system.md §21 - Left
     /// eye and Right eye instead), Brows, Mouth, Nose.
@@ -376,7 +373,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(PreviewRightEye));
         OnPropertyChanged(nameof(ExpressionWarning));
         OnPropertyChanged(nameof(Hint));
-        OnPropertyChanged(nameof(HairGalleries));
+        OnPropertyChanged(nameof(HairTabContent));
         OnPropertyChanged(nameof(FaceGalleries));
         RaiseStylesChanged(); // previewed in the stage's view
     }
@@ -721,7 +718,7 @@ public sealed partial class CharacterEditorViewModel
         RaiseLooksChanged();
         OnPropertyChanged(nameof(IsEyesSplit));
         OnPropertyChanged(nameof(CanSplitEyes));
-        OnPropertyChanged(nameof(HairGalleries));
+        RaiseHairChanged();
         OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));
         OnPropertyChanged(nameof(AccessoryGalleries));

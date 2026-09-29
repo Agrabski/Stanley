@@ -45,6 +45,35 @@
       </DockPanel>
     </DataTemplate>
 
+    <!-- The Hairstyles tab of the Hair flyout: bald, the hairstyles, then the character's own whole hairstyles - each a close-up on this character. -->
+    <DataTemplate x:Key="HairstyleChoicesTemplate" x:DataType="local:HairstyleGallery">
+      <DockPanel MaxWidth="440">
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="1,6,1,0">
+        <Button Name="DrawYourOwnButton" Classes="small" Command="{Binding Draw}" CommandParameter="hair"
+                ToolTip.Tip="Draw a whole hairstyle in your own SVG editor (Inkscape...), on a template of this body - every save updates it here">Draw your own...</Button>
+        <Button Name="ImportArtButton" Classes="small" Command="{Binding Import}" CommandParameter="hair"
+                ToolTip.Tip="An SVG or PNG of a whole hairstyle: a file drawn on a template goes where it was drawn; anything else is placed here to move and size">Import...</Button>
+      </StackPanel>
+      <ItemsControl Name="HairstyleChoices" ItemsSource="{Binding Choices}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:HairstyleChoice">
+            <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsWorn}" Margin="1" Padding="2"
+                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Command="{Binding $parent[ItemsControl].((local:HairstyleGallery)DataContext).Wear}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Closeup="{Binding Closeup}" />
+              </DockPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      </DockPanel>
+    </DataTemplate>
+
     <!-- A slot's gallery: its label and what's worn, opening the choices. -->
     <DataTemplate x:Key="SlotGalleryTemplate" x:DataType="local:SlotGallery">
       <DropDownButton Classes="slotGallery" ToolTip.Tip="{Binding Tip}">
@@ -259,7 +288,42 @@
         <DockPanel Classes="group">
           <StackPanel Orientation="Vertical" Spacing="2">
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <ItemsControl Name="HairGalleries" ItemsSource="{Binding HairGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}" />
+            <!-- The one Hair button: its flyout has a row of tabs - Hairstyles first, then a tab per piece and Streaks - and that tab's choices under them. -->
+            <DropDownButton Name="HairButton" Classes="slotGallery" ToolTip.Tip="{Binding HairTip}">
+              <StackPanel Spacing="1">
+                <TextBlock Text="Hair" FontSize="12" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding HairCurrent}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                <Flyout Placement="BottomEdgeAlignedLeft">
+                  <StackPanel Spacing="6" MaxWidth="440">
+                    <ItemsControl Name="HairTabItems" ItemsSource="{Binding HairTabs}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:HairTab">
+                          <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="8,2"
+                                  Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowHairTabCommand}"
+                                  CommandParameter="{Binding}" Content="{Binding Label}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Only the tab in view is built: previews are expensive. -->
+                    <ContentControl Name="HairTabContentHost" Content="{Binding HairTabContent}">
+                      <ContentControl.DataTemplates>
+                        <DataTemplate DataType="local:HairstyleGallery" x:DataType="local:HairstyleGallery">
+                          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource HairstyleChoicesTemplate}" />
+                        </DataTemplate>
+                        <DataTemplate DataType="local:SlotGallery" x:DataType="local:SlotGallery">
+                          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StickerChoicesTemplate}" />
+                        </DataTemplate>
+                      </ContentControl.DataTemplates>
+                    </ContentControl>
+                  </StackPanel>
+                </Flyout>
+              </DropDownButton.Flyout>
+            </DropDownButton>
             <ItemsControl Name="FaceGalleries" ItemsSource="{Binding FaceGalleries}" ItemTemplate="{StaticResource CompactSlotGalleryTemplate}" Width="148">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
