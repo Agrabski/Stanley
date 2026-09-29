@@ -183,18 +183,25 @@ internal sealed class ShapeItem(SKPath path, SKColor fill, SKPath? inkMask, Stic
 
 /// <summary>
 /// A fabric (pattern and/or texture) over an item's colour: the pieces it's laid out in,
-/// each with its region's frame. Shaders are made once and shared by every draw.
+/// each with its region's frame. Shaders are made once and shared by every draw. A dye
+/// pattern (<see cref="PatternFill.IsDye"/>) isn't repeated per piece: it is one
+/// <see cref="DyeLayout"/>, fitted across all the pieces together in the first one's frame
+/// (or the part's, when the caller fitted it to more than these pieces).
 /// </summary>
 internal sealed class FabricFill
 {
     private readonly List<(SKPath Path, SKShader? Pattern, SKShader? Texture)> _pieces;
+    private readonly DyeLayout? _dye;
     private readonly float _strength;
 
-    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles)
+    /// <param name="dye">The dye already fitted across the whole part these pieces are some of; null to fit it across the pieces (using <paramref name="seed"/> for streaks).</param>
+    public FabricFill(IReadOnlyList<PartPiece> pieces, SKColor ground, Fabric fabric, double height, Func<string, ArtFile?> tiles, DyeLayout? dye = null, int seed = 0)
     {
         _pieces = pieces.Select(p => (p.Path,
             fabric.Pattern is { } pattern ? FabricShaders.Pattern(pattern, ground, p.Frame, height, tiles) : null,
             fabric.Texture is { } texture ? FabricShaders.Texture(texture, p.Frame, height, tiles) : null)).ToList();
+        if (fabric.Pattern is { IsDye: true } dyed)
+            _dye = dye ?? (pieces.Count > 0 ? DyeLayout.Fit(dyed, pieces.Select(p => p.Path), pieces[0].Frame, ground, seed) : null);
         _strength = (float)Math.Clamp(fabric.Texture?.Strength ?? TextureFill.DefaultStrength, 0, 1);
     }
 
@@ -213,6 +220,7 @@ internal sealed class FabricFill
                 paint.Shader = pattern;
                 canvas.DrawPath(path, paint);
             }
+            _dye?.Draw(canvas, path);
             if (texture != null)
             {
                 paint.Shader = texture;
@@ -537,7 +545,9 @@ public sealed class FigureRenderer : ICharacterRenderer
                 continue;
             }
             var ground = FigureGeometry.ToSk(look.Color(group.Key, fallback));
-            var fabric = look.FabricOf(group.Key) is { } f ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles) : null;
+            var fabric = look.FabricOf(group.Key) is { } f
+                ? new FabricFill(group.Select(g => g.Piece).ToList(), ground, f, height, tiles, seed: DyeLayout.Seed(worn.Asset.Id.Value, group.Key))
+                : null;
             yield return new ShapeItem(path, ground, mask, worn.Asset.Id, fabric);
         }
 

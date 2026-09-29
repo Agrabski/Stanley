@@ -412,17 +412,22 @@ internal static class StickerArtPieces
             }
 
             var mapped = new List<ArtStroke>();
-            foreach (var e in elements)
+            // A split eye's own elements still say "slot-eyes" (§21) - drawn from the
+            // shared "eyes" colour slot, split into "eyesLeft"/"eyesRight" only once a
+            // side is chosen for this worn copy, so splitting never repaints on its own.
+            // A hair piece's "slot-hair" is drawn from the piece's own key ("hairFringe",
+            // which follows "hair" until it's given its own), a streak's from its own.
+            var keys = elements.Select(e => e.Slot == StickerSlots.Eyes && worn.Side is { } eyeSide
+                ? StickerSlots.SidedSlot(e.Slot, eyeSide)
+                : StickerSlots.ColorKey(worn.Slot, worn.Asset.Id, e.Slot)).ToList();
+            var placed = elements.Select(e => place(e.Path)).ToList();
+            // A dye is fitted once across the elements of this part that share its colour key.
+            var dyes = new Dictionary<string, (DyeLayout? Layout, SKMatrix Frame)>(StringComparer.Ordinal);
+            for (var i = 0; i < elements.Count; i++)
             {
-                // A split eye's own elements still say "slot-eyes" (§21) - drawn from the
-                // shared "eyes" colour slot, split into "eyesLeft"/"eyesRight" only once a
-                // side is chosen for this worn copy, so splitting never repaints on its own.
-                // A hair piece's "slot-hair" is drawn from the piece's own key ("hairFringe",
-                // which follows "hair" until it's given its own), a streak's from its own.
-                var colorSlot = e.Slot == StickerSlots.Eyes && worn.Side is { } eyeSide
-                    ? StickerSlots.SidedSlot(e.Slot, eyeSide)
-                    : StickerSlots.ColorKey(worn.Slot, worn.Asset.Id, e.Slot);
-                var path = place(e.Path);
+                var e = elements[i];
+                var colorSlot = keys[i];
+                var path = placed[i];
                 var clip = e.Clip is { } c ? place(c) : null;
                 var fill = e.Fill is { } f ? Recolor(f.Color, e.Slot, colorSlot, worn, look) : (SKColor?)null;
                 var stroke = e.Stroke is { } s ? Recolor(s.Color, e.Slot, colorSlot, worn, look) : (SKColor?)null;
@@ -431,9 +436,24 @@ internal static class StickerArtPieces
                 FabricFill? fabric = null;
                 if (fill is { } ground && colorSlot is { } slot && !e.Solid && look.FabricOf(slot) is { } f2)
                 {
-                    var b = path.TightBounds;
-                    var frame = RegionMapping.FabricFrame(figure, part.Region, side, new Point2D(b.MidX, b.MidY));
-                    fabric = new FabricFill([new PartPiece(path, FigureLayerKind.Front, frame)], ground, f2, height, tiles);
+                    if (f2.Pattern is { IsDye: true } dye)
+                    {
+                        if (!dyes.TryGetValue(slot, out var fitted))
+                        {
+                            var sharing = Enumerable.Range(0, elements.Count)
+                                .Where(j => keys[j] == slot && elements[j].Fill is not null && !elements[j].Solid).Select(j => placed[j]).ToList();
+                            var at = DyeLayout.Bounds(sharing);
+                            var dyeFrame = RegionMapping.FabricFrame(figure, part.Region, side, new Point2D(at.MidX, at.MidY));
+                            dyes[slot] = fitted = (DyeLayout.Fit(dye, sharing, dyeFrame, ground, DyeLayout.Seed(worn.Asset.Id.Value, part.Name, side.ToString(), slot)), dyeFrame);
+                        }
+                        fabric = new FabricFill([new PartPiece(path, FigureLayerKind.Front, fitted.Frame)], ground, f2, height, tiles, fitted.Layout);
+                    }
+                    else
+                    {
+                        var b = path.TightBounds;
+                        var frame = RegionMapping.FabricFrame(figure, part.Region, side, new Point2D(b.MidX, b.MidY));
+                        fabric = new FabricFill([new PartPiece(path, FigureLayerKind.Front, frame)], ground, f2, height, tiles);
+                    }
                 }
                 mapped.Add(new ArtStroke(path, clip, fill, fillShader, stroke, strokeShader, e.StrokeWidth / ArtItem.TemplateInk,
                     e.Cap, e.Join, e.Dash, fabric, e.EvenOdd, e.Image, matrix));
