@@ -916,7 +916,7 @@ a band name, emoji), beyond patterns and textures.
 ## 20. Styles
 
 **Status: implemented.** Ways to wear a sticker: a hood up or down (#72), a cap with its
-brim forward, backward or to either side (#74). A style is one of the sticker's
+brim forward, backward or to either side (#74), a jacket zipped up, half open or open (#71). A style is one of the sticker's
 `variants` (§7), chosen **per sticker**, not per slot, so a cap and a hood worn together
 in `headwear` each keep their own.
 - **Storage**: sticker id → variant, sparse and absent when unused, along the look chain
@@ -937,6 +937,11 @@ in `headwear` each keep their own.
   style can change a sticker's shape, not just its drawing:
   the hood's cover pieces only when it's up, the brim behind the head only when it's back.
   Drawn parts take their art from `variants/<style>/<view>.svg` as for any variant.
+  The **Zip jacket** (`outer/zip-jacket`) is the pattern for an opening garment: cover parts
+  for the jacket, a `blend: cut` warp part `opening` only in `half` and `open` (so the top or
+  skin underneath shows through, whatever is worn), and a `zip` part in every style drawing
+  the slider and pull tab. The cut is a plain polygon per style, so a new zipped garment is
+  three SVGs per view.
 - **Character editor**: the contextual Sticker tab has a **Worn** gallery - each style of
   the selected sticker, previewed on the character wearing it that way (a close-up for
   head stickers), the current one marked. A click is one undo step through the same look
