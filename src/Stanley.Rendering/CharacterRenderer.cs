@@ -511,6 +511,21 @@ public sealed class FigureRenderer : ICharacterRenderer
         return builder.Detach();
     }
 
+    /// <summary>
+    /// Where a clipped item can be clicked: its area inside <paramref name="keep"/> - or, if
+    /// that comes out empty (the piece is off the hair it's clipped to, or the intersection
+    /// failed on awkward art), its whole area, so it can still be found and dragged back.
+    /// Its drawing is clipped either way.
+    /// </summary>
+    private static SKPath ClippedArea(SKPath area, SKPath keep)
+    {
+        var clipped = FigureGeometry.Combine(area, keep, SKPathOp.Intersect);
+        if (!clipped.IsEmpty)
+            return clipped;
+        clipped.Dispose();
+        return FigureGeometry.Copy(area);
+    }
+
     /// <summary>What <paramref name="clip"/> keeps a long-lived art or text item inside - an owned copy, since <paramref name="bodySkin"/>, <paramref name="own"/>, <paramref name="clothes"/> and <paramref name="hair"/> are disposed once this layer is done.</summary>
     private static SKPath? PersistedClip(PartClip? clip, SKPath bodySkin, SKPath own, SKPath clothes, SKPath hair) => clip switch
     {
@@ -579,7 +594,7 @@ public sealed class FigureRenderer : ICharacterRenderer
         foreach (var piece in art.Where(a => a.Part.Blend != PartBlend.Cut))
         {
             var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes, hair);
-            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : ClippedArea(piece.Area, keep);
             if (!cuts.IsEmpty)
             {
                 var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);
@@ -598,7 +613,7 @@ public sealed class FigureRenderer : ICharacterRenderer
         foreach (var piece in text.Where(t => t.Part.Blend != PartBlend.Cut))
         {
             var keep = PersistedClip(piece.Part.Clip, bodySkin, own, clothes, hair);
-            var area = keep is null ? FigureGeometry.Copy(piece.Area) : FigureGeometry.Combine(piece.Area, keep, SKPathOp.Intersect);
+            var area = keep is null ? FigureGeometry.Copy(piece.Area) : ClippedArea(piece.Area, keep);
             if (!cuts.IsEmpty)
             {
                 var cut = FigureGeometry.Combine(area, cuts, SKPathOp.Difference);

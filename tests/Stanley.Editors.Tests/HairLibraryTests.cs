@@ -175,6 +175,44 @@ public sealed class HairLibraryTests
             $"expected about {e}, got {actual}");
     }
 
+    private static int Pixels(SKBitmap bitmap, ColorValue color, int tolerance = 30)
+    {
+        var c = SKColor.Parse(color.Hex);
+        var count = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var p = bitmap.GetPixel(x, y);
+                if (Math.Abs(p.Red - c.Red) <= tolerance && Math.Abs(p.Green - c.Green) <= tolerance && Math.Abs(p.Blue - c.Blue) <= tolerance)
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    [Theory]
+    [InlineData(ViewAngle.Front)]
+    [InlineData(ViewAngle.Profile)]
+    public void A_streak_shows_on_the_hair_pieces_and_stops_at_their_edge(ViewAngle view)
+    {
+        // Regression: a union of warped art with an outline traced along its own fill's edge
+        // could silently drop the fill, so the hair a streak is clipped to came out empty and
+        // the streak vanished (or showed only as the top's strand lines).
+        var streak = Library.Find("hairStreaks/chunky")!.Asset.Sticker.Colors[StickerSlots.StreakColor];
+        var bald = LookEditing.Wear(CharacterDefinition.Create("A"), Library.Find("hairStreaks/chunky")!.Instantiate());
+        var character = CharacterDefinition.Create("A");
+        foreach (var key in new[] { "hairTop/smooth", "hairFringe/blunt", "hairStreaks/chunky" })
+            character = LookEditing.Wear(character, Hairstyles.Piece(key, character)!);
+
+        using var alone = Render(bald, view);
+        using var onHair = Render(character, view);
+        var shown = Pixels(onHair, streak);
+
+        Assert.True(shown > 200, $"only {shown} streak pixels on the hair");
+        Assert.True(shown < Pixels(alone, streak), "the streak isn't clipped to the hair");
+    }
+
     [Fact]
     public void A_purple_fringe_on_black_hair_the_issues_photo()
     {
