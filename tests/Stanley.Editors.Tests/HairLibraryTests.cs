@@ -58,7 +58,8 @@ public sealed class HairLibraryTests
                 var art = StickerSvg.Parse(file!);
                 Assert.True(art is not null, $"{key} {variant} {view} isn't an SVG Stanley reads");
                 Assert.True(art!.Report.Count == 0, $"{key} {variant} {view}: {string.Join("; ", art.Report)}");
-                foreach (var part in sticker.Parts.Where(p => p.AppliesTo(variant)))
+                // The back of the hair (a far pigtail) may be hidden from the front; everything else is drawn in both views.
+                foreach (var part in sticker.Parts.Where(p => p.AppliesTo(variant) && !(p.Depth == PartDepth.Back && view == ViewAngle.Front)))
                     Assert.True(art.Part(part.Name).Count > 0, $"{key} {variant} {view} has nothing in its \"{part.Name}\" layer");
             }
         }

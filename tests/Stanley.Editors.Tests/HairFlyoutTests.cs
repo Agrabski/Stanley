@@ -198,7 +198,7 @@ public sealed class HairFlyoutTests
 
         editor.WearHairstyleCommand.Execute(BobChoice(editor));
 
-        Assert.Equal(4, Hairdo(editor).Count); // the look shown
+        Assert.Equal(4, HairEditing.WornHairdo(editor.LookWorking).Count); // the look shown
         Assert.All(StickerSlots.HairPieces, slot => Assert.False(editor.Committed.Stickers.TryGetValue(slot, out var ids) && ids.Count > 0));
         Assert.Equal(4, StickerSlots.HairPieces.Count(slot => editor.Committed.Revisions[winter].ActiveStickers.ContainsKey(slot)));
         session.Workspace.History.Undo();
@@ -510,7 +510,9 @@ public sealed class HairFlyoutTests
         SetColor(editor, "hair", Red);
         editor.NewLookCommand.Execute(null);
         var winter = editor.CurrentLook!.Value;
-        WearOn(editor, extra); // the look's own hair slot: the old Bob and something more
+        // The look's own hair slot: the old Bob and something more.
+        editor.Apply(EditResult<CharacterDefinition>.Success(LookEditing.StoreLook(editor.Committed, winter,
+            LookEditing.Wear(LookEditing.Project(editor.Committed, editor.Committed.Revisions[winter]), extra))));
         Assert.Contains(old.Id, editor.Committed.Revisions[winter].ActiveStickers[StickerSlots.Hair]);
         Assert.True(editor.HasHairUpgrade);
 

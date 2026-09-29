@@ -17,5 +17,4 @@
     <path class="slot-hair" d="M65.8,-783.8 L65.2,-771.2" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
     <ellipse class="slot-accent" cx="69.1" cy="-787.1" rx="7.4" ry="5" fill="#c0392b" stroke="#1a1a1a" stroke-width="2" transform="rotate(-176.0 69.1 -787.1)"/>
   </g>
-  <g id="front" inkscape:groupmode="layer" inkscape:label="front"/>
 </svg>

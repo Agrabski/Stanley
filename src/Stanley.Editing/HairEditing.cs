@@ -46,8 +46,8 @@ public static class HairEditing
         StickerSlots.Hairdo.SelectMany(slot => character.Stickers.TryGetValue(slot, out var ids) ? ids : []).ToList();
 
     /// <summary>
-    /// Puts on a hairdo's <paramref name="pieces"/>, each in its style (null for its default),
-    /// as one edit. <paramref name="replace"/> takes everything in the hairdo's slots off first
+    /// Puts on a hairdo's <paramref name="pieces"/>, each in its style (null for its default -
+    /// a piece reused from the wardrobe drops the style another hairstyle gave it), as one edit. <paramref name="replace"/> takes everything in the hairdo's slots off first
     /// (a hairstyle preset); otherwise the pieces go on over what's there, skipping any already
     /// worn. Colours are the character's, so they're kept either way.
     /// </summary>
@@ -64,10 +64,12 @@ public static class HairEditing
         var worn = WornHairdo(character).ToHashSet();
         foreach (var (asset, style) in pieces)
         {
-            if (!worn.Contains(asset.Id))
+            var already = worn.Contains(asset.Id);
+            if (!already)
                 character = LookEditing.Wear(character, asset);
-            if (style is not null)
-                character = LookEditing.SetVariant(character, asset.Id, style);
+            // A piece already in the mix keeps its style unless the hairstyle names one.
+            if (style is not null || !already)
+                character = LookEditing.SetVariant(character, asset.Id, style ?? LookEditing.DefaultStyle(asset.Sticker));
         }
         return character;
     }

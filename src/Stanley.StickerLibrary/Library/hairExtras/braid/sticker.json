@@ -13,13 +13,6 @@
       "depth": "back",
       "name": "back",
       "region": "head"
-    },
-    {
-      "art": {
-        "mapping": "warp"
-      },
-      "name": "front",
-      "region": "head"
     }
   ],
   "slot": "hairExtras",
