@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="hairExtras">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back">
+    <path class="slot-hair" d="M-27,-1010 C-27,-1022.2 -14.9,-1032 0,-1032 C14.9,-1032 27,-1022.2 27,-1010 C27,-997.8 14.9,-988 0,-988 C-14.9,-988 -27,-997.8 -27,-1010 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-14,-1018 C-5,-1026 8,-1024 16,-1012" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M-18,-1006 C-14,-1000 -6,-996 4,-996" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

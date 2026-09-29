@@ -1,0 +1,28 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Space buns",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "depth": "back",
+      "name": "back",
+      "region": "head"
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairExtras",
+  "variants": [
+    "default"
+  ]
+}

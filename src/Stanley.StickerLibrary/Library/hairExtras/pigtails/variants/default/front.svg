@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="320" height="340" viewBox="-160 -1060 320 340" data-stanley-view="front" data-stanley-slot="hairExtras">
+  <g id="back" inkscape:groupmode="layer" inkscape:label="back"/>
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" d="M -58,-944 C -70,-950 -82,-944 -86,-930 C -94,-905 -96,-870 -90,-840 C -87,-824 -82,-810 -76,-800 C -70,-808 -66,-822 -65,-838 C -63,-866 -64,-895 -58,-925 C -55,-935 -55,-940 -58,-944 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M -74,-935 C -82,-915 -84,-885 -80,-855" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M -70,-930 C -74,-905 -74,-880 -72,-850" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <ellipse class="slot-accent" cx="-70" cy="-942" rx="6" ry="11" fill="#c0392b" stroke="#1a1a1a" stroke-width="2" transform="rotate(-25 -70 -942)"/>
+    <path class="slot-hair" d="M58,-944 C70,-950 82,-944 86,-930 C94,-905 96,-870 90,-840 C87,-824 82,-810 76,-800 C70,-808 66,-822 65,-838 C63,-866 64,-895 58,-925 C55,-935 55,-940 58,-944 Z" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M74,-935 C82,-915 84,-885 80,-855" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path class="slot-hair" d="M70,-930 C74,-905 74,-880 72,-850" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <ellipse class="slot-accent" cx="70" cy="-942" rx="6" ry="11" fill="#c0392b" stroke="#1a1a1a" stroke-width="2" transform="rotate(25 70 -942)"/>
+  </g>
+</svg>
