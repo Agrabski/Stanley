@@ -4,6 +4,7 @@ using Stanley.Editing.Abstractions;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.StickerLibrary;
 
 namespace Stanley.Editors;
 
@@ -77,9 +78,6 @@ public sealed partial class CharacterEditorViewModel
     }
 
     // ---------------------------------------------------------------- galleries
-
-    /// <summary>The hair gallery.</summary>
-    public IReadOnlyList<SlotGallery> HairGalleries => Galleries(StickerSlots.Hair);
 
     /// <summary>
     /// The face's galleries: Eyes (or, split left/right - docs/sticker-system.md §21 - Left
@@ -160,12 +158,15 @@ public sealed partial class CharacterEditorViewModel
         if (choice.StampsCopy)
         {
             // A print or a badge: every click puts on another copy, in the next free spot across the chest.
+            // A hair streak is placed across the fringe instead, and takes the last streak's colour.
             var design = choice.Asset?.Sticker ?? choice.Library!.Asset.Sticker;
-            var spot = StickerCopies.Spot(StickerCopies.WornCopies(character, choice.Slot, design.Name));
+            var copies = StickerCopies.WornCopies(character, choice.Slot, design.Name);
+            var isStreak = choice.Slot == StickerSlots.HairStreaks;
+            var spot = isStreak ? HairEditing.StreakSpot(copies) : StickerCopies.Spot(copies);
             var copy = choice.Asset is { } own
                 ? (worn.Contains(own.Id) ? StickerCopies.Copy(own, spot) : own)
                 : StickerCopies.Copy(choice.Library!.Instantiate(), spot);
-            ApplyLook(c => LookEditing.Wear(c, copy));
+            ApplyLook(c => isStreak ? HairEditing.WearStreak(c, copy) : LookEditing.Wear(c, copy));
             SelectSticker(copy.Id);
         }
         else if (choice.Asset is { } asset && worn.Contains(asset.Id))
@@ -177,7 +178,9 @@ public sealed partial class CharacterEditorViewModel
         else
         {
             var wearing = choice.Asset ?? choice.Library!.Instantiate();
-            ApplyLook(c => LookEditing.Wear(c, wearing));
+            // A fringe, sides, back or extra on a head with nothing on top would float on a bald crown: a top comes with it.
+            var top = HairEditing.NeedsTop(character, choice.Slot) ? Hairstyles.Piece(Hairstyles.DefaultTop, character) : null;
+            ApplyLook(c => top is null ? LookEditing.Wear(c, wearing) : LookEditing.Wear(LookEditing.Wear(c, top), wearing));
             SelectSticker(wearing.Id);
         }
     }
@@ -376,7 +379,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(PreviewRightEye));
         OnPropertyChanged(nameof(ExpressionWarning));
         OnPropertyChanged(nameof(Hint));
-        OnPropertyChanged(nameof(HairGalleries));
+        OnPropertyChanged(nameof(HairTabContent));
         OnPropertyChanged(nameof(FaceGalleries));
         RaiseStylesChanged(); // previewed in the stage's view
     }
@@ -721,7 +724,7 @@ public sealed partial class CharacterEditorViewModel
         RaiseLooksChanged();
         OnPropertyChanged(nameof(IsEyesSplit));
         OnPropertyChanged(nameof(CanSplitEyes));
-        OnPropertyChanged(nameof(HairGalleries));
+        RaiseHairChanged();
         OnPropertyChanged(nameof(FaceGalleries));
         OnPropertyChanged(nameof(ClothesGalleries));
         OnPropertyChanged(nameof(AccessoryGalleries));

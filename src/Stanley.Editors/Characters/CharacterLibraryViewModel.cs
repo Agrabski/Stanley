@@ -132,6 +132,9 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	/// <summary>How "Draw your own" reaches the user's SVG editor; the app points it at its data folder, tests at a fake.</summary>
 	public IArtEditing ArtEditing { get; set; } = new SystemArtEditing(Path.Combine(Path.GetTempPath(), "stanley-drawing"));
 
+	/// <summary>Which characters keep their old whole hairstyle (the upgrade bar's "Keep"); the app points it at the user's settings, tests at memory.</summary>
+	public HairUpgradeMemory HairUpgrades { get; set; } = new();
+
 	// ---------------------------------------------------------------- ICharacterCatalog
 
 	public IReadOnlyDictionary<CharacterId, CharacterDefinition> Characters => _snapshot;
@@ -202,6 +205,7 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	public void ReturnToPage()
 	{
 		var closing = _current;
+		closing?.Editor.DismissHairReplaced();
 		_current = null;
 		OnPropertyChanged(nameof(Current));
 		NotifyCommands();

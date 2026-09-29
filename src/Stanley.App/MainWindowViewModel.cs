@@ -1095,6 +1095,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _settings.SvgEditorPath = path;
             OnPropertyChanged(nameof(SvgEditorPath));
         });
+        _characters.HairUpgrades = new HairUpgradeMemory(() => _settings.DeclinedHairUpgrades, ids => _settings.DeclinedHairUpgrades = ids);
         _characters.RecentComics = () => _recent.Paths;
         _characters.ComicLocation = project.Location;
         _characters.KeepFailed += ShowError;
