@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.Input;
 using Stanley.Editing;
 using Stanley.Editing.Abstractions;
 using Stanley.ProjectModel.Characters;
+using Stanley.ProjectModel.Ids;
 using Stanley.StickerLibrary;
 
 namespace Stanley.Editors;
@@ -153,7 +154,7 @@ public sealed partial class CharacterEditorViewModel
         var ownMix = Hairstyles.IsOwnMix(LookWorking);
         ApplyLook(c => HairEditing.WearHairdo(c, pieces, replace: true));
         DeselectIfTakenOff();
-        SetHairReplaced(ownMix ? new($"Replaced your hair with {name}.", pieces, Working) : null);
+        SetHairReplaced(ownMix ? new($"Replaced your hair with {name}.", pieces, Working, _currentLook) : null);
     }
 
     /// <summary>Every slot that holds a hairdo emptied; streaks stay on.</summary>
@@ -176,8 +177,8 @@ public sealed partial class CharacterEditorViewModel
 
     // ---------------------------------------------------------------- "Replaced your hair with Bob."
 
-    /// <summary>What a hairstyle click replaced, kept while its note is up: the pieces to add instead, and the state the click left (any other edit makes the note stale).</summary>
-    private sealed record HairReplaced(string Text, IReadOnlyList<(StickerAsset Asset, string? Style)> Pieces, CharacterDefinition After);
+    /// <summary>What a hairstyle click replaced, kept while its note is up: the pieces to add instead, and the state and look the click left (any other edit, or another look, makes the note stale).</summary>
+    private sealed record HairReplaced(string Text, IReadOnlyList<(StickerAsset Asset, string? Style)> Pieces, CharacterDefinition After, CharacterRevisionId? Look);
 
     private HairReplaced? _hairReplaced;
 
@@ -265,7 +266,7 @@ public sealed partial class CharacterEditorViewModel
     /// <summary>Called whenever the character changes: the button's line and tab move on, a note about an edit that isn't the latest goes away, and the upgrade bar comes or goes.</summary>
     private void RaiseHairChanged()
     {
-        if (_hairReplaced is { } note && !ReferenceEquals(Working, note.After))
+        if (_hairReplaced is { } note && (!ReferenceEquals(Working, note.After) || _currentLook != note.Look))
             SetHairReplaced(null);
         OnPropertyChanged(nameof(HairCurrent));
         OnPropertyChanged(nameof(HairTip));

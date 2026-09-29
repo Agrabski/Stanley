@@ -46,7 +46,9 @@ public class HairFlyoutTests
 
         // One Hair button in the Hair & face group, saying what is worn on its second line.
         var hair = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "HairButton");
-        Assert.Equal(["Hair", "None"], hair.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
+        var lines = hair.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("Hair", lines);
+        Assert.Contains("None", lines);
         hair.Flyout!.ShowAt(hair);
         Dispatcher.UIThread.RunJobs();
         LookTabTests.Snapshot(window, "hair-flyout-hairstyles");

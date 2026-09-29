@@ -335,6 +335,21 @@ public sealed class HairFlyoutTests
     }
 
     [Fact]
+    public void Looking_at_another_look_takes_the_bar_down_too()
+    {
+        var (_, editor) = NewCharacter();
+        Keep(editor, [.. BobPieces()]);
+        editor.NewLookCommand.Execute(null);
+        WearOn(editor, Piece(StickerSlots.HairExtras, "Ribbon"));
+        editor.WearHairstyleCommand.Execute(BobChoice(editor));
+        Assert.True(editor.HasHairReplaced);
+
+        editor.ShowLookCommand.Execute(editor.Looks.Single(l => l.Id is null));
+
+        Assert.False(editor.HasHairReplaced);
+    }
+
+    [Fact]
     public void Add_to_my_mix_is_used_up_after_one_press()
     {
         var (session, editor) = NewCharacter();
