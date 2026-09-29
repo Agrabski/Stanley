@@ -173,14 +173,7 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	/// how far up the tips reach, how far down the roots, where the ombre starts fading, how wide
 	/// the streaks are (fractions of the piece / of one repeat).
 	/// </summary>
-	public static double DefaultDyeWeight(PatternKind kind) => kind switch
-	{
-		PatternKind.Tips => HairEditing.DipDyeReach,
-		PatternKind.Roots => 0.3,
-		PatternKind.Ombre => 0.3,
-		PatternKind.Streaks => 0.3,
-		_ => 0.3
-	};
+	public static double DefaultDyeWeight(PatternKind kind) => kind == PatternKind.Tips ? HairEditing.DipDyeReach : 0.3;
 
 	/// <summary>A fresh dye of <paramref name="kind"/> in place of <paramref name="previous"/>: its colour carries over, Rainbow starts with its own six.</summary>
 	internal static PatternFill NewDye(PatternKind kind, PatternFill? previous)
