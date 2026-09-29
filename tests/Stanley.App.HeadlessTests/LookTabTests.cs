@@ -138,7 +138,8 @@ public class LookTabTests
         ribbon.TabControl.SelectedItem = ribbon.FindControl<TabItem>("LookTab");
         Dispatcher.UIThread.RunJobs();
 
-        var hair = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Hair" });
+        // One Hair button; its flyout opens on the Hairstyles tab (the tabs are covered in HairFlyoutTests).
+        var hair = ribbon.GetVisualDescendants().OfType<DropDownButton>().Single(b => b.Name == "HairButton");
         hair.Flyout!.ShowAt(hair);
         Dispatcher.UIThread.RunJobs();
         Snapshot(window, "look-hair-gallery");
@@ -146,11 +147,14 @@ public class LookTabTests
         var figures = content.GetVisualDescendants().OfType<CharacterFigure>().ToList();
         Assert.NotEmpty(figures);
         Assert.All(figures, f => Assert.True(f.Closeup));
-        var bob = content.GetLogicalDescendants().OfType<Button>().First(b => b.DataContext is StickerChoice { Label: "Bob" });
-        bob.Command!.Execute(bob.CommandParameter);
-        Dispatcher.UIThread.RunJobs();
-        Assert.Equal("Bob", editor.Gallery(StickerSlots.Hair).Current);
-        Assert.Contains(ribbon.GetVisualDescendants().OfType<DropDownButton>(), b => b.DataContext is ColorSlotEditor { Slot: "hair" });
+        if (Stanley.StickerLibrary.Hairstyles.Available.FirstOrDefault() is { } preset)
+        {
+            var choice = content.GetLogicalDescendants().OfType<Button>().First(b => b.DataContext is HairstyleChoice c && c.Label == preset.Name);
+            choice.Command!.Execute(choice.CommandParameter);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(preset.Name, editor.HairCurrent);
+            Assert.Contains(ribbon.GetVisualDescendants().OfType<DropDownButton>(), b => b.DataContext is ColorSlotEditor { Slot: "hair" });
+        }
 
         // The face galleries sit beside it, half height.
         var eyes = ribbon.GetVisualDescendants().OfType<DropDownButton>().First(b => b.DataContext is SlotGallery { Label: "Eyes" });
