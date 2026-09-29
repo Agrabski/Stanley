@@ -1,0 +1,22 @@
+{
+  "colors": {
+    "hair": "#5a3a22"
+  },
+  "id": "library",
+  "name": "Smooth",
+  "parts": [
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "front",
+      "region": "head"
+    }
+  ],
+  "slot": "hairTop",
+  "variants": [
+    "left",
+    "middle",
+    "right"
+  ]
+}

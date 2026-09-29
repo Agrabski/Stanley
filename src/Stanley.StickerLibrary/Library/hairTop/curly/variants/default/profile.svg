@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="300" height="220" viewBox="-150 -1060 300 220" data-stanley-view="profile" data-stanley-slot="hairTop">
+  <g id="front" inkscape:groupmode="layer" inkscape:label="front">
+    <path class="slot-hair" fill="#5a3a22" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" d="M30,-912 C35.9,-912.1 36.8,-924 31,-925 C36.9,-924.8 38.7,-938.6 33,-940 C38.9,-939.3 42.5,-955 37,-957 C42.4,-954.6 50.7,-968.4 46,-972 C51,-968.9 61.2,-981.8 57,-986 C55.3,-990.7 53.9,-995.4 52,-1000 C50.7,-1003 48.9,-1005.7 47.4,-1008.6 C52,-1018.7 34.6,-1028.2 28.5,-1018.9 C30.4,-1029.9 10.7,-1034.8 7.1,-1024.3 C6.2,-1035.4 -14.2,-1035.4 -15.1,-1024.3 C-18.7,-1034.8 -38.4,-1029.9 -36.5,-1018.9 C-42.6,-1028.2 -60,-1018.7 -55.4,-1008.6 C-63.7,-1016 -77.4,-1002.6 -70.3,-994.1 C-80.4,-998.8 -89.3,-982.7 -80.1,-976.6 C-91.1,-978 -94.6,-960.4 -84,-957.4 C-94.8,-955.4 -92.7,-937.5 -81.6,-938.1 C-89.4,-934.7 -84.3,-919 -76,-921 C-81.5,-914.6 -71.4,-904.5 -65,-910 C-66.8,-901.7 -53,-897.6 -50,-905.5 C-49.7,-897 -36.9,-896.6 -36,-905 C-34.6,-896.6 -19.9,-898 -20,-906.5 C-18.1,-898.3 -3.3,-900.6 -4,-909 C-1.7,-900.8 14.9,-904.1 14,-912.5 C14.4,-904 29.1,-903.6 30,-912 Z"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M-56,-995 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M-14,-1016 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M24,-1008 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M-70,-948 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M-40,-975 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M10,-993 a5.5,5.5 0 1,1 5.5,5.5"/>
+    <path class="slot-hair" fill="none" stroke="#3b2414" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" d="M-60,-925 a5.5,5.5 0 1,1 5.5,5.5"/>
+  </g>
+</svg>
