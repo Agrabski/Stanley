@@ -414,8 +414,11 @@ public sealed partial class CharacterEditorViewModel
     private ColorSlotEditor NewColorEditor(string slot) =>
         new(this, slot, Palette(slot).Select(p => new ColorSwatchChoice(slot, p.Name, p.Color)).ToList());
 
-    private static void RefreshColorEditor(ColorSlotEditor editor, CharacterDefinition character, CharacterLook look) =>
+    private static void RefreshColorEditor(ColorSlotEditor editor, CharacterDefinition character, CharacterLook look)
+    {
         editor.Refresh(look.Color(editor.Slot, editor.Slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")), look.FabricOf(editor.Slot));
+        editor.RefreshSchemes(); // the previews show the whole head, which any edit may have changed
+    }
 
     internal void SetSlotColor(string slot, ColorValue color) => ApplyLook(c => LookEditing.SetColor(c, slot, color));
 

@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.Input;
 using Stanley.Editing;
 using Stanley.Editing.Abstractions;
 using Stanley.ProjectModel.Characters;
+using Stanley.ProjectModel.Geometry;
 
 namespace Stanley.Editors;
 
@@ -96,6 +97,42 @@ public sealed partial class CharacterEditorViewModel
                 return;
             Apply(EditResult<CharacterDefinition>.Success(HairEditing.SetOverGlasses(Committed, id, value)));
         }
+    }
+
+    // ---------------------------------------------------------------- schemes
+
+    private ColorValue _hairAccent = ColorSlotEditor.DefaultDyeColor;
+
+    /// <summary>The second colour the Hair colour's schemes use - a vivid purple until another is picked. Only a preview setting: picking it changes nothing on the character.</summary>
+    public ColorValue HairAccent => _hairAccent;
+
+    private static readonly (HairScheme Scheme, string Label)[] SchemeLabels =
+    [
+        (HairScheme.Natural, "Natural"), (HairScheme.TwoTone, "Two-tone"), (HairScheme.Peekaboo, "Peekaboo"), (HairScheme.FringeOnly, "Fringe only"),
+        (HairScheme.DipDye, "Dip-dye"), (HairScheme.Ombre, "Ombré"), (HairScheme.Rainbow, "Rainbow"),
+    ];
+
+    /// <summary>Every scheme, each as a close-up of this character with it applied in the current accent colour.</summary>
+    internal IReadOnlyList<HairSchemeChoice> HairSchemeChoices
+    {
+        get
+        {
+            var character = LookWorking;
+            var pose = StagePose;
+            return SchemeLabels.Select(s => new HairSchemeChoice(s.Scheme, s.Label, HairEditing.ApplyScheme(character, s.Scheme, _hairAccent, HairBaseline), pose, PreviewAngle)).ToList();
+        }
+    }
+
+    /// <summary>A scheme click: the hair (and its pieces) dressed in it, one undo step. Every scheme starts from Natural, so picking one after another never piles up.</summary>
+    internal void ApplyHairScheme(HairScheme scheme) => ApplyLook(c => HairEditing.ApplyScheme(c, scheme, _hairAccent, HairBaseline));
+
+    internal void SetHairAccent(ColorValue color)
+    {
+        if (color == _hairAccent)
+            return;
+        _hairAccent = color;
+        foreach (var editor in _colorEditors.Append(_stickerColorEditor).OfType<ColorSlotEditor>())
+            editor.RefreshSchemes();
     }
 
     private void RaiseHairColorChanged()

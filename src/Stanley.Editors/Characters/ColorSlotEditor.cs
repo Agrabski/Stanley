@@ -44,6 +44,21 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 			if (c != null)
 				owner.EditFabric(Slot, f => f with { Pattern = c.Pattern is { } kind ? (f.Pattern is { } was && was.Kind == kind ? was : NewDye(kind, f.Pattern)) : null });
 		});
+		SetScheme = new RelayCommand<HairSchemeChoice>(c =>
+		{
+			if (c != null)
+				owner.ApplyHairScheme(c.Scheme);
+		});
+		SetAccent = new RelayCommand<AccentChoice>(c =>
+		{
+			if (c != null)
+				owner.SetHairAccent(c.Color);
+		});
+		PickCustomAccent = new RelayCommand<Control>(control =>
+		{
+			if (control != null)
+				ColorMenus.ShowMoreColors(control, owner.HairAccent, color => owner.SetHairAccent(color));
+		});
 		SelectBand = new RelayCommand<RainbowBand>(band =>
 		{
 			if (band != null && band.Index != _band)
@@ -98,6 +113,9 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	public System.Windows.Input.ICommand SetPatternColor { get; }
 	public System.Windows.Input.ICommand SetPattern { get; }
 	public System.Windows.Input.ICommand SetDye { get; }
+	public System.Windows.Input.ICommand SetScheme { get; }
+	public System.Windows.Input.ICommand SetAccent { get; }
+	public System.Windows.Input.ICommand PickCustomAccent { get; }
 	public System.Windows.Input.ICommand SelectBand { get; }
 	public System.Windows.Input.ICommand SetTexture { get; }
 	public System.Windows.Input.ICommand PickCustomColor { get; }
@@ -116,6 +134,26 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	public bool HasClothingPattern => _fabric?.Pattern is { IsDye: false };
 
 	public bool HasTexture => _fabric?.Texture is not null;
+
+	// ---------------------------------------------------------------- schemes (the Hair colour only)
+
+	/// <summary>Whether the dropdown starts with a row of schemes: the Hair colour's does, a piece's or a streak's doesn't.</summary>
+	public bool HasSchemes => Slot == StickerSlots.Hair;
+
+	/// <summary>Natural, Two-tone, Peekaboo, Fringe only, Dip-dye, Ombré and Rainbow, each as a close-up of the character with it applied.</summary>
+	public IReadOnlyList<HairSchemeChoice> SchemeChoices => HasSchemes ? _owner.HairSchemeChoices : [];
+
+	/// <summary>The colours a scheme can take as its second: the hair palette, the one picked marked.</summary>
+	public IReadOnlyList<AccentChoice> AccentChoices => HasSchemes ? Swatches.Select(s => new AccentChoice(s.Name, s.Color, s.Color == _owner.HairAccent)).ToList() : [];
+
+	/// <summary>Redraws the scheme previews and marks the accent: they show the whole head, so any edit (or a new accent) can change them.</summary>
+	internal void RefreshSchemes()
+	{
+		if (!HasSchemes)
+			return;
+		OnPropertyChanged(nameof(SchemeChoices));
+		OnPropertyChanged(nameof(AccentChoices));
+	}
 
 	// ---------------------------------------------------------------- dyes (hair)
 
