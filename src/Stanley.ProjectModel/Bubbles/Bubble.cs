@@ -24,6 +24,7 @@ namespace Stanley.ProjectModel.Bubbles;
 /// <param name="FontFamily">The typeface family (see <c>TextStyle.FontFamily</c>); null is the default lettering font.</param>
 /// <param name="FontSizePt">The letters' size in points, as in Word; null is <see cref="DefaultFontSizePt"/>.</param>
 /// <param name="Align">How lines line up; null is centred, as dialogue usually is.</param>
+/// <param name="Link">Set when the bubble was grouped with other things in its panel (see <see cref="Issues.PanelElement.Link"/>); null otherwise.</param>
 public sealed record Bubble(
     BubbleId Id,
     BubbleShape Shape,
@@ -34,7 +35,8 @@ public sealed record Bubble(
     double? FontSizePt = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Bold = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Italic = false,
-    TextAlign? Align = null)
+    TextAlign? Align = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupLinkId? Link = null)
 {
     /// <summary>The usual dialogue size: bubble lettering's size unless one is chosen.</summary>
     public const double DefaultFontSizePt = 10;

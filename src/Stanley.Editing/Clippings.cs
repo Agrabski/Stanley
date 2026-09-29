@@ -32,21 +32,44 @@ public static class Clippings
     /// <summary>How far a copy steps aside from one already in its spot, in mm - the same step a new bubble takes (<see cref="BubbleEditing.CascadeStepMm"/>).</summary>
     public const double CascadeStepMm = BubbleEditing.CascadeStepMm;
 
-    public static Bubble Copy(Bubble bubble) => bubble with { Id = BubbleId.New() };
+    // A lone copy joins no group: whatever a bubble, character or element was grouped with stays
+    // with the original (a whole panel's copy keeps its groups - they're all inside it).
+    public static Bubble Copy(Bubble bubble) => bubble with { Id = BubbleId.New(), Link = null };
+
+    public static CharacterInstance Copy(CharacterInstance character) => character with { Link = null };
 
     public static PanelElement Copy(PanelElement element) => element switch
     {
-        GroupElement group => group with { Id = ElementId.New(), Children = group.Children.Select(Copy).ToList() },
-        _ => element with { Id = ElementId.New() }
+        GroupElement group => group with { Id = ElementId.New(), Link = null, Children = group.Children.Select(Copy).ToList() },
+        _ => element with { Id = ElementId.New(), Link = null }
     };
 
-    /// <summary>A panel under a new id, its bubbles and elements under new ones too.</summary>
+    /// <summary>A panel under a new id, its bubbles and elements under new ones too; what was grouped in it stays grouped.</summary>
     public static Panel Copy(Panel panel) => panel with
     {
         Id = PanelId.New(),
-        Bubbles = panel.Bubbles.Select(Copy).ToList(),
-        Elements = panel.Elements.Select(Copy).ToList()
+        Bubbles = panel.Bubbles.Select(b => Copy(b) with { Link = b.Link }).ToList(),
+        Elements = panel.Elements.Select(e => Copy(e) with { Link = e.Link }).ToList()
     };
+
+    /// <summary>
+    /// Hands out new group links for a set of copies, one per link they came from, so copying a
+    /// whole group gives a whole new group rather than joining the original (or splitting into
+    /// singles): <c>Copy(x) with { Link = relinker.For(x.Link) }</c>.
+    /// </summary>
+    public sealed class Relinker
+    {
+        private readonly Dictionary<GroupLinkId, GroupLinkId> _links = [];
+
+        public GroupLinkId? For(GroupLinkId? original)
+        {
+            if (original is not { } link)
+                return null;
+            if (!_links.TryGetValue(link, out var fresh))
+                _links[link] = fresh = GroupLinkId.New();
+            return fresh;
+        }
+    }
 
     /// <summary>
     /// Where a copy with box <paramref name="bounds"/> goes so it doesn't land exactly on

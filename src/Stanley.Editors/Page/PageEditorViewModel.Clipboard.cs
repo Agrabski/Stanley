@@ -188,7 +188,7 @@ public sealed partial class PageEditorViewModel
                         Apply(EditResult<PageDocument>.Failure("That character isn't in this comic - bring them in from the Characters pane first."));
                         return false;
                     }
-                    var instance = CharacterPlacementEditing.Refit(original, clipping.FromPanelBounds, bounds);
+                    var instance = CharacterPlacementEditing.Refit(Clippings.Copy(original), clipping.FromPanelBounds, bounds);
                     var box = CharacterBounds(instance);
                     // Sideways only: a copy steps along the same floor rather than down into it.
                     var spot = Clippings.FreeSpot(box, panel.CharacterInstances.Select(CharacterBounds).ToList(), bounds, stepY: 0);
@@ -300,7 +300,7 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>Alt+drag on a character: <see cref="BeginDuplicateBubble"/> for a placed character; move it with <see cref="UpdateMoveCharacter"/> (it snaps onto the original's floor).</summary>
     public int BeginDuplicateCharacter(PanelId panelId, int index) =>
-        BeginDuplicate(panelId, index, p => index < p.CharacterInstances.Count ? p with { CharacterInstances = [.. p.CharacterInstances, p.CharacterInstances[index]] } : null,
+        BeginDuplicate(panelId, index, p => index < p.CharacterInstances.Count ? p with { CharacterInstances = [.. p.CharacterInstances, Clippings.Copy(p.CharacterInstances[index])] } : null,
             p => p.CharacterInstances.Count - 1, i => SelectCharacter(panelId, i), () => SelectCharacter(panelId, index));
 
     /// <summary>Alt+drag on a panel: a copy of it and all it holds, on top of the other panels; move it with <see cref="UpdateMovePanel"/>. Returns the copy's id, or null (a locked layout).</summary>
@@ -334,20 +334,22 @@ public sealed partial class PageEditorViewModel
         var characters = panel.CharacterInstances.ToList();
         var elements = panel.Elements.ToList();
         var copies = new List<SelectedItem>();
+        // What was grouped together is copied as a group of its own, not into the original's.
+        var relinker = new Clippings.Relinker();
         foreach (var item in AllSelected())
         {
             switch (item.Kind)
             {
                 case SelectionKind.Bubble when item.Index >= 0 && item.Index < bubbles.Count:
-                    bubbles.Add(Clippings.Copy(bubbles[item.Index]));
+                    bubbles.Add(Clippings.Copy(bubbles[item.Index]) with { Link = relinker.For(bubbles[item.Index].Link) });
                     copies.Add(new SelectedItem(SelectionKind.Bubble, bubbles.Count - 1));
                     break;
                 case SelectionKind.Character when item.Index >= 0 && item.Index < characters.Count:
-                    characters.Add(characters[item.Index]);
+                    characters.Add(Clippings.Copy(characters[item.Index]) with { Link = relinker.For(characters[item.Index].Link) });
                     copies.Add(new SelectedItem(SelectionKind.Character, characters.Count - 1));
                     break;
                 case SelectionKind.Element when item.Index >= 0 && item.Index < elements.Count:
-                    elements.Add(Clippings.Copy(elements[item.Index]));
+                    elements.Add(Clippings.Copy(elements[item.Index]) with { Link = relinker.For(elements[item.Index].Link) });
                     copies.Add(new SelectedItem(SelectionKind.Element, elements.Count - 1));
                     break;
             }

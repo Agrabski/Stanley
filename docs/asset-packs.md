@@ -85,7 +85,7 @@ individual library items internally (`StickerAsset`).
 
 Selecting several panel elements (shapes, free text, pictures, speed lines —
 the "Panel elements" from `CLAUDE.md`, not bubbles or characters, which have
-their own placement model and stay out of groups in v1) and choosing **Group**
+their own placement model and stay out of a `GroupElement`, see §3.1) and choosing **Group**
 (ribbon, right-click, `Ctrl+G`) replaces them with one new panel element:
 
 - **`GroupElement`**: an ordered list of child `PanelElement`s, each still
@@ -116,6 +116,51 @@ their own placement model and stay out of groups in v1) and choosing **Group**
   element + Group" already does naturally.
 
 This slice alone closes #86 and is useful with zero asset-pack UI.
+
+### 3.1 Grouping characters and bubbles too (#125)
+
+A shape and a character couldn't be grouped ("Group" stayed greyed out), which
+is the "group a character with its prop" case open question 2 below said to
+revisit. **A `GroupElement` still can't hold them** — a character's box comes
+from its definition, rig and pose (`PageEditorViewModel.CharacterBounds`),
+none of which `PanelElements.Bounds` in `Stanley.ProjectModel` can see, and
+the group would have to draw between the two element passes. So the user still
+just presses **Group** (Ctrl+G) and the editor picks the mechanism:
+
+| The selection is… | Group makes… |
+|---|---|
+| elements only, all on one side of the characters | a `GroupElement` (§3, unchanged) |
+| anything else: a character, a bubble, elements from both sides of the characters | a **link**: each member keeps its own list and z-order and gets the same `GroupLinkId` |
+
+- `PanelElement.Link` (base record, `init`), `CharacterInstance.Link` and
+  `Bubble.Link`, all `GroupLinkId?`, `WhenWritingNull` so an ungrouped page's
+  JSON is unchanged. Scoped to one panel, like an `ElementId`. Pure functions:
+  `Grouping.Link` / `Unlink` / `MembersOf`.
+- **A link is only ever a selection.** `PageEditorViewModel.Select` (and
+  `ToggleSelect`, for Shift+click) adds every member sharing a link of anything
+  it selects (`AddGroupedSiblings`, `ToggleGroup`), and the existing
+  multi-selection machinery does the rest — drag, nudge, Alt+drag and delete
+  are already "one undo step for the whole selection". Rendering, hit-testing,
+  bounds and the drawing order never look at `Link`. The canvas calls
+  `SelectGroupOf` before a press or right-click so a press on an unselected
+  member drags the whole group. The only way to reach one member is to Ungroup.
+- **Grouping a group with something else makes one bigger group** (every
+  selected member gets one new link; the old ones simply stop existing).
+  **Ungroup** on a link removes it from everything selected (`Grouping.Unlink`);
+  on a lone `GroupElement` it unwraps as before. If both are true of a
+  selection, the link goes first.
+- **Anything that copies must not copy the link into the original's group.**
+  `Clippings.Copy` (bubble, element, character) sets `Link = null`;
+  `Clippings.Copy(Panel)` keeps a panel's groups (they're all inside it);
+  `BeginDuplicateSelection` (Alt+drag) gives the copies a group of their own via
+  `Clippings.Relinker`. `Grouping.Group` clears the link of what it wraps. New
+  code that builds a copy of one of these three records needs the same care —
+  `with { ... }` alone carries the link over.
+- **Not for linked groups (yet):** resizing as one (a handle drags only the
+  primary member, as in any multi-selection today), Copy/Cut/Paste of the whole
+  group (the clipboard holds only the primary item), *Keep in My Assets*
+  (`GroupElement` only — a character's own copy is kept via §6), and being one
+  z-order slot (each member keeps its own).
 
 ## 4. Vocabulary
 
@@ -385,9 +430,9 @@ Stanley doesn't need to know about.
 1. **The file extension.** `.stpack` above is a placeholder — needs a short,
    collision-unlikely choice the way `my-characters.md` §10 slice 6 picked
    `.chp`. *Recommended:* decide alongside slice 6, not now.
-2. **Can a group (§3) contain a character or a bubble?** v1 above says no —
-   keeps grouping to panel elements, where CLAUDE.md already describes their
-   z-order rules. Revisit if users ask for "group a character with its prop".
+2. **Can a group (§3) contain a character or a bubble?** *Answered by #125
+   (§3.1):* yes, by tying them together with a shared link rather than by
+   nesting them in a `GroupElement`.
 3. **Do stickers/patterns/backgrounds/poses (§10 slice 8) all ship, or does
    #99 only need object groups + characters?** *Recommended:* ship 1–7 first
    and treat slice 8 as separate follow-up work, reusing this same doc.

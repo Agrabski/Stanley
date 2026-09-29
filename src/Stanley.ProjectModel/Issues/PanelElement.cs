@@ -30,7 +30,17 @@ public enum ElementLayer
 [JsonDerivedType(typeof(PictureElement), "picture")]
 [JsonDerivedType(typeof(SpeedLinesElement), "speedLines")]
 [JsonDerivedType(typeof(GroupElement), "group")]
-public abstract record PanelElement(ElementId Id, ElementLayer Layer);
+public abstract record PanelElement(ElementId Id, ElementLayer Layer)
+{
+    /// <summary>
+    /// Set when this element was grouped with other things in its panel that a <see cref="GroupElement"/>
+    /// can't hold - a character or a bubble, or elements from both sides of the characters. Everything
+    /// in the panel carrying the same link moves and deletes as one (docs/asset-packs.md §3); each
+    /// keeps its own place in the drawing order. Null for everything else, and absent from the file.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public GroupLinkId? Link { get; init; }
+}
 
 /// <summary>The pattern a line is drawn in - Word's "Dashes" - each scaled to the line's thickness.</summary>
 [JsonConverter(typeof(CamelCaseEnumConverter<LineDash>))]
