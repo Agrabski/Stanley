@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.PanelRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="SplitColumnsButton" Classes="tool" Command="{Binding SplitColumnsCommand}"
+                      ToolTip.Tip="Split this panel into two side-by-side panels">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ColumnsIcon}" /><TextBlock Text="Columns" />
+                  </StackPanel>
+              </Button>
+              <Button Name="SplitRowsButton" Classes="tool" Command="{Binding SplitRowsCommand}"
+                      ToolTip.Tip="Split this panel into two stacked panels">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource RowsIcon}" /><TextBlock Text="Rows" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Split" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <DropDownButton Name="PanelBackgroundButton" Classes="slotGallery" Width="100"
+                          ToolTip.Tip="Fill this panel behind everything in it: a colour or a sky">
+              <StackPanel Spacing="2">
+                  <Border Width="34" Height="22" Background="{Binding BackgroundPreview}"
+                          BorderBrush="#80808080" BorderThickness="1" CornerRadius="2"
+                          HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding BackgroundName}" FontSize="10" HorizontalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" MaxWidth="76" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <local:BackgroundPicker Command="{Binding SetBackgroundCommand}"
+                                              PictureCommand="{Binding BackgroundPictureCommand}" />
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Background" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+              <local:ColorMenuButton Name="PanelFillButton" Label="Shape Fill"
+                                     Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                     Command="{Binding SetPanelFillCommand}" NoneLabel="No Fill"
+                                     MoreLabel="More Fill Colors…"
+                                     CurrentColor="{Binding CurrentPanelStyle.Fill}"
+                                     ToolTip.Tip="Shape Fill - this panel's background colour (No Fill: plain paper)" />
+              <local:ColorMenuButton Name="PanelOutlineButton" Label="Shape Outline"
+                                     Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                     Command="{Binding SetPanelOutlineCommand}" NoneLabel="No Outline"
+                                     MoreLabel="More Outline Colors…"
+                                     CurrentColor="{Binding CurrentPanelStyle.Stroke}"
+                                     WeightCommand="{Binding SetPanelOutlineWeightCommand}"
+                                     CurrentWeight="{Binding CurrentPanelStyle.StrokeWidthMm}"
+                                     DashCommand="{Binding SetPanelOutlineDashCommand}"
+                                     CurrentDash="{Binding CurrentPanelStyle.Dash}"
+                                     ToolTip.Tip="Shape Outline - this panel's border: its colour, weight and dashes (No Outline: none)" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <ToggleButton Name="PanelBorderButton" Classes="tool" IsChecked="{Binding SelectedPanelHasBorder}"
+                        ToolTip.Tip="Draw this panel's border - switch it off for an open panel, or a background that runs to the page edge">
+              <StackPanel>
+                  <PathIcon Data="{StaticResource PanelBorderIcon}" /><TextBlock Text="Border" />
+              </StackPanel>
+          </ToggleButton>
+          <TextBlock Classes="groupLabel" Text="Border" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Classes="tool" Command="{Binding AddBubbleCommand}"
+                      ToolTip.Tip="Add a bubble to this panel and start typing">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" />
+                  </StackPanel>
+              </Button>
+              <Button Name="DeletePanelButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete this panel and its bubbles" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Panel" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

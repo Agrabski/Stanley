@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.ViewRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Classes="tool" Command="{Binding FitPageCommand}" ToolTip.Tip="Show the whole page"
+                      local:Shortcut.Keys="Ctrl+0">
+                  <StackPanel>
+                      <PathIcon
+                          Data="M3,3 H9 V5 H5 V9 H3 Z M15,3 H21 V9 H19 V5 H15 Z M3,15 H5 V19 H9 V21 H3 Z M19,15 H21 V21 H15 V19 H19 Z M8,8 H16 V16 H8 Z" />
+                      <TextBlock Text="Fit page" />
+                  </StackPanel>
+              </Button>
+              <Button Classes="tool" Command="{Binding ActualSizeCommand}"
+                      ToolTip.Tip="Show the page at its printed size" local:Shortcut.Keys="Ctrl+1">
+                  <StackPanel>
+                      <TextBlock Text="1:1" FontSize="15" FontWeight="SemiBold" Margin="0" />
+                      <TextBlock Text="Actual size" />
+                  </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+                  <Button Classes="small" Command="{Binding ZoomOutCommand}"
+                          ToolTip.Tip="Zoom out - or Ctrl+scroll" local:Shortcut.Keys="Ctrl+−" FontSize="16">
+                      −
+                  </Button>
+                  <TextBlock Name="ZoomText" Width="52" TextAlignment="Center" VerticalAlignment="Center"
+                             FontSize="12" Text="{Binding ZoomText}" />
+                  <Button Classes="small" Command="{Binding ZoomInCommand}"
+                          ToolTip.Tip="Zoom in - or Ctrl+scroll" local:Shortcut.Keys="Ctrl++" FontSize="16">
+                      +
+                  </Button>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Zoom" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel VerticalAlignment="Center" Margin="0,6,0,0">
+              <CheckBox
+                  Name="MarginGuidesCheck"
+                  IsChecked="{Binding ShowMarginGuides}"
+                  Focusable="False"
+                  Content="Margin guides" />
+              <CheckBox
+                  IsChecked="{Binding SnapEnabled}"
+                  Focusable="False"
+                  Content="Snap to margins and gutters" />
+              <CheckBox
+                  IsChecked="{Binding IsLayoutLocked}"
+                  Focusable="False"
+                  Content="Lock layout" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Show" />
+      </DockPanel>
+
+  </StackPanel>
+</UserControl>

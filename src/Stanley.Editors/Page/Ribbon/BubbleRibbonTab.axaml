@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.BubbleRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Spacing="1">
+              <RadioButton Name="SpeechStyleButton" Classes="small" GroupName="BubbleTabStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSpeechStyle}"
+                           ToolTip.Tip="Rounded speech bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="ShoutStyleButton" Classes="small" GroupName="BubbleTabStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShoutStyle}"
+                           ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="WhisperStyleButton" Classes="small" GroupName="BubbleTabStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsWhisperStyle}"
+                           ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Style" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <local:FontGroup Name="BubbleFontGroup" />
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="EditTextButton" Classes="tool" Command="{Binding EditTextCommand}"
+                      ToolTip.Tip="Edit the bubble's text - or double-click the bubble"
+                      local:Shortcut.Keys="Enter">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Text" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="AddTailButton" Classes="small" Command="{Binding AddTailCommand}"
+                      ToolTip.Tip="Add another tail - drag its orange tip onto the speaker"
+                      HorizontalAlignment="Stretch">
+                  Add tail
+              </Button>
+              <Button Name="RemoveTailButton" Classes="small" Command="{Binding RemoveTailCommand}"
+                      ToolTip.Tip="Remove the most recently added tail (right-click a tail to remove that one)"
+                      HorizontalAlignment="Stretch">
+                  Remove tail
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Tails" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Name="BringToFrontButton" Classes="small" Command="{Binding BringToFrontCommand}"
+                          ToolTip.Tip="Draw this bubble above the others in its panel"
+                          HorizontalAlignment="Stretch">
+                      To front
+                  </Button>
+                  <Button Name="SendToBackButton" Classes="small" Command="{Binding SendToBackCommand}"
+                          ToolTip.Tip="Draw this bubble below the others in its panel"
+                          HorizontalAlignment="Stretch">
+                      To back
+                  </Button>
+              </StackPanel>
+              <Button Name="DeleteBubbleButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete this bubble" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

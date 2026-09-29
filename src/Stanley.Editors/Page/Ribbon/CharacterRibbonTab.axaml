@@ -1,0 +1,370 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.CharacterRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="EditCharacterButton" Classes="tool" Command="{Binding EditCharacterCommand}"
+                      ToolTip.Tip="Edit this character's body - every panel it's in follows (or double-click it)">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Edit body" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="{Binding SelectedCharacterName}" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <RadioButton Name="FrontViewButton" Classes="tool" GroupName="CharacterView"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsSelectedCharacterFront}" ToolTip.Tip="Facing the reader"
+                           local:Shortcut.Keys="F">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="SideViewButton" Classes="tool" GroupName="CharacterView"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsSelectedCharacterSide}"
+                           ToolTip.Tip="Seen from the side - Flip to face the other way"
+                           local:Shortcut.Keys="S">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" />
+                  </StackPanel>
+              </RadioButton>
+              <Button Name="FlipCharacterButton" Classes="tool" Command="{Binding FlipCharacterCommand}"
+                      ToolTip.Tip="Face the other way">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Flip" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="View" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+              <ScrollViewer MaxWidth="560" HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled">
+                  <!-- The bottom margin keeps a scroll bar, when there is one, off the pose names. -->
+                  <ItemsControl Name="PoseGallery" ItemsSource="{Binding PoseChoices}" Margin="0,0,0,6">
+                      <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                              <StackPanel Orientation="Horizontal" Spacing="2" />
+                          </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="local:PosePresetChoice">
+                              <Button Classes="small" MinWidth="41" MaxWidth="80" Height="66" Padding="3,2"
+                                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                      Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyPosePresetCommand}"
+                                      CommandParameter="{Binding}"
+                                      ToolTip.Tip="{Binding Name, StringFormat='{}{0} - then adjust by dragging the green dots'}">
+                                  <DockPanel>
+                                      <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9"
+                                                 HorizontalAlignment="Center"
+                                                 TextTrimming="CharacterEllipsis" />
+                                      <local:CharacterFigure Character="{Binding Character}"
+                                                             Pose="{Binding Pose}" />
+                                  </DockPanel>
+                              </Button>
+                          </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+              </ScrollViewer>
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Name="MirrorPoseButton" Classes="small" Command="{Binding MirrorPoseCommand}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="The same pose the other way round - wave with the other hand">
+                      Mirror
+                  </Button>
+                  <Button Name="ResetPoseButton" Classes="small" Command="{Binding ResetPoseCommand}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Stand at rest again">
+                      Reset
+                  </Button>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Pose" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <DropDownButton Name="ExpressionGallery" Classes="slotGallery"
+                          ToolTip.Tip="The face: happy, sad, surprised... or mix your own (for this panel only)">
+              <StackPanel Spacing="1">
+                  <TextBlock Text="Face" FontSize="12" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding SelectedExpressionName}" FontSize="9" Opacity="0.7"
+                             HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <!-- Sized to fit a flyout (Fluent caps them at 456 px): the presets six to a row, a mixer row's eight choices in one line. -->
+                      <StackPanel Spacing="4" Width="424">
+                          <ItemsControl Name="ExpressionChoices" ItemsSource="{Binding ExpressionChoices}">
+                              <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                      <WrapPanel />
+                                  </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:ExpressionPresetChoice">
+                                      <Button Classes="small choice sticker closeup"
+                                              Classes.worn="{Binding IsCurrent}" Width="68" Margin="1"
+                                              Padding="2"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Stretch"
+                                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyExpressionCommand}"
+                                              CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                          <DockPanel>
+                                              <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}"
+                                                         FontSize="9" HorizontalAlignment="Center"
+                                                         TextTrimming="CharacterEllipsis" />
+                                              <local:CharacterFigure Character="{Binding Character}"
+                                                                     Pose="{Binding Pose}" Closeup="True" />
+                                          </DockPanel>
+                                      </Button>
+                                  </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <!-- The character's own saved faces (right-click one to delete it). -->
+                          <StackPanel Spacing="4" IsVisible="{Binding HasSavedFaces}">
+                              <TextBlock Text="{Binding SavedFacesTitle}" FontSize="11" FontWeight="SemiBold"
+                                         Margin="1,6,0,0" />
+                              <ItemsControl Name="SavedFaces" ItemsSource="{Binding SavedFaceChoices}">
+                                  <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate>
+                                          <WrapPanel />
+                                      </ItemsPanelTemplate>
+                                  </ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="local:SavedFaceChoice">
+                                          <Button Classes="small choice sticker closeup"
+                                                  Classes.worn="{Binding IsCurrent}" Width="68" Margin="1"
+                                                  Padding="2"
+                                                  HorizontalContentAlignment="Stretch"
+                                                  VerticalContentAlignment="Stretch"
+                                                  Command="{Binding Apply}"
+                                                  ToolTip.Tip="{Binding Name, StringFormat='{}{0} - right-click to delete'}">
+                                              <Button.ContextMenu>
+                                                  <ContextMenu>
+                                                      <MenuItem Header="Delete this face"
+                                                                Command="{Binding Delete}" />
+                                                  </ContextMenu>
+                                              </Button.ContextMenu>
+                                              <DockPanel>
+                                                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}"
+                                                             FontSize="9" HorizontalAlignment="Center"
+                                                             TextTrimming="CharacterEllipsis" />
+                                                  <local:CharacterFigure Character="{Binding Character}"
+                                                          Pose="{Binding Pose}" Closeup="True" />
+                                              </DockPanel>
+                                          </Button>
+                                      </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                          </StackPanel>
+                          <!-- Mix your own: one face part at a time, each choice showing the whole face it gives;
+             a drawn face can have a new expression drawn (+) or the one shown redrawn (pen). -->
+                          <TextBlock Text="Mix your own" FontSize="11" FontWeight="SemiBold" Margin="1,6,0,0" />
+                          <ItemsControl Name="ExpressionMixer" ItemsSource="{Binding ExpressionMixer}">
+                              <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:ExpressionSlotRow">
+                                      <DockPanel Margin="0,1">
+                                          <StackPanel DockPanel.Dock="Left" Width="38"
+                                                      VerticalAlignment="Center" Spacing="2">
+                                              <TextBlock Text="{Binding Label}" FontSize="11" />
+                                              <StackPanel Orientation="Horizontal" Spacing="1"
+                                                          IsVisible="{Binding CanDraw}">
+                                                  <Button Name="DrawNewExpressionButton"
+                                                          Classes="small faceDraw"
+                                                          Command="{Binding DrawNew}"
+                                                          ToolTip.Tip="{Binding Label, StringFormat='Draw a new {0} in your SVG editor - it starts as a copy of the one shown'}">
+                                                      +
+                                                  </Button>
+                                                  <Button Name="EditExpressionButton"
+                                                          Classes="small faceDraw"
+                                                          Command="{Binding EditDrawing}"
+                                                          ToolTip.Tip="{Binding Label, StringFormat='Redraw the {0} shown in your SVG editor - every save updates it here'}">
+                                                      <PathIcon Data="{StaticResource PenIcon}" />
+                                                  </Button>
+                                              </StackPanel>
+                                          </StackPanel>
+                                          <ItemsControl ItemsSource="{Binding Choices}">
+                                              <ItemsControl.ItemsPanel>
+                                                  <ItemsPanelTemplate>
+                                                      <WrapPanel />
+                                                  </ItemsPanelTemplate>
+                                              </ItemsControl.ItemsPanel>
+                                              <ItemsControl.ItemTemplate>
+                                                  <DataTemplate x:DataType="local:ExpressionVariantChoice">
+                                                      <Button Classes="small choice sticker closeup mini"
+                                                              Classes.worn="{Binding IsCurrent}" Margin="1"
+                                                              Padding="2"
+                                                              HorizontalContentAlignment="Stretch"
+                                                              VerticalContentAlignment="Stretch"
+                                                              Command="{Binding $parent[ItemsControl;1].((local:PageEditorViewModel)DataContext).SetExpressionVariantCommand}"
+                                                              CommandParameter="{Binding}"
+                                                              ToolTip.Tip="{Binding Name}">
+                                                          <DockPanel>
+                                                              <TextBlock DockPanel.Dock="Bottom"
+                                                                      Text="{Binding Name}" FontSize="8"
+                                                                      HorizontalAlignment="Center"
+                                                                      TextTrimming="CharacterEllipsis" />
+                                                              <local:CharacterFigure
+                                                                  Character="{Binding Character}"
+                                                                  Pose="{Binding Pose}" Closeup="True" />
+                                                          </DockPanel>
+                                                      </Button>
+                                                  </DataTemplate>
+                                              </ItemsControl.ItemTemplate>
+                                          </ItemsControl>
+                                      </DockPanel>
+                                  </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <!-- Save the face as it is, to use again in any panel: a name that's saved already is replaced. -->
+                          <DockPanel Margin="1,6,1,0">
+                              <Button Name="SaveFaceButton" DockPanel.Dock="Right" Classes="small"
+                                      Command="{Binding SaveFaceCommand}" Margin="6,0,0,0"
+                                      ToolTip.Tip="Keep this face on the character - it's then one click in any panel">
+                                  Save this face
+                              </Button>
+                              <TextBox Name="FaceNameBox" Text="{Binding NewFaceName}"
+                                       PlaceholderText="Name it - e.g. Grinning" FontSize="12" Height="24"
+                                       MinHeight="24" Padding="6,2">
+                                  <TextBox.KeyBindings>
+                                      <KeyBinding Gesture="Enter" Command="{Binding SaveFaceCommand}" />
+                                  </TextBox.KeyBindings>
+                              </TextBox>
+                          </DockPanel>
+                      </StackPanel>
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Expression" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group" IsVisible="{Binding SelectedCharacterHasLooks}">
+          <DropDownButton Name="LookGallery" Classes="slotGallery"
+                          ToolTip.Tip="Which of the character's looks: for this panel, or for the whole issue">
+              <StackPanel Spacing="1">
+                  <TextBlock Text="Look" FontSize="12" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding SelectedLookName}" FontSize="9" Opacity="0.7"
+                             HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="64" />
+              </StackPanel>
+              <DropDownButton.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                      <StackPanel Spacing="4" MaxWidth="440">
+                          <TextBlock Text="This panel" FontSize="11" FontWeight="SemiBold" />
+                          <ItemsControl Name="PanelLooks" ItemsSource="{Binding PanelLookChoices}">
+                              <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                      <WrapPanel />
+                                  </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:LookChoice">
+                                      <Button Classes="small choice sticker"
+                                              Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Stretch"
+                                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).SetPanelLookCommand}"
+                                              CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                          <DockPanel>
+                                              <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}"
+                                                         FontSize="9" HorizontalAlignment="Center"
+                                                         TextTrimming="CharacterEllipsis" />
+                                              <local:CharacterFigure Character="{Binding Preview}" />
+                                          </DockPanel>
+                                      </Button>
+                                  </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Text="The whole issue" FontSize="11" FontWeight="SemiBold"
+                                     Margin="0,4,0,0" />
+                          <ItemsControl Name="IssueLooks" ItemsSource="{Binding IssueLookChoices}">
+                              <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                      <WrapPanel />
+                                  </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="local:LookChoice">
+                                      <Button Classes="small choice sticker"
+                                              Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                                              HorizontalContentAlignment="Stretch"
+                                              VerticalContentAlignment="Stretch"
+                                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).SetIssueLookCommand}"
+                                              CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                                          <DockPanel>
+                                              <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}"
+                                                         FontSize="9" HorizontalAlignment="Center"
+                                                         TextTrimming="CharacterEllipsis" />
+                                              <local:CharacterFigure Character="{Binding Preview}" />
+                                          </DockPanel>
+                                      </Button>
+                                  </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                      </StackPanel>
+                  </Flyout>
+              </DropDownButton.Flyout>
+          </DropDownButton>
+          <TextBlock Classes="groupLabel" Text="Look" />
+      </DockPanel>
+      <Rectangle Classes="divider" IsVisible="{Binding SelectedCharacterHasLooks}" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Name="BiggerCharacterButton" Classes="small"
+                          Command="{Binding BiggerCharacterCommand}" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Closer to camera - every character in this panel at the same distance grows too, keeping their relative heights">
+                      Bigger
+                  </Button>
+                  <Button Name="SmallerCharacterButton" Classes="small"
+                          Command="{Binding SmallerCharacterCommand}" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Further from camera - together with the panel's other characters">
+                      Smaller
+                  </Button>
+                  <Button Name="MatchSizeButton" Classes="small"
+                          Command="{Binding MatchCharacterSizeCommand}" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Back to the same scale as the panel's other characters (after resizing it on its own with Shift)">
+                      Match size
+                  </Button>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Size" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Classes="small" Command="{Binding BringToFrontCommand}"
+                          ToolTip.Tip="In front of the panel's other characters (bubbles stay on top)"
+                          HorizontalAlignment="Stretch">
+                      To front
+                  </Button>
+                  <Button Classes="small" Command="{Binding SendToBackCommand}"
+                          ToolTip.Tip="Behind the panel's other characters" HorizontalAlignment="Stretch">
+                      To back
+                  </Button>
+              </StackPanel>
+              <Button Name="DeleteCharacterButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Remove from this panel (the character itself stays in the Characters pane)"
+                      local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Remove" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>

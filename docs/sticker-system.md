@@ -1102,3 +1102,10 @@ slot (two hats, two prints). The mechanism is the streaks' one, generalised:
   page's right-click Colour menu is still per slot.
 - **Tidying.** `HairEditing.DropOrphanStreakColors` drops any key whose sticker
   (`StickerSlots.StickerOfKey`) has left the wardrobe, streaks' and stickers' alike.
+
+The ribbons are split per tab (`Page/Ribbon/*RibbonTab`, `Characters/Ribbon/*RibbonTab`):
+each tab's groups are their own `UserControl`, so their controls are named in *that*
+control's name scope. `PageEditorRibbon.FindControl<T>` / `CharacterEditorRibbon.FindControl<T>`
+look in every tab too (an instance method, so it wins over Avalonia's extension), and
+templates a tab uses (the Look tab's slot galleries) live in that tab's own resources -
+a `StaticResource` can't reach a parent control's resources from a nested XAML.

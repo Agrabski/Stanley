@@ -1,0 +1,228 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.HomeRibbonTab"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Classes="tabContent">
+      <!-- Word's Clipboard group: whatever is selected - a bubble, a character, a shape, text, a picture or a whole panel - with everything about it. -->
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="PasteButton" Classes="tool" Command="{Binding PasteCommand}"
+                      local:Shortcut.Keys="Ctrl+V"
+                      ToolTip.Tip="Paste what you copied - into the selected panel, stepped aside from anything in the same spot">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource PasteIcon}" /><TextBlock Text="Paste" />
+                  </StackPanel>
+              </Button>
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                  <Button Name="CutButton" Classes="small" Command="{Binding CutCommand}"
+                          local:Shortcut.Keys="Ctrl+X"
+                          ToolTip.Tip="Take what's selected off the page, to paste somewhere else"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource CutIcon}" /><TextBlock Text="Cut" />
+                      </StackPanel>
+                  </Button>
+                  <Button Name="CopyButton" Classes="small" Command="{Binding CopyCommand}"
+                          local:Shortcut.Keys="Ctrl+C"
+                          ToolTip.Tip="Copy what's selected, with its words, colours and pose - then paste it on any page"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource CopyIcon}" /><TextBlock Text="Copy" />
+                      </StackPanel>
+                  </Button>
+                  <Button Name="DuplicateButton" Classes="small" Command="{Binding DuplicateCommand}"
+                          local:Shortcut.Keys="Ctrl+D"
+                          ToolTip.Tip="A copy of what's selected, right beside it - or hold Alt and drag it to pull a copy away"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                          <PathIcon Data="{StaticResource DuplicateIcon}" />
+                          <TextBlock Text="Duplicate" />
+                      </StackPanel>
+                  </Button>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Clipboard" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <!-- Welds several selected panel elements into one persistent object (issue #86), and takes one apart again. -->
+      <DockPanel Classes="group">
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+              <Button Name="GroupButton" Classes="small" Command="{Binding GroupSelectionCommand}"
+                      local:Shortcut.Keys="Ctrl+G"
+                      ToolTip.Tip="Weld what's selected into one object, so it moves, resizes and reorders together"
+                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                  Group
+              </Button>
+              <Button Name="UngroupButton" Classes="small" Command="{Binding UngroupSelectionCommand}"
+                      local:Shortcut.Keys="Ctrl+Shift+G"
+                      ToolTip.Tip="Take a group back apart into its separate pieces"
+                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                  Ungroup
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Arrange" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <RadioButton Name="SelectToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsSelectTool}"
+                           ToolTip.Tip="Select, move and resize panels and bubbles - hold Alt and drag to pull a copy away"
+                           local:Shortcut.Keys="V">
+                  <StackPanel>
+                      <PathIcon Data="M5,2 L5,19 L9.5,14.5 L12.7,21.5 L15.3,20.3 L12.1,13.4 L18.5,13.4 Z" />
+                      <TextBlock Text="Select" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="PanelToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsPanelTool}"
+                           ToolTip.Tip="Draw a new panel by dragging on the page" local:Shortcut.Keys="P">
+                  <StackPanel>
+                      <PathIcon
+                          Data="M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z" />
+                      <TextBlock Text="Panel" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="BubbleToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsBubbleTool}"
+                           ToolTip.Tip="Click inside a panel to add a speech bubble"
+                           local:Shortcut.Keys="B">
+                  <StackPanel>
+                      <PathIcon
+                          Data="M12,3 C6.5,3 2,6.6 2,11 C2,13.6 3.6,15.9 6,17.3 L5,21.5 L9.8,18.6 C10.5,18.8 11.3,18.9 12,18.9 C17.5,18.9 22,15.3 22,11 C22,6.6 17.5,3 12,3 Z" />
+                      <TextBlock Text="Bubble" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="DrawToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsDrawTool}"
+                           ToolTip.Tip="Draw freehand inside a panel - end where you started to close and fill the shape"
+                           local:Shortcut.Keys="D">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource PenIcon}" /><TextBlock Text="Draw" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="TextToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsTextTool}"
+                           ToolTip.Tip="Click inside a panel to type a caption or other text there"
+                           local:Shortcut.Keys="T">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Text" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Name="PanToolButton" Classes="tool" GroupName="Tool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsPanTool}"
+                           ToolTip.Tip="Move around the page - or hold Space and drag, with any tool"
+                           local:Shortcut.Keys="H">
+                  <StackPanel>
+                      <PathIcon
+                          Data="M12,1 L15.5,4.5 H13 V11 H19.5 V8.5 L23,12 L19.5,15.5 V13 H13 V19.5 H15.5 L12,23 L8.5,19.5 H11 V13 H4.5 V15.5 L1,12 L4.5,8.5 V11 H11 V4.5 H8.5 Z" />
+                      <TextBlock Text="Pan" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Tools" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Spacing="1">
+              <RadioButton Classes="small" GroupName="HomeBubbleStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsSpeechStyle}"
+                           ToolTip.Tip="Rounded speech bubble (the selected bubble, and new ones)"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource SpeechIcon}" /><TextBlock Text="Speech" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Classes="small" GroupName="HomeBubbleStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsShoutStyle}"
+                           ToolTip.Tip="Spiky shout bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource ShoutIcon}" /><TextBlock Text="Shout" />
+                  </StackPanel>
+              </RadioButton>
+              <RadioButton Classes="small" GroupName="HomeBubbleStyle"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsWhisperStyle}"
+                           ToolTip.Tip="Dashed whisper bubble" HorizontalAlignment="Stretch"
+                           HorizontalContentAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{StaticResource WhisperIcon}" /><TextBlock Text="Whisper" />
+                  </StackPanel>
+              </RadioButton>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Bubble style" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <local:FontGroup Name="HomeFontGroup" />
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Spacing="2" Margin="0,4,0,0">
+              <!-- Like Word's and Figma's: they change what's selected - a shape, a text's box, a panel - and, with nothing selected, what you draw next. -->
+              <local:ColorMenuButton Name="HomeShapeFillButton" Label="Shape Fill"
+                                     Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                                     IsEnabled="{Binding CanUseShapeStyles}"
+                                     Command="{Binding SetFillColorCommand}" NoneLabel="No Fill"
+                                     MoreLabel="More Fill Colors…"
+                                     CurrentColor="{Binding CurrentShapeStyle.Fill}"
+                                     ToolTip.Tip="Shape Fill - the colour inside what's selected: a shape, the box behind a text, a panel (a title page's band too). With nothing selected, inside the closed shapes you draw next" />
+              <local:ColorMenuButton Name="HomeShapeOutlineButton" Label="Shape Outline"
+                                     Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                                     IsEnabled="{Binding CanUseShapeStyles}"
+                                     Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline"
+                                     MoreLabel="More Outline Colors…"
+                                     CurrentColor="{Binding CurrentShapeStyle.Stroke}"
+                                     WeightCommand="{Binding SetStrokeWeightCommand}"
+                                     CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}"
+                                     DashCommand="{Binding SetStrokeDashCommand}"
+                                     CurrentDash="{Binding CurrentShapeStyle.Dash}"
+                                     ToolTip.Tip="Shape Outline - the colour, weight and dashes of what's selected: a shape's line, a text's border, a panel's border. With nothing selected, of what you draw next" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Shape Styles" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
+              <Button Name="AddBubbleButton" Classes="tool" Command="{Binding AddBubbleCommand}"
+                      ToolTip.Tip="Add a bubble to the selected panel and start typing">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" />
+                  </StackPanel>
+              </Button>
+              <Button Classes="tool" Command="{Binding EditTextCommand}"
+                      ToolTip.Tip="Edit the selected bubble's or text's words - or double-click it"
+                      local:Shortcut.Keys="Enter">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" />
+                  </StackPanel>
+              </Button>
+              <Button Name="DeleteButton" Classes="tool" Command="{Binding DeleteSelectionCommand}"
+                      ToolTip.Tip="Delete what's selected" local:Shortcut.Keys="Del">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+                  </StackPanel>
+              </Button>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Edit" />
+      </DockPanel>
+  </StackPanel>
+</UserControl>
