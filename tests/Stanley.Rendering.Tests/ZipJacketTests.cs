@@ -65,13 +65,13 @@ public class ZipJacketTests
     public void Half_open_shows_what_is_under_it_at_the_neck_only()
     {
         Assert.Equal(Skin, Chest("half", ViewAngle.Front, 0, -770));
-        Assert.Equal(Jacket, Chest("half", ViewAngle.Front, 12, -580));
+        Assert.Equal(Jacket, Chest("half", ViewAngle.Front, 12, -660));
     }
 
     [Fact]
     public void Open_shows_what_is_under_it_all_the_way_down()
     {
         Assert.Equal(Skin, Chest("open", ViewAngle.Front, 0, -770));
-        Assert.Equal(Skin, Chest("open", ViewAngle.Front, 0, -580));
+        Assert.Equal(Skin, Chest("open", ViewAngle.Front, 0, -660));
     }
 }
