@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="120" height="300" viewBox="-60 -800 120 300" data-stanley-view="profile" data-stanley-slot="outer">
+  <g id="opening" inkscape:groupmode="layer" inkscape:label="opening">
+    <path d="M44,-800 L22,-800 L22,-500 L44,-500 Z" fill="#000000"/>
+  </g>
+  <g id="zip" inkscape:groupmode="layer" inkscape:label="zip">
+    <path d="M44,-800 L44,-500" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M40,-516 L48,-516 L47,-500 L41,-500 Z" fill="#c9ccd1" stroke="#1a1a1a" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M22,-800 L22,-500" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,54 @@
+{
+  "colors": {
+    "outer": "#3f6b8f"
+  },
+  "id": "library",
+  "name": "Zip jacket",
+  "parts": [
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.022,
+        "from": 0,
+        "to": 0.95
+      },
+      "name": "body",
+      "region": "torso"
+    },
+    {
+      "cover": {
+        "color": "outer",
+        "ease": 0.022,
+        "from": 0,
+        "to": 0.96
+      },
+      "name": "sleeves",
+      "region": "arm"
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "blend": "cut",
+      "name": "opening",
+      "region": "torso",
+      "variants": [
+        "half",
+        "open"
+      ]
+    },
+    {
+      "art": {
+        "mapping": "warp"
+      },
+      "name": "zip",
+      "region": "torso"
+    }
+  ],
+  "slot": "outer",
+  "variants": [
+    "closed",
+    "half",
+    "open"
+  ]
+}
