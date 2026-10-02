@@ -599,6 +599,11 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public int SelectedCharacterIndex => _selectedCharacterIndex;
 
     public bool HasSelectedPanel => _selectedPanelId is not null;
+
+    /// <summary>Tooltip for Insert › Background: what it does, or - while it is disabled - why and how to enable it.</summary>
+    public string InsertBackgroundTip => HasSelectedPanel
+        ? "Fill the selected panel behind everything in it: a colour or a sky"
+        : "Select a panel first (click one, or anything in one) to set its background";
     public bool HasSelectedBubble => SelectedBubble is not null;
     public bool HasSelectedCharacter => SelectedCharacter is not null;
     public bool HasSelection => HasSelectedPanel;
@@ -908,6 +913,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         OnPropertyChanged(nameof(SelectedBubbleIndex));
         OnPropertyChanged(nameof(SelectedCharacterIndex));
         OnPropertyChanged(nameof(HasSelectedPanel));
+        OnPropertyChanged(nameof(InsertBackgroundTip));
         OnPropertyChanged(nameof(HasSelectedBubble));
         OnPropertyChanged(nameof(HasSelectedCharacter));
         OnPropertyChanged(nameof(HasSelection));
