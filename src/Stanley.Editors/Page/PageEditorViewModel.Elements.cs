@@ -582,11 +582,20 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>Sets a text element's words (one undo step), growing its box to fit them.</summary>
     public void SetElementText(PanelId panelId, int index, string value) =>
-        Apply(EditElementInPanel(Working, panelId, index, e => e is TextElement text
+        Apply(WithElementText(Working, panelId, index, value));
+
+    /// <summary>The text element exactly as <see cref="SetElementText"/> would leave it (words in, box grown to fit them), without changing anything - for the inline editor to show while typing. Null when there's no such text or the words aren't allowed.</summary>
+    public TextElement? PreviewElementText(PanelId panelId, int index, string value) =>
+        WithElementText(Working, panelId, index, value) is { IsValid: true } result && result.Value.Panels.TryGetValue(panelId, out var panel)
+            ? panel.Elements[index] as TextElement
+            : null;
+
+    private static EditResult<PageDocument> WithElementText(PageDocument document, PanelId panelId, int index, string value) =>
+        EditElementInPanel(document, panelId, index, e => e is TextElement text
             ? TextEditing.SetText(text, value) is { IsValid: true } set
                 ? EditResult<PanelElement>.Success(TextEditing.GrowToFit(set.Value, ElementRenderer.NeededHeight(set.Value)))
                 : EditResult<PanelElement>.Failure($"Text can't exceed {TextEditing.MaxTextLength} characters.")
-            : EditResult<PanelElement>.Failure("That isn't text.")));
+            : EditResult<PanelElement>.Failure("That isn't text."));
 
     // ---------------------------------------------------------------- moving, resizing, arranging
 

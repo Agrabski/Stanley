@@ -43,10 +43,17 @@ public sealed record PageCanvasScene(
     IReadOnlyDictionary<string, ArtFile>? Pictures = null,
     TextFields? Fields = null,
     /// <summary>The page-space bounding box of every extra item a Shift+click multi-selection added, beyond the primary selection drawn above - a plain outline, no handles (those stay on the primary).</summary>
-    IReadOnlyList<Rect2D>? ExtraSelectionBounds = null);
+    IReadOnlyList<Rect2D>? ExtraSelectionBounds = null,
+    /// <summary>The text element being typed into, as it will be once the words typed so far are kept (its box grown to fit them) - drawn in place of the stored one, so the box is the size Enter will leave it.</summary>
+    TextElement? EditingTextDraft = null);
 
-/// <summary>The bubble whose text is being typed in the inline editor: drawn without its lettering (the text box shows it) and without handles, so nothing covers it.</summary>
-public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble);
+/// <summary>
+/// The bubble whose text is being typed in the inline editor: drawn without its lettering
+/// (the text box shows it) and without handles, so nothing covers it. <paramref name="Draft"/>
+/// is the bubble as it will be once the words typed so far are kept - grown to fit them - and
+/// is drawn in place of the stored one, so the outline is the size Enter will leave it.
+/// </summary>
+public readonly record struct EditingBubble(PanelId Panel, BubbleId Bubble, ProjectModel.Bubbles.Bubble? Draft = null);
 
 /// <summary>
 /// Draws the page in two passes: the artwork in page space (millimetres, under the
@@ -141,15 +148,19 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
     }
 
-    /// <summary>The inline text editor draws the edited bubble's text itself; drawing it here too would show it twice.</summary>
+    /// <summary>The inline text editor draws the edited bubble's text itself; drawing it here too would show it twice. The bubble (or text box) itself is drawn as it will be once the typed words are kept, grown to fit them.</summary>
     private ProjectModel.Issues.Panel WithoutEditedText(ProjectModel.Issues.Panel panel)
     {
-        if (_scene.EditingBubble is not { } editing || !editing.Panel.Equals(panel.Id))
-            return panel;
-        return panel with
+        if (_scene.EditingBubble is { } editing && editing.Panel.Equals(panel.Id))
         {
-            Bubbles = panel.Bubbles.Select(b => b.Id.Equals(editing.Bubble) ? b with { Text = "" } : b).ToList()
-        };
+            panel = panel with
+            {
+                Bubbles = panel.Bubbles.Select(b => b.Id.Equals(editing.Bubble) ? (editing.Draft ?? b) with { Text = "" } : b).ToList()
+            };
+        }
+        if (_scene.EditingTextDraft is { } draft && panel.Elements.Any(e => e.Id == draft.Id))
+            panel = panel with { Elements = panel.Elements.Select(e => e.Id == draft.Id ? draft : e).ToList() };
+        return panel;
     }
 
     // ---------------------------------------------------------------- screen space (px)
