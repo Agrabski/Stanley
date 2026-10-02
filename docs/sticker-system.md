@@ -1130,3 +1130,7 @@ control's name scope. `PageEditorRibbon.FindControl<T>` / `CharacterEditorRibbon
 look in every tab too (an instance method, so it wins over Avalonia's extension), and
 templates a tab uses (the Look tab's slot galleries) live in that tab's own resources -
 a `StaticResource` can't reach a parent control's resources from a nested XAML.
+
+### Gotcha: slider drags and the Sticker tab picker
+
+A slider drag on the Sticker tab edits the sticker on every move, so `RaiseLookChanged` runs per move. `WornStickers` (the ComboBox list) is therefore cached and only re-raised when its content actually changes (`RefreshWornStickers`); replacing an equal list resets the ComboBox mid-drag and the ribbon dropped back to the Look tab (#61).

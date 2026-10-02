@@ -565,8 +565,22 @@ public sealed partial class CharacterEditorViewModel
     // ---------------------------------------------------------------- the selected sticker (Sticker tab)
 
     /// <summary>The worn stickers, for the Sticker tab's picker - in paint order.</summary>
-    public IReadOnlyList<WornStickerItem> WornStickers =>
+    public IReadOnlyList<WornStickerItem> WornStickers => _wornStickers ??= BuildWornStickers();
+
+    private IReadOnlyList<WornStickerItem>? _wornStickers;
+
+    private List<WornStickerItem> BuildWornStickers() =>
         CharacterLooks.Resolve(LookWorking).Stickers.Select(w => new WornStickerItem(w.Asset.Id, w.Asset.Sticker.Name, StickerSlots.Get(w.Slot).Label)).ToList();
+
+    /// <summary>Rebuilds the picker's list, and says whether it changed: a slider drag edits the sticker on every move, and replacing an unchanged list would reset the ComboBox under the pointer (and the ribbon with it).</summary>
+    private bool RefreshWornStickers()
+    {
+        var fresh = BuildWornStickers();
+        if (_wornStickers is { } old && old.SequenceEqual(fresh))
+            return false;
+        _wornStickers = fresh;
+        return true;
+    }
 
     /// <summary>The sticker the Sticker tab works on (picked on the stage or in its list), or null.</summary>
     public StickerId? SelectedStickerId => _selectedSticker;
@@ -757,7 +771,8 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(AccessoryGalleries));
         if (RefreshColorEditors())
             OnPropertyChanged(nameof(ColorEditors));
-        OnPropertyChanged(nameof(WornStickers));
+        if (RefreshWornStickers())
+            OnPropertyChanged(nameof(WornStickers));
         OnPropertyChanged(nameof(PreviewExpressionChoices));
         OnPropertyChanged(nameof(PreviewLeftEye));
         OnPropertyChanged(nameof(PreviewRightEye));
