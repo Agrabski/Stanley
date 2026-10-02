@@ -274,7 +274,7 @@
       <DockPanel Classes="group">
           <DropDownButton Name="InsertBackgroundButton" Classes="slotGallery" Width="100"
                           IsEnabled="{Binding HasSelectedPanel}"
-                          ToolTip.Tip="Fill the selected panel behind everything in it: a colour or a sky (select a panel, or anything in one, first)">
+                          ToolTip.Tip="{Binding InsertBackgroundTip}" ToolTip.ShowOnDisabled="True">
               <StackPanel Spacing="2">
                   <PathIcon Data="{StaticResource BackgroundIcon}" Width="20" Height="20" />
                   <TextBlock Text="Background" FontSize="11" HorizontalAlignment="Center" />

@@ -333,6 +333,16 @@ public class PageEditorViewModelTests
     }
 
     [Fact]
+    public void InsertBackgroundTip_ExplainsWhyDisabled_UntilAPanelIsSelected()
+    {
+        var (_, vm, panelId) = NewEditor();
+        vm.CreateBubble(panelId, new Point2D(50, 50));
+        vm.DeleteSelection();
+        Assert.True(vm.HasSelectedPanel);
+        Assert.DoesNotContain("Select a panel first", vm.InsertBackgroundTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DeleteSelection_ThenUndo_KeepsSelectionValid()
     {
         var (history, vm, panelId) = NewEditor();
