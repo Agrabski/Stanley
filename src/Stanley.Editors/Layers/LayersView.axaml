@@ -1,0 +1,15 @@
+<!--
+  The Layers pane (docked right of the editors): the current page's panels and what each
+  holds, in drawing order. Like the page navigator it's not an editor - the ribbon keeps
+  showing whatever is being edited.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.LayersView"
+             x:DataType="local:LayersViewModel">
+    <DockPanel Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+        <TextBlock Name="LayersPlaceholder" Text="Nothing to show yet." TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                   Margin="12" />
+    </DockPanel>
+</UserControl>

@@ -13,6 +13,9 @@ namespace Stanley.EditorFramework;
 public sealed class EditorWorkspace : ObservableObject
 {
     private IEditorPane? _activeEditor;
+    private readonly IDock? _row;
+    private readonly IDock? _rightDock;
+    private IReadOnlyList<(IDockable Dockable, double Proportion)> _rowProportions = [];
 
     public EditorWorkspace(EditorHistory history, params IEditorPane[] panes)
         : this(history, panes, [])
@@ -21,10 +24,20 @@ public sealed class EditorWorkspace : ObservableObject
 
     /// <param name="leftTools">Side panes (a navigator, an inspector) docked left of the editors. They're not editors, so activating one never changes <see cref="ActiveEditor"/> - the ribbon stays on the editor being worked in.</param>
     public EditorWorkspace(EditorHistory history, IReadOnlyList<IEditorPane> panes, IReadOnlyList<IDockable> leftTools)
+        : this(history, panes, leftTools, [])
+    {
+    }
+
+    /// <param name="rightTools">Side panes docked right of the editors (the Layers pane). Like the left ones they never change <see cref="ActiveEditor"/>; unlike them they can be shown and hidden (<see cref="SetRightToolsVisible"/>).</param>
+    /// <param name="rightToolsVisible">Whether the right-hand panes start out showing.</param>
+    public EditorWorkspace(EditorHistory history, IReadOnlyList<IEditorPane> panes, IReadOnlyList<IDockable> leftTools,
+        IReadOnlyList<IDockable> rightTools, bool rightToolsVisible = true)
     {
         History = history;
-        (Factory, Layout) = EditorDockHost.CreateLayout(panes, leftTools);
+        (Factory, Layout) = EditorDockHost.CreateLayout(panes, leftTools, rightTools);
         _activeEditor = panes.FirstOrDefault();
+        _row = FindDock(EditorDockHost.MainRowId);
+        _rightDock = FindDock(EditorDockHost.RightToolsDockId);
 
         Factory.ActiveDockableChanged += (_, e) => Follow(e.Dockable);
         Factory.FocusedDockableChanged += (_, e) => Follow(e.Dockable);
@@ -33,6 +46,9 @@ public sealed class EditorWorkspace : ObservableObject
             if (ReferenceEquals(e.Dockable, ActiveEditor))
                 ActiveEditor = OpenEditors().FirstOrDefault();
         };
+
+        if (!rightToolsVisible)
+            SetRightToolsVisible(false);
     }
 
     public EditorHistory History { get; }
@@ -121,7 +137,46 @@ public sealed class EditorWorkspace : ObservableObject
         ActiveEditor = next;
     }
 
-    private IDock? FindEditorsDock()
+    /// <summary>Whether the right-hand panes (the Layers pane) are showing. False too when the workspace has none.</summary>
+    public bool RightToolsVisible => _row?.VisibleDockables is { } shown && _rightDock != null && shown.Contains(_rightDock);
+
+    /// <summary>
+    /// Shows or hides the right-hand panes; the editors reclaim the room when they go. Showing
+    /// them again gives every column the width it had when they were hidden - without that,
+    /// Dock re-normalises the proportions on each toggle and the pane creeps narrower every
+    /// time. Does nothing for a workspace without right-hand panes.
+    /// </summary>
+    public void SetRightToolsVisible(bool visible)
+    {
+        if (_row is null || _rightDock is null || visible == RightToolsVisible)
+            return;
+
+        if (visible)
+        {
+            Factory.AddDockable(_row, Factory.CreateProportionalDockSplitter());
+            Factory.AddDockable(_row, _rightDock);
+            foreach (var (dockable, proportion) in _rowProportions)
+            {
+                dockable.Proportion = proportion;
+                dockable.CollapsedProportion = proportion;
+            }
+        }
+        else
+        {
+            _rowProportions = (_row.VisibleDockables ?? []).Where(d => d is not IProportionalDockSplitter).Select(d => (d, d.Proportion)).ToList();
+            Factory.RemoveDockable(_rightDock, collapse: false);
+            // Dock cleans up the splitter the right pane leaves behind; make sure it did.
+            while (_row.VisibleDockables?.LastOrDefault() is IProportionalDockSplitter orphan)
+                Factory.RemoveDockable(orphan, collapse: false);
+            if (FindEditorsDock() is { ActiveDockable: { } active } editors)
+                Factory.SetFocusedDockable(editors, active);
+        }
+        OnPropertyChanged(nameof(RightToolsVisible));
+    }
+
+    private IDock? FindEditorsDock() => FindDock(EditorDockHost.EditorsDockId);
+
+    private IDock? FindDock(string id)
     {
         var pending = new Stack<IDockable>([Layout]);
         while (pending.Count > 0)
@@ -129,7 +184,7 @@ public sealed class EditorWorkspace : ObservableObject
             var next = pending.Pop();
             if (next is IDock dock)
             {
-                if (dock.Id == EditorDockHost.EditorsDockId)
+                if (dock.Id == id)
                     return dock;
                 foreach (var child in dock.VisibleDockables ?? [])
                     pending.Push(child);

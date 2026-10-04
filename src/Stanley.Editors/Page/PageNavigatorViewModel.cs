@@ -226,6 +226,17 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         }
     }
 
+    /// <summary>Where the "Layers pane is showing" switch lives, handed to every page so its View tab can flip it; null for a comic edited without a Layers pane.</summary>
+    public ILayersPaneHost? LayersHost
+    {
+        get;
+        set
+        {
+            field = value;
+            SyncPages();
+        }
+    }
+
     /// <summary>The comic's copies of kept object groups, shared by every page; null for a comic edited without them.</summary>
     public ObjectGroupLibrary? ObjectGroups
     {
@@ -551,6 +562,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             page.Editor.Fields = _fields;
             page.Editor.MyAssets = MyAssets;
             page.Editor.ObjectGroups = ObjectGroups;
+            page.Editor.LayersHost = LayersHost;
         }
     }
 
@@ -587,7 +599,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             Grid = _grid,
             Fields = _fields,
             MyAssets = MyAssets,
-            ObjectGroups = ObjectGroups
+            ObjectGroups = ObjectGroups,
+            LayersHost = LayersHost
         };
         if (settingsFrom != null)
         {

@@ -425,6 +425,47 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     public bool HasPageNumbering => _numberingHost != null;
 
+    // ---------------------------------------------------------------- layers pane
+
+    private ILayersPaneHost? _layersHost;
+
+    /// <summary>Where the "Layers pane is showing" switch lives (the window-wide setting); null for a page edited on its own, which has no Layers pane to show.</summary>
+    public ILayersPaneHost? LayersHost
+    {
+        get => _layersHost;
+        set
+        {
+            if (ReferenceEquals(value, _layersHost))
+                return;
+            if (_layersHost != null)
+                _layersHost.LayersPaneVisibleChanged -= RaiseShowLayersChanged;
+            _layersHost = value;
+            if (_layersHost != null)
+                _layersHost.LayersPaneVisibleChanged += RaiseShowLayersChanged;
+            RaiseShowLayersChanged();
+        }
+    }
+
+    /// <summary>View tab › Show › Layers: whether the Layers pane is showing beside the page.</summary>
+    public bool ShowLayers
+    {
+        get => _layersHost?.LayersPaneVisible ?? false;
+        set
+        {
+            if (_layersHost != null)
+                _layersHost.LayersPaneVisible = value;
+        }
+    }
+
+    /// <summary>False for a page edited on its own: there's no Layers pane to switch.</summary>
+    public bool HasLayersPane => _layersHost != null;
+
+    private void RaiseShowLayersChanged()
+    {
+        OnPropertyChanged(nameof(ShowLayers));
+        OnPropertyChanged(nameof(HasLayersPane));
+    }
+
     // ---------------------------------------------------------------- looks
 
     private IIssueLooksHost? _looksHost;

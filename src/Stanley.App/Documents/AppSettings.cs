@@ -68,6 +68,13 @@ public sealed class AppSettings
         set => Set(nameof(AutoCheckForUpdates), value.ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <summary>View &gt; Show &gt; Layers: whether the Layers pane shows beside the page. Off until the user asks for it.</summary>
+    public bool ShowLayers
+    {
+        get => _values.TryGetValue(nameof(ShowLayers), out var value) && bool.TryParse(value, out var on) && on;
+        set => Set(nameof(ShowLayers), value.ToString(CultureInfo.InvariantCulture));
+    }
+
     /// <summary>Stable (tagged releases only) or Nightly (every change to `develop`) release track.</summary>
     public AppUpdateChannel UpdateChannel
     {

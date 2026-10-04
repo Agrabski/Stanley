@@ -60,6 +60,20 @@
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Show" />
       </DockPanel>
+      <Rectangle Classes="divider" IsVisible="{Binding HasLayersPane}" />
+
+      <!-- The Layers pane, docked right of the page: what each panel holds, in drawing order. -->
+      <DockPanel Classes="group" IsVisible="{Binding HasLayersPane}">
+          <StackPanel VerticalAlignment="Center" Margin="0,6,0,0">
+              <CheckBox
+                  Name="ShowLayersCheck"
+                  IsChecked="{Binding ShowLayers}"
+                  Focusable="False"
+                  ToolTip.Tip="Show the Layers pane: every panel's contents in drawing order, to pick or move overlapping things"
+                  Content="Layers" />
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Panes" />
+      </DockPanel>
 
   </StackPanel>
 </UserControl>

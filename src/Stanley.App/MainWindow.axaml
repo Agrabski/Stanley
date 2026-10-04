@@ -15,12 +15,15 @@
         <DataTemplate DataType="editors:CharacterEditorViewModel">
             <editors:CharacterEditorView />
         </DataTemplate>
-        <!-- Side panes: the page navigator and the Characters pane. -->
+        <!-- Side panes: the page navigator and the Characters pane on the left, the Layers pane on the right. -->
         <DataTemplate DataType="editors:PageNavigatorViewModel">
             <editors:PageNavigatorView />
         </DataTemplate>
         <DataTemplate DataType="editors:CharacterLibraryViewModel">
             <editors:CharacterLibraryView />
+        </DataTemplate>
+        <DataTemplate DataType="editors:LayersViewModel">
+            <editors:LayersView />
         </DataTemplate>
     </Window.DataTemplates>
 
