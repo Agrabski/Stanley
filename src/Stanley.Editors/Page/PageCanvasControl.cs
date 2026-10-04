@@ -187,6 +187,21 @@ public sealed class PageCanvasControl : Control
 
     private ElementId? _editingText;
 
+    /// <summary>The text being typed into as it will be once its words are kept (box grown to fit them), drawn in place of the stored element while the editor is open.</summary>
+    public ProjectModel.Issues.TextElement? EditingTextDraft
+    {
+        get => _editingTextDraft;
+        set
+        {
+            if (Equals(_editingTextDraft, value))
+                return;
+            _editingTextDraft = value;
+            InvalidateVisual();
+        }
+    }
+
+    private ProjectModel.Issues.TextElement? _editingTextDraft;
+
     // ---------------------------------------------------------------- view transform
 
     public double Zoom => _zoom;
@@ -309,7 +324,8 @@ public sealed class PageCanvasControl : Control
             _editingText,
             _viewModel.PictureSnapshot,
             _viewModel.Fields,
-            _viewModel.ExtraSelectionBounds)));
+            _viewModel.ExtraSelectionBounds,
+            _editingTextDraft)));
     }
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>

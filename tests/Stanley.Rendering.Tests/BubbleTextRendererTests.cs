@@ -107,6 +107,23 @@ public class BubbleTextRendererTests
         Assert.True(font.MeasureText(bubble.Text, paint) <= textWidth + 1e-3f);
     }
 
+    /// <summary>Issue #19: a bubble grown to its text must hold it with margin, so the line that decided the size can't tip over to the next row on float noise or a last-digit difference between the page's and the inline editor's measurements.</summary>
+    [Fact]
+    public void NeededScale_leaves_the_widest_line_room_to_spare()
+    {
+        var bubble = MakeBubble("I told you the bridge was closed three times already, but nobody on this crew ever listens to a word I say", fontSizePt: 10);
+
+        var scale = BubbleTextRenderer.NeededScale(bubble);
+
+        Assert.True(scale > 1f);
+        using var font = Lettering.Font((float)FontPoints.ToMm(10));
+        using var paint = new SKPaint();
+        using var measurer = new Lettering.Measurer(font);
+        var areaWidth = (float)SmallBounds.Width * scale * (1 - 2 * 0.18f);
+        var widest = Lettering.Wrap(bubble.Text, font, paint, areaWidth).Max(line => measurer.Width(line, paint));
+        Assert.True(widest <= areaWidth / 1.004f, $"widest line {widest} should leave room in {areaWidth}");
+    }
+
     [Fact]
     public void NeededScale_is_never_less_than_1()
     {

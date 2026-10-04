@@ -36,7 +36,8 @@
       <!-- The text editor sits inside the bubble's (or text box's) text area on the (always white) paper, so it stays light in dark mode too. -->
       <ThemeVariantScope RequestedThemeVariant="Light">
       <Canvas Name="Overlay">
-        <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center"
+        <!-- No layout rounding: it would round the box up to whole pixels, wide enough to fit a word the page wraps. -->
+        <TextBox Name="InlineTextEditor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap" TextAlignment="Center" UseLayoutRounding="False"
                  VerticalContentAlignment="Center" Background="Transparent" Foreground="Black" BorderThickness="0" MaxLength="500"
                  PlaceholderText="Type…" />
       </Canvas>

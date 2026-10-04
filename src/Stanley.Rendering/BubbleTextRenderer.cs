@@ -90,6 +90,7 @@ public static class BubbleTextRenderer
             return 1f;
 
         using var font = Lettering.Font(fontSize, bubble.Bold, bubble.Italic, bubble.FontFamily);
+        using var measurer = new Lettering.Measurer(font);
         using var paint = new SKPaint { IsAntialias = true };
 
         // Fits when the wrapped lines are no taller than the area - and none wider, since a
@@ -97,7 +98,7 @@ public static class BubbleTextRenderer
         bool FitsAt(float scale)
         {
             var lines = WrapLines(bubble.Text, font, paint, width0 * scale);
-            return font.Spacing * lines.Count <= height0 * scale && lines.All(l => font.MeasureText(l, paint) <= width0 * scale);
+            return font.Spacing * lines.Count <= height0 * scale && lines.All(l => measurer.Width(l, paint) <= width0 * scale);
         }
 
         if (FitsAt(1f))
@@ -116,8 +117,16 @@ public static class BubbleTextRenderer
             else
                 lo = mid;
         }
-        return hi;
+        return hi * FitSlack;
     }
+
+    /// <summary>
+    /// The bisection above lands exactly where the widest line just fits its area, so whether
+    /// that line stays on one row or tips over to the next would come down to float noise - and
+    /// to the last digit of two text engines' (the page's, the inline editor's) measurements.
+    /// A hair more room (invisible) makes the bubble fit its text with margin instead.
+    /// </summary>
+    private const float FitSlack = 1.005f;
 
     /// <summary>The size <see cref="Draw"/> and <see cref="NeededScale"/> both letter at: the bubble's own (points, in millimetres), or <paramref name="fallback"/> when it has none.</summary>
     private static float OwnFontSize(Bubble bubble, float fallback) =>

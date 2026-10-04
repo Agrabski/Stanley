@@ -1595,11 +1595,25 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     /// <summary>Sets a bubble's words (one undo step), growing it to fit them.</summary>
     public void SetBubbleText(PanelId panelId, int bubbleIndex, string text) =>
-        Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
+        Apply(WithBubbleText(Working, panelId, bubbleIndex, text));
+
+    /// <summary>
+    /// The bubble exactly as <see cref="SetBubbleText"/> would leave it - words in, grown to
+    /// fit them - without changing anything, so the inline editor can show the result while
+    /// the words are still being typed (what's typed then looks like what Enter keeps).
+    /// Null when there's no such bubble or the words aren't allowed.
+    /// </summary>
+    public Bubble? PreviewBubbleText(PanelId panelId, int bubbleIndex, string text) =>
+        WithBubbleText(Working, panelId, bubbleIndex, text) is { IsValid: true } result && result.Value.Panels.TryGetValue(panelId, out var panel)
+            ? panel.Bubbles[bubbleIndex]
+            : null;
+
+    private static EditResult<PageDocument> WithBubbleText(PageDocument document, PanelId panelId, int bubbleIndex, string text) =>
+        EditBubbleInPanel(document, panelId, bubbleIndex, (b, _) =>
         {
             var set = BubbleEditing.SetText(b, text);
             return set.IsValid ? GrownBubbleEdit(set.Value) : set;
-        }));
+        });
 
     public void DeleteBubble(PanelId panelId, int bubbleIndex)
     {

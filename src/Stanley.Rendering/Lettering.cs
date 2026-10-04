@@ -295,9 +295,40 @@ public static class Lettering
         return x - start;
     }
 
+    /// <summary>
+    /// Measures how wide text is in a font - at the font's size in the page's own units, a few
+    /// millimetres, where the font engine rounds the size and every width to a fraction of a
+    /// unit and comes up about a third of a percent short of what's actually drawn (the page
+    /// scales those glyphs up under its zoom transform) and of what a text box lays out at
+    /// screen size. So this measures a copy of the font a good deal bigger and scales the
+    /// answer back down, which is exact at any size: a line then fits here exactly when it fits
+    /// on the page, and the inline editor (Avalonia lays text out at the real size on screen)
+    /// breaks lines at the very same words (issue #19).
+    /// </summary>
+    public sealed class Measurer : IDisposable
+    {
+        private const float Magnification = 64f;
+        private readonly SKFont _wide;
+
+        public Measurer(SKFont font)
+        {
+            _wide = new SKFont(font.Typeface, font.Size * Magnification, font.ScaleX, font.SkewX)
+            {
+                LinearMetrics = font.LinearMetrics,
+                Subpixel = font.Subpixel,
+                Embolden = font.Embolden
+            };
+        }
+
+        public float Width(string text, SKPaint paint) => _wide.MeasureText(text, paint) / Magnification;
+
+        public void Dispose() => _wide.Dispose();
+    }
+
     /// <summary>Splits <paramref name="text"/> into lines no wider than <paramref name="maxWidth"/> at word breaks (a single over-long word keeps its own line); <c>\n</c> always starts a new line.</summary>
     public static List<string> Wrap(string text, SKFont font, SKPaint paint, float maxWidth)
     {
+        using var measurer = new Measurer(font);
         var lines = new List<string>();
         foreach (var paragraph in text.Split('\n'))
         {
@@ -312,7 +343,7 @@ public static class Lettering
             for (var i = 1; i < words.Length; i++)
             {
                 var candidate = current + " " + words[i];
-                if (font.MeasureText(candidate, paint) <= maxWidth)
+                if (measurer.Width(candidate, paint) <= maxWidth)
                 {
                     current = candidate;
                 }

@@ -13,6 +13,33 @@ public class LetteringTests
     private static float Width(string? family, string text = "Hello there") =>
         Lettering.Font(10, family: family).MeasureText(text);
 
+    /// <summary>Issue #19: at a few millimetres the font engine's own measure runs short of the real width, so the page and the inline editor (which lays text out at screen size) broke lines at different words.</summary>
+    [Fact]
+    public void Measurer_gives_the_same_width_at_any_size_of_font()
+    {
+        const string sentence = "I told you the bridge was closed three times already";
+        using var paint = new SKPaint();
+        using var small = Lettering.Font(3.53f);
+        using var huge = Lettering.Font(3.53f * 100);
+        using var measurer = new Lettering.Measurer(small);
+
+        var exact = huge.MeasureText(sentence, paint) / 100;
+
+        Assert.Equal(exact, measurer.Width(sentence, paint), exact * 1e-4);
+    }
+
+    [Fact]
+    public void Wrap_breaks_a_line_exactly_where_the_words_stop_fitting()
+    {
+        using var paint = new SKPaint();
+        using var font = Lettering.Font(3.53f);
+        using var measurer = new Lettering.Measurer(font);
+        var fits = measurer.Width("alpha beta", paint);
+
+        Assert.Equal(["alpha beta", "gamma"], Lettering.Wrap("alpha beta gamma", font, paint, fits + 0.001f));
+        Assert.Equal(["alpha", "beta", "gamma"], Lettering.Wrap("alpha beta gamma", font, paint, fits - 0.001f));
+    }
+
     [Fact]
     public void A_font_this_computer_doesnt_have_draws_in_the_default()
     {

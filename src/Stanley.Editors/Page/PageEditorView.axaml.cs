@@ -24,10 +24,23 @@ public partial class PageEditorView : UserControl
     private const string DialogueHint = "Type the dialogue · Enter = done · Shift+Enter = new line · Esc = cancel";
     private const string TextHint = "Type the text - {title} and {issue} show the comic's title and issue number · Enter = done · Shift+Enter = new line · Esc = cancel";
 
+    /// <summary>
+    /// The page draws lettering glyph by glyph (SkiaSharp, no text shaper: <see cref="Lettering"/>),
+    /// so a letter pair isn't kerned and no ligature or contextual swap is made. Avalonia's text
+    /// box shapes with all of those on by default, which sets the same words narrower (and so
+    /// onto different lines) than the page will; asked not to, it sets them the way the page does.
+    /// </summary>
+    private static readonly Avalonia.Media.FontFeatureCollection PlainGlyphs = new(
+        new[] { "kern", "liga", "clig", "calt" }.Select(tag => new Avalonia.Media.FontFeature { Tag = tag, Value = 0 }));
+
     private PageEditorViewModel? _subscribed;
 
     /// <summary>What the inline text editor is open over: a bubble, or a text element (by id, so undo/redo shuffling the lists can't point it elsewhere).</summary>
     private (PanelId Panel, BubbleId? Bubble, ElementId? Element)? _editing;
+
+    /// <summary>What Enter would leave the edited bubble (or text) as, given the words typed so far - grown to fit them. The canvas draws it in place of the stored one and the editor sits over its text area, so the page looks the same while typing as after.</summary>
+    private ProjectModel.Bubbles.Bubble? _draftBubble;
+    private TextElement? _draftText;
 
     public PageEditorView()
     {
@@ -37,6 +50,7 @@ public partial class PageEditorView : UserControl
 
         InlineTextEditor.AddHandler(KeyDownEvent, OnInlineEditorKeyDown, RoutingStrategies.Tunnel);
         InlineTextEditor.LostFocus += (_, _) => EndTextEdit(commit: true);
+        InlineTextEditor.TextChanged += (_, _) => RefreshDraft();
         // The box grows with the text (see PositionTextEditor); keep it centred on the bubble.
         InlineTextEditor.SizeChanged += (_, _) => PositionTextEditor();
     }
@@ -107,13 +121,14 @@ public partial class PageEditorView : UserControl
         if (e.PropertyName != nameof(PageEditorViewModel.Working) || _editing is not { } editing)
             return;
         // Undo/redo mid-edit could remove what's being typed into; don't leave a text box
-        // floating over nothing. A restyle from the ribbon moves or resizes it instead.
+        // floating over nothing. A restyle from the ribbon moves or resizes it instead (and
+        // a bigger font can need a bigger bubble: the draft is worked out again).
         if (FindIndex(editing) < 0)
             EndTextEdit(commit: false);
         else
         {
             StyleTextEditor();
-            PositionTextEditor();
+            RefreshDraft();
         }
     }
 
@@ -226,7 +241,7 @@ public partial class PageEditorView : UserControl
     {
         InlineTextEditor.Text = text;
         StyleTextEditor();
-        PositionTextEditor();
+        RefreshDraft();
         InlineTextEditor.IsVisible = true;
         HintText.IsVisible = false;
         TextEditHintText.Text = hint;
@@ -241,6 +256,7 @@ public partial class PageEditorView : UserControl
         var style = EditedText()?.Style;
         var font = style is not null ? LetteringFont.Of(style) : EditedBubble() is { } bubble ? LetteringFont.Of(bubble) : LetteringFont.BubbleDefault;
         InlineTextEditor.FontFamily = LetteringFonts.AvaloniaFamily(font.Family);
+        InlineTextEditor.FontFeatures = PlainGlyphs;
         InlineTextEditor.TextAlignment = font.Align switch
         {
             TextAlign.Left => Avalonia.Media.TextAlignment.Left,
@@ -264,33 +280,84 @@ public partial class PageEditorView : UserControl
             ? vm.Working.Panels[editing.Panel].Elements[index] as TextElement
             : null;
 
-    private void PositionTextEditor()
+    /// <summary>
+    /// Works out what Enter would keep of the words typed so far - the bubble (or text box)
+    /// grown to fit them, exactly as <see cref="PageEditorViewModel.SetBubbleText"/> and
+    /// <see cref="PageEditorViewModel.SetElementText"/> would leave it - hands it to the canvas
+    /// to draw, and puts the editor over its lettering. So the bubble you type into is already
+    /// the one you'll get, never one that jumps bigger (and rewraps its words) on Enter.
+    /// </summary>
+    private void RefreshDraft()
     {
-        if (_editing is not { } editing || ViewModel is not { } vm || FindIndex(editing) is var index && index < 0)
+        if (_editing is not { } editing || ViewModel is not { } vm)
+            return;
+        var index = FindIndex(editing);
+        if (index < 0)
             return;
 
-        Rect rect;
-        double fontSize;
-        if (editing.Element is not null && vm.Working.Panels[editing.Panel].Elements[index] is TextElement text)
+        // Words left as they were are never committed (EndTextEdit), so nothing grows for
+        // them either: a bubble hand-sized smaller than its text keeps spilling, as it does
+        // on the page.
+        var words = InlineTextEditor.Text ?? "";
+        var panel = vm.Working.Panels[editing.Panel];
+        if (editing.Bubble is { } bubbleId)
         {
-            rect = PageCanvas.PageToControl(ElementRenderer.TextArea(text));
-            fontSize = Math.Clamp(text.Style.FontSizeMm * PageCanvas.Zoom * 0.95, 11, 160);
+            _draftBubble = words == panel.Bubbles[index].Text ? null : vm.PreviewBubbleText(editing.Panel, index, words);
+            PageCanvas.EditingBubble = new EditingBubble(editing.Panel, bubbleId, _draftBubble);
         }
         else
         {
-            var bubble = vm.Working.Panels[editing.Panel].Bubbles[index];
-            rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(bubble));
-            fontSize = Math.Clamp(FontPoints.ToMm(LetteringFont.Of(bubble).SizePt) * PageCanvas.Zoom * 0.95, 11, 160);
+            _draftText = panel.Elements[index] is TextElement { } stored && words == stored.Text ? null : vm.PreviewElementText(editing.Panel, index, words);
+            PageCanvas.EditingTextDraft = _draftText;
         }
+        PositionTextEditor();
+    }
+
+    /// <summary>
+    /// Puts the editor where the lettering will be and letters it at the size it will be: the
+    /// page's own scale (the lettering's size in millimetres times the zoom), not a nudged or
+    /// clamped one, so a line breaks at the same word here as on the page.
+    /// </summary>
+    private void PositionTextEditor()
+    {
+        if (_editing is not { } editing || ViewModel is not { } vm)
+            return;
+        var index = FindIndex(editing);
+        if (index < 0)
+            return;
+
+        Rect rect;
+        LetteringFont font;
+        var panel = vm.Working.Panels[editing.Panel];
+        if (editing.Element is not null && (_draftText ?? panel.Elements[index] as TextElement) is { } text)
+        {
+            rect = PageCanvas.PageToControl(ElementRenderer.TextArea(text));
+            font = LetteringFont.Of(text.Style);
+        }
+        else
+        {
+            var bubble = _draftBubble ?? panel.Bubbles[index];
+            rect = PageCanvas.PageToControl(BubbleTextRenderer.TextArea(bubble));
+            font = LetteringFont.Of(bubble);
+        }
+        var fontSize = Math.Max(FontPoints.ToMm(font.SizePt) * PageCanvas.Zoom, 1);
+
         // Height follows the text, so no line is ever clipped: when there's more text than
-        // fits (or the box is smaller than a readable line at this zoom) it grows past it -
-        // but it's transparent, so only the typed text spills over, never a box.
+        // fits it grows past the area - but it's transparent, so only the typed text spills
+        // over, never a box. A line is never narrower than a few letters, so a tiny bubble
+        // doesn't break words apart; the box then stays on the side the lines line up to.
         var width = Math.Max(rect.Width, fontSize * 3);
         InlineTextEditor.Width = width;
         InlineTextEditor.MinHeight = rect.Height;
         InlineTextEditor.FontSize = fontSize;
         var height = Math.Max(InlineTextEditor.Bounds.Height, rect.Height);
-        Avalonia.Controls.Canvas.SetLeft(InlineTextEditor, rect.Center.X - width / 2);
+        var left = font.Align switch
+        {
+            TextAlign.Left => rect.Left,
+            TextAlign.Right => rect.Right - width,
+            _ => rect.Center.X - width / 2
+        };
+        Avalonia.Controls.Canvas.SetLeft(InlineTextEditor, left);
         Avalonia.Controls.Canvas.SetTop(InlineTextEditor, rect.Center.Y - height / 2);
     }
 
@@ -326,6 +393,9 @@ public partial class PageEditorView : UserControl
         HintText.IsVisible = true;
         PageCanvas.EditingBubble = null;
         PageCanvas.EditingText = null;
+        PageCanvas.EditingTextDraft = null;
+        _draftBubble = null;
+        _draftText = null;
 
         if (ViewModel is { } vm && FindIndex(editing) is var index and >= 0)
         {
