@@ -52,6 +52,9 @@ curl -fsSL https://raw.githubusercontent.com/Agrabski/Stanley/develop/install.sh
   page, including between comics, via Stanley's own clipboard.
 - **Multi-select.** Shift-click to select several bubbles, characters or
   elements at once and move, nudge, Alt-drag or delete them together.
+- **Layers pane.** A list of the page's panels and everything in them, front to
+  back, to pick overlapping things and move them in front of or behind each
+  other - a speech bubble behind a character's arm, say.
 - **Undo/redo** for every editing action.
 - **Multiple issues per comic**, added and switched from File › Info or the
   title bar's issue switcher.

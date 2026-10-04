@@ -160,7 +160,7 @@ just presses **Group** (Ctrl+G) and the editor picks the mechanism:
   primary member, as in any multi-selection today), Copy/Cut/Paste of the whole
   group (the clipboard holds only the primary item), *Keep in My Assets*
   (`GroupElement` only — a character's own copy is kept via §6), and being one
-  z-order slot (each member keeps its own).
+  z-order slot (each member keeps its own place in the panel's stack, `docs/layers-panel.md`).
 
 ## 4. Vocabulary
 

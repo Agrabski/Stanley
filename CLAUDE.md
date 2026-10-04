@@ -95,7 +95,14 @@ element to the selection, or drops it: a multi-selection stays in one panel and 
 drives the ribbon. **Lock layout** protects a page's panel geometry (move, resize,
 split, delete, re-tile) but leaves panels selectable, so a double-clicked character
 still lands in the selected one. **To front / To back** on a drawn element cross the
-character layer: the top of the foreground, the bottom of the background. A bubble's
+character layer: the top of the foreground, the bottom of the background. The
+**Layers pane** (View › Panes › Layers, docs/layers-panel.md) docks a list on the right of
+the page - each panel in reading order, opening to its bubbles, characters and drawings
+from the front to the back, then its background - to pick overlapping things and move
+them forward or back (or all the way), past each other whatever they are; selecting
+there and on the page follow each other. A panel arranged that way keeps its own
+`Panel.Stack` (written only then; `PanelStack.Order` is what the renderer, picking and the
+pane all walk), and its To front / To back mean the front / back of the whole stack. A bubble's
 **font size is absolute** - a bubble too small for its text grows to fit
 (`BubbleTextRenderer.NeededScale` → `BubbleEditing.GrowToFit`) instead of the letters
 shrinking; one dragged smaller by hand lets its text spill. An issue can be deleted
