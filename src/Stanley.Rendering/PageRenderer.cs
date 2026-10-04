@@ -97,14 +97,25 @@ public static class PageRenderer
             // Everything in a panel belongs to it: clip it there, like ink that can't leave the frame.
             canvas.Save();
             canvas.ClipPath(path, antialias: true);
-            DrawBackground(canvas, panel.Background, AnchorRing.BoundingBox(panel.Shape.Anchors), pictures);
-            DrawElements(canvas, panel, ElementLayer.Background, hideText, pictures, fields);
-            foreach (var instance in panel.CharacterInstances)
-                CharacterRenderers.DrawInstance(canvas, instance, characters, CharacterStrokeMm, issueLooks);
-            DrawElements(canvas, panel, ElementLayer.Foreground, hideText, pictures, fields);
-            foreach (var bubble in panel.Bubbles)
-                BubbleRenderer.Draw(canvas, fields is null ? bubble : bubble with { Text = fields.Fill(bubble.Text) },
-                    SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
+            var panelBounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+            DrawBackground(canvas, panel.Background, panelBounds, pictures);
+            foreach (var item in PanelStack.Order(panel))
+            {
+                switch (item.Kind)
+                {
+                    case StackKind.Element:
+                        DrawElement(canvas, panel.Elements[item.Index], panelBounds, hideText, pictures, fields);
+                        break;
+                    case StackKind.Character:
+                        CharacterRenderers.DrawInstance(canvas, panel.CharacterInstances[item.Index], characters, CharacterStrokeMm, issueLooks);
+                        break;
+                    case StackKind.Bubble:
+                        var bubble = panel.Bubbles[item.Index];
+                        BubbleRenderer.Draw(canvas, fields is null ? bubble : bubble with { Text = fields.Fill(bubble.Text) },
+                            SKColors.White, SKColors.Black, BubbleStrokeMm, FontSizeMm, TailBaseHalfWidthMm);
+                        break;
+                }
+            }
             canvas.Restore();
 
             // A thought cloud's trail leads towards the thinker, who may well be in a
@@ -132,15 +143,10 @@ public static class PageRenderer
         }
     }
 
-    private static void DrawElements(SKCanvas canvas, Panel panel, ElementLayer layer, ElementId? hideText, IReadOnlyDictionary<string, ArtFile>? pictures, TextFields? fields)
+    private static void DrawElement(SKCanvas canvas, PanelElement element, Rect2D panelBounds, ElementId? hideText, IReadOnlyDictionary<string, ArtFile>? pictures, TextFields? fields)
     {
-        foreach (var element in panel.Elements)
-        {
-            if (element.Layer != layer)
-                continue;
-            var shown = element is TextElement text && fields is not null ? text with { Text = fields.Fill(text.Text) } : element;
-            ElementRenderer.Draw(canvas, shown, drawText: element.Id != hideText, pictures, AnchorRing.BoundingBox(panel.Shape.Anchors));
-        }
+        var shown = element is TextElement text && fields is not null ? text with { Text = fields.Fill(text.Text) } : element;
+        ElementRenderer.Draw(canvas, shown, drawText: element.Id != hideText, pictures, panelBounds);
     }
 
     /// <summary>Fills <paramref name="bounds"/> (the panel's box - the caller clips to its outline) with the panel's background; nothing for none, leaving the paper.</summary>

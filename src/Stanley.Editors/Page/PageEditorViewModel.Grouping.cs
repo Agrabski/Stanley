@@ -73,12 +73,14 @@ public sealed partial class PageEditorViewModel
             return false;
 
         var elements = new List<PanelElement>(panel.Elements);
+        var members = indices.Select(i => panel.Elements[i].Id).ToList();
         var frontmost = indices[^1];
         for (var k = indices.Count - 1; k >= 0; k--)
             elements.RemoveAt(indices[k]);
         elements.Insert(frontmost - (indices.Count - 1), grouped.Value);
 
-        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with { Elements = elements })));
+        // In a panel stacked by hand the group takes its frontmost member's place in the stack too.
+        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(PanelStackEditing.Grouped(p, p with { Elements = elements }, members, grouped.Value))));
 
         var newIndex = IndexOfElement(panelId, grouped.Value.Id);
         if (newIndex >= 0)
@@ -141,7 +143,8 @@ public sealed partial class PageEditorViewModel
             var elements = new List<PanelElement>(p.Elements);
             elements.RemoveAt(oldIndex);
             elements.InsertRange(oldIndex, children);
-            return EditResult<Panel>.Success(p with { Elements = elements });
+            // In a panel stacked by hand the children take the group's place in the stack too.
+            return EditResult<Panel>.Success(PanelStackEditing.Ungrouped(p, p with { Elements = elements }, p.Elements[oldIndex], children));
         }));
 
         if (children.Count == 0 || !Working.Panels.ContainsKey(panelId))

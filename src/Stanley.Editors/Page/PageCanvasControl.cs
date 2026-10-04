@@ -467,33 +467,8 @@ public sealed class PageCanvasControl : Control
         if (!doc.LayoutLocked && PanelGutters.FindAt(doc.Panels.Values, p, EdgeBandPx / _zoom) is { } gutter)
             return new Hit(HitKind.Gutter, Gutter: gutter);
 
-        for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
-        {
-            var id = doc.PanelOrder[i];
-            if (!doc.Panels.TryGetValue(id, out var panel) || !Contains(AnchorRing.BoundingBox(panel.Shape.Anchors), p))
-                continue;
-            for (var b = panel.Bubbles.Count - 1; b >= 0; b--)
-            {
-                using var path = BubbleRenderer.BuildRenderPath(panel.Bubbles[b], PageCanvasDrawOperation.TailBaseHalfWidthMm);
-                if (path.Contains((float)p.X, (float)p.Y))
-                    return new Hit(HitKind.BubbleBody, id, b);
-            }
-        }
-
-        if (ElementAt(p, ProjectModel.Issues.ElementLayer.Foreground) is { } front)
-            return front;
-
-        for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
-        {
-            var id = doc.PanelOrder[i];
-            if (!doc.Panels.TryGetValue(id, out var panel) || !Contains(AnchorRing.BoundingBox(panel.Shape.Anchors), p))
-                continue;
-            for (var c = panel.CharacterInstances.Count - 1; c >= 0; c--)
-            {
-                if (HitsCharacter(panel.CharacterInstances[c], p))
-                    return new Hit(HitKind.CharacterBody, id, CharacterIndex: c);
-            }
-        }
+        if (StackedAt(p) is { } stacked)
+            return stacked;
 
         var band = EdgeBandPx / _zoom;
         for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
@@ -515,29 +490,59 @@ public sealed class PageCanvasControl : Control
                 if (edges != RectEdges.None)
                     return new Hit(HitKind.PanelEdge, id, Edges: edges);
             }
-            return ElementAt(p, ProjectModel.Issues.ElementLayer.Background, id) ?? new Hit(HitKind.PanelBody, id);
+            return SceneryAt(p, id, panel) ?? new Hit(HitKind.PanelBody, id);
         }
 
         return new Hit(HitKind.None);
     }
 
-    /// <summary>The topmost element of <paramref name="layer"/> under <paramref name="p"/> - only where it shows, inside its panel.</summary>
-    private Hit? ElementAt(Point2D p, ProjectModel.Issues.ElementLayer layer, PanelId? only = null)
+    /// <summary>
+    /// The frontmost bubble, character or in-front drawing under <paramref name="p"/>: panel by
+    /// panel from the top one down, and within a panel from the front of its stack
+    /// (<see cref="PanelStack.Order"/>) to the back - the order they're drawn in, so what looks
+    /// on top is what a click gets, wherever the stack has been arranged to put it. Drawings
+    /// behind the characters are left for <see cref="SceneryAt"/>.
+    /// </summary>
+    private Hit? StackedAt(Point2D p)
     {
         var doc = _viewModel!.Working;
         var tol = HitRadiusPx / 2 / _zoom;
         for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)
         {
             var id = doc.PanelOrder[i];
-            if (only is { } wanted && !wanted.Equals(id))
-                continue;
             if (!doc.Panels.TryGetValue(id, out var panel) || !Contains(AnchorRing.BoundingBox(panel.Shape.Anchors), p))
                 continue;
-            for (var e = panel.Elements.Count - 1; e >= 0; e--)
+            var order = ProjectModel.Issues.PanelStack.Order(panel);
+            for (var s = order.Count - 1; s >= 0; s--)
             {
-                if (panel.Elements[e].Layer == layer && ElementRenderer.Hits(panel.Elements[e], p, tol))
-                    return new Hit(HitKind.ElementBody, id, ElementIndex: e);
+                var item = order[s];
+                switch (item.Kind)
+                {
+                    case ProjectModel.Issues.StackKind.Bubble:
+                        using (var path = BubbleRenderer.BuildRenderPath(panel.Bubbles[item.Index], PageCanvasDrawOperation.TailBaseHalfWidthMm))
+                        {
+                            if (path.Contains((float)p.X, (float)p.Y))
+                                return new Hit(HitKind.BubbleBody, id, item.Index);
+                        }
+                        break;
+                    case ProjectModel.Issues.StackKind.Character when HitsCharacter(panel.CharacterInstances[item.Index], p):
+                        return new Hit(HitKind.CharacterBody, id, CharacterIndex: item.Index);
+                    case ProjectModel.Issues.StackKind.Element when panel.Elements[item.Index].Layer == ProjectModel.Issues.ElementLayer.Foreground && ElementRenderer.Hits(panel.Elements[item.Index], p, tol):
+                        return new Hit(HitKind.ElementBody, id, ElementIndex: item.Index);
+                }
             }
+        }
+        return null;
+    }
+
+    /// <summary>The topmost drawing behind the characters under <paramref name="p"/> in one panel - only where it shows, inside the panel. It loses to the panel's edges, so scenery covering a panel never stops it being resized.</summary>
+    private Hit? SceneryAt(Point2D p, PanelId id, ProjectModel.Issues.Panel panel)
+    {
+        var tol = HitRadiusPx / 2 / _zoom;
+        for (var e = panel.Elements.Count - 1; e >= 0; e--)
+        {
+            if (panel.Elements[e].Layer == ProjectModel.Issues.ElementLayer.Background && ElementRenderer.Hits(panel.Elements[e], p, tol))
+                return new Hit(HitKind.ElementBody, id, ElementIndex: e);
         }
         return null;
     }

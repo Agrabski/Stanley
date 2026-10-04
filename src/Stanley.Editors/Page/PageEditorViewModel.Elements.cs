@@ -625,6 +625,11 @@ public sealed partial class PageEditorViewModel
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.Elements.Count)
             return;
+        if (panel.Stack != null)
+        {
+            MoveInStack(panelId, new StackItem(StackKind.Element, index), toFront ? StackMove.ToFront : StackMove.ToBack);
+            return;
+        }
         var (list, newIndex) = ElementEditing.Reorder(panel.Elements, index, toFront);
         if (ReferenceEquals(list, panel.Elements))
             return;
@@ -633,9 +638,18 @@ public sealed partial class PageEditorViewModel
             SelectElement(panelId, newIndex);
     }
 
-    /// <summary>Behind or in front of the panel's characters.</summary>
-    public void SetElementLayer(PanelId panelId, int index, ElementLayer layer) =>
+    /// <summary>Behind or in front of the panel's characters - in a panel stacked by hand, right behind the rearmost one or right in front of the frontmost.</summary>
+    public void SetElementLayer(PanelId panelId, int index, ElementLayer layer)
+    {
+        if (Working.Panels.TryGetValue(panelId, out var panel) && panel.Stack != null && panel.CharacterInstances.Count > 0 && index >= 0 && index < panel.Elements.Count)
+        {
+            var moved = PanelStackEditing.MoveBeyondCharacters(panel, new StackItem(StackKind.Element, index), inFront: layer == ElementLayer.Foreground);
+            if (moved.IsValid && !ReferenceEquals(moved.Value, panel))
+                Apply(EditPanel(Working, panelId, _ => moved));
+            return;
+        }
         Apply(EditElementInPanel(Working, panelId, index, e => EditResult<PanelElement>.Success(ElementEditing.SetLayer(e, layer))));
+    }
 
     public void SetShapeStyle(PanelId panelId, int index, ShapeStyle style) =>
         Apply(EditElementInPanel(Working, panelId, index, e => e is ShapeElement shape

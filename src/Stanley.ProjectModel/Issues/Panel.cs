@@ -29,6 +29,13 @@ namespace Stanley.ProjectModel.Issues;
 /// the right outline instead of stretching it. Written only when not the default.</param>
 /// <param name="Trail">A thought cloud's trail towards the thinker (<see cref="PanelKind.Cloud"/>
 /// only) - absent for an ordinary panel, and for a cloud until one is added. Written only when set.</param>
+/// <param name="Stack">
+/// What's in front of what, once it's been arranged by hand in the Layers pane: every bubble,
+/// character and element of the panel, back to front, each as the token <see cref="PanelStack.Token"/>
+/// makes of it. Null - and not written - until then: the panel stacks the usual way, behind-the-characters
+/// drawings, characters, in-front drawings, bubbles (<see cref="PanelStack.Order"/>, which also
+/// says how a list that has fallen out of step with the panel's contents is read).
+/// </param>
 public sealed record Panel(
     PanelId Id,
     PanelShape Shape,
@@ -39,9 +46,14 @@ public sealed record Panel(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Borderless = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PanelBorderStyle? BorderStyle = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] PanelKind Kind = PanelKind.Rectangle,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ThoughtTrail? Trail = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ThoughtTrail? Trail = null,
+    IReadOnlyList<string>? Stack = null)
 {
     public IReadOnlyList<PanelElement> Elements { get; init; } = Elements ?? [];
+
+    /// <summary>An empty list means no stacking was arranged, the same as none: read as null, and so never written.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Stack { get; init; } = Stack is { Count: 0 } ? null : Stack;
 }
 
 /// <summary>A panel border drawn other than in the usual black ink line: in <paramref name="Color"/>, <paramref name="WidthMm"/> thick, in <paramref name="Dash"/>'s pattern (a flashback's dashed frame).</summary>

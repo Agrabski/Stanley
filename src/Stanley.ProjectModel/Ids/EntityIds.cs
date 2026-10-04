@@ -285,6 +285,31 @@ public readonly record struct ElementId : IStrongId<ElementId>, IParsable<Elemen
 }
 
 /// <summary>
+/// Identifies one placed character within the one panel that holds it
+/// (<see cref="Issues.Panel.CharacterInstances"/>) - stable only within that panel, the same
+/// way a <see cref="BubbleId"/> is. A placed character has none until its panel's stacking is
+/// first arranged by hand (<see cref="Issues.Panel.Stack"/>), which is the only thing that
+/// refers to it.
+/// </summary>
+[JsonConverter(typeof(StrongIdJsonConverter<CharacterInstanceId>))]
+public readonly record struct CharacterInstanceId : IStrongId<CharacterInstanceId>, IParsable<CharacterInstanceId>, IComparable<CharacterInstanceId>
+{
+    public string Value { get; }
+    private CharacterInstanceId(string value) => Value = value;
+    public static CharacterInstanceId New() => new(EntityIdValue.NewToken());
+    public static CharacterInstanceId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static CharacterInstanceId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out CharacterInstanceId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new CharacterInstanceId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(CharacterInstanceId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}
+
+/// <summary>
 /// Ties together the bubbles, characters and elements of one panel that were grouped as one
 /// (<see cref="Issues.PanelElement.Link"/>, <see cref="Issues.CharacterInstance.Link"/>,
 /// <see cref="Bubbles.Bubble.Link"/>): everything in a panel carrying the same one is selected,

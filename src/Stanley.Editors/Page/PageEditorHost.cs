@@ -18,9 +18,12 @@ public static class PageEditorHost
     /// any other character already open) instead of replacing anything. The ribbon follows
     /// whichever tab is active, never the side panes. With <paramref name="myAssets"/>, the
     /// Characters pane and every page can keep things in My Assets and take them from there.
+    /// The Layers pane is docked on the right, showing or hidden as <paramref name="layersPane"/>
+    /// says (hidden, in memory only, if none is given) and following it as it changes.
     /// </summary>
-    public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null)
+    public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null, LayersPaneMemory? layersPane = null)
     {
+        layersPane ??= new LayersPaneMemory();
         var history = new EditorHistory();
         var characters = new CharacterLibraryViewModel(history, project.Characters) { MyAssets = myAssets };
         var pictures = new PictureLibrary(project.Pictures);
@@ -30,16 +33,21 @@ public static class PageEditorHost
         {
             Fields = project.Fields,
             MyAssets = myAssets,
-            ObjectGroups = objectGroups
+            ObjectGroups = objectGroups,
+            LayersHost = layersPane
         };
-        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters]);
+        var layers = new LayersViewModel();
+        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters], [layers], layersPane.LayersPaneVisible);
+        layersPane.LayersPaneVisibleChanged += () => workspace.SetRightToolsVisible(layersPane.LayersPaneVisible);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;
+        layers.Editor = navigator.CurrentPage.Editor;
         navigator.CurrentPageChanged += page =>
         {
             characters.Deselect();
             workspace.Replace(shownPage, page.Editor);
             shownPage = page.Editor;
+            layers.Editor = page.Editor;
         };
         characters.CharacterShown += item => workspace.Show(item.Editor);
         characters.PageRequested += closed => workspace.Replace(closed?.Editor, navigator.CurrentPage.Editor);

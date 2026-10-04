@@ -1131,7 +1131,8 @@ public sealed class MainWindowViewModel : ObservableObject
         Unload();
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
-        (_workspace, _navigator, _characters, _pictures, _objectGroups) = PageEditorHost.CreateWorkspace(project, MyAssets);
+        (_workspace, _navigator, _characters, _pictures, _objectGroups) =
+            PageEditorHost.CreateWorkspace(project, MyAssets, new LayersPaneMemory(() => _settings.ShowLayers, on => _settings.ShowLayers = on));
         _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory, () => _settings.SvgEditorPath, path =>
         {
             _settings.SvgEditorPath = path;

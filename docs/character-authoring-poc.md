@@ -143,7 +143,8 @@ public sealed record CharacterInstance(
   snap is a single y value. The ground may lie below the panel for waist-up shots.
 - Page mm (like bubbles), not panel-relative, so it fits how bubbles already work
   and how `Refit` carries them.
-- `Panel.CharacterInstances` order is z-order (back to front), like bubbles.
+- `Panel.CharacterInstances` order is z-order among the characters (back to front), like
+  bubbles; how they stack against bubbles and drawings is `PanelStack` (`docs/layers-panel.md`).
   Instances are addressed by index within their panel, like bubbles.
 
 ### 3.5 Repository
@@ -254,12 +255,13 @@ change switches to the character (existing behaviour).
   height (or the others' floor); x = to the right of the rightmost existing
   character, else panel centre.
 - **Select** by clicking the silhouette (path hit-test via `Silhouette`, not the
-  bounding box, since characters overlap). Hit priority: bubbles > characters >
-  panel.
+  bounding box, since characters overlap). Hit priority: whatever is in front in the
+  panel's stack (by default bubbles > characters, `docs/layers-panel.md`) > panel.
 - **Move**: drag. **Resize**: top-corner handles, uniform, about the ground point,
   resizing everyone at the same scale (Shift: just this one). **Flip**, **Bigger /
   Smaller**, **Match size**: ribbon or right-click. **Delete**: Del. **Order**: to
-  front / to back (always behind bubbles). **Double-click**: opens the character editor.
+  front / to back (behind bubbles, unless the panel's stacking was arranged in the Layers
+  pane - `docs/layers-panel.md`). **Double-click**: opens the character editor.
 - **Snapping** (reusing `SnapGuide` drawing, Alt disables): ground snaps to
   panel-mates' floor ("same floor"); a Shift-resize snaps back onto the panel's
   scale when close. Done in `PageEditorViewModel` with `PanelSnapping.SnapValue`.

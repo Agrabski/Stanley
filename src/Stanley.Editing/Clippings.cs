@@ -36,7 +36,8 @@ public static class Clippings
     // with the original (a whole panel's copy keeps its groups - they're all inside it).
     public static Bubble Copy(Bubble bubble) => bubble with { Id = BubbleId.New(), Link = null };
 
-    public static CharacterInstance Copy(CharacterInstance character) => character with { Link = null };
+    // Nor does a copy keep the id its original is stacked under - two characters in a panel never share one.
+    public static CharacterInstance Copy(CharacterInstance character) => character with { Link = null, Id = null };
 
     public static PanelElement Copy(PanelElement element) => element switch
     {
@@ -44,13 +45,25 @@ public static class Clippings
         _ => element with { Id = ElementId.New(), Link = null }
     };
 
-    /// <summary>A panel under a new id, its bubbles and elements under new ones too; what was grouped in it stays grouped.</summary>
-    public static Panel Copy(Panel panel) => panel with
+    /// <summary>A panel under a new id, its bubbles and elements under new ones too; what was grouped in it stays grouped, and what was in front of what stays so.</summary>
+    public static Panel Copy(Panel panel)
     {
-        Id = PanelId.New(),
-        Bubbles = panel.Bubbles.Select(b => Copy(b) with { Link = b.Link }).ToList(),
-        Elements = panel.Elements.Select(e => Copy(e) with { Link = e.Link }).ToList()
-    };
+        var bubbles = panel.Bubbles.Select(b => Copy(b) with { Link = b.Link }).ToList();
+        var elements = panel.Elements.Select(e => Copy(e) with { Link = e.Link }).ToList();
+        // The stacking names things by id, and the copies have new ones: say the same thing in them. (The characters keep theirs - ids only mean something inside one panel.)
+        var renamed = new Dictionary<string, string>();
+        for (var i = 0; i < bubbles.Count; i++)
+            renamed[PanelStack.Token(panel.Bubbles[i])] = PanelStack.Token(bubbles[i]);
+        for (var i = 0; i < elements.Count; i++)
+            renamed[PanelStack.Token(panel.Elements[i])] = PanelStack.Token(elements[i]);
+        return panel with
+        {
+            Id = PanelId.New(),
+            Bubbles = bubbles,
+            Elements = elements,
+            Stack = panel.Stack?.Select(token => renamed.GetValueOrDefault(token, token)).ToList()
+        };
+    }
 
     /// <summary>
     /// Hands out new group links for a set of copies, one per link they came from, so copying a
