@@ -34,10 +34,13 @@ public sealed record CharacterInstanceOverrides(
 /// z-order, back to front) - the same way bubbles are.
 /// </summary>
 /// <param name="Link">Set when the character was grouped with other things in its panel (see <see cref="PanelElement.Link"/>); null otherwise.</param>
+/// <param name="Id">What <see cref="Panel.Stack"/> calls this character, once its panel's stacking has been arranged by hand; null until then.
+/// Written only when set, so older panel files read unchanged. A copy never keeps it (<c>Clippings.Copy</c>): two characters in a panel never share one.</param>
 public sealed record CharacterInstance(
     CharacterId CharacterId,
     CharacterPlacement Placement,
     CharacterRevisionId? RevisionOverride,
     PoseData Pose,
     CharacterInstanceOverrides? Overrides,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupLinkId? Link = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GroupLinkId? Link = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CharacterInstanceId? Id = null);

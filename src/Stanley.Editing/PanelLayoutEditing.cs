@@ -124,7 +124,9 @@ public static class PanelLayoutEditing
             Bubbles: panel.Bubbles.Where(InSecond).Select(b => BubbleEditing.KeepInside(b, secondBounds)).ToList(),
             Elements: panel.Elements.Where(ElementInSecond).Select(e => ElementEditing.KeepReachable(e, secondBounds)).ToList(),
             Borderless: panel.Borderless,
-            BorderStyle: panel.BorderStyle);
+            BorderStyle: panel.BorderStyle,
+            // Whatever moved over keeps its id, so the same list orders it here too; the tokens of what stayed behind are simply ignored.
+            Stack: panel.Stack);
         return EditResult<(Panel, Panel)>.Success((first, second));
     }
 
