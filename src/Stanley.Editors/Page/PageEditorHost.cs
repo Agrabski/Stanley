@@ -41,11 +41,13 @@ public static class PageEditorHost
         layersPane.LayersPaneVisibleChanged += () => workspace.SetRightToolsVisible(layersPane.LayersPaneVisible);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;
+        layers.Editor = navigator.CurrentPage.Editor;
         navigator.CurrentPageChanged += page =>
         {
             characters.Deselect();
             workspace.Replace(shownPage, page.Editor);
             shownPage = page.Editor;
+            layers.Editor = page.Editor;
         };
         characters.CharacterShown += item => workspace.Show(item.Editor);
         characters.PageRequested += closed => workspace.Replace(closed?.Editor, navigator.CurrentPage.Editor);
