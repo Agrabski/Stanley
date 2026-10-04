@@ -89,6 +89,9 @@
     <StreamGeometry x:Key="CaptionIcon">M2,5 H22 V19 H2 Z M4,7 V17 H20 V7 Z M6,9 H18 V11 H6 Z M6,13 H14 V15 H6 Z</StreamGeometry>
     <StreamGeometry x:Key="BehindIcon">M3,3 H15 V15 H3 Z M17,9 H21 V21 H9 V17 H11 V19 H19 V11 H17 Z</StreamGeometry>
     <StreamGeometry x:Key="InFrontIcon">M3,3 H15 V7 H13 V5 H5 V13 H7 V15 H3 Z M9,9 H21 V21 H9 Z</StreamGeometry>
+    <!-- One place towards the front / the back (the Layers pane's arrows). -->
+    <StreamGeometry x:Key="ForwardIcon">M12,3 L19,11 H14 V21 H10 V11 H5 Z</StreamGeometry>
+    <StreamGeometry x:Key="BackwardIcon">M12,21 L5,13 H10 V3 H14 V13 H19 Z</StreamGeometry>
     <StreamGeometry x:Key="BackgroundIcon">M2,4 H22 V20 H2 Z M4,6 V14.5 L9,10 L13,14 L16,11 L20,15 V6 Z</StreamGeometry>
     <StreamGeometry x:Key="AlignLeftIcon">M3,4 H21 V6 H3 Z M3,9 H15 V11 H3 Z M3,14 H21 V16 H3 Z M3,19 H15 V21 H3 Z</StreamGeometry>
     <StreamGeometry x:Key="AlignCenterIcon">M3,4 H21 V6 H3 Z M6,9 H18 V11 H6 Z M3,14 H21 V16 H3 Z M6,19 H18 V21 H6 Z</StreamGeometry>

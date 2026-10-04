@@ -3,6 +3,7 @@ using Stanley.EditorFramework;
 using Stanley.ProjectModel;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
+using Stanley.ProjectModel.Issues;
 using Stanley.ProjectModel.Storage;
 
 namespace Stanley.Editors.Tests;
@@ -53,6 +54,40 @@ public sealed class ComicProjectTests : IDisposable
         Assert.Equal(navigator.Pages.Select(p => p.Id), reopened.Pages.Select(p => p.Id));
         Assert.Equal("Hello!", Assert.Single(reopened.Pages[0].Document.Panels[panelId].Bubbles).Text);
         Assert.Equal(4, reopened.Pages[1].Document.PanelOrder.Count);
+    }
+
+    [Fact]
+    public void SaveAs_ThenOpen_KeepsAPanelsArrangedStackAndWritesNoStackForAPanelNeverArranged()
+    {
+        var project = ComicProject.CreateNew(MetricPaperSize.A4, PanelLayoutPresets.All.First(p => p.ColumnsPerRow.Sum() == 4));
+        var navigator = NavigatorFor(project);
+        var editor = navigator.CurrentPage.Editor;
+        var arranged = editor.Working.PanelOrder[0];
+        var untouched = editor.Working.PanelOrder[1];
+        var bounds = editor.PanelBounds(arranged);
+        editor.CreateBubble(untouched, new Point2D(editor.PanelBounds(untouched).MidX, editor.PanelBounds(untouched).MidY));
+        var bubble = editor.CreateBubble(arranged, new Point2D(bounds.MidX, bounds.MidY));
+        editor.Tool = PageEditorTool.Rectangle;
+        editor.BeginDrawShape(arranged);
+        editor.UpdateDrawShape(new Point2D(bounds.Left + 5, bounds.Top + 5), new Point2D(bounds.Right - 5, bounds.Bottom - 5));
+        var shape = editor.CommitDrawShape();
+        editor.Tool = PageEditorTool.Select;
+        editor.MoveInStack(arranged, new StackItem(StackKind.Bubble, bubble), StackMove.ToBack); // behind the shape drawn over it
+        var before = PanelStack.Order(editor.Working.Panels[arranged]);
+        Assert.Equal([new StackItem(StackKind.Bubble, bubble), new StackItem(StackKind.Element, shape)], before);
+
+        var folder = Path.Combine(_root, "arranged");
+        project.SaveAs(folder, navigator.Snapshot());
+
+        var reopened = ComicProject.Open(folder).Pages[0].Document.Panels;
+        Assert.Equal(before, PanelStack.Order(reopened[arranged]));
+        Assert.NotNull(reopened[arranged].Stack);
+        Assert.Null(reopened[untouched].Stack);
+
+        // on disk, only the panel that was arranged says anything about it
+        var withStack = Directory.EnumerateFiles(folder, "*.json", SearchOption.AllDirectories)
+            .Where(f => File.ReadAllText(f).Contains("\"stack\"", StringComparison.Ordinal)).ToList();
+        Assert.Equal($"{arranged.Value}.json", Path.GetFileName(Assert.Single(withStack)));
     }
 
     [Fact]

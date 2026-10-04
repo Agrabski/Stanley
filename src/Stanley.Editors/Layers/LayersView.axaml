@@ -28,6 +28,17 @@
         <Style Selector="Border.layerRow.selected TextBlock.name">
             <Setter Property="Foreground" Value="{DynamicResource StanleySelectionBrush}" />
         </Style>
+        <Style Selector="Button.layerTool">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+        <Style Selector="Button.layerTool PathIcon">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+        </Style>
         <Style Selector="Button.expander">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -40,6 +51,27 @@
     </UserControl.Styles>
 
     <DockPanel Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+        <!-- Move the selected layer: all the way to the front, one place forward, one place back, all the way to the back. -->
+        <Border DockPanel.Dock="Top" Padding="6,4" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button Name="BringToFrontButton" Classes="layerTool" Command="{Binding BringToFrontCommand}"
+                        ToolTip.Tip="{Binding BringToFrontTip}" ToolTip.ShowOnDisabled="True">
+                    <PathIcon Data="{StaticResource InFrontIcon}" />
+                </Button>
+                <Button Name="BringForwardButton" Classes="layerTool" Command="{Binding BringForwardCommand}"
+                        ToolTip.Tip="{Binding BringForwardTip}" ToolTip.ShowOnDisabled="True">
+                    <PathIcon Data="{StaticResource ForwardIcon}" />
+                </Button>
+                <Button Name="SendBackwardButton" Classes="layerTool" Command="{Binding SendBackwardCommand}"
+                        ToolTip.Tip="{Binding SendBackwardTip}" ToolTip.ShowOnDisabled="True">
+                    <PathIcon Data="{StaticResource BackwardIcon}" />
+                </Button>
+                <Button Name="SendToBackButton" Classes="layerTool" Command="{Binding SendToBackCommand}"
+                        ToolTip.Tip="{Binding SendToBackTip}" ToolTip.ShowOnDisabled="True">
+                    <PathIcon Data="{StaticResource BehindIcon}" />
+                </Button>
+            </StackPanel>
+        </Border>
         <TextBlock Name="LayersPlaceholder" DockPanel.Dock="Top" Text="Nothing to show yet." TextWrapping="Wrap" Opacity="0.7"
                    FontSize="12" Margin="12" IsVisible="{Binding !HasRows}" />
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">

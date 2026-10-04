@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dock.Model.Mvvm.Controls;
+using Stanley.Editing;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
@@ -23,6 +24,10 @@ public sealed class LayersViewModel : Tool
     private readonly HashSet<PanelId> _expanded = [];
     private PageEditorViewModel? _editor;
 
+    // Where the selected layer sits in its panel's stack (0 is the back), and how many layers the panel stacks; null when no layer is selected.
+    private int? _slot;
+    private int _count;
+
     public LayersViewModel()
     {
         Id = "Layers";
@@ -33,6 +38,34 @@ public sealed class LayersViewModel : Tool
         CanPin = false;
         CanDrag = false;
         CanDockAsDocument = false;
+
+        BringToFrontCommand = new RelayCommand(() => MoveSelected(StackMove.ToFront), () => _slot is { } slot && slot < _count - 1);
+        BringForwardCommand = new RelayCommand(() => MoveSelected(StackMove.Forward), () => _slot is { } slot && slot < _count - 1);
+        SendBackwardCommand = new RelayCommand(() => MoveSelected(StackMove.Backward), () => _slot is > 0);
+        SendToBackCommand = new RelayCommand(() => MoveSelected(StackMove.ToBack), () => _slot is > 0);
+    }
+
+    // The four buttons above the list, ComiPo's way: all the way to the front, one place forward, one place back, all the way to the back.
+    public IRelayCommand BringToFrontCommand { get; }
+    public IRelayCommand BringForwardCommand { get; }
+    public IRelayCommand SendBackwardCommand { get; }
+    public IRelayCommand SendToBackCommand { get; }
+
+    // What each button says it does - or why it can't just now (disabled buttons show it too).
+    public string BringToFrontTip => MoveTip("Bring to front", towardsFront: true);
+    public string BringForwardTip => MoveTip("Bring forward", towardsFront: true);
+    public string SendBackwardTip => MoveTip("Send backward", towardsFront: false);
+    public string SendToBackTip => MoveTip("Send to back", towardsFront: false);
+
+    private string MoveTip(string action, bool towardsFront)
+    {
+        if (_slot is not { } slot)
+            return "Select a layer - in the list or on the page - to move it";
+        if (towardsFront && slot == _count - 1)
+            return "Already in front of everything else in its panel";
+        if (!towardsFront && slot == 0)
+            return "Already behind everything else in its panel (only the background is further back)";
+        return action;
     }
 
     /// <summary>The rows, top to bottom: each panel in reading order, and under an open one its layers from the front to the back, then its background.</summary>
@@ -92,6 +125,51 @@ public sealed class LayersViewModel : Tool
         }
         // The keyboard goes to the page, so Delete and the arrow keys act on what was just picked.
         editor.FocusPage();
+    }
+
+    /// <summary>The bubble, character or drawing that's selected on the page (the primary one, if several are), with its panel.</summary>
+    private (PanelId Panel, StackItem Item)? SelectedLayer()
+    {
+        if (_editor is not { SelectedPanelId: { } panel } editor)
+            return null;
+        if (editor.HasSelectedBubble)
+            return (panel, new StackItem(StackKind.Bubble, editor.SelectedBubbleIndex));
+        if (editor.HasSelectedCharacter)
+            return (panel, new StackItem(StackKind.Character, editor.SelectedCharacterIndex));
+        if (editor.HasSelectedElement)
+            return (panel, new StackItem(StackKind.Element, editor.SelectedElementIndex));
+        return null;
+    }
+
+    private void MoveSelected(StackMove move)
+    {
+        if (_editor != null && SelectedLayer() is { } layer)
+            _editor.MoveInStack(layer.Panel, layer.Item, move);
+    }
+
+    /// <summary>Works out where the selected layer sits in its panel's stack, and so which of the four buttons can move it.</summary>
+    private void RefreshMoves()
+    {
+        _slot = null;
+        _count = 0;
+        if (_editor != null && SelectedLayer() is { } layer && _editor.Committed.Panels.TryGetValue(layer.Panel, out var panel))
+        {
+            var order = PanelStack.Order(panel);
+            for (var i = 0; i < order.Count; i++)
+            {
+                if (order[i] == layer.Item)
+                    _slot = i;
+            }
+            _count = order.Count;
+        }
+        BringToFrontCommand.NotifyCanExecuteChanged();
+        BringForwardCommand.NotifyCanExecuteChanged();
+        SendBackwardCommand.NotifyCanExecuteChanged();
+        SendToBackCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(BringToFrontTip));
+        OnPropertyChanged(nameof(BringForwardTip));
+        OnPropertyChanged(nameof(SendBackwardTip));
+        OnPropertyChanged(nameof(SendToBackTip));
     }
 
     private void ToggleExpanded(PanelId panel)
@@ -180,6 +258,7 @@ public sealed class LayersViewModel : Tool
 
     private void RefreshSelection()
     {
+        RefreshMoves();
         if (_editor is not { } editor)
             return;
         var itemSelected = editor.HasSelectedBubble || editor.HasSelectedCharacter || editor.HasSelectedElement;

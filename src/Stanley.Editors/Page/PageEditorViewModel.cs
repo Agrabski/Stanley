@@ -1661,6 +1661,13 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel) || bubbleIndex < 0 || bubbleIndex >= panel.Bubbles.Count)
             return;
+        if (panel.Stack != null)
+        {
+            MoveInStack(panelId, new StackItem(StackKind.Bubble, bubbleIndex), toFront ? StackMove.ToFront : StackMove.ToBack);
+            return;
+        }
+        if (toFront ? bubbleIndex == panel.Bubbles.Count - 1 : bubbleIndex == 0)
+            return; // already there: nothing to undo
 
         var bubbles = panel.Bubbles.ToList();
         var bubble = bubbles[bubbleIndex];
@@ -2270,10 +2277,34 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel) || index < 0 || index >= panel.CharacterInstances.Count)
             return;
+        if (panel.Stack != null)
+        {
+            MoveInStack(panelId, new StackItem(StackKind.Character, index), toFront ? StackMove.ToFront : StackMove.ToBack);
+            return;
+        }
+        if (toFront ? index == panel.CharacterInstances.Count - 1 : index == 0)
+            return; // already there: nothing to undo
         var (list, newIndex) = CharacterPlacementEditing.Reorder(panel.CharacterInstances, index, toFront);
         Apply(EditCharacters(Working, panelId, _ => list));
         if (Equals(_selectedPanelId, panelId) && _selectedCharacterIndex == index)
             SelectCharacter(panelId, newIndex);
+    }
+
+    /// <summary>
+    /// Moves one bubble, character or drawing within its panel's stack (<see cref="PanelStack"/>):
+    /// one place or all the way, past whatever kind of thing is next to it - the Layers pane's
+    /// buttons. One undo step, and none when it's there already. Arranging a panel this way
+    /// for the first time gives it its own <see cref="Panel.Stack"/>; nothing is renumbered, so
+    /// the selection stays on the same item.
+    /// </summary>
+    public void MoveInStack(PanelId panelId, StackItem item, StackMove move)
+    {
+        if (!Working.Panels.TryGetValue(panelId, out var panel))
+            return;
+        var moved = PanelStackEditing.Move(panel, item, move);
+        if (!moved.IsValid || ReferenceEquals(moved.Value, panel))
+            return;
+        Apply(EditPanel(Working, panelId, _ => moved));
     }
 
     private void ReorderSelection(bool toFront)
