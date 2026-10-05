@@ -128,7 +128,7 @@ public class PanelLayoutEditingTests
     }
 
     [Fact]
-    public void Resize_CarriesBubblesAlongInsideThePanel()
+    public void Resize_ScalesBubblesAlongInsideThePanel()
     {
         var bubble = NewBubble(new Rect2D(60, 60, 30, 20));
         var panel = NewPanel(new Rect2D(0, 0, 100, 100)) with { Bubbles = [bubble] };
@@ -137,9 +137,11 @@ public class PanelLayoutEditingTests
 
         Assert.True(result.IsValid);
         var bubbleBounds = AnchorRing.BoundingBox(result.Value.Bubbles[0].Shape.Anchors);
-        Assert.True(bubbleBounds.Left >= 100 && bubbleBounds.Right <= 150 && bubbleBounds.Top >= 100 && bubbleBounds.Bottom <= 150,
-            "bubble should end up inside the resized panel");
-        Assert.Equal(30, bubbleBounds.Width, 6);
+        Assert.Equal(130, bubbleBounds.Left, 6);
+        Assert.Equal(130, bubbleBounds.Top, 6);
+        Assert.Equal(15, bubbleBounds.Width, 6);
+        Assert.Equal(10, bubbleBounds.Height, 6);
+        Assert.Equal(Bubble.DefaultFontSizePt / 2, result.Value.Bubbles[0].FontSizePt);
     }
 
     [Fact]

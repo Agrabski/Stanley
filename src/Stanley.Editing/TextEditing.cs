@@ -122,6 +122,25 @@ public static class TextEditing
 
     public static bool IsValidSize(double points) => double.IsFinite(points) && points >= MinFontSizePt && points <= MaxFontSizePt;
 
+    /// <summary><paramref name="points"/> made <paramref name="scale"/> times bigger along with the panel it's in, kept to sizes Word would take.</summary>
+    public static double ScaleFontSize(double points, double scale) => Math.Clamp(points * scale, MinFontSizePt, MaxFontSizePt);
+
+    /// <summary>
+    /// Carries text along when its panel is resized (<see cref="PanelContentScale"/>): its box
+    /// and its letters - their outline too, which is part of how they're drawn - scale
+    /// together, so it wraps and reads exactly as before. The box's border is ink, the same
+    /// weight at any size.
+    /// </summary>
+    public static TextElement Scale(TextElement text, PanelContentScale scale) => text with
+    {
+        Bounds = scale.Map(text.Bounds),
+        Style = scale.Scale == 1 ? text.Style : text.Style with
+        {
+            FontSizePt = ScaleFontSize(text.Style.FontSizePt, scale.Scale),
+            OutlineWidthMm = text.Style.OutlineWidthMm * scale.Scale
+        }
+    };
+
     /// <summary>
     /// A size typed into the font size box, in points as in Word: "12", "10.5", "10,5" or
     /// "12 pt", rounded to the half point like Word's; "5 mm" is taken too, and turned into

@@ -14,9 +14,9 @@ namespace Stanley.Editing;
 /// is still the escape hatch for panel outlines beyond what this editor covers; it just
 /// isn't draggable through these operations.
 ///
-/// A panel's bubbles, characters and elements belong to it: every operation here carries
-/// them along (<see cref="BubbleEditing.Refit"/>, <see cref="CharacterPlacementEditing.Refit"/>,
-/// <see cref="ElementEditing.Refit"/>) and keeps bubbles inside the panel's new bounds.
+/// A panel's bubbles, characters and elements belong to it: a move or resize carries them
+/// along as one picture, scaled with the panel (<see cref="PanelContentScale"/>), and keeps
+/// bubbles inside its new bounds; a split leaves each where it was on the page.
 /// </summary>
 public static class PanelLayoutEditing
 {
@@ -32,17 +32,17 @@ public static class PanelLayoutEditing
             newBounds.Right > pageBounds.Right + epsilon || newBounds.Bottom > pageBounds.Bottom + epsilon)
             return EditResult<Panel>.Failure("A panel can't extend past the page.");
 
-        var oldBounds = AnchorRing.BoundingBox(panel.Shape.Anchors);
+        var contents = PanelContentScale.Between(AnchorRing.BoundingBox(panel.Shape.Anchors), newBounds);
         return EditResult<Panel>.Success(panel with
         {
             // A thought cloud regenerates its scallops at the new bounds instead of stretching
             // them into ovals (PanelShapes.Cloud is deterministic, so this is exactly what
             // drawing a fresh cloud at newBounds would give).
             Shape = panel.Kind == PanelKind.Cloud ? PanelShapes.Cloud(newBounds) : PanelShapes.Rectangle(newBounds),
-            CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Refit(c, oldBounds, newBounds)).ToList(),
-            Bubbles = panel.Bubbles.Select(b => BubbleEditing.Refit(b, oldBounds, newBounds)).ToList(),
-            Elements = panel.Elements.Select(e => ElementEditing.Refit(e, oldBounds, newBounds)).ToList(),
-            Trail = ThoughtCloudEditing.RefitTrail(panel.Trail, oldBounds, newBounds)
+            CharacterInstances = panel.CharacterInstances.Select(c => CharacterPlacementEditing.Scale(c, contents)).ToList(),
+            Bubbles = panel.Bubbles.Select(b => BubbleEditing.KeepInside(BubbleEditing.Scale(b, contents), newBounds)).ToList(),
+            Elements = panel.Elements.Select(e => ElementEditing.KeepReachable(ElementEditing.Scale(e, contents), newBounds)).ToList(),
+            Trail = ThoughtCloudEditing.ScaleTrail(panel.Trail, contents)
         });
     }
 

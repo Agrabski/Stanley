@@ -77,22 +77,11 @@ public static class ThoughtCloudEditing
         panel.Trail is { } trail ? panel with { Trail = trail with { AttachmentT = AnchorRing.NearestT(panel.Shape.Anchors, pointer) } } : panel;
 
     /// <summary>
-    /// Carries the trail's target along when its cloud moves or resizes from
-    /// <paramref name="oldBounds"/> to <paramref name="newBounds"/>: the same proportional
-    /// mapping <see cref="BubbleEditing.Refit"/> gives a bubble's tail targets, so the trail
-    /// keeps pointing at roughly the same relative spot rather than the cloud sliding away
-    /// from under it. The attachment fraction needs no such mapping - it's already
-    /// resolution-independent.
+    /// Carries the trail's tip along when its cloud is resized (<see cref="PanelContentScale"/>),
+    /// the same way a bubble's tail tips go (<see cref="BubbleEditing.Scale"/>), so the trail
+    /// keeps pointing at the same spot of the picture rather than the cloud sliding away from
+    /// under it. Its base needs nothing: a fraction along the outline is the same on any size of cloud.
     /// </summary>
-    public static ThoughtTrail? RefitTrail(ThoughtTrail? trail, Rect2D oldBounds, Rect2D newBounds)
-    {
-        if (trail is null)
-            return null;
-        if (oldBounds.Width <= 0 || oldBounds.Height <= 0)
-            return trail;
-
-        var x = newBounds.Left + (trail.Target.X - oldBounds.Left) / oldBounds.Width * newBounds.Width;
-        var y = newBounds.Top + (trail.Target.Y - oldBounds.Top) / oldBounds.Height * newBounds.Height;
-        return trail with { Target = new Point2D(x, y) };
-    }
+    public static ThoughtTrail? ScaleTrail(ThoughtTrail? trail, PanelContentScale scale) =>
+        trail is null ? null : trail with { Target = scale.Map(trail.Target) };
 }

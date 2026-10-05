@@ -193,34 +193,33 @@ public class ThoughtCloudEditingTests
     }
 
     [Fact]
-    public void RefitTrail_CarriesTheTargetAlongProportionallyWithTheCloudsBounds()
+    public void ScaleTrail_TakesTheTargetWhereThePictureGoes()
     {
-        var oldBounds = new Rect2D(0, 0, 100, 100);
-        var newBounds = new Rect2D(0, 0, 200, 50);
-        var trail = new ThoughtTrail(0.1, new Point2D(50, 150)); // 50% across, 50mm below the old bounds
+        var trail = new ThoughtTrail(0.1, new Point2D(50, 150));
 
-        var refitted = ThoughtCloudEditing.RefitTrail(trail, oldBounds, newBounds);
+        var scaled = ThoughtCloudEditing.ScaleTrail(trail, new PanelContentScale(0.5, 10, 20));
 
-        Assert.NotNull(refitted);
-        Assert.Equal(100, refitted!.Target.X, 3); // still 50% across the (now wider) bounds
-        Assert.Equal(75, refitted.Target.Y, 3); // still 50mm-in-100 below the top, scaled to the new height
-        Assert.Equal(trail.AttachmentT, refitted.AttachmentT, 6); // a ring fraction needs no remapping
+        Assert.NotNull(scaled);
+        Assert.Equal(35, scaled!.Target.X, 6);
+        Assert.Equal(95, scaled.Target.Y, 6);
+        Assert.Equal(trail.AttachmentT, scaled.AttachmentT, 6); // a ring fraction needs no remapping
     }
 
     [Fact]
-    public void RefitTrail_WithNoTrail_StaysNull() =>
-        Assert.Null(ThoughtCloudEditing.RefitTrail(null, new Rect2D(0, 0, 10, 10), new Rect2D(0, 0, 20, 20)));
+    public void ScaleTrail_WithNoTrail_StaysNull() =>
+        Assert.Null(ThoughtCloudEditing.ScaleTrail(null, new PanelContentScale(2, 0, 0)));
 
     [Fact]
-    public void Resize_CarriesTheTrailAlongProportionally()
+    public void Resize_CarriesTheTrailAlongWithTheCloudsContents()
     {
         var cloud = ThoughtCloudEditing.SetTrail(ThoughtCloudEditing.Create(new Rect2D(0, 0, 100, 100)).Value, new Point2D(50, 150));
 
+        // Half as tall: everything in it halves, held to the top-left corner that stayed put.
         var resized = PanelLayoutEditing.Resize(cloud, new Rect2D(0, 0, 200, 50), PageBounds);
 
         Assert.True(resized.IsValid);
         Assert.NotNull(resized.Value.Trail);
-        Assert.Equal(100, resized.Value.Trail!.Target.X, 3);
+        Assert.Equal(25, resized.Value.Trail!.Target.X, 3);
         Assert.Equal(75, resized.Value.Trail.Target.Y, 3);
     }
 }

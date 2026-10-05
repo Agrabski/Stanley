@@ -94,7 +94,9 @@ element to the selection, or drops it: a multi-selection stays in one panel and 
 (tails along), nudges, Alt+drags and deletes as one undo step; the last one clicked
 drives the ribbon. **Lock layout** protects a page's panel geometry (move, resize,
 split, delete, re-tile) but leaves panels selectable, so a double-clicked character
-still lands in the selected one. **To front / To back** on a drawn element cross the
+still lands in the selected one. **Resizing a panel scales what's in it** as one picture
+(`PanelContentScale`: as big as fits uncropped, held to the edges that didn't move, line
+weights unchanged) so its composition never comes apart (docs/panel-layout.md). **To front / To back** on a drawn element cross the
 character layer: the top of the foreground, the bottom of the background. The
 **Layers pane** (View › Panes › Layers, docs/layers-panel.md) docks a list on the right of
 the page - each panel in reading order, opening to its bubbles, characters and drawings

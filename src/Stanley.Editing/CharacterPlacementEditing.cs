@@ -119,7 +119,25 @@ public static class CharacterPlacementEditing
         return groups.Count == 0 ? null : groups[0].First();
     }
 
-    /// <summary>Carries a character along when its panel moves or resizes: its ground point keeps the same relative position in the panel; its size is kept (people don't squash).</summary>
+    /// <summary>
+    /// Carries a character along when its panel is resized (<see cref="PanelContentScale"/>):
+    /// standing on the same spot of the scaled picture, scaled with it, so it keeps its place
+    /// beside everything else in the panel. Characters that shared a scale still do.
+    /// </summary>
+    public static CharacterInstance Scale(CharacterInstance instance, PanelContentScale scale)
+    {
+        var placement = instance.Placement;
+        return instance with
+        {
+            Placement = placement with
+            {
+                Ground = scale.Map(placement.Ground),
+                UnitHeightMm = scale.Scale == 1 ? placement.UnitHeightMm : Math.Clamp(placement.UnitHeightMm * scale.Scale, MinUnitHeightMm, MaxUnitHeightMm)
+            }
+        };
+    }
+
+    /// <summary>Brings a character into another panel (pasting it there): its ground point keeps the same relative position in the panel; its size is kept (people don't squash). A panel's own resize goes through <see cref="Scale"/> instead.</summary>
     public static CharacterInstance Refit(CharacterInstance instance, Rect2D oldPanel, Rect2D newPanel)
     {
         if (oldPanel.Width <= 0 || oldPanel.Height <= 0)
