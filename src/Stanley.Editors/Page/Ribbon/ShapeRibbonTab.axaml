@@ -32,6 +32,53 @@
       <Rectangle Classes="divider" />
       <DockPanel Classes="group">
           <StackPanel Orientation="Horizontal">
+              <ToggleButton Name="EditPointsButton" Classes="tool" IsChecked="{Binding IsEditingPoints}"
+                            IsEnabled="{Binding CanEditPoints}"
+                            ToolTip.Tip="Edit Points - drag the shape's points to reshape it, drag its outline to add a point, drag a point's round handles to bend the curve, double-click a point to make it smooth or sharp"
+                            local:Shortcut.Keys="Enter">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource EditPointsIcon}" /><TextBlock Text="Edit Points" />
+                  </StackPanel>
+              </ToggleButton>
+              <StackPanel Spacing="1" VerticalAlignment="Center">
+                  <RadioButton Name="SmoothPointButton" Classes="small" GroupName="PointKind"
+                               Theme="{StaticResource {x:Type ToggleButton}}"
+                               IsChecked="{Binding IsSelectedPointSmooth}" IsEnabled="{Binding HasSelectedPoint}"
+                               ToolTip.Tip="Smooth point - the outline curves through it"
+                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      Smooth
+                  </RadioButton>
+                  <RadioButton Name="CornerPointButton" Classes="small" GroupName="PointKind"
+                               Theme="{StaticResource {x:Type ToggleButton}}"
+                               IsChecked="{Binding IsSelectedPointCorner}" IsEnabled="{Binding HasSelectedPoint}"
+                               ToolTip.Tip="Corner point - the outline turns sharply there"
+                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      Corner
+                  </RadioButton>
+                  <Button Name="DeletePointButton" Classes="small" Command="{Binding DeletePointCommand}"
+                          ToolTip.Tip="Delete the selected point (the Delete key does too, while editing points)"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      Delete point
+                  </Button>
+              </StackPanel>
+              <StackPanel Spacing="1" VerticalAlignment="Center">
+                  <Button Name="CloseShapeButton" Classes="small" Command="{Binding CloseShapeCommand}"
+                          ToolTip.Tip="Join the line's two ends into a closed shape, which Shape Fill fills"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      Close shape
+                  </Button>
+                  <Button Name="OpenShapeButton" Classes="small" Command="{Binding OpenShapeCommand}"
+                          ToolTip.Tip="Cut the shape open at the selected point, leaving a line whose ends can be pulled apart"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                      Open at point
+                  </Button>
+              </StackPanel>
+          </StackPanel>
+          <TextBlock Classes="groupLabel" Text="Points" />
+      </DockPanel>
+      <Rectangle Classes="divider" />
+      <DockPanel Classes="group">
+          <StackPanel Orientation="Horizontal">
               <RadioButton Name="ShapeBehindButton" Classes="tool" GroupName="ShapeLayer"
                            Theme="{StaticResource {x:Type ToggleButton}}"
                            IsChecked="{Binding IsElementBehind}"

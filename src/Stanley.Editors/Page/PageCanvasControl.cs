@@ -26,6 +26,9 @@ public sealed class PageCanvasControl : Control
     public const double MaxZoom = ActualSizeZoom * 16;
 
     private const double HitRadiusPx = 9;
+
+    /// <summary>How near (screen px) the outline of a shape whose points are being edited a press must be to add a point there.</summary>
+    private const double OutlineHitPx = 6;
     private const double EdgeBandPx = 6;
     private const double SnapDistancePx = 8;
     private const double DragThresholdPx = 4;
@@ -68,6 +71,23 @@ public sealed class PageCanvasControl : Control
 
     /// <summary>The drag is moving a copy (Alt+drag) rather than the thing itself.</summary>
     private bool _duplicating;
+
+    // Edit Points: the point (or one of its handles) being dragged, where it was when the drag
+    // began, and the spot on the outline under the pointer, where a click would add a point.
+    private int _dragPointIndex = -1;
+    private HandleSide _dragHandleSide;
+    private Point2D _dragStartPoint;
+    private Point2D _dragAnchorPoint;
+    private Point2D? _pointGhost;
+
+    /// <summary>The point the last click on the outline added - the second click of a double-click lands on it, and mustn't then flip it smooth or sharp.</summary>
+    private int _pointAddedByLastClick = -1;
+
+    // The Freeform tool's shape so far: the points placed, the panel it's going into and where
+    // the pointer is, for the edge the next click would add.
+    private readonly List<ShapeAnchor> _freeform = [];
+    private PanelId? _freeformPanel;
+    private Point2D? _freeformPointer;
 
     private readonly Dictionary<StandardCursorType, Cursor> _cursors = new();
 
@@ -148,6 +168,7 @@ public sealed class PageCanvasControl : Control
         {
             if (_viewModel != null)
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            ClearFreeform();
             _viewModel = value;
             if (_viewModel != null)
                 _viewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -282,10 +303,16 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.SelectedCharacterIndex) or nameof(PageEditorViewModel.CharacterSnapshot)
             or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex)
             or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields)
-            or nameof(PageEditorViewModel.SelectionCount))
+            or nameof(PageEditorViewModel.SelectionCount) or nameof(PageEditorViewModel.IsEditingPoints)
+            or nameof(PageEditorViewModel.SelectedPointIndex))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
+        {
+            // Switching tools mid-shape keeps what the Freeform tool placed so far.
+            if (_freeform.Count > 0 && _viewModel?.Tool != PageEditorTool.Freeform)
+                FinishFreeform(closed: false, select: false);
             UpdateCursor(null);
+        }
     }
 
     // ---------------------------------------------------------------- rendering
@@ -325,8 +352,20 @@ public sealed class PageCanvasControl : Control
             _viewModel.PictureSnapshot,
             _viewModel.Fields,
             _viewModel.ExtraSelectionBounds,
-            _editingTextDraft)));
+            _editingTextDraft,
+            _viewModel.IsEditingPoints,
+            _viewModel.SelectedPointIndex,
+            _drag == DragKind.None ? _pointGhost : null,
+            FreeformDraft(),
+            _freeformPanel is { } freeformPanel && _viewModel.Working.Panels.ContainsKey(freeformPanel) ? _viewModel.PanelBounds(freeformPanel) : null,
+            _drag == DragKind.None ? _freeformPointer : null)));
     }
+
+    /// <summary>The Freeform tool's shape so far, in the current pen - closed (and filled) when the pointer is on the first point, where a click closes it.</summary>
+    private ProjectModel.Issues.ShapeElement? FreeformDraft() =>
+        _freeform.Count == 0 || _viewModel is not { } vm
+            ? null
+            : new ProjectModel.Issues.ShapeElement(default, vm.CurrentElementLayer, _freeform.ToList(), FreeformWouldClose(_freeformPointer), vm.CurrentShapeStyle);
 
     /// <summary>The gutter being dragged, re-read from the live document so the highlight follows it.</summary>
     private GutterHit? CurrentDragGutter()
@@ -346,6 +385,9 @@ public sealed class PageCanvasControl : Control
     private enum HitKind
     {
         None,
+        ShapePoint,
+        ShapeHandle,
+        ShapeOutline,
         TailTarget,
         TailBase,
         TrailTarget,
@@ -375,14 +417,19 @@ public sealed class PageCanvasControl : Control
         Limb Limb = Limb.LeftArm,
         TrunkPart Trunk = TrunkPart.Hips,
         RectEdges Edges = RectEdges.None,
-        GutterHit? Gutter = null);
+        GutterHit? Gutter = null,
+        int PointIndex = -1,
+        HandleSide Side = HandleSide.Out,
+        int Segment = -1,
+        double T = 0);
 
     /// <summary>
-    /// What's under a point, in priority order: the selected bubble's own handles first
-    /// (they sit on top), then the selected character's pose handles (hand/foot, then
-    /// elbow/knee, then trunk) and resize handles, the selected element's resize handles,
-    /// panel corners and gutters, then bubble bodies (so a bubble flush against a panel edge
-    /// is still grabbable), foreground elements, characters, panel edges, background
+    /// What's under a point, in priority order: while a shape's points are being edited, the
+    /// selected point's curve handles, its points and its outline come first (<see cref="PointAt"/>);
+    /// then the selected bubble's own handles (they sit on top), then the selected character's
+    /// pose handles (hand/foot, then elbow/knee, then trunk) and resize handles, the selected
+    /// element's resize handles, panel corners and gutters, then bubble bodies (so a bubble
+    /// flush against a panel edge is still grabbable), foreground elements, characters, panel edges, background
     /// elements (scenery covering a panel mustn't stop its edges being dragged), and last
     /// panel bodies - front to back, the way they're drawn.
     /// </summary>
@@ -391,6 +438,9 @@ public sealed class PageCanvasControl : Control
         var vm = _viewModel!;
         var doc = vm.Working;
         var tol = HitRadiusPx / _zoom;
+
+        if (vm.IsEditingPoints && vm.SelectedShape is { } edited && vm.SelectedPanelId is { } editedPanel && PointAt(edited, editedPanel, p, tol) is { } pointHit)
+            return pointHit;
 
         if (vm.SelectedBubble is { } selected && vm.SelectedPanelId is { } selectedPanel)
         {
@@ -433,7 +483,8 @@ public sealed class PageCanvasControl : Control
                 return new Hit(HitKind.CharacterHandle, characterPanel, CharacterIndex: vm.SelectedCharacterIndex, Edges: RectEdges.Right | RectEdges.Top);
         }
 
-        if (vm.SelectedElement is { } element && vm.SelectedPanelId is { } elementPanel && element.Id != _editingText)
+        // A shape whose points are being edited has its points to grab instead of a box to resize.
+        if (vm.SelectedElement is { } element && vm.SelectedPanelId is { } elementPanel && element.Id != _editingText && !vm.IsEditingPoints)
         {
             var handleEdges = HitHandles(ProjectModel.Issues.PanelElements.Bounds(element), p, tol, includeMidpoints: true);
             if (handleEdges != RectEdges.None)
@@ -494,6 +545,40 @@ public sealed class PageCanvasControl : Control
         }
 
         return new Hit(HitKind.None);
+    }
+
+    /// <summary>
+    /// What of the shape being edited is under <paramref name="p"/>: one of the selected point's
+    /// curve handles (they sit over everything), the nearest point, or the outline - where a
+    /// press adds a point - else null.
+    /// </summary>
+    private Hit? PointAt(ProjectModel.Issues.ShapeElement shape, PanelId panelId, Point2D p, double tol)
+    {
+        var vm = _viewModel!;
+        var element = vm.SelectedElementIndex;
+        if (vm.SelectedPointIndex >= 0)
+        {
+            foreach (var (side, handle) in ShapePointEditing.VisibleHandles(shape, vm.SelectedPointIndex))
+            {
+                if (Dist(handle, p) <= tol)
+                    return new Hit(HitKind.ShapeHandle, panelId, ElementIndex: element, PointIndex: vm.SelectedPointIndex, Side: side);
+            }
+        }
+
+        var nearest = -1;
+        var nearestDistance = tol;
+        for (var i = 0; i < shape.Anchors.Count; i++)
+        {
+            var d = Dist(shape.Anchors[i].Point, p);
+            if (d <= nearestDistance)
+                (nearest, nearestDistance) = (i, d);
+        }
+        if (nearest >= 0)
+            return new Hit(HitKind.ShapePoint, panelId, ElementIndex: element, PointIndex: nearest);
+
+        return ShapePointEditing.Nearest(shape, p) is { } spot && spot.Distance <= OutlineHitPx / _zoom
+            ? new Hit(HitKind.ShapeOutline, panelId, ElementIndex: element, Segment: spot.Segment, T: spot.T)
+            : null;
     }
 
     /// <summary>
@@ -728,6 +813,12 @@ public sealed class PageCanvasControl : Control
 
         if (point.Properties.IsRightButtonPressed)
         {
+            // A right-click mid-way through a Freeform shape finishes it, like Enter.
+            if (_freeform.Count > 0)
+            {
+                FinishFreeform(closed: false);
+                return;
+            }
             ShowContextMenu(page);
             return;
         }
@@ -771,15 +862,81 @@ public sealed class PageCanvasControl : Control
                     StartDrag(e, DragKind.CreateText);
                 }
                 return;
+
+            case PageEditorTool.Freeform:
+                PressWithFreeform(e, page);
+                return;
         }
 
         PressWithSelectTool(e, page);
+    }
+
+    /// <summary>
+    /// The Freeform tool: each press places a point (dragged before letting go, a smooth one -
+    /// see <see cref="ShapePointEditing.Placed"/>); the first goes into the panel under it. A press
+    /// back on the first point closes the shape, on the last point (or a double-click) finishes
+    /// it as a line.
+    /// </summary>
+    private void PressWithFreeform(PointerPressedEventArgs e, Point2D page)
+    {
+        var vm = _viewModel!;
+        if (_freeform.Count == 0)
+        {
+            if (PanelAt(page) is not { } panel)
+                return;
+            vm.ClearSelection();
+            _freeformPanel = panel;
+        }
+        else
+        {
+            if (e.ClickCount >= 2 || Dist(_freeform[^1].Point, page) <= HitRadiusPx / _zoom)
+            {
+                FinishFreeform(closed: false);
+                return;
+            }
+            if (FreeformWouldClose(page))
+            {
+                FinishFreeform(closed: true);
+                return;
+            }
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                page = ShapePointEditing.SnapAngle(_freeform[^1].Point, page);
+        }
+
+        _freeform.Add(ShapePointEditing.Placed(page));
+        _pressPage = page;
+        _freeformPointer = null;
+        StartDrag(e, DragKind.PlaceFreeformPoint);
+    }
+
+    /// <summary>Whether a press at <paramref name="p"/> would close the Freeform shape: it's on the first point, with at least three placed.</summary>
+    private bool FreeformWouldClose(Point2D? p) =>
+        _freeform.Count >= ShapePointEditing.MinPoints(closed: true) && p is { } at && Dist(_freeform[0].Point, at) <= HitRadiusPx / _zoom;
+
+    /// <summary>Keeps the Freeform shape placed so far (one undo step) - unless it's still a single point - and starts afresh.</summary>
+    private void FinishFreeform(bool closed, bool select = true)
+    {
+        var (panel, anchors) = (_freeformPanel, _freeform.ToList());
+        // Cleared first: keeping the shape switches back to the Select tool, which would otherwise finish it a second time.
+        ClearFreeform();
+        if (panel is { } panelId && _viewModel is { } vm)
+            vm.AddFreeformShape(panelId, anchors, closed, select);
+    }
+
+    private void ClearFreeform()
+    {
+        _freeform.Clear();
+        _freeformPanel = null;
+        _freeformPointer = null;
+        InvalidateVisual();
     }
 
     private void PressWithSelectTool(PointerPressedEventArgs e, Point2D page)
     {
         var vm = _viewModel!;
         var hit = HitTest(page);
+        var justAdded = _pointAddedByLastClick;
+        _pointAddedByLastClick = -1;
 
         if (e.ClickCount >= 2)
         {
@@ -798,6 +955,17 @@ public sealed class PageCanvasControl : Control
                     vm.SelectCharacter(characterPanel, hit.CharacterIndex);
                     if (vm.EditCharacterCommand.CanExecute(null))
                         vm.EditCharacterCommand.Execute(null);
+                    return;
+                case HitKind.ShapePoint when hit.PointIndex == justAdded:
+                    return; // a double-click on the outline: the first click added this point, which is all it wanted
+                case HitKind.ShapePoint:
+                    vm.TogglePointKind(hit.PointIndex);
+                    return;
+                // Like Figma: double-click a shape to edit its points.
+                case HitKind.ElementBody or HitKind.ElementHandle when hit.PanelId is { } shapePanel && !vm.IsEditingPoints
+                                                                     && vm.Working.Panels[shapePanel].Elements[hit.ElementIndex] is ProjectModel.Issues.ShapeElement:
+                    vm.SelectElement(shapePanel, hit.ElementIndex);
+                    vm.IsEditingPoints = true;
                     return;
                 case HitKind.PanelBody when hit.PanelId is { } emptyPanel:
                     var index = vm.CreateBubble(emptyPanel, page);
@@ -841,6 +1009,34 @@ public sealed class PageCanvasControl : Control
 
         switch (hit.Kind)
         {
+            case HitKind.ShapePoint:
+                _dragStartPoint = vm.SelectedShape!.Anchors[hit.PointIndex].Point;
+                _dragPointIndex = hit.PointIndex;
+                vm.SelectPoint(hit.PointIndex);
+                StartDrag(e, DragKind.PendingMovePoint);
+                break;
+
+            case HitKind.ShapeHandle:
+                var anchor = vm.SelectedShape!.Anchors[hit.PointIndex];
+                _dragAnchorPoint = anchor.Point;
+                _dragStartPoint = hit.Side == HandleSide.In ? anchor.InHandle : anchor.OutHandle;
+                _dragPointIndex = hit.PointIndex;
+                _dragHandleSide = hit.Side;
+                vm.BeginMoveHandle(hit.PanelId!.Value, hit.ElementIndex, hit.PointIndex, hit.Side);
+                StartDrag(e, DragKind.MoveHandle);
+                break;
+
+            case HitKind.ShapeOutline:
+                // A new point right there, which the drag then pulls (released straight away, it's just added).
+                var added = vm.BeginInsertPoint(hit.PanelId!.Value, hit.ElementIndex, hit.Segment, hit.T);
+                if (added >= 0 && vm.SelectedPoint is { } inserted)
+                {
+                    _dragStartPoint = inserted.Point;
+                    _dragPointIndex = added;
+                    StartDrag(e, DragKind.InsertPoint);
+                }
+                break;
+
             case HitKind.TailTarget:
                 vm.BeginMoveBubbleTail(hit.PanelId!.Value, hit.BubbleIndex, hit.TailIndex);
                 StartDrag(e, DragKind.MoveTailTarget);
@@ -892,6 +1088,8 @@ public sealed class PageCanvasControl : Control
                 break;
 
             case HitKind.ElementBody:
+                // Inside the shape whose points are being edited, away from them: let go of the point (a drag moves the whole shape).
+                vm.SelectPoint(-1);
                 vm.SelectElement(hit.PanelId!.Value, hit.ElementIndex);
                 StartDrag(e, DragKind.PendingMoveElement);
                 break;
@@ -972,6 +1170,11 @@ public sealed class PageCanvasControl : Control
         if (_drag == DragKind.None)
         {
             UpdateHover(page);
+            if (_freeform.Count > 0)
+            {
+                _freeformPointer = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? ShapePointEditing.SnapAngle(_freeform[^1].Point, page) : page;
+                InvalidateVisual();
+            }
             return;
         }
 
@@ -1137,9 +1340,47 @@ public sealed class PageCanvasControl : Control
             case DragKind.DrawShape when _dragMoved:
                 _viewModel.UpdateDrawShape(_pressPage, page, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 break;
+
+            case DragKind.PendingMovePoint when beyondThreshold:
+                _viewModel.BeginMovePoint(_dragPanelId!.Value, _dragElementIndex, _dragPointIndex);
+                _drag = DragKind.MovePoint;
+                UpdateCursor(null);
+                MovePoint(dx, dy, e.KeyModifiers);
+                break;
+
+            case DragKind.MovePoint:
+                MovePoint(dx, dy, e.KeyModifiers);
+                break;
+
+            case DragKind.InsertPoint when _dragMoved:
+                MovePoint(dx, dy, e.KeyModifiers);
+                break;
+
+            case DragKind.MoveHandle:
+                // Shift keeps the handle at a multiple of 45° round its point; Alt bends just this side.
+                var handleTo = new Point2D(_dragStartPoint.X + dx, _dragStartPoint.Y + dy);
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                    handleTo = ShapePointEditing.SnapAngle(_dragAnchorPoint, handleTo);
+                _viewModel.UpdateMoveHandle(_dragPanelId!.Value, _dragElementIndex, _dragPointIndex, _dragHandleSide, handleTo, independent: alt);
+                break;
+
+            case DragKind.PlaceFreeformPoint when _dragMoved && _freeform.Count > 0:
+                // Dragging as a point is placed pulls out its curve handles.
+                var pull = e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? ShapePointEditing.SnapAngle(_pressPage, page) : page;
+                _freeform[^1] = ShapePointEditing.Placed(_pressPage, pull);
+                break;
         }
 
         InvalidateVisual();
+    }
+
+    /// <summary>The dragged point follows the pointer from where it was (it doesn't jump onto it); Shift keeps it level, upright or at 45° from there.</summary>
+    private void MovePoint(double dx, double dy, KeyModifiers modifiers)
+    {
+        var to = new Point2D(_dragStartPoint.X + dx, _dragStartPoint.Y + dy);
+        if (modifiers.HasFlag(KeyModifiers.Shift))
+            to = ShapePointEditing.SnapAngle(_dragStartPoint, to);
+        _viewModel!.UpdateMovePoint(_dragPanelId!.Value, _dragElementIndex, _dragPointIndex, to);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -1190,8 +1431,11 @@ public sealed class PageCanvasControl : Control
             case DragKind.MoveBubble or DragKind.MovePanel or DragKind.ResizePanel or DragKind.ResizeBubble
                 or DragKind.MoveTailTarget or DragKind.SlideTailAttachment or DragKind.MoveTrailTarget or DragKind.SlideTrailAttachment or DragKind.DragGutter
                 or DragKind.MoveCharacter or DragKind.ResizeCharacter or DragKind.PoseLimb or DragKind.PoseBend or DragKind.PoseTrunk
-                or DragKind.MoveElement or DragKind.ResizeElement or DragKind.MoveGroup:
+                or DragKind.MoveElement or DragKind.ResizeElement or DragKind.MoveGroup
+                or DragKind.MovePoint or DragKind.MoveHandle or DragKind.InsertPoint:
                 vm.EndGesture(commit);
+                if (kind == DragKind.InsertPoint && commit && !_dragMoved)
+                    _pointAddedByLastClick = _dragPointIndex;
                 break;
 
             // Never dragged (no BeginMoveSelection call was ever made, so there's no gesture to
@@ -1235,6 +1479,7 @@ public sealed class PageCanvasControl : Control
         _dragTailIndex = -1;
         _dragCharacterIndex = -1;
         _dragElementIndex = -1;
+        _dragPointIndex = -1;
         _trail.Clear();
         _dragEdges = RectEdges.None;
         _dragGutter = null;
@@ -1266,6 +1511,7 @@ public sealed class PageCanvasControl : Control
     {
         base.OnPointerExited(e);
         _hoverHit = null;
+        _pointGhost = null;
         if (_hoverGutter != null || _hoverPanelId != null)
         {
             _hoverGutter = null;
@@ -1289,6 +1535,15 @@ public sealed class PageCanvasControl : Control
             InvalidateVisual();
         }
         _hoverHit = hit;
+        // Over the outline of a shape whose points are being edited: mark where a click adds one.
+        Point2D? ghost = hit is { Kind: HitKind.ShapeOutline } outline && vm.SelectedShape is { } shape
+            ? ShapePointEditing.PointOn(shape, outline.Segment, outline.T)
+            : null;
+        if (!Equals(ghost, _pointGhost))
+        {
+            _pointGhost = ghost;
+            InvalidateVisual();
+        }
         UpdateCursor(hit);
     }
 
@@ -1308,6 +1563,29 @@ public sealed class PageCanvasControl : Control
         {
             case Key.Escape when _drag != DragKind.None:
                 FinishDrag(commit: false);
+                break;
+            // The Freeform tool mid-shape: Esc or Enter keeps it as a line, Backspace takes the last point back.
+            case Key.Escape or Key.Enter when _freeform.Count > 0:
+                FinishFreeform(closed: false);
+                break;
+            case Key.Back or Key.Delete when _drag == DragKind.None && _freeform.Count > 0:
+                _freeform.RemoveAt(_freeform.Count - 1);
+                if (_freeform.Count == 0)
+                    ClearFreeform();
+                InvalidateVisual();
+                break;
+            // Editing points: Esc or Enter is done, Delete removes the selected point (never the whole shape), the arrows move it.
+            case Key.Escape or Key.Enter when vm.IsEditingPoints:
+                vm.IsEditingPoints = false;
+                break;
+            case Key.Delete or Key.Back when _drag == DragKind.None && vm.IsEditingPoints:
+                vm.DeleteSelectedPoint();
+                break;
+            case Key.Left or Key.Right or Key.Up or Key.Down when _drag == DragKind.None && vm.HasSelectedPoint:
+                vm.NudgeSelectedPoint(e.Key == Key.Left ? -step : e.Key == Key.Right ? step : 0, e.Key == Key.Up ? -step : e.Key == Key.Down ? step : 0);
+                break;
+            case Key.Enter when vm.CanEditPoints:
+                vm.IsEditingPoints = true;
                 break;
             case Key.Escape when vm.Tool != PageEditorTool.Select:
                 vm.Tool = PageEditorTool.Select;
@@ -1408,6 +1686,9 @@ public sealed class PageCanvasControl : Control
             case Key.F when !ctrl && vm.HasSelectedCharacter:
                 vm.IsSelectedCharacterFront = true;
                 break;
+            case Key.F when !ctrl:
+                vm.Tool = PageEditorTool.Freeform;
+                break;
             default:
                 return;
         }
@@ -1446,6 +1727,9 @@ public sealed class PageCanvasControl : Control
         var vm = _viewModel!;
         var hit = HitTest(page);
         var items = new List<Control>();
+
+        if (hit.Kind is HitKind.ShapePoint or HitKind.ShapeHandle or HitKind.ShapeOutline)
+            return PointMenuItems(vm, hit);
 
         // Right-clicking something grouped with other things means the whole group, as a press does.
         if (hit.PanelId is { } linkedPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody)
@@ -1516,6 +1800,11 @@ public sealed class PageCanvasControl : Control
             }
             else if (element is ProjectModel.Issues.ShapeElement)
             {
+                var editPoints = vm.IsEditingPoints
+                    ? Item("Done editing points", () => vm.IsEditingPoints = false, "Esc")
+                    : Item("Edit points", () => vm.IsEditingPoints = true, "Enter");
+                editPoints.IsEnabled = vm.CanEditPoints;
+                items.Add(editPoints);
                 var style = vm.CurrentShapeStyle;
                 items.Add(ColorMenu("Fill", new ColorMenuOptions(vm.SetFillColorCommand, "No Fill", "More Fill Colors…", style.Fill)));
                 items.Add(ColorMenu("Outline", new ColorMenuOptions(vm.SetStrokeColorCommand, "No Outline", "More Outline Colors…", style.Stroke,
@@ -1704,6 +1993,42 @@ public sealed class PageCanvasControl : Control
         return items;
     }
 
+    /// <summary>
+    /// The right-click menu on a point of the shape being edited (or one of its handles) - smooth
+    /// or sharp, delete it, open the shape there - or on its outline: add a point there, close a
+    /// line into a shape. PowerPoint's Edit Points menu.
+    /// </summary>
+    private static List<Control> PointMenuItems(PageEditorViewModel vm, Hit hit)
+    {
+        var items = new List<Control>();
+        if (hit.Kind == HitKind.ShapeOutline)
+        {
+            var (segment, t) = (hit.Segment, hit.T);
+            items.Add(Item("Add point", () => vm.AddPoint(segment, t)));
+        }
+        else
+        {
+            var index = hit.PointIndex;
+            vm.SelectPoint(index);
+            var smooth = Item("Smooth point", () => vm.SetPointKind(index, AnchorHandleKind.Smooth));
+            smooth.ToggleType = MenuItemToggleType.Radio;
+            smooth.IsChecked = vm.IsSelectedPointSmooth;
+            var corner = Item("Corner point", () => vm.SetPointKind(index, AnchorHandleKind.Corner));
+            corner.ToggleType = MenuItemToggleType.Radio;
+            corner.IsChecked = vm.IsSelectedPointCorner;
+            var delete = Item("Delete point", vm.DeleteSelectedPoint, "Del");
+            delete.IsEnabled = vm.CanDeleteSelectedPoint;
+            items.AddRange([smooth, corner, delete]);
+            if (vm.CanOpenShape)
+                items.Add(Item("Open the shape here", () => vm.OpenEditedShapeAt(index)));
+        }
+        if (vm.CanCloseShape)
+            items.Add(Item("Close the shape", vm.CloseEditedShape));
+        items.Add(new Separator());
+        items.Add(Item("Done editing points", () => vm.IsEditingPoints = false, "Esc"));
+        return items;
+    }
+
     /// <summary>Word's Cut, Copy and Paste - and Duplicate - for what the menu was opened on (already selected), then a separator.</summary>
     private static IEnumerable<Control> ClipboardItems(PageEditorViewModel vm)
     {
@@ -1756,7 +2081,7 @@ public sealed class PageCanvasControl : Control
     {
         var item = new MenuItem { Header = header };
         if (gesture != null)
-            item.InputGesture = KeyGesture.Parse(gesture == "Del" ? "Delete" : gesture);
+            item.InputGesture = KeyGesture.Parse(gesture switch { "Del" => "Delete", "Esc" => "Escape", _ => gesture });
         item.Click += (_, _) => action();
         return item;
     }
@@ -1779,12 +2104,16 @@ public sealed class PageCanvasControl : Control
         else if (_duplicating || _drag == DragKind.None && _altHeld && hit is not null && CanDuplicate(hit))
             type = StandardCursorType.DragCopy;
         else if (hit == null)
-            type = _drag is DragKind.MoveBubble or DragKind.MovePanel or DragKind.MoveCharacter or DragKind.MoveElement ? StandardCursorType.SizeAll : StandardCursorType.Arrow;
+            type = _drag is DragKind.MoveBubble or DragKind.MovePanel or DragKind.MoveCharacter or DragKind.MoveElement or DragKind.MovePoint or DragKind.InsertPoint
+                ? StandardCursorType.SizeAll
+                : StandardCursorType.Arrow;
         else
             type = hit.Kind switch
             {
                 HitKind.TailTarget or HitKind.TailBase or HitKind.TrailTarget or HitKind.TrailBase
-                    or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle => StandardCursorType.Hand,
+                    or HitKind.LimbHandle or HitKind.BendHandle or HitKind.TrunkHandle or HitKind.ShapeHandle => StandardCursorType.Hand,
+                HitKind.ShapePoint => StandardCursorType.SizeAll,
+                HitKind.ShapeOutline => StandardCursorType.Cross,
                 HitKind.BubbleHandle or HitKind.PanelCorner or HitKind.PanelEdge or HitKind.CharacterHandle or HitKind.ElementHandle => EdgeCursor(hit.Edges),
                 HitKind.Gutter => hit.Gutter!.Drag.Orientation == BoundaryOrientation.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth,
                 HitKind.PanelBody when vm.Working.LayoutLocked => StandardCursorType.Arrow,
@@ -1902,6 +2231,11 @@ public sealed class PageCanvasControl : Control
         DrawShape,
         CreateText,
         PendingMoveGroup,
-        MoveGroup
+        MoveGroup,
+        PendingMovePoint,
+        MovePoint,
+        MoveHandle,
+        InsertPoint,
+        PlaceFreeformPoint
     }
 }

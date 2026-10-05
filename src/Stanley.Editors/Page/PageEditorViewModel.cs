@@ -26,6 +26,9 @@ public enum PageEditorTool
     Rectangle,
     Ellipse,
 
+    /// <summary>Click point after point to build a shape (drag as you place one to curve it); click the first point again to close it, double-click or Enter to finish a line.</summary>
+    Freeform,
+
     /// <summary>Click in a panel to type text there, or drag to size its box.</summary>
     Text
 }
@@ -325,6 +328,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             // of a selected element, so let go of the element.
             if ((IsShapeTool || value == PageEditorTool.Text) && HasSelectedElement)
                 Select(_selectedPanelId);
+            // Points are edited with the Select tool; any other tool ends it.
+            if (value != PageEditorTool.Select)
+                StopEditingPoints();
             // Always re-raise every flag: a toggle button bound to one of them may have
             // flipped itself off locally, and needs to hear "no, you're still on".
             OnPropertyChanged(nameof(IsSelectTool));
@@ -942,6 +948,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     private void RaiseMultiSelectionChanged()
     {
+        OnSelectionChangedForPoints();
         OnPropertyChanged(nameof(SelectionCount));
         OnPropertyChanged(nameof(HasMultiSelection));
         OnPropertyChanged(nameof(Hint));
@@ -950,6 +957,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     private void RaiseSelectionChanged()
     {
+        OnSelectionChangedForPoints();
         OnPropertyChanged(nameof(SelectedPanelId));
         OnPropertyChanged(nameof(SelectedBubbleIndex));
         OnPropertyChanged(nameof(SelectedCharacterIndex));
@@ -1013,6 +1021,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
                     RaiseMultiSelectionChanged();
             }
         }
+        DropStalePointEditing();
         OnPropertyChanged(nameof(SelectedCharacterHasOddScale));
         OnPropertyChanged(nameof(IsLayoutLocked));
         OnPropertyChanged(nameof(Hint));
@@ -1115,10 +1124,12 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         PageEditorTool.Draw => "Drag inside a panel to draw; end where you started to close the shape (it fills). Pick colours on the Home tab · Esc when done.",
         PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
         PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
+        PageEditorTool.Freeform => "Click inside a panel to place points one by one - drag as you place one to curve it (Shift keeps it level or at 45°). Click the first point to close the shape, double-click or Enter to finish a line · Backspace takes the last point back.",
         PageEditorTool.Text => "Click inside a panel to type there, or drag to size the text box first.",
         _ when SelectionIsOneGroup => $"A group of {SelectionCount} - drag to move it together, Delete removes it, Ctrl+Shift+G takes it apart.",
         _ when HasMultiSelection => $"{SelectionCount} selected - drag to move them together, Ctrl+G groups them, Delete removes them, Shift+click adds or removes.",
-        _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · Home or Shape tab for colours · behind or in front of the characters on the Shape tab · Delete removes it.",
+        _ when IsEditingPoints => "Editing points - drag a point to move it, or the outline to add one there · drag a round handle to bend the curve (Alt bends just that side) · double-click a point to make it smooth or sharp · Delete removes the point · Enter or Esc when done.",
+        _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · double-click or Enter to edit its points · Home or Shape tab for colours · Delete removes it.",
         _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
         _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
         _ when HasSelectedText => "Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",

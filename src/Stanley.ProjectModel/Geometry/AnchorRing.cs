@@ -138,6 +138,62 @@ public static class AnchorRing
         return Rect2D.FromEdges(minX, minY, maxX, maxY);
     }
 
+    /// <summary>
+    /// The smallest axis-aligned rectangle containing the outline itself - every edge's curve,
+    /// which a handle pulled out can bow past the anchor points (unlike
+    /// <see cref="BoundingBox"/>, which only looks at the points). <paramref name="closed"/>
+    /// includes the edge from the last anchor back to the first; an open line has none.
+    /// </summary>
+    public static Rect2D CurveBounds(IReadOnlyList<ShapeAnchor> anchors, bool closed = true)
+    {
+        if (anchors.Count == 0)
+            return default;
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        void Include(Point2D p)
+        {
+            minX = Math.Min(minX, p.X);
+            minY = Math.Min(minY, p.Y);
+            maxX = Math.Max(maxX, p.X);
+            maxY = Math.Max(maxY, p.Y);
+        }
+
+        foreach (var a in anchors)
+            Include(a.Point);
+        var edges = closed ? anchors.Count : anchors.Count - 1;
+        for (var i = 0; i < edges; i++)
+        {
+            var a = anchors[i];
+            var b = anchors[(i + 1) % anchors.Count];
+            // Where the curve turns back along x or y: the roots of its derivative, a quadratic per axis.
+            foreach (var t in Turns(a.Point.X, a.OutHandle.X, b.InHandle.X, b.Point.X).Concat(Turns(a.Point.Y, a.OutHandle.Y, b.InHandle.Y, b.Point.Y)))
+                Include(CubicPoint(a.Point, a.OutHandle, b.InHandle, b.Point, t));
+        }
+        return Rect2D.FromEdges(minX, minY, maxX, maxY);
+    }
+
+    /// <summary>The t in (0, 1) where one coordinate of a cubic bezier stops rising or falling.</summary>
+    private static IEnumerable<double> Turns(double p0, double c0, double c1, double p1)
+    {
+        var a = -p0 + 3 * c0 - 3 * c1 + p1;
+        var b = 2 * (p0 - 2 * c0 + c1);
+        var c = c0 - p0;
+        if (Math.Abs(a) < 1e-12)
+        {
+            if (Math.Abs(b) > 1e-12 && -c / b is > 0 and < 1 and var t)
+                yield return t;
+            yield break;
+        }
+        var discriminant = b * b - 4 * a * c;
+        if (discriminant < 0)
+            yield break;
+        var root = Math.Sqrt(discriminant);
+        foreach (var t in new[] { (-b + root) / (2 * a), (-b - root) / (2 * a) })
+        {
+            if (t is > 0 and < 1)
+                yield return t;
+        }
+    }
+
     /// <summary>Affine-maps every anchor point and handle from <paramref name="from"/> to <paramref name="to"/>, returning a new ring.</summary>
     public static IReadOnlyList<ShapeAnchor> Rescale(IReadOnlyList<ShapeAnchor> anchors, Rect2D from, Rect2D to)
     {

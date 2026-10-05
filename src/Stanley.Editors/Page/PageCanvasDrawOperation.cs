@@ -45,7 +45,18 @@ public sealed record PageCanvasScene(
     /// <summary>The page-space bounding box of every extra item a Shift+click multi-selection added, beyond the primary selection drawn above - a plain outline, no handles (those stay on the primary).</summary>
     IReadOnlyList<Rect2D>? ExtraSelectionBounds = null,
     /// <summary>The text element being typed into, as it will be once the words typed so far are kept (its box grown to fit them) - drawn in place of the stored one, so the box is the size Enter will leave it.</summary>
-    TextElement? EditingTextDraft = null);
+    TextElement? EditingTextDraft = null,
+    /// <summary>The selected shape's points are being edited: it shows them (and the selected one's curve handles) instead of a box to resize.</summary>
+    bool EditingPoints = false,
+    int SelectedPointIndex = -1,
+    /// <summary>Where on the edited shape's outline a click would add a point - the spot under the pointer.</summary>
+    Point2D? PointGhost = null,
+    /// <summary>The Freeform tool's shape so far, drawn as it will be kept, its points showing.</summary>
+    ShapeElement? FreeformDraft = null,
+    /// <summary>The panel the Freeform shape is going into, which it's clipped to as it will be.</summary>
+    Rect2D? FreeformPanelBounds = null,
+    /// <summary>Where the pointer is while the Freeform tool waits for the next point: the edge to it previews what a click adds.</summary>
+    Point2D? FreeformPointer = null);
 
 /// <summary>
 /// The bubble whose text is being typed in the inline editor: drawn without its lettering
@@ -74,6 +85,9 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
     private static readonly SKColor PoseHandle = new(0x2E, 0x9E, 0x5B);
     private static readonly SKColor GuideColor = new(0xE0, 0x2F, 0x8C);
     private static readonly SKColor MarginColor = new(0x5B, 0xC0, 0xDE);
+
+    /// <summary>Half the size of a shape's point marker, in screen px.</summary>
+    private const float PointHalfPx = 4f;
 
     private readonly Rect _bounds;
     private readonly PageCanvasScene _scene;
@@ -146,6 +160,15 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             .ToList(), _scene.Characters, _scene.IssueLooks, _scene.EditingText, _scene.Pictures, _scene.Fields);
         if (_scene.Folio != null)
             PageRenderer.DrawFolio(canvas, _scene.PageBounds, _scene.Folio);
+
+        if (_scene.FreeformDraft is { } draft)
+        {
+            canvas.Save();
+            if (_scene.FreeformPanelBounds is { } panel)
+                canvas.ClipRect(ToSk(panel));
+            ElementRenderer.DrawShape(canvas, draft);
+            canvas.Restore();
+        }
     }
 
     /// <summary>The inline text editor draws the edited bubble's text itself; drawing it here too would show it twice. The bubble (or text box) itself is drawn as it will be once the typed words are kept, grown to fit them.</summary>
@@ -212,7 +235,9 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             {
                 // Typing into it: no box or handles over the text.
                 var element = selectedPanel.Elements[_scene.SelectedElementIndex];
-                if (element.Id != _scene.EditingText)
+                if (_scene.EditingPoints && element is ShapeElement shape)
+                    DrawPointEditing(canvas, shape);
+                else if (element.Id != _scene.EditingText)
                     DrawElementSelection(canvas, element);
             }
             else if (!doc.LayoutLocked)
@@ -242,6 +267,9 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
                 }
             }
         }
+
+        if (_scene.FreeformDraft is { } draft)
+            DrawFreeform(canvas, draft);
 
         if (_scene.RubberBand is { } band)
         {
@@ -329,6 +357,106 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         foreach (var mid in new[] { new SKPoint(rect.MidX, rect.Top), new SKPoint(rect.Right, rect.MidY), new SKPoint(rect.MidX, rect.Bottom), new SKPoint(rect.Left, rect.MidY) })
             DrawSquareHandle(canvas, mid, Accent, 3.5f);
     }
+
+    /// <summary>
+    /// Edit Points: the shape's outline traced thin (so its points read as lying on it, whatever
+    /// its own colours), each point a marker - a square for a corner, a circle for a smooth
+    /// point, filled in for the selected one - the selected point's curve handles on stalks, and
+    /// a hollow dot where a click on the outline would add a point.
+    /// </summary>
+    private void DrawPointEditing(SKCanvas canvas, ShapeElement shape)
+    {
+        DrawOutline(canvas, shape);
+        if (_scene.SelectedPointIndex >= 0 && _scene.SelectedPointIndex < shape.Anchors.Count)
+            DrawHandles(canvas, shape.Anchors[_scene.SelectedPointIndex], ShapePointEditing.VisibleHandles(shape, _scene.SelectedPointIndex));
+        for (var i = 0; i < shape.Anchors.Count; i++)
+            DrawPoint(canvas, shape.Anchors[i], i == _scene.SelectedPointIndex);
+
+        if (_scene.PointGhost is { } ghost)
+        {
+            using var fill = new SKPaint { Color = SKColors.White, IsAntialias = true };
+            using var ring = Stroke(Accent, 1.5f);
+            var at = Screen(ghost);
+            canvas.DrawCircle(at, 3.5f, fill);
+            canvas.DrawCircle(at, 3.5f, ring);
+        }
+    }
+
+    /// <summary>
+    /// The Freeform tool's shape so far: its outline and points, the handles of a point being
+    /// dragged out into a curve, the edge the next click would add (dashed, out to the pointer)
+    /// and - when the pointer is on it - the first point ringed, a click there closing the shape.
+    /// </summary>
+    private void DrawFreeform(SKCanvas canvas, ShapeElement draft)
+    {
+        DrawOutline(canvas, draft);
+        var last = draft.Anchors[^1];
+        if (_scene.FreeformPointer is { } pointer && !draft.Closed)
+        {
+            using var builder = new SKPathBuilder();
+            builder.MoveTo(Screen(last.Point));
+            builder.CubicTo(Screen(last.OutHandle), Screen(pointer), Screen(pointer));
+            using var next = builder.Detach();
+            using var dashed = Stroke(Accent, 1f);
+            dashed.PathEffect = SKPathEffect.CreateDash([4, 3], 0);
+            canvas.DrawPath(next, dashed);
+        }
+        if (last.HandleKind == AnchorHandleKind.Smooth)
+            DrawHandles(canvas, last, [(HandleSide.In, last.InHandle), (HandleSide.Out, last.OutHandle)]);
+        for (var i = 0; i < draft.Anchors.Count; i++)
+            DrawPoint(canvas, draft.Anchors[i], selected: i == draft.Anchors.Count - 1);
+        if (draft.Closed)
+        {
+            using var ring = Stroke(Accent, 2f);
+            canvas.DrawCircle(Screen(draft.Anchors[0].Point), PointHalfPx + 4, ring);
+        }
+    }
+
+    /// <summary>A shape's outline as a thin accent line, a constant pixel wide at any zoom.</summary>
+    private void DrawOutline(SKCanvas canvas, ShapeElement shape)
+    {
+        using var path = ElementRenderer.ShapePath(shape);
+        canvas.Save();
+        canvas.Translate((float)_scene.Offset.X, (float)_scene.Offset.Y);
+        canvas.Scale((float)_scene.Zoom);
+        using var line = Stroke(Accent, 1f / (float)_scene.Zoom);
+        canvas.DrawPath(path, line);
+        canvas.Restore();
+    }
+
+    private void DrawHandles(SKCanvas canvas, ShapeAnchor anchor, IEnumerable<(HandleSide Side, Point2D Point)> handles)
+    {
+        using var stalk = Stroke(Accent, 1f);
+        using var fill = new SKPaint { Color = Accent, IsAntialias = true };
+        using var ring = Stroke(SKColors.White, 1.5f);
+        var from = Screen(anchor.Point);
+        foreach (var (_, handle) in handles)
+        {
+            var to = Screen(handle);
+            canvas.DrawLine(from, to, stalk);
+            canvas.DrawCircle(to, 4f, fill);
+            canvas.DrawCircle(to, 4f, ring);
+        }
+    }
+
+    private static void DrawPoint(SKCanvas canvas, SKPoint at, AnchorHandleKind kind, bool selected)
+    {
+        using var fill = new SKPaint { Color = selected ? Accent : SKColors.White, IsAntialias = true };
+        using var stroke = Stroke(selected ? SKColors.White : Accent, 1.5f);
+        if (kind == AnchorHandleKind.Smooth)
+        {
+            canvas.DrawCircle(at, PointHalfPx + 0.5f, fill);
+            canvas.DrawCircle(at, PointHalfPx + 0.5f, stroke);
+        }
+        else
+        {
+            var rect = new SKRect(at.X - PointHalfPx, at.Y - PointHalfPx, at.X + PointHalfPx, at.Y + PointHalfPx);
+            canvas.DrawRect(rect, fill);
+            canvas.DrawRect(rect, stroke);
+        }
+    }
+
+    private void DrawPoint(SKCanvas canvas, ShapeAnchor anchor, bool selected) => DrawPoint(canvas, Screen(anchor.Point), anchor.HandleKind, selected);
 
     /// <summary>A panel without a border only shows through what's in it; a faint outline shows where it is, so it can still be found, filled or selected. Not printed.</summary>
     private void DrawBorderlessPanelOutlines(SKCanvas canvas)
