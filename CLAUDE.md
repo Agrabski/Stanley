@@ -75,7 +75,11 @@ and a switch for characters still wearing an old whole hairstyle - all behind on
 button. No three-quarter view yet. Panels also hold **drawn shapes, free
 text, pictures and speed lines** (focus lines radiating from a point you drag)
 behind or in front of the characters, over a colour, gradient or picture
-**background** — see "Panel elements and backgrounds (implemented)" below. A comic
+**background** — see "Panel elements and backgrounds (implemented)" below. A drawn
+shape's **points can be edited** like Figma's (double-click it or Shape › Edit Points:
+drag a point, press the outline to add one, bend the curve by a point's handles, make a
+point smooth or a corner, delete it, open or close the shape), and Insert › **Freeform**
+builds one point by point (`ShapePointEditing`, docs/shape-editing.md, #84). A comic
 can start with a **title page** (Insert › Title page) and be a **comic strip or
 webcomic** rather than a comic book page (File › New templates) — see "Title pages
 and comic formats (implemented)" below. Anything selected on a page (bubble,

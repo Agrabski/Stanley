@@ -5,10 +5,10 @@ namespace Stanley.ProjectModel.Issues;
 /// <summary>Plain questions about a panel's <see cref="PanelElement"/>s, shared by rendering, editing, hit testing and saving.</summary>
 public static class PanelElements
 {
-    /// <summary>The element's box on the page: a shape's anchor points' bounding box (the box its resize handles drag), a text's own bounds. A group's is the union of its children's.</summary>
+    /// <summary>The element's box on the page: around a shape's outline - curves bowed out past its points included (the box its resize handles drag) - a text's own bounds. A group's is the union of its children's.</summary>
     public static Rect2D Bounds(PanelElement element) => element switch
     {
-        ShapeElement shape => AnchorRing.BoundingBox(shape.Anchors),
+        ShapeElement shape => AnchorRing.CurveBounds(shape.Anchors, closed: shape.Closed && shape.Anchors.Count > 2), // as ElementRenderer.ShapePath draws it
         TextElement text => text.Bounds,
         PictureElement picture => picture.Bounds,
         SpeedLinesElement speedLines => speedLines.Focus,

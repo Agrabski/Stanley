@@ -235,6 +235,7 @@ public sealed partial class PageEditorViewModel
         InitializePictureCommands();
         InitializeSpeedLinesCommands();
         InitializePanelStyleCommands();
+        InitializePointCommands();
         SetBackgroundCommand = new RelayCommand<BackgroundChoice>(choice =>
         {
             if (choice != null && _selectedPanelId is { } panelId)
@@ -248,6 +249,7 @@ public sealed partial class PageEditorViewModel
         SetBackgroundCommand.NotifyCanExecuteChanged();
         NotifyPictureCommands();
         NotifySpeedLinesCommands();
+        NotifyPointCommands();
     }
 
     // ---------------------------------------------------------------- ribbon
@@ -304,10 +306,11 @@ public sealed partial class PageEditorViewModel
     public bool IsLineTool { get => Tool == PageEditorTool.Line; set => SetToolFlag(PageEditorTool.Line, value); }
     public bool IsRectangleTool { get => Tool == PageEditorTool.Rectangle; set => SetToolFlag(PageEditorTool.Rectangle, value); }
     public bool IsEllipseTool { get => Tool == PageEditorTool.Ellipse; set => SetToolFlag(PageEditorTool.Ellipse, value); }
+    public bool IsFreeformTool { get => Tool == PageEditorTool.Freeform; set => SetToolFlag(PageEditorTool.Freeform, value); }
     public bool IsTextTool { get => Tool == PageEditorTool.Text; set => SetToolFlag(PageEditorTool.Text, value); }
 
     /// <summary>Any of the tools that draw a shape.</summary>
-    public bool IsShapeTool => Tool is PageEditorTool.Draw or PageEditorTool.Line or PageEditorTool.Rectangle or PageEditorTool.Ellipse;
+    public bool IsShapeTool => Tool is PageEditorTool.Draw or PageEditorTool.Line or PageEditorTool.Rectangle or PageEditorTool.Ellipse or PageEditorTool.Freeform;
 
     private void RaiseToolFlagsChanged()
     {
@@ -315,6 +318,7 @@ public sealed partial class PageEditorViewModel
         OnPropertyChanged(nameof(IsLineTool));
         OnPropertyChanged(nameof(IsRectangleTool));
         OnPropertyChanged(nameof(IsEllipseTool));
+        OnPropertyChanged(nameof(IsFreeformTool));
         OnPropertyChanged(nameof(IsTextTool));
         OnPropertyChanged(nameof(IsShapeTool));
         RaiseElementDerivedChanged();

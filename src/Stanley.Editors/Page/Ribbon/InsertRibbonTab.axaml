@@ -166,6 +166,15 @@
                       <PathIcon Data="{StaticResource PenIcon}" /><TextBlock Text="Draw" />
                   </StackPanel>
               </RadioButton>
+              <RadioButton Name="InsertFreeformButton" Classes="tool" GroupName="InsertShapeTool"
+                           Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsChecked="{Binding IsFreeformTool}"
+                           ToolTip.Tip="Build your own shape point by point: click to place each one (drag as you place it to curve the outline), click the first point to close the shape, double-click or Enter to finish a line"
+                           local:Shortcut.Keys="F">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource FreeformIcon}" /><TextBlock Text="Freeform" />
+                  </StackPanel>
+              </RadioButton>
               <StackPanel Spacing="1" VerticalAlignment="Center">
                   <RadioButton Name="InsertLineButton" Classes="small" GroupName="InsertShapeTool"
                                Theme="{StaticResource {x:Type ToggleButton}}"

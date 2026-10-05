@@ -81,13 +81,13 @@ public static class ShapeEditing
         shape with { Anchors = shape.Anchors.Select(a => a with { Point = Offset(a.Point, dx, dy), InHandle = Offset(a.InHandle, dx, dy), OutHandle = Offset(a.OutHandle, dx, dy) }).ToList() };
 
     /// <summary>
-    /// Stretches the shape so its anchors' bounding box becomes <paramref name="newBounds"/>.
-    /// A flat side (a horizontal line's height) can't be stretched open - it just follows
-    /// the box's near edge.
+    /// Stretches the shape so its box (<see cref="PanelElements.Bounds"/>: around its outline,
+    /// curves and all) becomes <paramref name="newBounds"/>. A flat side (a horizontal line's
+    /// height) can't be stretched open - it just follows the box's near edge.
     /// </summary>
     public static EditResult<ShapeElement> Resize(ShapeElement shape, Rect2D newBounds)
     {
-        var from = AnchorRing.BoundingBox(shape.Anchors);
+        var from = PanelElements.Bounds(shape);
         if ((from.Width >= MinSizeMm && newBounds.Width < MinSizeMm - 1e-9) || (from.Height >= MinSizeMm && newBounds.Height < MinSizeMm - 1e-9))
             return EditResult<ShapeElement>.Failure($"A shape must be at least {MinSizeMm}x{MinSizeMm}mm.");
 
