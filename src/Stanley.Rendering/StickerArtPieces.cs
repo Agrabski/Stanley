@@ -98,8 +98,8 @@ public static class RegionMapping
         BodyRegion.Head => StickerCovers.EllipseFrame(figure.Regions.Head),
         BodyRegion.Hand => StickerCovers.EllipseFrame(figure.Regions.Hand(side)),
         BodyRegion.Foot => StickerCovers.EllipseFrame(figure.Regions.Foot(side)),
-        BodyRegion.Arm or BodyRegion.Leg => SegmentFrame(Nearest(region == BodyRegion.Arm ? figure.Regions.Arm(side) : figure.Regions.Leg(side), at)),
-        BodyRegion.Neck => SegmentFrame(figure.Regions.Neck),
+        BodyRegion.Arm or BodyRegion.Leg => LimbFabricFrame(region == BodyRegion.Arm ? figure.Regions.Arm(side) : figure.Regions.Leg(side), at),
+        BodyRegion.Neck => StickerCovers.SegmentFrame(figure.Regions.Neck),
         _ => StickerCovers.Frame(at, figure.Regions.Torso.Bend.AngleAt(figure.Regions.Torso.Bottom - 0.5 * (figure.Regions.Torso.Bottom - figure.Regions.Torso.Top))),
     };
 
@@ -180,9 +180,9 @@ public static class RegionMapping
         return ((to.Bottom - to.Top) / (from.Bottom - from.Top), to.Bend.AngleAt(y));
     }
 
-    private static BodyCapsule Nearest(LimbFrame limb, Point2D p) => Distance(limb.Upper, p) <= Distance(limb.Lower, p) ? limb.Upper : limb.Lower;
-
-    private static SKMatrix SegmentFrame(BodyCapsule c) => StickerCovers.Frame(c.From, AngleOf(c) - 90);
+    /// <summary>The frame of the limb segment nearest <paramref name="p"/>, measured from the shoulder or hip as a cover's is, so a print on art lines up with a sleeve's.</summary>
+    private static SKMatrix LimbFabricFrame(LimbFrame limb, Point2D p) =>
+        Distance(limb.Upper, p) <= Distance(limb.Lower, p) ? StickerCovers.SegmentFrame(limb.Upper) : StickerCovers.SegmentFrame(limb.Lower, limb.UpperLength);
 
     private static (double X, double Y, double Length) Axis(BodyCapsule c)
     {

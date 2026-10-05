@@ -99,7 +99,13 @@ internal static class StickerCovers
         return new PartPiece(path, layer, Frame(frame.ToFigure(new Point2D(0, middle)), frame.Bend.AngleAt(middle)));
     }
 
-    /// <summary>An arm or leg from <paramref name="from"/> to <paramref name="to"/> of the way down it: each segment it reaches, round where it joins the next, cut square at the ends.</summary>
+    /// <summary>
+    /// An arm or leg from <paramref name="from"/> to <paramref name="to"/> of the way down it:
+    /// each segment it reaches, round where it joins the next, cut square at the ends. Its
+    /// fabric runs on unbroken from the shoulder or hip (#14): the lower segment's frame
+    /// carries on from the upper one's, and where the two overlap at the elbow or knee each
+    /// side of the joint's bisector wears its own segment's fabric, as a sleeve creases.
+    /// </summary>
     private static IEnumerable<PartPiece> Limb(LimbFrame limb, double from, double to, double ease, FigureLayerKind layer)
     {
         var length = limb.Length;
@@ -107,10 +113,41 @@ internal static class StickerCovers
             yield break;
         var (a, b) = (from * length, to * length);
         var upper = limb.UpperLength;
-        if (a < upper)
-            yield return SegmentAlong(limb.Upper.Inflated(ease), a, Math.Min(b, upper), capStart: a <= 0, capEnd: b > upper, layer);
-        if (b > upper)
-            yield return SegmentAlong(limb.Lower.Inflated(ease), Math.Max(a, upper) - upper, b - upper, capStart: a < upper, capEnd: false, layer);
+        var top = a < upper ? SegmentAlong(limb.Upper.Inflated(ease), a, Math.Min(b, upper), capStart: a <= 0, capEnd: b > upper, layer) : null;
+        var bottom = b > upper ? SegmentAlong(limb.Lower.Inflated(ease), Math.Max(a, upper) - upper, b - upper, capStart: a < upper, capEnd: false, layer, offset: upper) : null;
+        if (top is not null)
+            yield return top;
+        if (bottom is not null)
+            yield return top is null ? bottom : CutAtJoint(bottom, top, limb);
+    }
+
+    /// <summary>
+    /// The lower segment's piece without the part of the upper one's on the upper side of the
+    /// joint's bisector. Drawn over the whole upper piece, it covers the upper side's fabric
+    /// past the bisector and leaves it before - so the two meet along the crease, with no
+    /// seam between them, and still cover exactly what they did.
+    /// </summary>
+    private static PartPiece CutAtJoint(PartPiece lower, PartPiece upper, LimbFrame limb)
+    {
+        var (ux, uy) = Direction(limb.Upper.From, limb.Upper.To);
+        var (lx, ly) = Direction(limb.Lower.From, limb.Lower.To);
+        // The bisector's normal points down the limb, into the lower segment's side.
+        var (nx, ny) = (ux + lx, uy + ly);
+        if (nx * nx + ny * ny < 1e-12)
+            (nx, ny) = (-uy, ux); // folded flat: either way along the arm splits it
+        using var half = Rect(-Far, -Far, 0, Far);
+        using var upperSide = FigureGeometry.Transformed(half, Frame(limb.Upper.To, Math.Atan2(ny, nx) * 180 / Math.PI));
+        using var upperPart = FigureGeometry.Combine(upper.Path, upperSide, SKPathOp.Intersect);
+        var cut = lower with { Path = FigureGeometry.Combine(lower.Path, upperPart, SKPathOp.Difference) };
+        lower.Path.Dispose();
+        return cut;
+    }
+
+    private static (double X, double Y) Direction(Point2D from, Point2D to)
+    {
+        var (dx, dy) = (to.X - from.X, to.Y - from.Y);
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        return length < 1e-12 ? (0, 1) : (dx / length, dy / length);
     }
 
     /// <summary>A capsule cut to <paramref name="t0"/>-<paramref name="t1"/> (0-1) of its length.</summary>
@@ -120,17 +157,25 @@ internal static class StickerCovers
         return SegmentAlong(capsule, t0 * length, t1 * length, capStart && t0 <= 0, capEnd && t1 >= 1, layer);
     }
 
-    /// <summary>A capsule cut square at distances <paramref name="start"/> and <paramref name="end"/> along it, or left round at an end that isn't cut.</summary>
-    private static PartPiece SegmentAlong(BodyCapsule capsule, double start, double end, bool capStart, bool capEnd, FigureLayerKind layer)
+    /// <summary>A capsule cut square at distances <paramref name="start"/> and <paramref name="end"/> along it, or left round at an end that isn't cut; its fabric frame starts <paramref name="offset"/> before it (<see cref="SegmentFrame"/>).</summary>
+    private static PartPiece SegmentAlong(BodyCapsule capsule, double start, double end, bool capStart, bool capEnd, FigureLayerKind layer, double offset = 0)
     {
         var along = AngleOf(capsule.From, capsule.To);
         var frame = Frame(capsule.From, along);
         using var shape = FigureGeometry.Capsule(capsule);
         using var localBand = Rect(capStart ? -Far : (float)start, -Far, capEnd ? Far : (float)end, Far);
         using var band = FigureGeometry.Transformed(localBand, frame);
-        // Fabrics lie with "down" along the limb, as on the torso: stripes go round a sleeve.
-        return new PartPiece(FigureGeometry.Combine(shape, band, SKPathOp.Intersect), layer, Frame(capsule.From, along - 90));
+        return new PartPiece(FigureGeometry.Combine(shape, band, SKPathOp.Intersect), layer, SegmentFrame(capsule, offset));
     }
+
+    /// <summary>
+    /// The frame fabrics lie in on a segment: "down" along it, as on the torso, so stripes go
+    /// round a sleeve; its origin <paramref name="offset"/> back up the segment's line from
+    /// its start. A forearm or shin measured from the shoulder or hip (offset = the upper
+    /// segment's length) carries on the pattern above it instead of starting it again.
+    /// </summary>
+    internal static SKMatrix SegmentFrame(BodyCapsule segment, double offset = 0) =>
+        SKMatrix.CreateTranslation(0, -(float)offset).PostConcat(Frame(segment.From, AngleOf(segment.From, segment.To) - 90));
 
     /// <summary>A band of the (grown) head, from the crown (0) to the chin (1), turning with the head.</summary>
     private static PartPiece Head(BodyEllipse head, double from, double to, FigureLayerKind layer)
