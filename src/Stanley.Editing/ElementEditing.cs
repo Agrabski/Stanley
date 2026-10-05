@@ -87,7 +87,23 @@ public static class ElementEditing
         return dx == 0 && dy == 0 ? element : Move(element, dx, dy);
     }
 
-    /// <summary>Carries an element along when its panel moves or resizes: its centre keeps the same relative position in the panel, its size is kept.</summary>
+    /// <summary>
+    /// Carries an element along when its panel is resized (<see cref="PanelContentScale"/>):
+    /// wherever the scaled picture puts it, scaled with it - a group's children each the same
+    /// way. Line weights (a shape's outline, speed lines' thickness) stay as they were, as ink
+    /// does at any size.
+    /// </summary>
+    public static PanelElement Scale(PanelElement element, PanelContentScale scale) => element switch
+    {
+        ShapeElement shape => shape with { Anchors = scale.Map(shape.Anchors) },
+        TextElement text => TextEditing.Scale(text, scale),
+        PictureElement picture => picture with { Bounds = scale.Map(picture.Bounds) },
+        SpeedLinesElement speedLines => speedLines with { Focus = scale.Map(speedLines.Focus) },
+        GroupElement group => group with { Children = group.Children.Select(c => Scale(c, scale)).ToList() },
+        _ => element
+    };
+
+    /// <summary>Brings an element into another panel (pasting it there): its centre keeps the same relative position in the panel, its size is kept. A panel's own resize goes through <see cref="Scale"/> instead.</summary>
     public static PanelElement Refit(PanelElement element, Rect2D oldPanel, Rect2D newPanel)
     {
         if (oldPanel.Width <= 0 || oldPanel.Height <= 0)

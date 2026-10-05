@@ -169,7 +169,25 @@ public static class BubbleEditing
         return bubble with { Shape = shape, Tails = tails };
     }
 
-    /// <summary>Carries a bubble along when its panel moves or resizes from <paramref name="oldContainer"/> to <paramref name="newContainer"/>: its centre and tail targets keep the same relative position within the panel, its size is kept (unless the panel became too small for it).</summary>
+    /// <summary>
+    /// Carries a bubble along when its panel is resized (<see cref="PanelContentScale"/>): its
+    /// outline and tail tips go where the scaled picture puts them, and its lettering scales
+    /// with it, so it reads exactly as before, just bigger or smaller. Its outline's weight is
+    /// its style's, the same at any size. The tails' attachments are fractions of the outline,
+    /// which a uniform scale leaves where they were.
+    /// </summary>
+    public static Bubble Scale(Bubble bubble, PanelContentScale scale)
+    {
+        var size = scale.Scale == 1 ? bubble.FontSizePt : TextEditing.ScaleFontSize(bubble.FontSizePt ?? Bubble.DefaultFontSizePt, scale.Scale);
+        return bubble with
+        {
+            Shape = new BubbleShape(scale.Map(bubble.Shape.Anchors)),
+            Tails = bubble.Tails.Select(t => t with { Target = scale.Map(t.Target) }).ToList(),
+            FontSizePt = size is { } points && Math.Abs(points - Bubble.DefaultFontSizePt) < 1e-9 ? null : size
+        };
+    }
+
+    /// <summary>Brings a bubble into another panel (pasting it there) from <paramref name="oldContainer"/> to <paramref name="newContainer"/>: its centre and tail targets keep the same relative position within the panel, its size is kept (unless the panel is too small for it). A panel's own resize goes through <see cref="Scale"/> instead.</summary>
     public static Bubble Refit(Bubble bubble, Rect2D oldContainer, Rect2D newContainer)
     {
         if (oldContainer.Width <= 0 || oldContainer.Height <= 0)

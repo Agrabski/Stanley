@@ -95,15 +95,32 @@ public class CharacterPlacementEditingTests
     }
 
     [Fact]
-    public void Resizing_a_panel_carries_its_characters_along_at_the_same_size()
+    public void Moving_a_panel_carries_its_characters_along_at_the_same_size()
     {
         var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(Panel), null, [At(60, 90, 50)], []);
 
-        var moved = PanelLayoutEditing.Resize(panel, new Rect2D(110, 10, 200, 80), new Rect2D(0, 0, 400, 300)).Value;
+        var moved = PanelLayoutEditing.Move(panel, 100, 20, new Rect2D(0, 0, 400, 300)).Value;
 
         var placement = moved.CharacterInstances.Single().Placement;
-        Assert.Equal(new Point2D(210, 90), placement.Ground);
+        Assert.Equal(160, placement.Ground.X, 9);
+        Assert.Equal(110, placement.Ground.Y, 9);
         Assert.Equal(50, placement.UnitHeightMm);
+    }
+
+    [Fact]
+    public void Resizing_a_panel_scales_its_characters_with_it_about_the_corner_that_stayed_put()
+    {
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(Panel), null, [At(60, 90, 50), At(90, 120, 50)], []);
+
+        // Dragged out by the bottom-right corner to half as big again.
+        var resized = PanelLayoutEditing.Resize(panel, new Rect2D(10, 10, 150, 120), new Rect2D(0, 0, 400, 300)).Value;
+
+        var first = resized.CharacterInstances[0].Placement;
+        var second = resized.CharacterInstances[1].Placement;
+        Assert.Equal(new Point2D(85, 130), first.Ground);
+        Assert.Equal(75, first.UnitHeightMm, 9);
+        Assert.Equal(new Point2D(130, 175), second.Ground); // standing below the frame, it stays below it - not diving further than the rest
+        Assert.True(CharacterPlacementEditing.SameScale(first.UnitHeightMm, second.UnitHeightMm));
     }
 
     [Fact]
