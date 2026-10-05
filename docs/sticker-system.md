@@ -133,7 +133,7 @@ each part of the body, as pure data (figure space, like the rest of the figure):
 
 - One `from`/`to` on the whole limb chain means sleeve length is a single number
   that bends with the elbow (two capsules, cut perpendicular to the segment at the
-  right distance).
+  right distance). Its fabric runs on unbroken past the elbow (§9.3).
 - Cover parts use the figure **inflated** by the part's ease: capsule and ellipse
   radii grow by `ease`, and the torso outline moves out along its normals. `ease` is
   a fraction of the character's own height (0.01 = 1%), so a toddler's T-shirt fits
@@ -475,8 +475,20 @@ custom texture is a greyscale PNG.
 
 - **They are laid out in each part's region frame** (§4.1): the torso, each limb
   segment, the skirt and the head. Stripes on a sleeve turn with the arm, and the
-  shirt's pattern leans with the torso. Where regions meet (shoulder, elbow) the
-  pattern breaks, as it does at the seams of real clothes.
+  shirt's pattern leans with the torso. Where regions meet at a real seam (shoulder,
+  hip, neck) the pattern breaks, as it does on real clothes.
+- **A sleeve or trouser leg is one piece of cloth** (#14): there is no seam at the
+  elbow or knee, so the pattern runs on past it. The lower segment's frame
+  (`StickerCovers.SegmentFrame(segment, offset)`) starts the upper segment's length
+  back up its own line, so "down" in both frames is the distance from the shoulder or
+  hip, and on a straight limb the two frames coincide. Where the two capsules overlap
+  at the joint, the lower piece is cut back (`StickerCovers.CutAtJoint`) to the lower
+  side of the joint's bisector and drawn over the whole upper piece: a bent sleeve's
+  stripes meet in a chevron along the crease. Gotchas: don't cut both pieces at the
+  bisector - two antialiased edges meeting leave a hairline of what's underneath; and
+  keep the pieces in upper-then-lower order, as `FabricFill` draws them in turn. Fabric
+  on art (`StickerArtPieces.FabricFrame`) uses the same offset frame on a forearm or
+  shin, so a print lines up with a sleeve's.
 - **They are rigid within a frame.** They rotate and scale with the region but don't
   bend around a belly: flat, as the art style is. A Warp-style fabric that follows
   the outline is listed under §16.

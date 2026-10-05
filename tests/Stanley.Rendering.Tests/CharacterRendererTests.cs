@@ -470,6 +470,48 @@ public class FabricRenderingTests
         Assert.True(Alternations(bitmap, along.From, along.To, Blue, White) >= 3, "stripes along the raised arm");
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(70)]
+    public void A_sleeves_stripes_keep_their_spacing_past_the_elbow(double bend)
+    {
+        // #14: the forearm started the pattern again at the elbow, and its round end lay
+        // over the upper arm's, so a stripe there came out too wide or too narrow.
+        var yellow = new SKColor(255, 255, 0);
+        var character = Wearing(new Fabric(new PatternFill(PatternKind.Stripes, [ColorValue.FromHex("#ffff00")], Size: 0.023)),
+            new StickerPart("sleeves", BodyRegion.Arm, Cover: new PartCover("top", 0, 1)));
+        var pose = new PoseData(ViewAngle.Front, [new BoneRotation(HumanoidBone.LeftLowerArm, bend)], []);
+        var arm = BodyRig.Build(character.Body, ViewAngle.Front, null, pose).Regions.LeftArm;
+
+        using var bitmap = Render(character, pose);
+
+        // Where the colour turns from one to the other going down the middle of the arm, in pixels from the shoulder.
+        var edges = new List<double>();
+        int last = 0;
+        double lastAt = 0;
+        for (var d = 0.05 * arm.Length; d <= 0.85 * arm.Length; d += 0.5 / 400)
+        {
+            var c = At(bitmap, arm.At(d / arm.Length).Point);
+            var which = Near(c, Blue) ? 1 : Near(c, yellow) ? 2 : 0;
+            if (which == 0)
+                continue;
+            if (last != 0 && which != last)
+                edges.Add((lastAt + d) / 2 * 400);
+            (last, lastAt) = (which, d);
+        }
+
+        Assert.True(edges.Count >= 10, $"stripes down the sleeve: {edges.Count} edges");
+        var elbow = arm.UpperLength * 400;
+        Assert.Contains(edges, e => e < elbow);
+        Assert.Contains(edges, e => e > elbow);
+        // Every other gap is one colour's stripe: each the same width all the way down.
+        for (var parity = 0; parity < 2; parity++)
+        {
+            var widths = Enumerable.Range(0, edges.Count - 1).Where(i => i % 2 == parity).Select(i => edges[i + 1] - edges[i]).ToList();
+            Assert.True(widths.Max() - widths.Min() <= 2, $"stripe widths {string.Join(", ", widths.Select(w => w.ToString("0.0")))}");
+        }
+    }
+
     [Fact]
     public void A_texture_darkens_the_colour_a_little_without_changing_its_hue()
     {
