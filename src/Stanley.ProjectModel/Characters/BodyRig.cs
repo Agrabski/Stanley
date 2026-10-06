@@ -103,8 +103,8 @@ public static class BodyRig
     /// (<see cref="HumanoidBone.Neck"/>, about its base) and the head
     /// (<see cref="HumanoidBone.Head"/>, about the chin).
     /// </summary>
-    public const double MaxLean = 60;
-    public const double MaxBackBend = 35;
+    public const double MaxLean = 100;
+    public const double MaxBackBend = 50;
     public const double MaxNeckBend = 40;
     public const double MaxHeadTilt = 50;
 
