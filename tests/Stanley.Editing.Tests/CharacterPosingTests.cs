@@ -226,6 +226,12 @@ public class TrunkPosingAndPresetTests
     }
 
     [Fact]
+    public void The_back_can_bend_far_enough_to_turn_the_upper_body_upside_down()
+    {
+        Assert.True(BodyRig.SpineJoints.Sum(j => j.Limit) >= 180);
+    }
+
+    [Fact]
     public void Dragging_the_head_bends_the_neck_and_tilts_the_head_together()
     {
         var start = Placed();
