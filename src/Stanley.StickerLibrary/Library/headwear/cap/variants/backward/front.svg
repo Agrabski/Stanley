@@ -11,12 +11,12 @@
     <path class="slot-hat" d="M-78,-967 C-78,-969.5 -56.7,-968.3 -43.7,-969 C-30.7,-969.7 -14.6,-971 0,-971 C14.6,-971 30.7,-969.7 43.7,-969 C56.7,-968.3 78,-969.5 78,-967 C78,-964.5 56.7,-955.7 43.7,-954 C30.7,-952.3 14.6,-957 0,-957 C-14.6,-957 -30.7,-952.3 -43.7,-954 C-56.7,-955.7 -78,-964.5 -78,-967 Z" fill="#2f8a57" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
   <g id="strap" inkscape:groupmode="layer" inkscape:label="strap">
-    <path class="slot-hat" d="M-23,-973 L23,-973 L23,-962 L-23,-962 Z" fill="#216541" stroke="#1a1a1a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-    <circle cx="-12" cy="-967.5" r="1.8" fill="#1a1a1a"/>
-    <circle cx="0" cy="-967.5" r="1.8" fill="#1a1a1a"/>
-    <circle cx="12" cy="-967.5" r="1.8" fill="#1a1a1a"/>
+    <path class="slot-hat" d="M-23,-979 L23,-979 L23,-968 L-23,-968 Z" fill="#216541" stroke="#1a1a1a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="-12" cy="-973.5" r="1.8" fill="#1a1a1a"/>
+    <circle cx="0" cy="-973.5" r="1.8" fill="#1a1a1a"/>
+    <circle cx="12" cy="-973.5" r="1.8" fill="#1a1a1a"/>
   </g>
   <g id="gap" inkscape:groupmode="layer" inkscape:label="gap">
-    <path d="M-18,-973 C-17.3,-977.3 -19,-982.5 -16,-986 C-13,-989.5 -5.3,-994 0,-994 C5.3,-994 13,-989.5 16,-986 C19,-982.5 17.3,-977.3 18,-973 L-18,-973 Z" fill="#ffffff"/>
+    <path d="M-18,-979 C-17.3,-983.3 -19,-988.5 -16,-992 C-13,-995.5 -5.3,-1000 0,-1000 C5.3,-1000 13,-995.5 16,-992 C19,-988.5 17.3,-983.3 18,-979 L-18,-979 Z" fill="#ffffff"/>
   </g>
 </svg>

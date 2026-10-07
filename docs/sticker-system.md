@@ -150,7 +150,7 @@ each part of the body, as pure data (figure space, like the rest of the figure):
 front:
 
 ```
-front view:  back │ legs │ torso (+neck) │ head │ arms │ front
+front view:  back │ left leg │ right leg │ torso (+neck) │ head │ left arm │ right arm │ front
 side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foot │ near arm │ front
 ```
 
@@ -159,6 +159,12 @@ side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foo
   drawn over it. In the front view, arms are in front of the body (hands on hips,
   Think). Arms held behind the back (a per-limb "behind" flag in the pose) are a
   later addition.
+- In the front view each arm and each leg is a group of its own, the character's
+  right over its left (#120: one group per pair merged legs crossed at the shins, or an
+  arm across the other, into one shape). So the thighs, which touch standing, still
+  meet without a line, the right leg's attachment zones include the strip down the
+  middle from the crotch as far as they touch at rest (`BodyRig.ThighsTouch`), besides
+  its hip.
 - `back` and `front` contain no body. They hold parts that ask for them: the back of
   the hair or a cape (`back`), or an item held in front of everything (`front`).
 - Within a group, the order is skin, then parts by slot z-order (§8), then stacking
@@ -347,7 +353,7 @@ The standard vocabulary for the library and the presets:
 |---|---|
 | `eyes` | neutral, happy, sad, angry, wide, closed, wink, halfClosed |
 | `brows` | neutral, raised, angry, sad, skeptical |
-| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk |
+| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk, doubtful |
 
 `ExpressionPresets` (Stanley.Editing, next to `PosePresets`). Each preset sets all
 three slots:
@@ -361,7 +367,8 @@ three slots:
 | Angry | angry | angry | frown |
 | Surprised | wide | raised | o |
 | Scared | wide | sad | open |
-| Skeptical | halfClosed | skeptical | smirk |
+| Skeptical | neutral | skeptical | doubtful |
+| Seductive | halfClosed | skeptical | smirk |
 | Wink | wink | raised | grin |
 | Talking | neutral | neutral | open |
 | Shouting | angry | angry | shout |
@@ -857,8 +864,13 @@ open:
   a shirt's hem over the trousers keeps its line.
 - **The SVG adapter** also normalises what VectSharp reads differently from the
   spec: ellipses become paths (VectSharp strokes them in a scaled space), clip paths
-  become one path (it only takes a single path or rectangle there), and Inkscape's
-  duplicate `svg:` namespace prefix is dropped. Only *named* top-level groups are
+  become one path (it only takes a single path or rectangle there), Inkscape's
+  duplicate `svg:` namespace prefix is dropped, and the document is sized to its own
+  view box (`width`/`height` set to the view box's, which is made explicit): VectSharp
+  scales the drawing to a declared size, while everything here reads it in view-box
+  units, so an icon saved as `width="800px" viewBox="0 0 24 24"` drew as an empty
+  corner (#112). Without a view box, the declared size in px (mm, in, pt... converted)
+  is the view box. Only *named* top-level groups are
   parts; drawing outside them is reported. A trimmed publish shows trim warnings
   only from ExCSS (VectSharp.SVG's CSS parser); VectSharp itself is clean. CI
   doesn't trim.

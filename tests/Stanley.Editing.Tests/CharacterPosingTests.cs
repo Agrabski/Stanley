@@ -328,6 +328,54 @@ public class TrunkPosingAndPresetTests
             Assert.True(Distance(CharacterPosing.TrunkPoint(character, expected, part), CharacterPosing.TrunkPoint(character, actual, part)) < 0.01, $"{part}");
     }
 
+    [Theory]
+    [InlineData(BodyPreset.Adult)]
+    [InlineData(BodyPreset.Child)]
+    [InlineData(BodyPreset.Heavy)]
+    [InlineData(BodyPreset.Chibi)]
+    public void Thinking_from_the_front_holds_the_hand_at_the_chin_with_the_elbow_down_not_folded_over_the_head(BodyPreset body)
+    {
+        // #31: bent outwards, the arm reached the chin by folding its elbow up over the head.
+        var character = CharacterDefinition.Create("A", BodyPresets.Shape(body));
+        var posed = PosePresets.Apply(character, Placed(character: character), PosePresets.Get(PosePreset.Think), ViewAngle.Front);
+
+        var shoulder = posed.Placement.ToPage(CharacterPosing.Figure(character, posed).Layout.Bones.First(b => b.Bone == CharacterPosing.Chain(Limb.RightArm).Root).Position);
+        var hand = CharacterPosing.EndPoint(character, posed, Limb.RightArm);
+        var elbow = CharacterPosing.BendPoint(character, posed, Limb.RightArm);
+        Assert.True(hand.Y < shoulder.Y, "the hand is up at the chin");
+        Assert.True(elbow.Y > shoulder.Y, "the elbow hangs below the shoulder");
+    }
+
+    public static TheoryData<PosePreset, ViewAngle, bool> GrabCases()
+    {
+        var data = new TheoryData<PosePreset, ViewAngle, bool>();
+        foreach (var preset in Enum.GetValues<PosePreset>())
+            foreach (var angle in new[] { ViewAngle.Front, ViewAngle.Profile })
+                foreach (var mirrored in new[] { false, true })
+                    data.Add(preset, angle, mirrored);
+        return data;
+    }
+
+    /// <summary>
+    /// #76: from the front, the bend read when a drag started was the opposite of the one
+    /// the reach solves for, so the elbow (or a crouch's knee) jumped inside-out the moment
+    /// its hand or foot was grabbed - and the arm had to be posed again from scratch.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(GrabCases))]
+    public void Grabbing_a_hand_or_foot_without_moving_it_leaves_the_elbow_or_knee_where_it_is(PosePreset preset, ViewAngle angle, bool mirrored)
+    {
+        var posed = PosePresets.Apply(Alice, Placed(angle, mirrored), PosePresets.Get(preset), angle);
+
+        foreach (var limb in Enum.GetValues<Limb>())
+        {
+            var held = CharacterPosing.Reach(Alice, posed, limb, CharacterPosing.EndPoint(Alice, posed, limb), CharacterPosing.BendSign(Alice, posed, limb));
+
+            var (before, after) = (CharacterPosing.BendPoint(Alice, posed, limb), CharacterPosing.BendPoint(Alice, held, limb));
+            Assert.True(Distance(before, after) < 0.05, $"{preset} {angle}: the {limb}'s joint moved from {before} to {after}");
+        }
+    }
+
     public static TheoryData<PosePreset, bool> TurnCases()
     {
         var data = new TheoryData<PosePreset, bool>();

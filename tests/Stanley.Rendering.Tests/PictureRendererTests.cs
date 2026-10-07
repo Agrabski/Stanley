@@ -91,4 +91,30 @@ public class PictureRendererTests
 
         Assert.Equal(new SKColor(0, 255, 0), bitmap.GetPixel(40, 40));
     }
+
+    /// <summary>
+    /// #112: icon sites save an SVG sized in pixels over a much smaller view box (800px over a
+    /// 24-unit icon). The reader drew it scaled up to that size, so the picture's box showed an
+    /// empty corner of it - the picture was invisible. Whatever size it declares, it fills its box.
+    /// </summary>
+    [Theory]
+    [InlineData("width=\"800px\" height=\"800px\" viewBox=\"0 0 24 24\"")]
+    [InlineData("width=\"10\" height=\"10\" viewBox=\"0 0 24 24\"")]
+    [InlineData("width=\"100%\" height=\"100%\" viewBox=\"0 0 24 24\"")]
+    [InlineData("width=\"24\" height=\"24\"")]
+    [InlineData("width=\"0.25in\" height=\"0.25in\"")]
+    public void An_svg_picture_fills_its_box_whatever_size_it_declares(string size)
+    {
+        // A 24-unit square (24 px is a quarter inch), green but for a red top-left quarter.
+        var svg = ArtFile.Svg($"<svg xmlns=\"http://www.w3.org/2000/svg\" {size} fill=\"none\"><rect width=\"24\" height=\"24\" fill=\"#00ff00\"/><rect width=\"12\" height=\"12\" fill=\"#ff0000\"/></svg>");
+        var picture = new PictureElement(ElementId.New(), ElementLayer.Background, new Rect2D(20, 20, 40, 40), "icon.svg");
+        var panel = new Panel(PanelId.New(), PanelShapes.Rectangle(new Rect2D(10, 10, 80, 80)), null, [], [], [picture]);
+
+        using var bitmap = Render(panel, new Dictionary<string, ArtFile> { ["icon.svg"] = svg });
+
+        Assert.Equal((24.0, 24.0), PictureRenderer.Size(svg));
+        Assert.Equal(new SKColor(255, 0, 0), bitmap.GetPixel(30, 30));
+        Assert.Equal(new SKColor(0, 255, 0), bitmap.GetPixel(50, 50));
+        Assert.Equal(new SKColor(0, 255, 0), bitmap.GetPixel(58, 58)); // to its far corner
+    }
 }

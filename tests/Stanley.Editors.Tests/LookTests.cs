@@ -187,6 +187,19 @@ public sealed class LookTests : IDisposable
     }
 
     [Fact]
+    public void Every_library_face_draws_the_whole_expression_vocabulary()
+    {
+        // So every expression preset shows as itself on any library face - a Skeptical
+        // "doubtful" mouth included (#153), not the neutral one a missing variant falls back to.
+        foreach (var slot in ExpressionPresets.FaceSlots)
+        {
+            var faces = StickerLibrary.StickerLibrary.ForSlot(slot).ToList();
+            Assert.NotEmpty(faces);
+            Assert.All(faces, face => Assert.Empty(ExpressionPresets.MissingVariants(face.Asset.Sticker)));
+        }
+    }
+
+    [Fact]
     public void A_library_sticker_is_worn_as_a_fresh_copy_marked_as_coming_from_the_library()
     {
         var item = StickerLibrary.StickerLibrary.Find("top/t-shirt")!;

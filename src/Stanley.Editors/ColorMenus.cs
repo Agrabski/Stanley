@@ -226,27 +226,36 @@ public sealed class ColorMenu
         Children =
         {
             new TextBlock { Text = weight.Name, Width = 64, VerticalAlignment = VerticalAlignment.Center },
-            new Rectangle { Width = 90, Height = weight.PreviewThickness, Fill = Brushes.Black, VerticalAlignment = VerticalAlignment.Center }
+            Inked(new Rectangle { Width = 90, Height = weight.PreviewThickness, VerticalAlignment = VerticalAlignment.Center }, fill: true)
         }
     };
 
     /// <summary>A Dashes ▸ entry: a sample line in that pattern.</summary>
     private static Control DashSample(LineDash dash)
     {
-        var line = new Line
+        var line = Inked(new Line
         {
             StartPoint = new Point(1, 6),
             EndPoint = new Point(141, 6),
-            Stroke = Brushes.Black,
             StrokeThickness = 2,
             StrokeLineCap = dash == LineDash.RoundDot ? PenLineCap.Round : PenLineCap.Flat,
             Width = 142,
             Height = 12
-        };
+        }, fill: false);
         // Avalonia measures dashes in multiples of the thickness, as the page does.
         if (LinePatterns.Intervals(dash, 1) is { } intervals)
             line.StrokeDashArray = new AvaloniaList<double>(intervals.Select(i => (double)i));
         return line;
+    }
+
+    /// <summary>
+    /// <paramref name="shape"/> drawn in the menu's own text colour, so a sample line reads in
+    /// a dark theme as well as a light one (#46: drawn black, it all but vanished on a dark menu).
+    /// </summary>
+    private static T Inked<T>(T shape, bool fill) where T : Shape
+    {
+        shape.Bind(fill ? Shape.FillProperty : Shape.StrokeProperty, shape.GetObservable(Avalonia.Controls.Documents.TextElement.ForegroundProperty));
+        return shape;
     }
 
     private static Control NoneIcon() => new Grid

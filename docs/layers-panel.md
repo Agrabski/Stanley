@@ -136,11 +136,14 @@ gets can't disagree:
 - **Rendering** - `PageRenderer.DrawPanels` draws the background, then
   `PanelStack.Order`. Thumbnails, PDF and PNG export go through the same function.
 - **Picking** - `PageCanvasControl.HitTest`: the selected item's handles first, then
-  panel corners and gutters, then `StackedAt`: panel by panel from the top one down,
-  and within a panel from the front of its stack - bubble bodies (the outline plus
-  tails), characters (their silhouette), drawings in front of the characters. Panel
-  edges come next, and `SceneryAt` (drawings behind the characters) last, so scenery
-  covering a panel never stops its edges being dragged. (This used to scan whole
+  panel corners, then `StackedAt`: panel by panel from the top one down, and within a
+  panel from the front of its stack - bubble bodies (the outline plus tails),
+  characters (their silhouette), drawings in front of the characters. Gutters and
+  panel edges come next - their grab bands reach a few pixels into the panels, and
+  what's in a panel wins there (#30: a character standing on a panel's bottom edge
+  couldn't be clicked by her feet while the gutter came first); the gap between panels
+  is still the gutter's. `SceneryAt` (drawings behind the characters) is last, so
+  scenery covering a panel never stops its edges being dragged. (This used to scan whole
   tiers across *all* panels, so a lower panel's bubble beat a thought cloud's own
   character; it's per panel now.)
 - **The Layers pane** - `LayersViewModel`.

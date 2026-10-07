@@ -89,7 +89,9 @@ public static class PosePresets
             // The elbows at the sides, the forearms forward, palms up.
             new PoseGoals(0, -6, default, [new(Limb.RightArm, 0.5, 0.42), new(Limb.LeftArm, 0.42, 0.45)])),
         new(PosePreset.Think, "Think", null,
-            new PoseGoals(0, 10, default, [new(Limb.RightArm, -0.25, -0.12), new(Limb.LeftArm, 0.05, 0.55)]),
+            // The hand under the chin with the elbow tucked down in front of the chest - bent
+            // outwards, the elbow would fold up over the head (#31).
+            new PoseGoals(0, 10, default, [new(Limb.RightArm, -0.3, -0.03, Tucked: true), new(Limb.LeftArm, 0.05, 0.55)]),
             // The near hand up at the chin, the far arm across the waist - both in front of the body.
             new PoseGoals(0, 10, default, [new(Limb.RightArm, 0.3, -0.2), new(Limb.LeftArm, 0.3, 0.5)])),
         new(PosePreset.Crouch, "Crouch", null, new PoseGoals(0, 0, new Point2D(0, 0.13), [new(Limb.RightArm, 0.25, 0.7), new(Limb.LeftArm, 0.25, 0.7)])),

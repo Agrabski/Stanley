@@ -40,20 +40,24 @@ public enum LimbSide
 }
 
 /// <summary>
-/// The layers a figure is painted in. A front view uses Back, Legs, Torso, Head, Arms,
-/// Front; a side view Back, FarArm, Body (torso, neck and both legs), Head, NearFoot,
-/// NearArm, Front. Back and Front hold no body - only sticker parts that ask for them.
+/// The layers a figure is painted in. A front view uses Back, LeftLeg, RightLeg, Torso,
+/// Head, LeftArm, RightArm, Front - each limb its own layer, so one crossing the other
+/// keeps its outline instead of merging with it; a side view Back, FarArm, Body (torso,
+/// neck and both legs), Head, NearFoot, NearArm, Front. Back and Front hold no body - only
+/// sticker parts that ask for them.
 /// </summary>
 public enum FigureLayerKind
 {
     Back,
     FarArm,
-    Legs,
+    LeftLeg,
+    RightLeg,
     Body,
     Torso,
     Head,
     NearFoot,
-    Arms,
+    LeftArm,
+    RightArm,
     NearArm,
     Front
 }

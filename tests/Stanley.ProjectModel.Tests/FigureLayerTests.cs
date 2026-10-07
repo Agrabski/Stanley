@@ -12,7 +12,8 @@ public class FigureLayerTests
         var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Front);
 
         Assert.Equal(
-            [FigureLayerKind.Back, FigureLayerKind.Legs, FigureLayerKind.Torso, FigureLayerKind.Head, FigureLayerKind.Arms, FigureLayerKind.Front],
+            [FigureLayerKind.Back, FigureLayerKind.LeftLeg, FigureLayerKind.RightLeg, FigureLayerKind.Torso, FigureLayerKind.Head,
+                FigureLayerKind.LeftArm, FigureLayerKind.RightArm, FigureLayerKind.Front],
             figure.Layers.Select(l => l.Kind));
         Assert.Equal(figure.Limbs.Count + figure.NearLimbs.Count, figure.Layers.Sum(l => l.Capsules.Count));
         Assert.Equal(figure.Blobs.Count + figure.NearBlobs.Count, figure.Layers.Sum(l => l.Ellipses.Count));
@@ -38,6 +39,26 @@ public class FigureLayerTests
         Assert.Equal(FigureLayerKind.Body, figure.LayerOf(BodyRegion.Leg, LimbSide.Right));
     }
 
+    [Fact]
+    public void A_front_view_paints_each_arm_and_leg_in_a_layer_of_its_own_the_right_over_the_left()
+    {
+        // #120: legs (or arms) in one layer merged into one shape where they crossed.
+        var figure = BodyRig.Build(BodyShape.Default, ViewAngle.Front);
+        FigureLayer Layer(FigureLayerKind kind) => figure.Layers.Single(l => l.Kind == kind);
+
+        Assert.Equal([figure.Regions.LeftArm.Upper, figure.Regions.LeftArm.Lower], Layer(FigureLayerKind.LeftArm).Capsules);
+        Assert.Equal([figure.Regions.RightArm.Upper, figure.Regions.RightArm.Lower], Layer(FigureLayerKind.RightArm).Capsules);
+        Assert.Equal([figure.Regions.LeftLeg.Upper, figure.Regions.LeftLeg.Lower], Layer(FigureLayerKind.LeftLeg).Capsules);
+        Assert.Equal([figure.Regions.RightLeg.Upper, figure.Regions.RightLeg.Lower], Layer(FigureLayerKind.RightLeg).Capsules);
+        Assert.Equal(FigureLayerKind.RightArm, figure.LayerOf(BodyRegion.Hand, LimbSide.Right));
+        Assert.Equal(FigureLayerKind.LeftArm, figure.LayerOf(BodyRegion.Arm, LimbSide.Left));
+        Assert.Equal(FigureLayerKind.RightLeg, figure.LayerOf(BodyRegion.Foot, LimbSide.Right));
+        Assert.Equal(FigureLayerKind.LeftLeg, figure.LayerOf(BodyRegion.Leg, LimbSide.Left));
+        // Standing, the thighs touch below the crotch: the right meets the left there without a line.
+        var crotch = (figure.Regions.LeftLeg.Upper.From.Y + figure.Regions.RightLeg.Upper.From.Y) / 2;
+        Assert.Contains(Layer(FigureLayerKind.RightLeg).Seams, s => s.Center.X == 0 && s.Center.Y > crotch);
+    }
+
     [Theory]
     [InlineData(ViewAngle.Front)]
     [InlineData(ViewAngle.Profile)]
@@ -46,7 +67,7 @@ public class FigureLayerTests
         var figure = BodyRig.Build(BodyShape.Default, angle);
         Point2D Joint(HumanoidBone bone) => figure.Layout.Bones.Single(b => b.Bone == bone).Position;
 
-        var arms = figure.Layers.Single(l => l.Kind == (angle == ViewAngle.Front ? FigureLayerKind.Arms : FigureLayerKind.NearArm));
+        var arms = figure.Layers.Single(l => l.Kind == (angle == ViewAngle.Front ? FigureLayerKind.RightArm : FigureLayerKind.NearArm));
         Assert.Contains(arms.Seams, s => s.Center == Joint(HumanoidBone.RightUpperArm));
         Assert.Contains(figure.Layers.Single(l => l.Kind == FigureLayerKind.Head).Seams, s => s.Center == Joint(HumanoidBone.Head));
         if (angle == ViewAngle.Front)
