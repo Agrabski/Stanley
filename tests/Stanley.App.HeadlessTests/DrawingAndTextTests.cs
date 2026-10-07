@@ -385,6 +385,42 @@ public class DrawingAndTextTests
         Assert.Null(editor.SelectedShape!.Style.Stroke);
     }
 
+    /// <summary>#46: the Weight ▸ and Dashes ▸ samples were drawn black, and all but vanished on a dark theme's menu.</summary>
+    [Fact]
+    public void Shape_Outlines_weight_and_dash_samples_are_drawn_in_the_menus_text_colour_in_a_dark_theme()
+    {
+        var (window, _, _, _) = Open();
+        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            var outline = ColorButton(Ribbon(window), "HomeTab", "HomeShapeOutlineButton");
+            outline.Menu.ShowAt(outline.Button);
+            Dispatcher.UIThread.RunJobs();
+            var items = outline.Menu.Items.OfType<MenuItem>().ToList();
+            foreach (var name in new[] { "Weight", "Dashes" })
+            {
+                var submenu = items.Single(i => i.Header as string == name);
+                submenu.IsSubMenuOpen = true;
+                Dispatcher.UIThread.RunJobs();
+                foreach (var item in submenu.Items.OfType<MenuItem>())
+                {
+                    var sample = ((Control)item.Header!).GetVisualDescendants().Prepend((Visual)item.Header!).OfType<Avalonia.Controls.Shapes.Shape>().Single();
+                    var ink = (sample is Avalonia.Controls.Shapes.Line ? sample.Stroke : sample.Fill) as Avalonia.Media.ISolidColorBrush;
+                    Assert.Equal((item.Foreground as Avalonia.Media.ISolidColorBrush)?.Color, ink?.Color);
+                    Assert.True(ink!.Color.R > 128, $"{name}: a light sample on the dark menu, not {ink.Color}");
+                }
+                submenu.IsSubMenuOpen = false;
+            }
+            outline.Menu.Hide();
+        }
+        finally
+        {
+            Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+            Dispatcher.UIThread.RunJobs();
+        }
+    }
+
     /// <summary>The Text tab has Word's Shape Fill / Shape Outline for the box and Text Fill / Text Outline for the letters.</summary>
     [Fact]
     public void The_Text_tab_sets_box_and_letters_separately()
