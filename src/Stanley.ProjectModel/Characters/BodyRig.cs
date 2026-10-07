@@ -475,11 +475,13 @@ public static class BodyRig
         var nearWrist = Along(nearElbow, armDir, m.Forearm);
         var farOffset = new Point2D(-w * 0.14, 0);
 
-        // Legs: the near one a touch forward, the far one a touch back, so both show.
+        // Legs: the near one a touch forward, the far one a touch back, so both show - only
+        // just, so standing the far shoe is a sliver behind the near one's heel, not a second
+        // shoe poking out behind it (#54).
         var nearHip = new Point2D(w * 0.05, m.HipY);
         var nearKnee = new Point2D(w * 0.12, m.HipY + m.LegLength * 0.5);
         var nearAnkle = new Point2D(w * 0.06, -m.AnkleHeight);
-        var farLeg = new Point2D(-w * 0.2, 0);
+        var farLeg = new Point2D(-w * 0.08, 0);
 
         var bones = Spine(m, w * 0.02);
         bones.Add(new(HumanoidBone.RightShoulder, new Point2D(0, m.ShoulderY)));
@@ -618,8 +620,18 @@ public static class BodyRig
             bottom = Math.Max(bottom, y + ry);
         }
 
-        foreach (var p in torso)
-            Include(p.X, p.Y, 0, 0);
+        // The torso is drawn as a smooth closed curve through its points' midpoints, each point
+        // pulling the curve towards it (a quadratic per corner), so it never quite reaches them.
+        for (var i = 0; torso.Count >= 3 && i < torso.Count; i++)
+        {
+            var (a, c, b) = (Mid(torso[i], torso[(i + 1) % torso.Count]), torso[(i + 1) % torso.Count], Mid(torso[(i + 1) % torso.Count], torso[(i + 2) % torso.Count]));
+            Include(a.X, a.Y, 0, 0);
+            var (tx, ty) = (Turn(a.X, c.X, b.X), Turn(a.Y, c.Y, b.Y));
+            if (tx is { } x)
+                Include(Quad(a.X, c.X, b.X, x), Quad(a.Y, c.Y, b.Y, x), 0, 0);
+            if (ty is { } y)
+                Include(Quad(a.X, c.X, b.X, y), Quad(a.Y, c.Y, b.Y, y), 0, 0);
+        }
         foreach (var c in limbGroups.SelectMany(g => g))
         {
             Include(c.From.X, c.From.Y, c.FromRadius, c.FromRadius);
@@ -635,6 +647,12 @@ public static class BodyRig
                 Math.Sqrt(e.RadiusX * e.RadiusX * sin * sin + e.RadiusY * e.RadiusY * cos * cos));
         }
         return Rect2D.FromEdges(left, top, right, bottom);
+
+        static Point2D Mid(Point2D p, Point2D q) => new((p.X + q.X) / 2, (p.Y + q.Y) / 2);
+        // Where a quadratic from a via control c to b turns back along one axis, if it does.
+        static double? Turn(double a, double c, double b) =>
+            a - 2 * c + b is var d && Math.Abs(d) > 1e-12 && (a - c) / d is var t && t > 0 && t < 1 ? t : null;
+        static double Quad(double a, double c, double b, double t) => (1 - t) * (1 - t) * a + 2 * t * (1 - t) * c + t * t * b;
     }
 
     /// <summary>A round seam zone (see <see cref="FigureLayer.Seams"/>).</summary>

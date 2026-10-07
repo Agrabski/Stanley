@@ -91,6 +91,21 @@ public class BodyRigTests
         Assert.Empty(BodyRig.Build(BodyShape.Default).NearLimbs);
     }
 
+    public static TheoryData<BodyPreset> Presets() => new(BodyPresets.All);
+
+    [Theory]
+    [MemberData(nameof(Presets))]
+    public void Standing_side_on_the_far_foot_is_only_a_sliver_behind_the_near_one(BodyPreset preset)
+    {
+        // #54: set back a fifth of the body's width, the far shoe poked out behind the near one
+        // as a second oval and the pair read as one odd, doubled shoe.
+        var figure = BodyRig.Build(BodyPresets.Shape(preset), ViewAngle.Profile);
+        var (near, far) = (figure.Regions.Foot(LimbSide.Right), figure.Regions.Foot(LimbSide.Left));
+
+        var heelGap = (near.Center.X - near.RadiusX) - (far.Center.X - far.RadiusX);
+        Assert.InRange(heelGap, 0, 0.15 * 2 * near.RadiusX);
+    }
+
     [Fact]
     public void Facing_right_the_characters_own_right_side_is_nearest_the_viewer()
     {
