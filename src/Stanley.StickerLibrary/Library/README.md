@@ -21,7 +21,7 @@ a top-level layer named after it, `class="slot-<name>"` makes a shape follow tha
 colour slot (greys such as the ink outline stay as drawn), and a 3-unit line matches
 the body's outline. Faces carry the expression vocabulary as variants (eyes: neutral,
 happy, sad, angry, wide, closed, wink, halfClosed; brows: neutral, raised, angry, sad,
-skeptical; mouth: neutral, smile, grin, open, shout, frown, o, smirk). Pattern tiles
+skeptical; mouth: neutral, smile, grin, open, shout, frown, o, smirk, doubtful). Pattern tiles
 are one repeat per view box, with `slot-ground`, `slot-1` and `slot-2` classes.
 Prints (`print/`) are symbols for clothes: one Pin art part named `print` on the
 chest, in `class="slot-print"`, clipped to the clothes underneath (`clip: clothes`);

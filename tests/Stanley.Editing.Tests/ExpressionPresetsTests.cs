@@ -13,7 +13,8 @@ public class ExpressionPresetsTests
     [Theory]
     [InlineData(ExpressionPreset.Happy, "happy", "neutral", "smile")]
     [InlineData(ExpressionPreset.Surprised, "wide", "raised", "o")]
-    [InlineData(ExpressionPreset.Skeptical, "halfClosed", "skeptical", "smirk")]
+    [InlineData(ExpressionPreset.Skeptical, "neutral", "skeptical", "doubtful")]
+    [InlineData(ExpressionPreset.Seductive, "halfClosed", "skeptical", "smirk")]
     [InlineData(ExpressionPreset.Asleep, "closed", "neutral", "neutral")]
     public void A_preset_sets_each_face_slot(ExpressionPreset preset, string eyes, string brows, string mouth)
     {

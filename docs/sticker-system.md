@@ -347,7 +347,7 @@ The standard vocabulary for the library and the presets:
 |---|---|
 | `eyes` | neutral, happy, sad, angry, wide, closed, wink, halfClosed |
 | `brows` | neutral, raised, angry, sad, skeptical |
-| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk |
+| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk, doubtful |
 
 `ExpressionPresets` (Stanley.Editing, next to `PosePresets`). Each preset sets all
 three slots:
@@ -361,7 +361,8 @@ three slots:
 | Angry | angry | angry | frown |
 | Surprised | wide | raised | o |
 | Scared | wide | sad | open |
-| Skeptical | halfClosed | skeptical | smirk |
+| Skeptical | neutral | skeptical | doubtful |
+| Seductive | halfClosed | skeptical | smirk |
 | Wink | wink | raised | grin |
 | Talking | neutral | neutral | open |
 | Shouting | angry | angry | shout |

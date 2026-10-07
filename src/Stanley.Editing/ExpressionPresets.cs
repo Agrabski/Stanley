@@ -15,6 +15,7 @@ public enum ExpressionPreset
     Surprised,
     Scared,
     Skeptical,
+    Seductive,
     Wink,
     Talking,
     Shouting,
@@ -50,7 +51,7 @@ public static class ExpressionPresets
     {
         [StickerSlots.Eyes] = [Neutral, "happy", "sad", "angry", "wide", "closed", "wink", "halfClosed"],
         [StickerSlots.Brows] = [Neutral, "raised", "angry", "sad", "skeptical"],
-        [StickerSlots.Mouth] = [Neutral, "smile", "grin", "open", "shout", "frown", "o", "smirk"],
+        [StickerSlots.Mouth] = [Neutral, "smile", "grin", "open", "shout", "frown", "o", "smirk", "doubtful"],
     };
 
     /// <summary>The face slots an expression sets, in the order a mix of your own lists them.</summary>
@@ -65,7 +66,10 @@ public static class ExpressionPresets
         new(ExpressionPreset.Angry, "Angry", "angry", "angry", "frown"),
         new(ExpressionPreset.Surprised, "Surprised", "wide", "raised", "o"),
         new(ExpressionPreset.Scared, "Scared", "wide", "sad", "open"),
-        new(ExpressionPreset.Skeptical, "Skeptical", "halfClosed", "skeptical", "smirk"),
+        // One brow up over a flat mouth pulled down at a corner: "hmm". Heavy lids and a smirk
+        // with that brow read as a come-on rather than doubt (#153) - that's Seductive.
+        new(ExpressionPreset.Skeptical, "Skeptical", Neutral, "skeptical", "doubtful"),
+        new(ExpressionPreset.Seductive, "Seductive", "halfClosed", "skeptical", "smirk"),
         new(ExpressionPreset.Wink, "Wink", "wink", "raised", "grin"),
         new(ExpressionPreset.Talking, "Talking", Neutral, Neutral, "open"),
         new(ExpressionPreset.Shouting, "Shouting", "angry", "angry", "shout"),
