@@ -145,6 +145,13 @@ public static class StickerSvg
                      .Where(a => a.IsNamespaceDeclaration && a.Name.Namespace == XNamespace.Xmlns && a.Value == Svg.NamespaceName).ToList())
             alias.Remove();
         var viewBox = ViewBoxOf(root);
+        // Everything below reads the art in its view box's units, so VectSharp must draw in
+        // them too: given a width and height of their own ("800px" over a 24-unit icon, as
+        // icon sites write them), it scales the drawing to that size and the view box shows an
+        // empty corner of it (#112). Sized to its own view box, the file draws 1:1.
+        root.SetAttributeValue("viewBox", string.Join(" ", new[] { viewBox.Left, viewBox.Top, viewBox.Width, viewBox.Height }.Select(Number)));
+        root.SetAttributeValue("width", Number(viewBox.Width));
+        root.SetAttributeValue("height", Number(viewBox.Height));
         var report = new List<string>();
         Normalize(root, report);
 
@@ -294,12 +301,33 @@ public static class StickerSvg
         var box = ((string?)root.Attribute("viewBox"))?.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
         if (box is { Length: 4 } && box.Select(ParseNumber).ToArray() is [var x, var y, var w, var h] && w > 0 && h > 0)
             return SKRect.Create(x, y, w, h);
-        var width = ParseLength((string?)root.Attribute("width")) ?? 100;
-        var height = ParseLength((string?)root.Attribute("height")) ?? 100;
+        // No view box: the drawing is in pixels, as far as the file's own size reaches.
+        var width = Pixels((string?)root.Attribute("width")) ?? 100;
+        var height = Pixels((string?)root.Attribute("height")) ?? 100;
         return SKRect.Create(0, 0, width, height);
     }
 
     private static float ParseNumber(string s) => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Number(float v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>An SVG length in pixels (CSS's 96 to the inch), or null for none, a percentage or a size of nothing.</summary>
+    private static float? Pixels(string? s)
+    {
+        if (ParseLength(s) is not { } value || value <= 0)
+            return null;
+        var unit = s!.Trim().TrimStart('+', '-', '.', 'e', 'E', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9').Trim().ToLowerInvariant();
+        return unit switch
+        {
+            "" or "px" => value,
+            "in" => value * 96,
+            "cm" => value * 96 / 2.54f,
+            "mm" => value * 96 / 25.4f,
+            "pt" => value * 96 / 72,
+            "pc" => value * 16,
+            _ => null,
+        };
+    }
 
     private static float? ParseLength(string? s)
     {

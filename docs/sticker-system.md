@@ -858,8 +858,13 @@ open:
   a shirt's hem over the trousers keeps its line.
 - **The SVG adapter** also normalises what VectSharp reads differently from the
   spec: ellipses become paths (VectSharp strokes them in a scaled space), clip paths
-  become one path (it only takes a single path or rectangle there), and Inkscape's
-  duplicate `svg:` namespace prefix is dropped. Only *named* top-level groups are
+  become one path (it only takes a single path or rectangle there), Inkscape's
+  duplicate `svg:` namespace prefix is dropped, and the document is sized to its own
+  view box (`width`/`height` set to the view box's, which is made explicit): VectSharp
+  scales the drawing to a declared size, while everything here reads it in view-box
+  units, so an icon saved as `width="800px" viewBox="0 0 24 24"` drew as an empty
+  corner (#112). Without a view box, the declared size in px (mm, in, pt... converted)
+  is the view box. Only *named* top-level groups are
   parts; drawing outside them is reported. A trimmed publish shows trim warnings
   only from ExCSS (VectSharp.SVG's CSS parser); VectSharp itself is clean. CI
   doesn't trim.
