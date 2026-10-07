@@ -59,24 +59,28 @@ public static class CharacterPosing
     }
 
     /// <summary>
-    /// Which way the elbow or knee bends: +1 or -1 (the side of the root-to-end line the
-    /// middle joint is on, in figure space). Read once when a drag starts and held for the
-    /// whole drag, so the joint never snaps inside-out as the limb passes straight. In a
-    /// side view it's anatomical - knees bend forward, elbows back.
+    /// Which way the elbow or knee bends, as <see cref="Reach"/> takes it: +1 or -1 for the
+    /// side of the root-to-end line the middle joint is on now (in figure space), so reaching
+    /// for where the hand or foot already is leaves the joint where it is. Read once when a
+    /// drag starts and held for the whole drag, so the joint never snaps inside-out as the
+    /// limb passes straight. In a side view it's anatomical - knees bend forward, elbows back.
     /// </summary>
     public static int BendSign(CharacterDefinition character, CharacterInstance instance, Limb limb)
     {
         if (instance.Pose.ViewAngle == ViewAngle.Profile)
             return IsLeg(limb) ? 1 : -1; // figure faces +x: knee to +x, elbow to -x
 
+        // Solve turns the upper bone back from the root-to-end line by +1's angle, which puts
+        // the joint on the line's negative side - so the sign is the opposite of Side's (#76:
+        // read as Side, the elbow jumped inside-out the moment a hand was grabbed).
         var figure = Figure(character, instance);
         var (root, middle, end) = Chain(limb);
         var sign = Side(Joint(figure.Layout, root), Joint(figure.Layout, end), Joint(figure.Layout, middle));
         if (sign != 0)
-            return sign;
+            return -sign;
         // Dead straight: bend the way the limb does at rest.
         sign = Side(Joint(figure.BaseLayout, root), Joint(figure.BaseLayout, end), Joint(figure.BaseLayout, middle));
-        return sign != 0 ? sign : 1;
+        return sign != 0 ? -sign : 1;
     }
 
     /// <summary>
