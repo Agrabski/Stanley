@@ -43,17 +43,22 @@
       <Rectangle Classes="divider" />
 
       <DockPanel Classes="group">
-          <StackPanel VerticalAlignment="Center" Margin="0,6,0,0">
+          <!-- Two columns: a check box is too tall (32 px) for three to stack above the group's name (#64). -->
+          <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0">
+              <StackPanel>
+                  <CheckBox
+                      Name="MarginGuidesCheck"
+                      IsChecked="{Binding ShowMarginGuides}"
+                      Focusable="False"
+                      Content="Margin guides" />
+                  <CheckBox
+                      IsChecked="{Binding SnapEnabled}"
+                      Focusable="False"
+                      Content="Snap to margins and gutters" />
+              </StackPanel>
               <CheckBox
-                  Name="MarginGuidesCheck"
-                  IsChecked="{Binding ShowMarginGuides}"
-                  Focusable="False"
-                  Content="Margin guides" />
-              <CheckBox
-                  IsChecked="{Binding SnapEnabled}"
-                  Focusable="False"
-                  Content="Snap to margins and gutters" />
-              <CheckBox
+                  Name="LockLayoutCheck"
+                  VerticalAlignment="Top"
                   IsChecked="{Binding IsLayoutLocked}"
                   Focusable="False"
                   Content="Lock layout" />

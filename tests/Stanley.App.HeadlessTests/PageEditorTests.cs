@@ -222,6 +222,30 @@ public class PageEditorTests
         Assert.NotNull(canvas.ViewModel);
     }
 
+    /// <summary>#64: the View tab's third stacked check box, Lock layout, didn't fit - it pushed the group's name out.</summary>
+    [Fact]
+    public void Every_check_box_on_the_View_tab_fits_above_its_groups_name()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "ViewTab");
+        Dispatcher.UIThread.RunJobs();
+
+        var view = ribbon.GetVisualDescendants().OfType<ViewRibbonTab>().Single();
+        var checks = view.GetVisualDescendants().OfType<CheckBox>().ToList();
+        Assert.Contains(checks, c => c.Content as string == "Lock layout");
+        foreach (var check in checks)
+        {
+            var group = check.GetVisualAncestors().OfType<DockPanel>().First();
+            var label = group.Children.OfType<TextBlock>().Single(t => t.Classes.Contains("groupLabel"));
+            var box = new Rect(check.TranslatePoint(default, group)!.Value, check.Bounds.Size);
+            var name = label.Bounds;
+            Assert.True(box.Bottom <= name.Top + 0.5, $"{check.Content}: ends at {box.Bottom}, below the top of its group's name at {name.Top}");
+            Assert.True(box.Right <= group.Bounds.Width + 0.5 && box.Bottom <= group.Bounds.Height + 0.5, $"{check.Content}: cut off");
+        }
+    }
+
     /// <summary>The main "add dialogue" path: double-click inside a panel, type, press Enter.</summary>
     [Fact]
     public void DoubleClickInPanel_TypeAndEnter_CreatesALetteredBubbleInThatPanel()
