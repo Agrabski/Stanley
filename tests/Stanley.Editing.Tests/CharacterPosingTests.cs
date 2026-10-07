@@ -328,6 +328,24 @@ public class TrunkPosingAndPresetTests
             Assert.True(Distance(CharacterPosing.TrunkPoint(character, expected, part), CharacterPosing.TrunkPoint(character, actual, part)) < 0.01, $"{part}");
     }
 
+    [Theory]
+    [InlineData(BodyPreset.Adult)]
+    [InlineData(BodyPreset.Child)]
+    [InlineData(BodyPreset.Heavy)]
+    [InlineData(BodyPreset.Chibi)]
+    public void Thinking_from_the_front_holds_the_hand_at_the_chin_with_the_elbow_down_not_folded_over_the_head(BodyPreset body)
+    {
+        // #31: bent outwards, the arm reached the chin by folding its elbow up over the head.
+        var character = CharacterDefinition.Create("A", BodyPresets.Shape(body));
+        var posed = PosePresets.Apply(character, Placed(character: character), PosePresets.Get(PosePreset.Think), ViewAngle.Front);
+
+        var shoulder = posed.Placement.ToPage(CharacterPosing.Figure(character, posed).Layout.Bones.First(b => b.Bone == CharacterPosing.Chain(Limb.RightArm).Root).Position);
+        var hand = CharacterPosing.EndPoint(character, posed, Limb.RightArm);
+        var elbow = CharacterPosing.BendPoint(character, posed, Limb.RightArm);
+        Assert.True(hand.Y < shoulder.Y, "the hand is up at the chin");
+        Assert.True(elbow.Y > shoulder.Y, "the elbow hangs below the shoulder");
+    }
+
     public static TheoryData<PosePreset, ViewAngle, bool> GrabCases()
     {
         var data = new TheoryData<PosePreset, ViewAngle, bool>();
