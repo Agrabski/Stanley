@@ -150,7 +150,7 @@ each part of the body, as pure data (figure space, like the rest of the figure):
 front:
 
 ```
-front view:  back │ legs │ torso (+neck) │ head │ arms │ front
+front view:  back │ left leg │ right leg │ torso (+neck) │ head │ left arm │ right arm │ front
 side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foot │ near arm │ front
 ```
 
@@ -159,6 +159,12 @@ side view:   back │ far arm │ body (torso, neck, legs) │ head │ near foo
   drawn over it. In the front view, arms are in front of the body (hands on hips,
   Think). Arms held behind the back (a per-limb "behind" flag in the pose) are a
   later addition.
+- In the front view each arm and each leg is a group of its own, the character's
+  right over its left (#120: one group per pair merged legs crossed at the shins, or an
+  arm across the other, into one shape). So the thighs, which touch standing, still
+  meet without a line, the right leg's attachment zones include the strip down the
+  middle from the crotch as far as they touch at rest (`BodyRig.ThighsTouch`), besides
+  its hip.
 - `back` and `front` contain no body. They hold parts that ask for them: the back of
   the hair or a cape (`back`), or an item held in front of everything (`front`).
 - Within a group, the order is skin, then parts by slot z-order (§8), then stacking

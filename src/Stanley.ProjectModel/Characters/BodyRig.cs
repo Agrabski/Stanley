@@ -40,7 +40,8 @@ public sealed record BodyFigure(
 {
     /// <summary>
     /// The layer a region is painted in: front view - legs and feet behind the torso (and
-    /// neck, and skirt), then the head, then the arms and hands in front; side view - the
+    /// neck, and skirt), then the head, then the arms and hands in front, each limb in a
+    /// layer of its own, the character's right over its left; side view - the
     /// far arm behind everything, then the body (torso, neck, legs, far foot), the head,
     /// the near foot and the near arm. The character's right side is the near one.
     /// </summary>
@@ -56,8 +57,8 @@ public sealed record BodyFigure(
             : region switch
             {
                 BodyRegion.Head => FigureLayerKind.Head,
-                BodyRegion.Arm or BodyRegion.Hand => FigureLayerKind.Arms,
-                BodyRegion.Leg or BodyRegion.Foot => FigureLayerKind.Legs,
+                BodyRegion.Arm or BodyRegion.Hand => side == LimbSide.Right ? FigureLayerKind.RightArm : FigureLayerKind.LeftArm,
+                BodyRegion.Leg or BodyRegion.Foot => side == LimbSide.Right ? FigureLayerKind.RightLeg : FigureLayerKind.LeftLeg,
                 _ => FigureLayerKind.Torso
             };
 }
@@ -430,15 +431,25 @@ public static class BodyRig
         }
 
         var both = new[] { Side.Left, Side.Right };
+        // Each limb is a layer of its own (#120: in one layer, legs crossed or an arm across
+        // the other merged into one shape) - the right over the left. Where the thighs touch
+        // standing, from the crotch down until their inner edges part, the right one meets the
+        // left without a line, as the torso meets both at the hips.
+        var crotch = Mid(At(Side.Left.UpperLeg), At(Side.Right.UpperLeg));
+        var touching = ThighsTouch(m, legX) * m.LegLength * 0.5;
+        var legSeams = new List<BodyEllipse> { Seam(At(Side.Right.UpperLeg), m.Thigh * 1.5) };
+        if (touching > 0)
+            legSeams.Add(new BodyEllipse(new Point2D(crotch.X, crotch.Y + touching / 2), m.Thigh, touching / 2 + m.Thigh));
         var layers = new List<FigureLayer>
         {
             FigureLayer.Empty(FigureLayerKind.Back),
-            new(FigureLayerKind.Legs, null, both.SelectMany(s => new[] { legs[s].Upper, legs[s].Lower }).ToList(), both.Select(s => feet[s]).ToList(), []),
+            new(FigureLayerKind.LeftLeg, null, [legs[Side.Left].Upper, legs[Side.Left].Lower], [feet[Side.Left]], []),
+            new(FigureLayerKind.RightLeg, null, [legs[Side.Right].Upper, legs[Side.Right].Lower], [feet[Side.Right]], legSeams),
             // The torso covers the tops of the thighs; at the hips its ink stops where it lies over them.
             new(FigureLayerKind.Torso, torso, [neck], [], both.Select(s => Seam(At(s.UpperLeg), m.Thigh * 1.5)).ToList()),
             new(FigureLayerKind.Head, null, [], [head], [Seam(headPoint, m.NeckHalf * 1.2)]),
-            new(FigureLayerKind.Arms, null, both.SelectMany(s => new[] { arms[s].Upper, arms[s].Lower }).ToList(), both.Select(s => hands[s]).ToList(),
-                both.Select(s => Seam(At(s.UpperArm), m.ArmTop * 1.4)).ToList()),
+            new(FigureLayerKind.LeftArm, null, [arms[Side.Left].Upper, arms[Side.Left].Lower], [hands[Side.Left]], [Seam(At(Side.Left.UpperArm), m.ArmTop * 1.4)]),
+            new(FigureLayerKind.RightArm, null, [arms[Side.Right].Upper, arms[Side.Right].Lower], [hands[Side.Right]], [Seam(At(Side.Right.UpperArm), m.ArmTop * 1.4)]),
             FigureLayer.Empty(FigureLayerKind.Front),
         };
         var regions = new FigureRegions(head, neck, new TorsoFrame(restTorso, trunk.Bend),
@@ -648,7 +659,6 @@ public static class BodyRig
         }
         return Rect2D.FromEdges(left, top, right, bottom);
 
-        static Point2D Mid(Point2D p, Point2D q) => new((p.X + q.X) / 2, (p.Y + q.Y) / 2);
         // Where a quadratic from a via control c to b turns back along one axis, if it does.
         static double? Turn(double a, double c, double b) =>
             a - 2 * c + b is var d && Math.Abs(d) > 1e-12 && (a - c) / d is var t && t > 0 && t < 1 ? t : null;
@@ -657,6 +667,22 @@ public static class BodyRig
 
     /// <summary>A round seam zone (see <see cref="FigureLayer.Seams"/>).</summary>
     private static BodyEllipse Seam(Point2D at, double radius) => new(at, radius, radius);
+
+    /// <summary>
+    /// How far down the thighs (0 to 1, of their length) touch each other standing in a front
+    /// view: where the inner edges of the two thigh capsules - hips <paramref name="legX"/>
+    /// either side of the middle, tapering to the knees - meet on the centre line.
+    /// </summary>
+    private static double ThighsTouch(Measures m, double legX)
+    {
+        var apart = legX - m.Thigh; // inner edge at the hip, from the centre line
+        if (apart >= 0)
+            return 0;
+        var closing = 0.08 * legX + m.Knee - m.Thigh; // how the edge moves along the thigh (the knee sits at 0.92 legX)
+        return closing >= 0 ? 1 : Math.Clamp(apart / closing, 0, 1);
+    }
+
+    private static Point2D Mid(Point2D a, Point2D b) => new((a.X + b.X) / 2, (a.Y + b.Y) / 2);
 
     private static Point2D Along(Point2D from, Point2D direction, double distance) =>
         new(from.X + direction.X * distance, from.Y + direction.Y * distance);

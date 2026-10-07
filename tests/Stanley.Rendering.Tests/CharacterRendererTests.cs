@@ -133,6 +133,54 @@ public class FigureLayerRenderingTests
         Assert.Contains(Enumerable.Range(-3, 7), dy => IsInk(bitmap.GetPixel((int)edge.X, (int)edge.Y + dy)));
     }
 
+    /// <summary>
+    /// #120: from the front both legs were one layer (and both arms another), inked round
+    /// their union, so legs crossed at the shins - or one arm across the other - merged into
+    /// one shape. Walking along the left limb away from where the right one crosses it, the
+    /// right one's outline is met before that part of the left one ends.
+    /// </summary>
+    [Theory]
+    [InlineData(true, -19.09, 69.54, -0.07, -37.43)] // the shins crossed
+    [InlineData(false, 111.88, -100.71, -63.51, -119.16)] // the right arm across the left forearm
+    public void From_the_front_a_limb_crossing_its_pair_keeps_its_outline(bool legs, double leftUpper, double leftLower, double rightUpper, double rightLower)
+    {
+        var character = CharacterDefinition.Create("A");
+        var bones = legs
+            ? new[] { HumanoidBone.LeftUpperLeg, HumanoidBone.LeftLowerLeg, HumanoidBone.RightUpperLeg, HumanoidBone.RightLowerLeg }
+            : [HumanoidBone.LeftUpperArm, HumanoidBone.LeftLowerArm, HumanoidBone.RightUpperArm, HumanoidBone.RightLowerArm];
+        var pose = new PoseData(ViewAngle.Front, bones.Zip([leftUpper, leftLower, rightUpper, rightLower], (b, d) => new BoneRotation(b, d)).ToList(), []);
+        var regions = BodyRig.Build(character.Body, ViewAngle.Front, null, pose).Regions;
+        // Each limb as two segments: shoulder or hip to elbow or knee, on to the middle of the hand or foot.
+        (Point2D, Point2D)[] Segments(LimbFrame limb, BodyEllipse end) => [(limb.Upper.From, limb.Upper.To), (limb.Lower.From, end.Center)];
+        var left = legs ? Segments(regions.LeftLeg, regions.LeftFoot) : Segments(regions.LeftArm, regions.LeftHand);
+        var right = legs ? Segments(regions.RightLeg, regions.RightFoot) : Segments(regions.RightArm, regions.RightHand);
+        var (segment, cross) = left.SelectMany(l => right.Select(r => (l, Crossing(l.Item1, l.Item2, r.Item1, r.Item2)))).FirstOrDefault(c => c.Item2 is not null);
+        Assert.True(cross is not null, "the pose crosses the two");
+
+        using var bitmap = Render(character, pose);
+        // From the crossing along the left limb towards whichever end of that segment is further away, to just short of it.
+        var (x0, y0) = (cross!.Value.X, cross.Value.Y);
+        var end = Distance(cross.Value, segment.Item1) > Distance(cross.Value, segment.Item2) ? segment.Item1 : segment.Item2;
+        var steps = (int)(Distance(cross.Value, end) * Unit) - 6;
+        var path = Enumerable.Range(2, steps).Select(i => ToPixel(new Point2D(x0 + (end.X - x0) * i / (steps + 6), y0 + (end.Y - y0) * i / (steps + 6))));
+
+        Assert.Contains(path, p => IsInk(bitmap.GetPixel((int)p.X, (int)p.Y)));
+    }
+
+    private static double Distance(Point2D a, Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+    /// <summary>Where segment a1-a2 crosses segment b1-b2, or null.</summary>
+    private static Point2D? Crossing(Point2D a1, Point2D a2, Point2D b1, Point2D b2)
+    {
+        var (dx1, dy1, dx2, dy2) = (a2.X - a1.X, a2.Y - a1.Y, b2.X - b1.X, b2.Y - b1.Y);
+        var d = dx1 * dy2 - dy1 * dx2;
+        if (Math.Abs(d) < 1e-12)
+            return null;
+        var t = ((b1.X - a1.X) * dy2 - (b1.Y - a1.Y) * dx2) / d;
+        var u = ((b1.X - a1.X) * dy1 - (b1.Y - a1.Y) * dx1) / d;
+        return t is >= 0 and <= 1 && u is >= 0 and <= 1 ? new Point2D(a1.X + t * dx1, a1.Y + t * dy1) : null;
+    }
+
     [Theory]
     [InlineData(ViewAngle.Front, HumanoidBone.LeftUpperArm)]
     [InlineData(ViewAngle.Profile, HumanoidBone.RightUpperArm)]
