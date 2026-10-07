@@ -155,6 +155,20 @@ public class HoodAndCapTests
         Assert.Equal(Cap, AtHead(behind, character, backward, -85, -965));
     }
 
+    [Fact]
+    public void A_backward_caps_strap_sits_on_its_rim_not_hanging_down_the_forehead()
+    {
+        // #123: the strap was centred on the rim, so half of it hung below the cap.
+        var character = Wearing("hair/short", "headwear/cap");
+        var backward = Pose(ViewAngle.Front, "backward");
+        var strap = FigureGeometry.ToSk(ColorValue.FromHex("#216541"));
+
+        using var bitmap = Render(character, backward);
+
+        Assert.Equal(strap, AtHead(bitmap, character, backward, 5, -974)); // between its holes, just above the rim
+        Assert.NotEqual(strap, AtHead(bitmap, character, backward, 5, -963)); // just below the rim: no strap
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
