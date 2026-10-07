@@ -352,6 +352,15 @@ characters or into a pose library. The elbow/knee bend side is fixed for a drag;
 in side view knees bend forward and elbows back. One drag = one undo step; Reset
 pose on the Character tab.
 
+*Gotcha (#76):* the bend sign `Reach`/`Solve` take is the opposite of which side of
+the root-to-end line the middle joint lies on (`Solve` turns the upper bone back from
+that line by +1's angle, putting the joint on its negative side). `BendSign` reads
+the current side and converts it; anything else that reads a limb's bend off its
+layout must do the same, or grabbing a bent arm's hand flips the elbow inside-out on
+the spot. A preset's bend (`PosePresets.Bend`) avoids the question by trying both
+signs through `Reach`. The test that catches it grabs every hand and foot of every
+preset without moving it and checks the joint stays put.
+
 **Whole-body movement and pose presets (added next).** Hollow rings on the hips,
 chest and head: dragging the hips moves the body with both feet pinned (legs
 re-solved each move; crouching is limited to about half the leg so a chibi can't
