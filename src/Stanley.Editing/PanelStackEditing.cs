@@ -38,14 +38,33 @@ public static class PanelStackEditing
 
         var to = move switch
         {
-            StackMove.Forward => Math.Min(at + 1, order.Count - 1),
-            StackMove.Backward => Math.Max(at - 1, 0),
+            StackMove.Forward => at + 1,
+            StackMove.Backward => at - 1,
             StackMove.ToFront => order.Count - 1,
             _ => 0
         };
+        return MoveTo(panel, order, at, to);
+    }
+
+    /// <summary>
+    /// Puts <paramref name="item"/> at <paramref name="slot"/> of the panel's stack as it's drawn now
+    /// (0 is the back, one less than the number of layers the front; anything past either end is
+    /// that end) - where a layer dragged in the Layers pane is dropped. The others keep their order.
+    /// </summary>
+    public static EditResult<Panel> MoveTo(Panel panel, StackItem item, int slot)
+    {
+        var order = PanelStack.Order(panel).ToList();
+        var at = order.IndexOf(item);
+        return at < 0 ? EditResult<Panel>.Failure("No such layer.") : MoveTo(panel, order, at, slot);
+    }
+
+    private static EditResult<Panel> MoveTo(Panel panel, List<StackItem> order, int at, int slot)
+    {
+        var to = Math.Clamp(slot, 0, order.Count - 1);
         if (to == at)
             return EditResult<Panel>.Success(panel);
 
+        var item = order[at];
         order.RemoveAt(at);
         order.Insert(to, item);
         return EditResult<Panel>.Success(Arranged(panel, order));

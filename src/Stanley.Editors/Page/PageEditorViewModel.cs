@@ -2322,11 +2322,18 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// for the first time gives it its own <see cref="Panel.Stack"/>; nothing is renumbered, so
     /// the selection stays on the same item.
     /// </summary>
-    public void MoveInStack(PanelId panelId, StackItem item, StackMove move)
+    public void MoveInStack(PanelId panelId, StackItem item, StackMove move) =>
+        ApplyStackMove(panelId, panel => PanelStackEditing.Move(panel, item, move));
+
+    /// <summary>Puts a bubble, character or drawing at <paramref name="slot"/> of its panel's stack (0 is the back) - a layer dropped in the Layers pane. One undo step; none if it's there already.</summary>
+    public void MoveInStackTo(PanelId panelId, StackItem item, int slot) =>
+        ApplyStackMove(panelId, panel => PanelStackEditing.MoveTo(panel, item, slot));
+
+    private void ApplyStackMove(PanelId panelId, Func<Panel, EditResult<Panel>> move)
     {
         if (!Working.Panels.TryGetValue(panelId, out var panel))
             return;
-        var moved = PanelStackEditing.Move(panel, item, move);
+        var moved = move(panel);
         if (!moved.IsValid || ReferenceEquals(moved.Value, panel))
             return;
         Apply(EditPanel(Working, panelId, _ => moved));

@@ -79,6 +79,33 @@ public class PanelStackEditingTests
     }
 
     [Fact]
+    public void A_layer_dropped_at_a_place_in_the_stack_lands_there_and_the_rest_keep_their_order()
+    {
+        // [drawing, character, bubble, caption] from the back
+        var panel = PanelOf([CharacterAt(100)], [BubbleAt(20)], Blob(10, ElementLayer.Background), Blob(40, ElementLayer.Foreground));
+        Assert.Equal([AtElement(0), AtChar(0), AtElement(1), AtBubble(0)], PanelStack.Order(panel));
+
+        var bubbleSecond = PanelStackEditing.MoveTo(panel, AtBubble(0), 1);
+        Assert.True(bubbleSecond.IsValid);
+        Assert.Equal([AtElement(0), AtBubble(0), AtChar(0), AtElement(1)], PanelStack.Order(bubbleSecond.Value));
+
+        var drawingThird = PanelStackEditing.MoveTo(panel, AtElement(0), 2);
+        Assert.Equal([AtChar(0), AtElement(1), AtElement(0), AtBubble(0)], PanelStack.Order(drawingThird.Value));
+        Assert.Equal(ElementLayer.Foreground, drawingThird.Value.Elements[0].Layer); // now in front of the only character
+    }
+
+    [Fact]
+    public void A_drop_past_either_end_of_the_stack_lands_at_that_end_and_one_where_it_was_changes_nothing()
+    {
+        var panel = Usual();
+
+        Assert.Equal([AtChar(0), AtBubble(0), AtElement(0)], PanelStack.Order(PanelStackEditing.MoveTo(panel, AtElement(0), 99).Value));
+        Assert.Equal([AtBubble(0), AtElement(0), AtChar(0)], PanelStack.Order(PanelStackEditing.MoveTo(panel, AtBubble(0), -3).Value));
+        Assert.Same(panel, PanelStackEditing.MoveTo(panel, AtChar(0), 1).Value);
+        Assert.False(PanelStackEditing.MoveTo(panel, AtChar(4), 0).IsValid);
+    }
+
+    [Fact]
     public void Arranging_a_panel_the_first_time_writes_a_stack_naming_everything_and_gives_each_character_an_id()
     {
         var panel = Usual();

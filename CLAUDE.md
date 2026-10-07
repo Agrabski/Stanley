@@ -102,11 +102,12 @@ still lands in the selected one. **Resizing a panel scales what's in it** as one
 (`PanelContentScale`: as big as fits uncropped, held to the edges that didn't move, line
 weights unchanged) so its composition never comes apart (docs/panel-layout.md). **To front / To back** on a drawn element cross the
 character layer: the top of the foreground, the bottom of the background. The
-**Layers pane** (View › Panes › Layers, docs/layers-panel.md) docks a list on the right of
-the page - each panel in reading order, opening to its bubbles, characters and drawings
-from the front to the back, then its background - to pick overlapping things and move
-them forward or back (or all the way), past each other whatever they are; selecting
-there and on the page follow each other. A panel arranged that way keeps its own
+**Layers pane** (docs/layers-panel.md; showing unless View › Panes › Layers turns it off) docks
+a list on the right of the page - each panel in reading order, opening to its bubbles,
+characters and drawings from the front to the back, then its background - to pick
+overlapping things and move them forward or back (or all the way) with its buttons or by
+**dragging a row** up or down, past each other whatever they are; selecting there and on
+the page follow each other. A panel arranged that way keeps its own
 `Panel.Stack` (written only then; `PanelStack.Order` is what the renderer, picking and the
 pane all walk), and its To front / To back mean the front / back of the whole stack. A bubble's
 **font size is absolute** - a bubble too small for its text grows to fit

@@ -27,6 +27,8 @@ public enum LayerRowKind
 public sealed class LayerRow : ObservableObject
 {
     private bool _isSelected;
+    private bool _isDragged;
+    private bool _showDropLine;
 
     public LayerRow(LayerRowKind kind, PanelId panelId, int index, string label, string detail, string iconKey)
     {
@@ -74,6 +76,23 @@ public sealed class LayerRow : ObservableObject
     {
         get => _isSelected;
         set => SetProperty(ref _isSelected, value);
+    }
+
+    /// <summary>A bubble, character or drawing: what can be dragged to another place in its panel's stack. Panels keep their reading order, and a background is always at the back.</summary>
+    public bool IsLayer => Kind is LayerRowKind.Bubble or LayerRowKind.Character or LayerRowKind.Element;
+
+    /// <summary>Being dragged to another place in the list; it fades while it is.</summary>
+    public bool IsDragged
+    {
+        get => _isDragged;
+        set => SetProperty(ref _isDragged, value);
+    }
+
+    /// <summary>The layer being dragged would land just above this row: a line shows where.</summary>
+    public bool ShowDropLine
+    {
+        get => _showDropLine;
+        set => SetProperty(ref _showDropLine, value);
     }
 
     public string Tip => HasDetail ? $"{Label} - {Detail}" : Label;

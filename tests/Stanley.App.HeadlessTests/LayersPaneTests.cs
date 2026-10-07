@@ -260,6 +260,51 @@ public class LayersPaneTests
         }
     }
 
+    /// <summary>#162: a row dragged up or down the list - not just the buttons - puts its layer in front of or behind the others.</summary>
+    [Fact]
+    public void Dragging_a_row_down_the_list_sends_its_layer_behind_what_it_passes()
+    {
+        var (window, editor) = Open();
+        try
+        {
+            var (panel, bubble, character, _) = CharacterWithABubbleOverIt(editor);
+            editor.Select(panel); // opens the panel's rows: the bubble, the character, the background
+            editor.ShowLayers = true;
+            Dispatcher.UIThread.RunJobs();
+            var view = Views(window).Single();
+            var bubbleRow = RowBorder(view, LayerRowKind.Bubble);
+            var characterRow = RowBorder(view, LayerRowKind.Character);
+
+            var from = CenterOf(bubbleRow, window);
+            var to = characterRow.TranslatePoint(new Point(characterRow.Bounds.Width / 2, characterRow.Bounds.Height * 0.8), window)!.Value; // the character's lower half
+            window.MouseDown(from, MouseButton.Left);
+            window.MouseMove(new Point(from.X, from.Y + 6), RawInputModifiers.LeftMouseButton);
+            window.MouseMove(to, RawInputModifiers.LeftMouseButton);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains("dragged", RowBorder(view, LayerRowKind.Bubble).Classes);
+            var line = view.List.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>()
+                .Single(r => r.Name == "DropLine" && r.DataContext is LayerRow { Kind: LayerRowKind.Background });
+            Assert.True(line.IsVisible, "a line shows where the bubble would land: just above the background");
+            LookTabTests.Snapshot(window, "layers-pane-dragging");
+
+            window.MouseUp(to, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            var order = PanelStack.Order(editor.Working.Panels[panel]).ToList();
+            Assert.True(order.IndexOf(new StackItem(StackKind.Bubble, bubble)) < order.IndexOf(new StackItem(StackKind.Character, character)), "the bubble is behind the character now");
+            Assert.Equal(bubble, editor.SelectedBubbleIndex);
+            Assert.DoesNotContain(view.List.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("dragged"));
+            Assert.DoesNotContain(view.List.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>(), r => r.Name == "DropLine" && r.IsVisible);
+
+            window.History.Undo();
+            Assert.Null(editor.Working.Panels[panel].Stack);
+        }
+        finally
+        {
+            editor.ShowLayers = true; // back to the default, for the tests that follow
+        }
+    }
+
     [Fact]
     public void A_click_on_the_page_picks_what_is_in_front_wherever_the_stack_has_put_it()
     {
