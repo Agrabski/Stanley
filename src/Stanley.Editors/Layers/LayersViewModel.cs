@@ -28,6 +28,11 @@ public sealed class LayersViewModel : Tool
     private int? _slot;
     private int _count;
 
+    // The row being dragged to another place in its panel's stack, and the gap it would be dropped
+    // into: the index of the row it would land just above (-1 until the pointer's been over one).
+    private LayerRow? _dragged;
+    private int _dropGap = -1;
+
     public LayersViewModel()
     {
         Id = "Layers";
@@ -127,6 +132,99 @@ public sealed class LayersViewModel : Tool
         editor.FocusPage();
     }
 
+    /// <summary>Whether a row is being dragged to another place in the list.</summary>
+    public bool IsDragging => _dragged != null;
+
+    /// <summary>
+    /// Starts dragging <paramref name="row"/> to another place among its panel's layers. False -
+    /// nothing to drag - for a panel or background row, or one no longer in the list.
+    /// </summary>
+    public bool BeginDrag(LayerRow row)
+    {
+        CancelDrag();
+        if (_editor == null || !row.IsLayer || !Rows.Contains(row))
+            return false;
+        _dragged = row;
+        row.IsDragged = true;
+        return true;
+    }
+
+    /// <summary>
+    /// The pointer is over the gap above <c>Rows[gap]</c> (<c>Rows.Count</c>: below the last row).
+    /// The layer stays among its own panel's, so a gap beyond them means the nearest end: in front
+    /// of the panel's frontmost layer, or just above its background. The drop line shows there -
+    /// unless dropping would leave the layer where it is.
+    /// </summary>
+    public void DragOver(int gap)
+    {
+        if (_dragged is not { } dragged || LayerRowsOf(dragged.PanelId) is not { } range)
+            return;
+        gap = Math.Clamp(gap, range.First, range.Background);
+        if (gap == _dropGap)
+            return;
+        if (_dropGap >= 0 && _dropGap < Rows.Count)
+            Rows[_dropGap].ShowDropLine = false;
+        _dropGap = gap;
+        var at = Rows.IndexOf(dragged);
+        Rows[gap].ShowDropLine = gap != at && gap != at + 1;
+    }
+
+    /// <summary>Puts the dragged layer where the drop line is - one undo step - and selects it. Nothing moves if it's dropped where it was.</summary>
+    public void Drop()
+    {
+        var dragged = _dragged;
+        var gap = _dropGap;
+        CancelDrag();
+        if (dragged is null || gap < 0 || _editor is not { } editor || LayerRowsOf(dragged.PanelId) is not { } range)
+            return;
+
+        // The rows list the panel's layers front first; the stack counts from the back.
+        var layers = range.Background - range.First;
+        var from = Rows.IndexOf(dragged) - range.First;
+        if (from < 0)
+            return;
+        var to = gap - range.First;
+        if (to > from)
+            to--; // the gap below the dragged row's own place closes up when it's taken out
+        if (to != from)
+            editor.MoveInStackTo(dragged.PanelId, StackItemOf(dragged), layers - 1 - to);
+        Pick(dragged, additive: false);
+    }
+
+    /// <summary>Lets go of a drag without moving anything.</summary>
+    public void CancelDrag()
+    {
+        if (_dragged != null)
+            _dragged.IsDragged = false;
+        if (_dropGap >= 0 && _dropGap < Rows.Count)
+            Rows[_dropGap].ShowDropLine = false;
+        _dragged = null;
+        _dropGap = -1;
+    }
+
+    /// <summary>Where a panel's layers are in <see cref="Rows"/>: the first (frontmost) one's row, and its background's row just after the last; null if the panel isn't open.</summary>
+    private (int First, int Background)? LayerRowsOf(PanelId panel)
+    {
+        var header = -1;
+        for (var i = 0; i < Rows.Count; i++)
+        {
+            if (Rows[i].PanelId != panel)
+                continue;
+            if (Rows[i].Kind == LayerRowKind.Panel)
+                header = i;
+            else if (Rows[i].Kind == LayerRowKind.Background && header >= 0)
+                return (header + 1, i);
+        }
+        return null;
+    }
+
+    private static StackItem StackItemOf(LayerRow row) => row.Kind switch
+    {
+        LayerRowKind.Bubble => new StackItem(StackKind.Bubble, row.Index),
+        LayerRowKind.Character => new StackItem(StackKind.Character, row.Index),
+        _ => new StackItem(StackKind.Element, row.Index)
+    };
+
     /// <summary>The bubble, character or drawing that's selected on the page (the primary one, if several are), with its panel.</summary>
     private (PanelId Panel, StackItem Item)? SelectedLayer()
     {
@@ -205,6 +303,7 @@ public sealed class LayersViewModel : Tool
 
     private void Rebuild()
     {
+        CancelDrag(); // the rows it pointed at are going
         Rows.Clear();
         if (_editor is { } editor)
         {

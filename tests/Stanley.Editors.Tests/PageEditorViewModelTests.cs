@@ -373,6 +373,88 @@ public class PageEditorViewModelTests
         Assert.True(distance > 15, $"second tail should point somewhere else, but its tip is only {distance:0.0}mm from the first");
     }
 
+    /// <summary>A selected bubble with three tails, aimed at three different spots.</summary>
+    private static (EditorHistory History, PageEditorViewModel ViewModel, PanelId PanelId, int Bubble) BubbleWithThreeTails()
+    {
+        var (history, vm, panelId) = NewEditor(new Rect2D(10, 10, 190, 190));
+        var index = vm.CreateBubble(panelId, new Point2D(100, 60));
+        vm.AddBubbleTail(panelId, index, new Point2D(40, 180));
+        vm.AddBubbleTail(panelId, index, new Point2D(160, 180));
+        Assert.Equal(3, vm.SelectedBubble!.Tails.Count);
+        return (history, vm, panelId, index);
+    }
+
+    [Fact]
+    public void RemoveTail_TakesOffTheNewestTail_UntilAnotherIsPicked()
+    {
+        var (_, vm, panelId, index) = BubbleWithThreeTails();
+        var tails = vm.SelectedBubble!.Tails;
+        Assert.Equal(2, vm.CurrentTailIndex);
+
+        vm.RemoveTailCommand.Execute(null);
+
+        Assert.Equal([tails[0], tails[1]], vm.Working.Panels[panelId].Bubbles[index].Tails);
+    }
+
+    [Fact]
+    public void PressingATailsTipOrBase_PicksIt_AndRemoveTailTakesOffThatOne()
+    {
+        var (_, vm, panelId, index) = BubbleWithThreeTails();
+        var tails = vm.SelectedBubble!.Tails;
+
+        vm.BeginMoveBubbleTail(panelId, index, 0); // pressed on the oldest tail's tip, let go without moving
+        vm.CommitGesture();
+        Assert.Equal(0, vm.CurrentTailIndex);
+
+        vm.RemoveTailCommand.Execute(null);
+        Assert.Equal([tails[1], tails[2]], vm.SelectedBubble!.Tails);
+        Assert.Equal(1, vm.CurrentTailIndex); // the picked one went: the newest left takes over
+
+        vm.BeginSlideBubbleTailAttachment(panelId, index, 0); // the base of what was the middle tail
+        vm.CommitGesture();
+        vm.RemoveTailCommand.Execute(null);
+        Assert.Equal([tails[2]], vm.SelectedBubble!.Tails);
+    }
+
+    [Fact]
+    public void ThePickedTail_StaysPicked_WhenAnotherGoes_AndIsForgottenWithTheSelection()
+    {
+        var (_, vm, panelId, index) = BubbleWithThreeTails();
+        var tails = vm.SelectedBubble!.Tails;
+        vm.PickTail(1);
+
+        vm.RemoveBubbleTail(panelId, index, 0); // right-click > Remove this tail, on another one
+        Assert.Equal(0, vm.CurrentTailIndex);
+        Assert.Equal(tails[1], vm.SelectedBubble!.Tails[vm.CurrentTailIndex]);
+
+        vm.AddBubbleTail(panelId, index); // a new tail is the one to aim next
+        Assert.Equal(2, vm.CurrentTailIndex);
+
+        vm.PickTail(0);
+        vm.Select(panelId);
+        vm.Select(panelId, index);
+        Assert.Equal(2, vm.CurrentTailIndex);
+    }
+
+    [Fact]
+    public void RemoveTailTip_SaysWhichTailGoes()
+    {
+        var (_, vm, panelId) = NewEditor(new Rect2D(10, 10, 190, 190));
+        Assert.Contains("Select a bubble", vm.RemoveTailTip, StringComparison.Ordinal);
+
+        var index = vm.CreateBubble(panelId, new Point2D(100, 60));
+        Assert.Equal("Remove the bubble's tail", vm.RemoveTailTip);
+
+        vm.AddBubbleTail(panelId, index);
+        Assert.Contains("ringed tail", vm.RemoveTailTip, StringComparison.Ordinal);
+
+        vm.RemoveTailCommand.Execute(null);
+        vm.RemoveTailCommand.Execute(null);
+        Assert.False(vm.RemoveTailCommand.CanExecute(null));
+        Assert.Equal(-1, vm.CurrentTailIndex);
+        Assert.Contains("no tail", vm.RemoveTailTip, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RibbonCommands_AreOnlyEnabledForTheMatchingSelection()
     {

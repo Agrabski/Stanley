@@ -160,6 +160,19 @@ public sealed class AutoSaveAndRecoveryTests : IDisposable
     }
 
     [Fact]
+    public void Settings_ShowLayers_DefaultsOnAndRemembersBeingSwitchedOff()
+    {
+        var path = Path.Combine(_root, "settings.txt");
+        Assert.True(new AppSettings(path).ShowLayers);
+
+        _ = new AppSettings(path) { ShowLayers = false };
+        Assert.False(new AppSettings(path).ShowLayers);
+
+        _ = new AppSettings(path) { ShowLayers = true };
+        Assert.True(new AppSettings(path).ShowLayers);
+    }
+
+    [Fact]
     public void Settings_Theme_DefaultsToSystemAndPersists()
     {
         var path = Path.Combine(_root, "settings.txt");

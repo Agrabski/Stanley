@@ -16,6 +16,7 @@ public interface ILayersPaneHost
 /// Whether the Layers pane is showing - a preference of the person, not part of the comic, so
 /// the app keeps it in its settings (<c>AppSettings.ShowLayers</c>); without one plugged in
 /// (tests) it lives in memory only - the same arrangement as <see cref="HairUpgradeMemory"/>.
+/// Showing until switched off, either way.
 /// </summary>
 public sealed class LayersPaneMemory : ILayersPaneHost
 {
@@ -26,7 +27,7 @@ public sealed class LayersPaneMemory : ILayersPaneHost
     /// <param name="set">Persists the choice.</param>
     public LayersPaneMemory(Func<bool>? get = null, Action<bool>? set = null)
     {
-        var memory = false;
+        var memory = true;
         _get = get ?? (() => memory);
         _set = set ?? (on => memory = on);
     }

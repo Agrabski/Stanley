@@ -56,7 +56,9 @@ public sealed record PageCanvasScene(
     /// <summary>The panel the Freeform shape is going into, which it's clipped to as it will be.</summary>
     Rect2D? FreeformPanelBounds = null,
     /// <summary>Where the pointer is while the Freeform tool waits for the next point: the edge to it previews what a click adds.</summary>
-    Point2D? FreeformPointer = null);
+    Point2D? FreeformPointer = null,
+    /// <summary>The selected bubble's tail Remove tail would take off - ringed when the bubble has more than one, so it's clear which.</summary>
+    int CurrentTailIndex = -1);
 
 /// <summary>
 /// The bubble whose text is being typed in the inline editor: drawn without its lettering
@@ -301,8 +303,9 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
         using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
         using var ring = Stroke(TailHandle, 2f);
         using var outline = Stroke(SKColors.White, 1.5f);
-        foreach (var tail in bubble.Tails)
+        for (var t = 0; t < bubble.Tails.Count; t++)
         {
+            var tail = bubble.Tails[t];
             var baseScreen = Screen(AnchorRing.PointAt(bubble.Shape.Anchors, tail.AttachmentT));
             canvas.DrawCircle(baseScreen, 4.5f, white);
             canvas.DrawCircle(baseScreen, 4.5f, ring);
@@ -310,6 +313,14 @@ public sealed class PageCanvasDrawOperation : ICustomDrawOperation
             var tip = Screen(tail.Target);
             canvas.DrawCircle(tip, 6f, fill);
             canvas.DrawCircle(tip, 6f, outline);
+
+            // With several tails, the one Remove tail takes off wears a ring, base and tip.
+            if (t == _scene.CurrentTailIndex && bubble.Tails.Count > 1)
+            {
+                using var current = Stroke(Accent, 2f);
+                canvas.DrawCircle(tip, 10f, current);
+                canvas.DrawCircle(baseScreen, 8f, current);
+            }
         }
     }
 

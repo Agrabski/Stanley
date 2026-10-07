@@ -28,8 +28,31 @@ public class LayersPaneTests
 
     private static double Left(Visual visual, Visual relativeTo) => visual.TranslatePoint(new Point(0, 0), relativeTo)!.Value.X;
 
+    /// <summary>A profile that's never switched the pane off: it's there from the start, so nobody has to know to look for it (#161).</summary>
     [Fact]
-    public void The_Layers_pane_stays_away_until_asked_for_and_then_sits_right_of_the_page()
+    public void The_Layers_pane_shows_from_the_start()
+    {
+        var window = new MainWindow(new MainWindowViewModel(new NoDialogs(), new Stanley.App.Documents.RecentProjects(null)));
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(window.Editor.ShowLayers);
+        Assert.Single(Views(window));
+    }
+
+    private sealed class NoDialogs : Stanley.App.Documents.IFileDialogs
+    {
+        public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(null);
+        public Task<string?> PickSaveLocationAsync(string title, string suggestedName) => Task.FromResult<string?>(null);
+        public Task<string?> PickExportFileAsync(string title, string suggestedFileName, string extension, string fileTypeName) => Task.FromResult<string?>(null);
+        public Task<Stanley.App.Documents.SaveChangesChoice> AskSaveChangesAsync(string documentTitle) => Task.FromResult(Stanley.App.Documents.SaveChangesChoice.Cancel);
+        public Task<string?> PickSvgEditorAsync(string? currentPath) => Task.FromResult<string?>(null);
+        public Task<bool> AskInstallUpdateAsync(string version, string? notes) => Task.FromResult(false);
+        public Task<bool> AskDeleteIssueAsync(string caption) => Task.FromResult(false);
+    }
+
+    [Fact]
+    public void The_Layers_pane_can_be_hidden_and_shown_again_right_of_the_page()
     {
         var (window, editor) = Open();
         try
@@ -50,7 +73,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
             Dispatcher.UIThread.RunJobs();
         }
     }
@@ -62,6 +85,8 @@ public class LayersPaneTests
         try
         {
             var canvas = window.GetVisualDescendants().OfType<PageCanvasControl>().Single();
+            editor.ShowLayers = false;
+            Dispatcher.UIThread.RunJobs();
             var before = canvas.Bounds.Width;
 
             editor.ShowLayers = true;
@@ -74,7 +99,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -89,21 +114,21 @@ public class LayersPaneTests
             Dispatcher.UIThread.RunJobs();
             var check = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Name == "ShowLayersCheck");
             Assert.True(check.IsVisible);
-            Assert.False(check.IsChecked);
-
-            check.IsChecked = true;
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(editor.ShowLayers);
-            Assert.Single(Views(window));
+            Assert.Equal(editor.ShowLayers, check.IsChecked);
 
             check.IsChecked = false;
             Dispatcher.UIThread.RunJobs();
             Assert.False(editor.ShowLayers);
             Assert.Empty(Views(window));
+
+            check.IsChecked = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(editor.ShowLayers);
+            Assert.Single(Views(window));
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -117,13 +142,15 @@ public class LayersPaneTests
             navigator.AddPageAfter(navigator.Pages[^1]);
             Dispatcher.UIThread.RunJobs();
 
-            editor.ShowLayers = true;
+            editor.ShowLayers = false;
+            Assert.All(navigator.AllPages, p => Assert.False(p.Editor.ShowLayers));
 
+            editor.ShowLayers = true;
             Assert.All(navigator.AllPages, p => Assert.True(p.Editor.ShowLayers));
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -166,7 +193,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -229,7 +256,52 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
+        }
+    }
+
+    /// <summary>#162: a row dragged up or down the list - not just the buttons - puts its layer in front of or behind the others.</summary>
+    [Fact]
+    public void Dragging_a_row_down_the_list_sends_its_layer_behind_what_it_passes()
+    {
+        var (window, editor) = Open();
+        try
+        {
+            var (panel, bubble, character, _) = CharacterWithABubbleOverIt(editor);
+            editor.Select(panel); // opens the panel's rows: the bubble, the character, the background
+            editor.ShowLayers = true;
+            Dispatcher.UIThread.RunJobs();
+            var view = Views(window).Single();
+            var bubbleRow = RowBorder(view, LayerRowKind.Bubble);
+            var characterRow = RowBorder(view, LayerRowKind.Character);
+
+            var from = CenterOf(bubbleRow, window);
+            var to = characterRow.TranslatePoint(new Point(characterRow.Bounds.Width / 2, characterRow.Bounds.Height * 0.8), window)!.Value; // the character's lower half
+            window.MouseDown(from, MouseButton.Left);
+            window.MouseMove(new Point(from.X, from.Y + 6), RawInputModifiers.LeftMouseButton);
+            window.MouseMove(to, RawInputModifiers.LeftMouseButton);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains("dragged", RowBorder(view, LayerRowKind.Bubble).Classes);
+            var line = view.List.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>()
+                .Single(r => r.Name == "DropLine" && r.DataContext is LayerRow { Kind: LayerRowKind.Background });
+            Assert.True(line.IsVisible, "a line shows where the bubble would land: just above the background");
+            LookTabTests.Snapshot(window, "layers-pane-dragging");
+
+            window.MouseUp(to, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+
+            var order = PanelStack.Order(editor.Working.Panels[panel]).ToList();
+            Assert.True(order.IndexOf(new StackItem(StackKind.Bubble, bubble)) < order.IndexOf(new StackItem(StackKind.Character, character)), "the bubble is behind the character now");
+            Assert.Equal(bubble, editor.SelectedBubbleIndex);
+            Assert.DoesNotContain(view.List.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("dragged"));
+            Assert.DoesNotContain(view.List.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Rectangle>(), r => r.Name == "DropLine" && r.IsVisible);
+
+            window.History.Undo();
+            Assert.Null(editor.Working.Panels[panel].Stack);
+        }
+        finally
+        {
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -284,7 +356,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -313,7 +385,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 
@@ -332,7 +404,7 @@ public class LayersPaneTests
         }
         finally
         {
-            editor.ShowLayers = false;
+            editor.ShowLayers = true; // back to the default, for the tests that follow
         }
     }
 }

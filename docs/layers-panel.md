@@ -1,10 +1,10 @@
 # Layers panel — what's in front of what
 
-**Status: implemented** (issue #17, slices 1–4 of §8). A list of the page's
-panels and what each holds, to pick overlapping things and move them in front
-of or behind each other - bubbles, characters and drawings alike. It came with a
-change to how a panel stacks: three fixed tiers became one stack the user can
-arrange.
+**Status: implemented** (issue #17, slices 1–4 of §8; shown by default and
+drag-and-drop since #161 and #162). A list of the page's panels and what each
+holds, to pick overlapping things and move them in front of or behind each
+other - bubbles, characters and drawings alike. It came with a change to how a
+panel stacks: three fixed tiers became one stack the user can arrange.
 
 Scope: how a panel orders its bubbles, characters and drawn elements, how that
 order is saved, and the pane that shows and changes it. Not how any of those
@@ -36,8 +36,11 @@ in front of all of them.
   characters and drawings interleave in any order. A panel stays "automatic" (the
   tiers above, no new data) until the user arranges it in the Layers pane.
 - **A right-hand dock**, so the pane is visible together with the Pages thumbnails.
-  Shown from View › Panes › Layers; off by default, remembered per user
-  (`AppSettings.ShowLayers`).
+  **On by default** (#161: a tester only found it by hunting through View - a pane you
+  have to know about is one most people never see); View › Panes › Layers hides it,
+  remembered per user (`AppSettings.ShowLayers`, true unless the file says `False`).
+  The key is only written once someone flips the switch, so an older profile that never
+  touched it gets the new default; one that turned the pane off keeps it off.
 - **Front first, top to bottom** - Office's Selection Pane convention, and "move up"
   means "towards the front". (ComiPo's screenshot lists back-first.)
 - **Panels in reading order** (`PageDocument.PanelOrder`). A panel's position there is
@@ -99,6 +102,8 @@ caller skips the undo step.
 - `Move(panel, item, StackMove)` - one place forward/back or all the way, past
   whatever kind of thing is next. Works on the order as drawn now, so the first move
   in an automatic panel writes the whole stack.
+- `MoveTo(panel, item, slot)` - straight to a place in that order (0 the back, past
+  either end clamped to it): what a drop in the pane does. `Move` is built on it.
 - `Arranged(panel, order)` - writes `Stack`, gives every character an id, and gives
   two things that share an id a new one (only a hand-edited or merged file can), so
   the order written is the order read back.
@@ -162,6 +167,29 @@ gets can't disagree:
 - Four buttons above the list: to front, forward, backward, to back, acting on the
   primary selected layer. A button that can't act is disabled and its tooltip says
   why (`ToolTip.ShowOnDisabled`). One undo step each.
+- **Drag and drop** (#162): press a bubble, character or drawing row and move 4 px up
+  or down, and it's being dragged - it fades (`LayerRow.IsDragged`) and a 2 px line
+  (`LayerRow.ShowDropLine`, the `DropLine` rectangle in the row template) shows the
+  row it would land just above. Letting go moves it there (one undo step) and selects
+  it; a release where it started moves nothing and adds no undo step. Panel and
+  background rows aren't dragged (a press on them stays a click).
+  - The view only turns pointer positions into a *gap* - the index of the row the
+    pointer is in the top half of (`LayersView.GapAt`, using the item containers'
+    bounds) - and scrolls the list when the pointer's near its top or bottom. The
+    view model does the rest: `BeginDrag(row)`, `DragOver(gap)`, `Drop()`,
+    `CancelDrag()`, so it's unit-tested without a window.
+  - A layer stays in its own panel: `DragOver` clamps the gap to between the panel's
+    first layer row and its Background row (just above it = the very back), so
+    dragging past a panel's header or off the end of the list stops at that end.
+  - Rows are front first, the stack back first: `Drop` turns the gap into a place in
+    the front-first list (minus one if it's below the row's own place, which closes up
+    when it's taken out) and then into a stack slot, and calls
+    `PageEditorViewModel.MoveInStackTo` → `PanelStackEditing.MoveTo(panel, item, slot)`.
+  - `Rebuild` cancels a drag - the rows it pointed at are gone. The pointer's implicit
+    capture stays on the pressed row's element, so moves and the release still reach
+    the list's handlers wherever the pointer goes; the release handler clears
+    `_dragging` *before* the capture-lost handler (which cancels a drag that's still
+    going) runs.
 
 ## 6. The right-hand dock
 
@@ -189,7 +217,7 @@ gets can't disagree:
 | `Stanley.Editing` | `PanelStackEditing`; `Clippings` and `PanelLayoutEditing.Split` carry the stack along |
 | `Stanley.Rendering` | `PageRenderer` walks `PanelStack.Order` |
 | `Stanley.EditorFramework` | `EditorDockHost`, `EditorWorkspace`: the right-hand dock |
-| `Stanley.Editors` | `Layers/*`, `PageEditorViewModel.MoveInStack` (+ `Reorder*` / `SetElementLayer` / group and ungroup redirecting in an arranged panel), `PageCanvasControl.StackedAt` |
+| `Stanley.Editors` | `Layers/*`, `PageEditorViewModel.MoveInStack` / `MoveInStackTo` (+ `Reorder*` / `SetElementLayer` / group and ungroup redirecting in an arranged panel), `PageCanvasControl.StackedAt` |
 | `Stanley.App` | `AppSettings.ShowLayers`, the `DataTemplate`, `MainWindowViewModel.Load` |
 
 ## 8. Delivery slices
@@ -213,12 +241,12 @@ gets can't disagree:
 
 ## 9. Later / open questions
 
-- Hide and lock toggles per layer; drag-and-drop to reorder in the list.
+- Hide and lock toggles per layer.
+- Dragging a layer into another panel (a drop only ever reorders within its own).
 - Reordering panels (z-order *is* reading order, and re-tiling rebuilds it).
 - Showing a group's children, and moving a multi-selection as a block (a move acts on
   the primary item only).
 - Keyboard shortcuts (Ctrl+[ and Ctrl+]), and "Bring forward" in the right-click menus.
-- Whether to show the pane by default once it's been used in anger.
 
 ## 10. Gotchas for the next person
 
@@ -233,5 +261,14 @@ gets can't disagree:
 - A command-disabled Avalonia button still has `IsEnabled == true`; headless tests
   check `IsEffectivelyEnabled`.
 - Headless tests share one real settings file for the whole process: any test that
-  switches the Layers pane on must switch it off again (`ShowLayers = false` in a
-  `finally`), or every later window comes up with it open.
+  switches the Layers pane off must switch it back on (`ShowLayers = true` in a
+  `finally`), or every later window comes up without it. Every other headless test
+  runs with the pane showing, as people see it. A test that needs the true default
+  regardless builds its window on a `MainWindowViewModel` with no settings
+  (`AppSettings(null)`), as `The_Layers_pane_shows_from_the_start` does.
+- The pane's tool buttons are named `BringToFrontButton` / `SendToBackButton`, the same
+  as the Bubble tab's: a headless test looking one up by name from the whole window
+  gets two now that the pane shows by default - search the ribbon or the pane, not the
+  window.
+- `LayersPaneMemory` with no getter/setter (`PageEditorHost.CreateWorkspace` without a
+  host, i.e. unit tests) starts showing too.

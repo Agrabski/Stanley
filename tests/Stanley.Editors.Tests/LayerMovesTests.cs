@@ -104,6 +104,109 @@ public class LayerMovesTests
 
     private static bool RowSelected(Scene scene, LayerRowKind kind) => scene.Layers.Rows.Single(r => r.Kind == kind).IsSelected;
 
+    private static LayerRow Row(Scene scene, LayerRowKind kind, int index = -1) => scene.Layers.Rows.Single(r => r.Kind == kind && r.Index == index);
+
+    /// <summary>Drags <paramref name="row"/> to the gap above <c>Rows[gap]</c> and lets go there.</summary>
+    private static void DragAndDrop(Scene scene, LayerRow row, int gap)
+    {
+        Assert.True(scene.Layers.BeginDrag(row));
+        scene.Layers.DragOver(gap);
+        scene.Layers.Drop();
+    }
+
+    [Fact]
+    public void Dragging_a_layer_to_the_top_of_its_panels_list_puts_it_in_front_in_one_undo_step_and_selects_it()
+    {
+        var scene = NewScene();
+        scene.Editor.Select(scene.Panel);
+        // [Panel 1, Speech bubble, Text, hero, Shape, Background]
+        var shape = Row(scene, LayerRowKind.Element, 0);
+        Assert.Equal(4, scene.Layers.Rows.IndexOf(shape));
+
+        Assert.True(scene.Layers.BeginDrag(shape));
+        Assert.True(scene.Layers.IsDragging);
+        Assert.True(shape.IsDragged);
+        scene.Layers.DragOver(1);
+        Assert.True(scene.Layers.Rows[1].ShowDropLine);
+        scene.Layers.Drop();
+
+        Assert.Equal([Hero, Caption, Speech, Shape], scene.Order);
+        Assert.Equal(ElementLayer.Foreground, scene.Current.Elements[0].Layer); // in front of the character now
+        Assert.Equal(0, scene.Editor.SelectedElementIndex);
+        Assert.True(Row(scene, LayerRowKind.Element, 0).IsSelected);
+        Assert.False(scene.Layers.IsDragging);
+        Assert.DoesNotContain(scene.Layers.Rows, r => r.IsDragged || r.ShowDropLine);
+
+        scene.History.Undo();
+        Assert.Equal([Shape, Hero, Caption, Speech], scene.Order);
+        Assert.False(scene.History.CanUndo);
+    }
+
+    [Fact]
+    public void Dragging_a_layer_down_the_list_puts_it_behind_what_it_passes()
+    {
+        var scene = NewScene();
+        scene.Editor.Select(scene.Panel);
+
+        DragAndDrop(scene, Row(scene, LayerRowKind.Bubble, 0), 4); // above the shape: under the character
+
+        Assert.Equal([Shape, Speech, Hero, Caption], scene.Order);
+        Assert.Equal(0, scene.Editor.SelectedBubbleIndex);
+    }
+
+    [Fact]
+    public void A_layer_dragged_past_its_panels_rows_stops_at_the_front_or_just_above_the_background()
+    {
+        var scene = NewScene();
+        scene.Editor.Select(scene.Panel);
+
+        DragAndDrop(scene, Row(scene, LayerRowKind.Element, 1), 0); // over the panel's own row
+        Assert.Equal([Shape, Hero, Speech, Caption], scene.Order);
+
+        DragAndDrop(scene, Row(scene, LayerRowKind.Character, 0), 99); // below the end of the list
+        Assert.Equal([Hero, Shape, Speech, Caption], scene.Order);
+        Assert.Equal(0, scene.Editor.SelectedCharacterIndex);
+    }
+
+    [Fact]
+    public void Dropping_a_layer_where_it_was_shows_no_line_and_adds_nothing_to_undo()
+    {
+        var scene = NewScene();
+        scene.Editor.Select(scene.Panel);
+        var hero = Row(scene, LayerRowKind.Character, 0);
+        var at = scene.Layers.Rows.IndexOf(hero);
+
+        Assert.True(scene.Layers.BeginDrag(hero));
+        scene.Layers.DragOver(at);
+        Assert.DoesNotContain(scene.Layers.Rows, r => r.ShowDropLine);
+        scene.Layers.DragOver(at + 1);
+        Assert.DoesNotContain(scene.Layers.Rows, r => r.ShowDropLine);
+        scene.Layers.Drop();
+
+        Assert.False(scene.History.CanUndo);
+        Assert.Null(scene.Current.Stack);
+        Assert.Equal(0, scene.Editor.SelectedCharacterIndex);
+    }
+
+    [Fact]
+    public void Panels_and_backgrounds_are_not_dragged_and_a_cancelled_drag_moves_nothing()
+    {
+        var scene = NewScene();
+        scene.Editor.Select(scene.Panel);
+
+        Assert.False(scene.Layers.BeginDrag(Row(scene, LayerRowKind.Panel)));
+        Assert.False(scene.Layers.BeginDrag(Row(scene, LayerRowKind.Background)));
+        Assert.False(scene.Layers.IsDragging);
+
+        Assert.True(scene.Layers.BeginDrag(Row(scene, LayerRowKind.Bubble, 0)));
+        scene.Layers.DragOver(5);
+        scene.Layers.CancelDrag();
+        scene.Layers.Drop(); // nothing being dragged any more
+
+        Assert.False(scene.History.CanUndo);
+        Assert.DoesNotContain(scene.Layers.Rows, r => r.IsDragged || r.ShowDropLine);
+    }
+
     [Fact]
     public void A_button_that_cannot_act_is_disabled_and_says_why()
     {

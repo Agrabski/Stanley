@@ -19,7 +19,7 @@ public static class PageEditorHost
     /// whichever tab is active, never the side panes. With <paramref name="myAssets"/>, the
     /// Characters pane and every page can keep things in My Assets and take them from there.
     /// The Layers pane is docked on the right, showing or hidden as <paramref name="layersPane"/>
-    /// says (hidden, in memory only, if none is given) and following it as it changes.
+    /// says (showing, in memory only, if none is given) and following it as it changes.
     /// </summary>
     public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null, LayersPaneMemory? layersPane = null)
     {

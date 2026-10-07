@@ -379,6 +379,40 @@ public class PageEditorTests
         Assert.Same(Tab("HomeTab"), ribbon.TabControl.SelectedItem); // the Panel tab it was on went away
     }
 
+    /// <summary>#160: with several tails, clicking one's orange tip picks it - it's ringed - and the Bubble tab's Remove tail takes off that one, not the newest.</summary>
+    [Fact]
+    public void Clicking_a_tails_tip_picks_it_for_the_Bubble_tabs_Remove_tail()
+    {
+        var window = new MainWindow();
+        window.Show();
+        var canvas = GetPageCanvasControl(window)!;
+        var ribbon = window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>().Single();
+        var editor = window.Editor;
+        var panelId = editor.Working.PanelOrder[0];
+        var bounds = editor.PanelBounds(panelId);
+        var index = editor.CreateBubble(panelId, new Point2D(bounds.MidX, bounds.Top + bounds.Height * 0.3));
+        editor.AddBubbleTail(panelId, index, new Point2D(bounds.Left + bounds.Width * 0.2, bounds.Bottom - 10));
+        var tails = editor.SelectedBubble!.Tails;
+        Assert.Equal(2, tails.Count);
+        Assert.Equal(1, editor.CurrentTailIndex); // the newest, until another is picked
+
+        var tip = canvas.TranslatePoint(canvas.PageToControl(tails[0].Target), window)!.Value;
+        window.MouseDown(tip, MouseButton.Left);
+        window.MouseUp(tip, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0, editor.CurrentTailIndex);
+        Assert.Equal(index, editor.SelectedBubbleIndex);
+        LookTabTests.Snapshot(window, "bubble-picked-tail");
+
+        ribbon.TabControl.SelectedItem = ribbon.TabControl.Items.OfType<TabItem>().Single(t => t.Name == "BubbleTab");
+        Dispatcher.UIThread.RunJobs();
+        var remove = ribbon.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "RemoveTailButton");
+        Assert.Contains("ringed tail", ToolTip.GetTip(remove) as string, StringComparison.Ordinal);
+        remove.Command!.Execute(remove.CommandParameter);
+
+        Assert.Equal([tails[1]], editor.Working.Panels[panelId].Bubbles[index].Tails);
+    }
+
     /// <summary>The File button opens the full-window File view over the ribbon and page; Escape goes back.</summary>
     [Fact]
     public void FileButton_OpensTheBackstage_AndEscapeReturns()

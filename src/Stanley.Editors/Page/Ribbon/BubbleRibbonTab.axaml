@@ -71,7 +71,7 @@
                   Add tail
               </Button>
               <Button Name="RemoveTailButton" Classes="small" Command="{Binding RemoveTailCommand}"
-                      ToolTip.Tip="Remove the most recently added tail (right-click a tail to remove that one)"
+                      ToolTip.Tip="{Binding RemoveTailTip}" ToolTip.ShowOnDisabled="True"
                       HorizontalAlignment="Stretch">
                   Remove tail
               </Button>
