@@ -36,8 +36,11 @@ in front of all of them.
   characters and drawings interleave in any order. A panel stays "automatic" (the
   tiers above, no new data) until the user arranges it in the Layers pane.
 - **A right-hand dock**, so the pane is visible together with the Pages thumbnails.
-  Shown from View › Panes › Layers; off by default, remembered per user
-  (`AppSettings.ShowLayers`).
+  **On by default** (#161: a tester only found it by hunting through View - a pane you
+  have to know about is one most people never see); View › Panes › Layers hides it,
+  remembered per user (`AppSettings.ShowLayers`, true unless the file says `False`).
+  The key is only written once someone flips the switch, so an older profile that never
+  touched it gets the new default; one that turned the pane off keeps it off.
 - **Front first, top to bottom** - Office's Selection Pane convention, and "move up"
   means "towards the front". (ComiPo's screenshot lists back-first.)
 - **Panels in reading order** (`PageDocument.PanelOrder`). A panel's position there is
@@ -218,7 +221,6 @@ gets can't disagree:
 - Showing a group's children, and moving a multi-selection as a block (a move acts on
   the primary item only).
 - Keyboard shortcuts (Ctrl+[ and Ctrl+]), and "Bring forward" in the right-click menus.
-- Whether to show the pane by default once it's been used in anger.
 
 ## 10. Gotchas for the next person
 
@@ -233,5 +235,14 @@ gets can't disagree:
 - A command-disabled Avalonia button still has `IsEnabled == true`; headless tests
   check `IsEffectivelyEnabled`.
 - Headless tests share one real settings file for the whole process: any test that
-  switches the Layers pane on must switch it off again (`ShowLayers = false` in a
-  `finally`), or every later window comes up with it open.
+  switches the Layers pane off must switch it back on (`ShowLayers = true` in a
+  `finally`), or every later window comes up without it. Every other headless test
+  runs with the pane showing, as people see it. A test that needs the true default
+  regardless builds its window on a `MainWindowViewModel` with no settings
+  (`AppSettings(null)`), as `The_Layers_pane_shows_from_the_start` does.
+- The pane's tool buttons are named `BringToFrontButton` / `SendToBackButton`, the same
+  as the Bubble tab's: a headless test looking one up by name from the whole window
+  gets two now that the pane shows by default - search the ribbon or the pane, not the
+  window.
+- `LayersPaneMemory` with no getter/setter (`PageEditorHost.CreateWorkspace` without a
+  host, i.e. unit tests) starts showing too.
