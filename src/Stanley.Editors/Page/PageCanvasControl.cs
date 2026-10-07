@@ -516,11 +516,14 @@ public sealed class PageCanvasControl : Control
                 return new Hit(HitKind.PanelCorner, id, Edges: edges);
         }
 
-        if (!doc.LayoutLocked && PanelGutters.FindAt(doc.Panels.Values, p, EdgeBandPx / _zoom) is { } gutter)
-            return new Hit(HitKind.Gutter, Gutter: gutter);
-
+        // What's in a panel wins over the gutter's grab band reaching into it, as over its edge
+        // band below (#30: a character standing on the bottom of a panel couldn't be clicked by
+        // her feet) - the gutter itself, between the panels, is still there to drag.
         if (StackedAt(p) is { } stacked)
             return stacked;
+
+        if (!doc.LayoutLocked && PanelGutters.FindAt(doc.Panels.Values, p, EdgeBandPx / _zoom) is { } gutter)
+            return new Hit(HitKind.Gutter, Gutter: gutter);
 
         var band = EdgeBandPx / _zoom;
         for (var i = doc.PanelOrder.Count - 1; i >= 0; i--)

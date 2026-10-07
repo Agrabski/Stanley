@@ -88,6 +88,42 @@ public class CharacterTests
         Assert.IsType<CharacterEditorViewModel>(window.Workspace.ActiveEditor);
     }
 
+    /// <summary>
+    /// #30: a character standing on the bottom of a panel, with a panel below, couldn't be
+    /// clicked by her feet - the gutter's grab band reaching into the panel won, and the
+    /// press went to the gutter instead. Things in a panel now win over it there, as over
+    /// the panel's own edge band; the gutter between the panels still drags.
+    /// </summary>
+    [Fact]
+    public void A_character_standing_on_a_panels_bottom_edge_is_selected_by_a_click_on_her_feet()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var page = window.Editor;
+        page.SplitPanel(page.Working.PanelOrder[0], Stanley.Editing.BoundaryOrientation.Horizontal, 0.5);
+        var (top, below) = (page.Working.PanelOrder[0], page.Working.PanelOrder[1]);
+        var bounds = page.PanelBounds(top);
+        Assert.True(page.PanelBounds(below).Top > bounds.Bottom, "a gutter between the two panels");
+        page.InsertCharacter(created.Id, top, new ProjectModel.Geometry.Point2D(bounds.MidX, bounds.Bottom));
+        page.ClearSelection();
+        Dispatcher.UIThread.RunJobs();
+
+        var canvas = Single<PageCanvasControl>(window);
+        var instance = page.Working.Panels[top].CharacterInstances[0];
+        // On her foot, two screen pixels above the floor - well inside the gutter's grab band.
+        var ankle = Stanley.Editing.CharacterPosing.EndPoint(page.CharacterSnapshot[instance.CharacterId], instance, Stanley.Editing.Limb.LeftLeg);
+        var foot = new ProjectModel.Geometry.Point2D(ankle.X, bounds.Bottom - 2 / canvas.Zoom);
+        using (var silhouette = Stanley.Rendering.CharacterRenderers.Default.BuildSilhouette(page.CharacterSnapshot[instance.CharacterId], instance.Placement, instance.Pose.ViewAngle, instance.Pose))
+            Assert.True(silhouette.Contains((float)foot.X, (float)foot.Y), "the point is on her foot");
+        var at = canvas.TranslatePoint(canvas.PageToControl(foot), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(top, page.SelectedPanelId);
+        Assert.Equal(0, page.SelectedCharacterIndex);
+    }
+
     [Fact]
     public void ClickingTheAlreadyCurrentPage_WhileACharacterEditorIsShowing_BringsThePageBack()
     {
