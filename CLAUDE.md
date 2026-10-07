@@ -109,7 +109,8 @@ overlapping things and move them forward or back (or all the way) with its butto
 **dragging a row** up or down, past each other whatever they are; selecting there and on
 the page follow each other. A panel arranged that way keeps its own
 `Panel.Stack` (written only then; `PanelStack.Order` is what the renderer, picking and the
-pane all walk), and its To front / To back mean the front / back of the whole stack. A bubble's
+pane all walk), and its To front / To back mean the front / back of the whole stack. A bubble with several tails rings the one **Remove tail** takes off - the newest until
+you click another's orange dot (`PageEditorViewModel.CurrentTailIndex`). A bubble's
 **font size is absolute** - a bubble too small for its text grows to fit
 (`BubbleTextRenderer.NeededScale` → `BubbleEditing.GrowToFit`) instead of the letters
 shrinking; one dragged smaller by hand lets its text spill. An issue can be deleted

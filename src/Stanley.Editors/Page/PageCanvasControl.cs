@@ -304,7 +304,7 @@ public sealed class PageCanvasControl : Control
             or nameof(PageEditorViewModel.IssueLooks) or nameof(PageEditorViewModel.SelectedElementIndex)
             or nameof(PageEditorViewModel.PictureSnapshot) or nameof(PageEditorViewModel.Fields)
             or nameof(PageEditorViewModel.SelectionCount) or nameof(PageEditorViewModel.IsEditingPoints)
-            or nameof(PageEditorViewModel.SelectedPointIndex))
+            or nameof(PageEditorViewModel.SelectedPointIndex) or nameof(PageEditorViewModel.CurrentTailIndex))
             InvalidateVisual();
         if (e.PropertyName == nameof(PageEditorViewModel.Tool))
         {
@@ -358,7 +358,8 @@ public sealed class PageCanvasControl : Control
             _drag == DragKind.None ? _pointGhost : null,
             FreeformDraft(),
             _freeformPanel is { } freeformPanel && _viewModel.Working.Panels.ContainsKey(freeformPanel) ? _viewModel.PanelBounds(freeformPanel) : null,
-            _drag == DragKind.None ? _freeformPointer : null)));
+            _drag == DragKind.None ? _freeformPointer : null,
+            _viewModel.CurrentTailIndex)));
     }
 
     /// <summary>The Freeform tool's shape so far, in the current pen - closed (and filled) when the pointer is on the first point, where a click closes it.</summary>

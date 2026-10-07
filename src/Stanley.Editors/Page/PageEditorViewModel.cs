@@ -53,6 +53,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     private PanelId? _selectedPanelId;
     private int _selectedBubbleIndex = -1;
+    // The selected bubble's tail the user last picked (pressed its tip or base), which Remove tail
+    // takes off; -1 until they pick one, when the newest is the one.
+    private int _pickedTailIndex = -1;
     private int _selectedCharacterIndex = -1;
     private ICharacterCatalog? _catalog;
     private BubbleStylePreset _newBubbleStyle = BubbleStylePreset.Speech;
@@ -80,7 +83,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         }, () => HasSelectedBubble || HasSelectedText);
         AddTailCommand = new RelayCommand(() => AddBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex), () => HasSelectedBubble);
         RemoveTailCommand = new RelayCommand(
-            () => RemoveBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex, SelectedBubble!.Tails.Count - 1),
+            () => RemoveBubbleTail(_selectedPanelId!.Value, _selectedBubbleIndex, CurrentTailIndex),
             () => SelectedBubbleHasTails);
         BringToFrontCommand = new RelayCommand(() => ReorderSelection(toFront: true), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
         SendToBackCommand = new RelayCommand(() => ReorderSelection(toFront: false), () => HasSelectedBubble || HasSelectedCharacter || HasSelectedElement);
@@ -656,6 +659,34 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     public bool HasSelection => HasSelectedPanel;
     public bool SelectedBubbleHasTails => SelectedBubble is { Tails.Count: > 0 };
 
+    /// <summary>
+    /// The selected bubble's tail that Remove tail takes off, ringed on the page when it has
+    /// several: the one last pressed (its tip or its base), or the newest until one is. -1 with no
+    /// bubble, or one without tails, selected.
+    /// </summary>
+    public int CurrentTailIndex =>
+        SelectedBubble is { Tails.Count: > 0 } bubble
+            ? _pickedTailIndex >= 0 && _pickedTailIndex < bubble.Tails.Count ? _pickedTailIndex : bubble.Tails.Count - 1
+            : -1;
+
+    /// <summary>The Remove tail button's tooltip: which tail it takes off, and how to pick another.</summary>
+    public string RemoveTailTip => SelectedBubble?.Tails.Count switch
+    {
+        null => "Select a bubble to remove one of its tails",
+        0 => "This bubble has no tail to remove",
+        1 => "Remove the bubble's tail",
+        _ => "Remove the ringed tail - click another tail's orange dot to pick that one instead (or right-click a tail)"
+    };
+
+    /// <summary>Makes <paramref name="tailIndex"/> of the selected bubble the one Remove tail takes off.</summary>
+    public void PickTail(int tailIndex)
+    {
+        if (tailIndex == _pickedTailIndex)
+            return;
+        _pickedTailIndex = tailIndex;
+        OnPropertyChanged(nameof(CurrentTailIndex));
+    }
+
     /// <summary>The primary item - the bubble, character or element the single-selection properties point at - as a <see cref="SelectedItem"/>, or null with a panel (or nothing) selected.</summary>
     private SelectedItem? PrimaryItem =>
         _selectedBubbleIndex >= 0 ? new SelectedItem(SelectionKind.Bubble, _selectedBubbleIndex)
@@ -957,6 +988,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     private void RaiseSelectionChanged()
     {
+        _pickedTailIndex = -1; // a newly selected bubble starts from its newest tail
         OnSelectionChangedForPoints();
         OnPropertyChanged(nameof(SelectedPanelId));
         OnPropertyChanged(nameof(SelectedBubbleIndex));
@@ -987,6 +1019,8 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     private void RaiseBubbleDerivedChanged()
     {
         OnPropertyChanged(nameof(SelectedBubbleHasTails));
+        OnPropertyChanged(nameof(CurrentTailIndex));
+        OnPropertyChanged(nameof(RemoveTailTip));
         OnPropertyChanged(nameof(CurrentBubbleStyle));
         OnPropertyChanged(nameof(IsSpeechStyle));
         OnPropertyChanged(nameof(IsShoutStyle));
@@ -1134,6 +1168,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
         _ when HasSelectedText => "Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
         _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
+        _ when SelectedBubble is { Tails.Count: > 1 } => "Remove tail takes off the ringed tail - click another tail's orange dot to pick it · drag a dot to aim its tail · drag the bubble to move it (Ctrl takes the tails along) · Enter edits text · Delete removes the bubble.",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel && Working.LayoutLocked => "Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock on the Layout tab.",
         _ when IsSelectedPanelCloud => "Thought cloud - drag the last dot to point at whoever's thinking · drag a corner to resize · it floats over the layout, so re-tiling leaves it be.",
@@ -1612,13 +1647,18 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) =>
             EditResult<Bubble>.Success(GrowBubbleToFit(BubbleEditing.SetStyle(b, style).Value))));
 
-    public void AddBubbleTail(PanelId panelId, int bubbleIndex, Point2D target) =>
+    public void AddBubbleTail(PanelId panelId, int bubbleIndex, Point2D target)
+    {
+        // The new tail is the one to aim next - and the one Remove tail would take back off.
+        if (IsSelectedBubble(panelId, bubbleIndex))
+            PickTail(-1);
         Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, panelBounds) =>
         {
             var clamped = BubbleEditing.Clamp(target, panelBounds);
             var added = BubbleEditing.AddTail(b, clamped).Value;
             return BubbleEditing.SlideTailAttachment(added, added.Tails.Count - 1, clamped);
         }));
+    }
 
     /// <summary>Adds a tail aimed somewhere sensible without asking where (see <see cref="DefaultTailTarget"/>); the user then drags its tip onto the speaker.</summary>
     public void AddBubbleTail(PanelId panelId, int bubbleIndex)
@@ -1630,16 +1670,36 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         AddBubbleTail(panelId, bubbleIndex, DefaultTailTarget(bubble, Bounds(panel)));
     }
 
-    public void RemoveBubbleTail(PanelId panelId, int bubbleIndex, int tailIndex) =>
+    public void RemoveBubbleTail(PanelId panelId, int bubbleIndex, int tailIndex)
+    {
+        // The picked tail stays picked when another one goes (its index shifts down past a lower
+        // one); when it's the one that goes, the newest left takes over.
+        if (IsSelectedBubble(panelId, bubbleIndex) && _pickedTailIndex >= 0 && tailIndex >= 0 && tailIndex <= _pickedTailIndex)
+            PickTail(tailIndex == _pickedTailIndex ? -1 : _pickedTailIndex - 1);
         Apply(EditBubbleInPanel(Working, panelId, bubbleIndex, (b, _) => BubbleEditing.RemoveTail(b, tailIndex)));
+    }
 
-    public void BeginMoveBubbleTail(PanelId panelId, int bubbleIndex, int tailIndex) => BeginGesture();
+    private bool IsSelectedBubble(PanelId panelId, int bubbleIndex) => Equals(_selectedPanelId, panelId) && _selectedBubbleIndex == bubbleIndex;
+
+    /// <summary>Starts dragging a tail's tip - which also picks that tail (<see cref="CurrentTailIndex"/>).</summary>
+    public void BeginMoveBubbleTail(PanelId panelId, int bubbleIndex, int tailIndex)
+    {
+        if (IsSelectedBubble(panelId, bubbleIndex))
+            PickTail(tailIndex);
+        BeginGesture();
+    }
 
     public void UpdateMoveBubbleTail(PanelId panelId, int bubbleIndex, int tailIndex, Point2D newTarget) =>
         UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, panelBounds) =>
             BubbleEditing.MoveTailTarget(b, tailIndex, BubbleEditing.Clamp(newTarget, panelBounds))));
 
-    public void BeginSlideBubbleTailAttachment(PanelId panelId, int bubbleIndex, int tailIndex) => BeginGesture();
+    /// <summary>Starts sliding a tail's base round the bubble - which also picks that tail (<see cref="CurrentTailIndex"/>).</summary>
+    public void BeginSlideBubbleTailAttachment(PanelId panelId, int bubbleIndex, int tailIndex)
+    {
+        if (IsSelectedBubble(panelId, bubbleIndex))
+            PickTail(tailIndex);
+        BeginGesture();
+    }
 
     public void UpdateSlideBubbleTailAttachment(PanelId panelId, int bubbleIndex, int tailIndex, Point2D pointer) =>
         UpdateGesture(EditBubbleInPanel(Committed, panelId, bubbleIndex, (b, _) =>
