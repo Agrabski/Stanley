@@ -21,6 +21,9 @@
         <SolidColorBrush x:Key="StanleyLetteringTextBrush" Color="#0E6E8C" />
         <SolidColorBrush x:Key="StanleyErrorBrush" Color="#B3261E" />
         <SolidColorBrush x:Key="StanleySuccessBrush" Color="#1E7A45" />
+        <SolidColorBrush x:Key="StanleyDangerBrush" Color="#C0281A" />
+        <SolidColorBrush x:Key="StanleyDangerHoverBrush" Color="#CE3525" />
+        <SolidColorBrush x:Key="StanleyDangerPressedBrush" Color="#9C2014" />
         <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#FFF4E0" />
         <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#F0B35A" />
         <SolidColorBrush x:Key="StanleySelectionBrush" Color="#1E5AA8" />
@@ -43,6 +46,9 @@
         <SolidColorBrush x:Key="StanleyLetteringTextBrush" Color="#7FD3F0" />
         <SolidColorBrush x:Key="StanleyErrorBrush" Color="#FF8A80" />
         <SolidColorBrush x:Key="StanleySuccessBrush" Color="#7FDCA4" />
+        <SolidColorBrush x:Key="StanleyDangerBrush" Color="#C73A2E" />
+        <SolidColorBrush x:Key="StanleyDangerHoverBrush" Color="#CF4034" />
+        <SolidColorBrush x:Key="StanleyDangerPressedBrush" Color="#A52B22" />
         <SolidColorBrush x:Key="StanleyNoticeBackgroundBrush" Color="#3A2F1C" />
         <SolidColorBrush x:Key="StanleyNoticeBorderBrush" Color="#8C6A2E" />
         <SolidColorBrush x:Key="StanleySelectionBrush" Color="#6FA8F0" />
@@ -481,6 +487,30 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="10,6" />
+  </Style>
+  <!-- The button that confirms something that can't be undone (Delete an issue, Remove from My
+       Assets): red with white text, so it can't be mistaken for an ordinary choice. The states are
+       drawn through the template's presenter, the way Fluent's own buttons are, so they win over
+       Fluent's; disabled falls back to Fluent's usual greyed-out button. -->
+  <Style Selector="Button.danger">
+    <Setter Property="Background" Value="{DynamicResource StanleyDangerBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyDangerBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource StanleyDangerHoverBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyDangerHoverBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource StanleyDangerPressedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyDangerPressedBrush}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackgroundDisabled}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrushDisabled}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForegroundDisabled}" />
   </Style>
 
   <!-- Ribbon buttons never take keyboard focus, so Delete/arrow keys/shortcuts keep

@@ -97,11 +97,15 @@ public sealed class AvaloniaFileDialogs(Window owner) : IFileDialogs
             ShowInTaskbar = false
         };
 
-        Button MakeButton(string text, bool choice, bool isDefault = false, bool isCancel = false)
+        // Delete is red (the "danger" class, RibbonStyles.axaml) because it can't be undone - and Cancel, not Delete, is the
+        // default, so a stray Enter keeps the issue.
+        Button MakeButton(string text, bool choice, bool isDefault = false, bool isCancel = false, bool isDanger = false)
         {
             var button = new Button { Content = text, MinWidth = 96, IsDefault = isDefault, IsCancel = isCancel, HorizontalContentAlignment = HorizontalAlignment.Center };
             if (isDefault)
                 button.Classes.Add("accent");
+            if (isDanger)
+                button.Classes.Add("danger");
             button.Click += (_, _) => dialog.Close(choice);
             return button;
         }
@@ -120,7 +124,7 @@ public sealed class AvaloniaFileDialogs(Window owner) : IFileDialogs
                     Spacing = 8,
                     Children =
                     {
-                        MakeButton("Delete", true),
+                        MakeButton("Delete", true, isDanger: true),
                         MakeButton("Cancel", false, isDefault: true, isCancel: true)
                     }
                 }
