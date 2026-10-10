@@ -58,6 +58,13 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 			item => (item ?? Current) is { Usage: 0 }
 		);
 
+		EditCharacterCommand = new RelayCommand<CharacterItem?>(item =>
+			{
+				if ((item ?? Current) is { } target)
+					Show(target);
+			}
+		);
+
 		PlaceOnPageCommand = new RelayCommand<CharacterItem?>(item =>
 			{
 				if ((item ?? Current) is { } target)
@@ -78,7 +85,11 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
 	public bool HasNoCharacters => Items.Count == 0;
 
-	/// <summary>The character whose editor is shown, or null while a page is. Bound two-way to the list's selection; picking one shows it.</summary>
+	/// <summary>
+	/// The character whose editor is shown, or null while a page is. The list's selection follows it
+	/// (so a new character, or one opened from the page, is highlighted), but not the other way
+	/// round: clicking a row only picks it, and <see cref="EditCharacterCommand"/> opens it.
+	/// </summary>
 	public CharacterItem? Current
 	{
 		get => _current;
@@ -108,6 +119,9 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
 	/// <summary>Raised to put a character on the page being edited (a double-click in the pane, or its "Place on page"; dragging onto the page places it where it's dropped instead).</summary>
 	public event Action<CharacterId>? PlaceRequested;
+
+	/// <summary>Opens a character's body editor - the pencil on its row, "Edit body" in its right-click menu, Enter on the picked row. A click on the row alone never does.</summary>
+	public IRelayCommand<CharacterItem?> EditCharacterCommand { get; }
 
 	public IRelayCommand<CharacterItem?> PlaceOnPageCommand { get; }
 
@@ -189,8 +203,8 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
 	/// <summary>
 	/// Puts <paramref name="item"/> on the page being edited and brings the page back: a
-	/// double-click in the pane, or its "Place on page". A double-click's first click has
-	/// already opened the character, so if it's the one showing its tab closes again.
+	/// double-click in the pane, or its "Place on page". If it's open in the editor its tab
+	/// closes, as placing it means going back to the page.
 	/// </summary>
 	public void PlaceOnPage(CharacterItem item)
 	{

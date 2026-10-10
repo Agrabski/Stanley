@@ -16,7 +16,7 @@ public partial class CharacterLibraryView : UserControl
 	private Point _pressPoint;
 	private bool _dragging;
 
-	// The character the last click opened, which a second click of the same burst puts on the page.
+	// The character the last click landed on, which a second click of the same burst puts on the page.
 	private CharacterItem? _clickedItem;
 	// The character a double-click just put on the page (a third click of the burst leaves it there),
 	// and the press that did it - the handler sees each press on the way down and again on the way up.
@@ -76,10 +76,17 @@ public partial class CharacterLibraryView : UserControl
 		// A press anywhere else while a name is being edited closes that editor first, the way
 		// losing focus would - so clicking another character (or empty space) gets you out of it.
 		CommitActiveRename();
+		// A press on a row's own Edit button is that button's click, not a click or a drag on the
+		// row - so two quick clicks on it can't add up to a double-click that places the character.
+		if (e.Source is Visual onButton && onButton.GetSelfAndVisualAncestors().OfType<Button>().Any())
+		{
+			_clickedItem = null;
+			return;
+		}
 		var item = ItemFrom(e.Source);
-		// A double-click puts the character on the page. Its first click opened the
-		// character already; placing it goes back to the page. Handled here, on the way
-		// down, so the list doesn't take the focus the page gets.
+		// A double-click puts the character on the page. Its first click only picked the row
+		// (it doesn't open the editor), so placing it needs nothing undone. Handled here, on
+		// the way down, so the list doesn't take the focus the page gets.
 		if (e.ClickCount >= 2 && item != null && (ReferenceEquals(item, _clickedItem) || ReferenceEquals(item, _placedItem)) && ViewModel is { } vm)
 		{
 			_placedBy = e;
@@ -91,7 +98,6 @@ public partial class CharacterLibraryView : UserControl
 				_placedItem = item;
 				vm.PlaceOnPage(item);
 			}
-			ShowCurrentSelection();
 			e.Handled = true;
 			return;
 		}
@@ -123,29 +129,19 @@ public partial class CharacterLibraryView : UserControl
 			_dragging = false;
 			_pressedItem = null;
 			_pressArgs = null;
-			ShowCurrentSelection();
 		}
 	}
 
 	private void OnListPointerReleased(object? sender, PointerReleasedEventArgs e)
 	{
-		// A click - press and release on the same character without dragging - opens it
-		// (the one already current too, e.g. after going back to the page).
-		if (!_dragging && _pressedItem is { } item && ViewModel is { } vm && ItemFrom(e.Source) == item)
-		{
+		// A click - press and release on the same character without dragging - only picks it,
+		// which the list box already did on press; a second click of the burst places it. Opening
+		// the editor takes a deliberate step (the row's pencil, Enter, right-click > Edit body), as
+		// a stray click on the list shouldn't throw you out of the page you were working on.
+		if (!_dragging && _pressedItem is { } item && ItemFrom(e.Source) == item)
 			_clickedItem = item;
-			vm.Show(item);
-		}
 		_pressedItem = null;
 		_pressArgs = null;
-		ShowCurrentSelection();
-	}
-
-	/// <summary>The list box selects on press; put its highlight back on the character that's actually open (or none) when that press didn't open one.</summary>
-	private void ShowCurrentSelection()
-	{
-		if (ViewModel is { } vm && !ReferenceEquals(CharacterList.SelectedItem, vm.Current))
-			CharacterList.SelectedItem = vm.Current;
 	}
 
 	private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -159,7 +155,7 @@ public partial class CharacterLibraryView : UserControl
 			ItemsSource = (Control[])
 			[
 				Item("Rename", () => item.IsEditingName = true),
-				Item("Edit body", () => vm.Show(item), gesture: "Enter"),
+				Item("Edit body", () => vm.EditCharacterCommand.Execute(item), gesture: "Enter"),
 				Item("Place on page", () => vm.PlaceOnPageCommand.Execute(item)),
 				new Separator(),
 				.. MyAssetsItems(vm, item),
@@ -175,7 +171,7 @@ public partial class CharacterLibraryView : UserControl
 	{
 		if (e.Key == Key.Enter && ViewModel is { } opener && CharacterList.SelectedItem is CharacterItem selected)
 		{
-			opener.Show(selected);
+			opener.EditCharacterCommand.Execute(selected);
 			e.Handled = true;
 			return;
 		}

@@ -38,6 +38,7 @@ public class CharacterTests
 
         var item = Assert.Single(characters.Items);
         Assert.Same(item.Editor, window.Workspace.ActiveEditor);
+        Assert.Same(item, pane.List.SelectedItem); // the highlight follows a character that was just opened
         Assert.Single(window.GetVisualDescendants().OfType<CharacterEditorView>());
         Assert.Single(window.RibbonBarControl.GetVisualDescendants().OfType<CharacterEditorRibbon>());
         Assert.Empty(window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>());
@@ -46,6 +47,7 @@ public class CharacterTests
         item.Editor.BackToPageCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
         Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+        Assert.Null(pane.List.SelectedItem); // nothing is open, and nothing was picked since
         Assert.Single(window.RibbonBarControl.GetVisualDescendants().OfType<PageEditorRibbon>());
     }
 
@@ -149,12 +151,21 @@ public class CharacterTests
         window.Workspace.Factory.SetActiveDockable(characters);
         Dispatcher.UIThread.RunJobs();
         var pane = Single<CharacterLibraryView>(window);
-        var item = (Control)pane.List.ContainerFromIndex(0)!;
-        return (pane, item.TranslatePoint(new Point(item.Bounds.Width / 2, item.Bounds.Height / 2), window)!.Value);
+        return (pane, RowCenter(window, pane, 0));
     }
 
+    private static Point RowCenter(MainWindow window, CharacterLibraryView pane, int index) =>
+        CenterOf(window, (Control)pane.List.ContainerFromIndex(index)!);
+
+    private static Point CenterOf(MainWindow window, Control control) =>
+        control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
+
+    /// <summary>The pencil on a character's row.</summary>
+    private static Button EditButton(CharacterLibraryView pane, CharacterItem item) =>
+        pane.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("editBody") && ReferenceEquals(b.DataContext, item));
+
     [Fact]
-    public void Pressing_a_character_in_the_pane_to_drag_it_leaves_the_page_showing_and_a_click_opens_it()
+    public void Pressing_a_character_in_the_pane_to_drag_it_leaves_the_page_showing_and_a_click_only_picks_it()
     {
         var (window, characters) = Open();
         characters.CreateCharacter();
@@ -171,9 +182,138 @@ public class CharacterTests
         Dispatcher.UIThread.RunJobs();
         Assert.Same(window.Editor, window.Workspace.ActiveEditor);
 
-        // A plain click (no drag) opens the character.
+        // A plain click (no drag) picks it - and leaves the page where it is.
         window.MouseDown(itemCenter, MouseButton.Left);
         window.MouseUp(itemCenter, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+    }
+
+    [Fact]
+    public void Clicking_a_character_in_the_pane_picks_it_without_opening_its_editor()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        characters.CreateCharacter();
+        var (pane, _) = ShowPane(window, characters);
+        var opened = new List<CharacterItem>();
+        characters.CharacterShown += opened.Add;
+
+        var first = RowCenter(window, pane, 0);
+        window.MouseDown(first, MouseButton.Left);
+        window.MouseUp(first, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(characters.Items[0], pane.List.SelectedItem);
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+        Assert.Null(characters.Current);
+        Assert.Empty(window.GetVisualDescendants().OfType<CharacterEditorView>());
+
+        // Another row: the highlight moves with the click, and still nothing opens.
+        var second = RowCenter(window, pane, 1);
+        window.MouseDown(second, MouseButton.Left);
+        window.MouseUp(second, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(characters.Items[1], pane.List.SelectedItem);
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+        Assert.Null(characters.Current);
+        Assert.Empty(opened);
+    }
+
+    [Fact]
+    public void Clicking_another_row_while_a_character_is_open_picks_it_and_leaves_the_open_one_showing()
+    {
+        var (window, characters) = Open();
+        var created = characters.CreateCharacter();
+        var open = characters.Items.Single(i => i.Id == created.Id);
+        characters.CreateCharacter();
+        characters.Show(open);
+        var (pane, _) = ShowPane(window, characters);
+        Assert.Same(open, pane.List.SelectedItem);
+
+        var other = RowCenter(window, pane, 1);
+        window.MouseDown(other, MouseButton.Left);
+        window.MouseUp(other, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(characters.Items[1], pane.List.SelectedItem);
+        Assert.Same(open, characters.Current);
+        Assert.Same(open.Editor, window.Workspace.ActiveEditor);
+    }
+
+    [Fact]
+    public void The_pencil_on_a_character_row_shows_on_the_picked_row_and_opens_the_character_when_clicked()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        characters.CreateCharacter();
+        var (pane, _) = ShowPane(window, characters);
+        var item = characters.Items[0];
+
+        // Not on a row nobody has picked or pointed at: invisible and not clickable.
+        var pencil = EditButton(pane, item);
+        Assert.Equal(0, pencil.Opacity);
+        Assert.False(pencil.IsHitTestVisible);
+
+        var row = RowCenter(window, pane, 0);
+        window.MouseDown(row, MouseButton.Left);
+        window.MouseUp(row, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, pencil.Opacity);
+        Assert.True(pencil.IsHitTestVisible);
+        Assert.Equal(0, EditButton(pane, characters.Items[1]).Opacity);
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+        LookTabTests.Snapshot(window, "characters-pane-edit-pencil");
+
+        var point = CenterOf(window, pencil);
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(item.Editor, window.Workspace.ActiveEditor);
+        Assert.Same(item, characters.Current);
+        Assert.Same(item, pane.List.SelectedItem);
+        Assert.Empty(window.Editor.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+    }
+
+    [Fact]
+    public void Double_clicking_the_pencil_opens_the_character_and_does_not_put_it_on_the_page()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        var page = window.Editor;
+        var (pane, row) = ShowPane(window, characters);
+        var item = characters.Items[0];
+
+        window.MouseDown(row, MouseButton.Left);
+        window.MouseUp(row, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        window.DoubleClick(CenterOf(window, EditButton(pane, item)));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Same(item.Editor, window.Workspace.ActiveEditor);
+        Assert.Empty(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+    }
+
+    [Fact]
+    public void Pressing_Enter_on_the_picked_character_in_the_pane_opens_its_editor()
+    {
+        var (window, characters) = Open();
+        characters.CreateCharacter();
+        var (pane, row) = ShowPane(window, characters);
+
+        // Nothing picked yet: Enter has nothing to open.
+        pane.List.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+
+        window.MouseDown(row, MouseButton.Left);
+        window.MouseUp(row, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(window.Editor, window.Workspace.ActiveEditor);
+
+        pane.List.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter });
         Dispatcher.UIThread.RunJobs();
         Assert.Same(characters.Items[0].Editor, window.Workspace.ActiveEditor);
     }
@@ -185,12 +325,15 @@ public class CharacterTests
         characters.CreateCharacter();
         var page = window.Editor;
         var (_, itemCenter) = ShowPane(window, characters);
+        var opened = new List<CharacterItem>();
+        characters.CharacterShown += opened.Add;
 
         window.DoubleClick(itemCenter);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Same(page, window.Workspace.ActiveEditor);
-        Assert.Empty(window.GetVisualDescendants().OfType<CharacterEditorView>()); // the tab the first click opened is closed again
+        Assert.Empty(window.GetVisualDescendants().OfType<CharacterEditorView>()); // the first click only picked it: no tab opened, none to close
+        Assert.Empty(opened);
         var placed = Assert.Single(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
         Assert.Equal(characters.Items[0].Id, placed.CharacterId);
         Assert.Null(characters.Current);
@@ -213,7 +356,7 @@ public class CharacterTests
         var boxPoint = nameBox.TranslatePoint(new Point(nameBox.Bounds.Width / 2, nameBox.Bounds.Height / 2), window)!.Value;
 
         // A click to place the caret must stay inside the text box - it must not also be read as
-        // the list's own click, which opens the character's editor.
+        // the list's own click (the first half of a double-click that would place the character).
         window.MouseDown(boxPoint, MouseButton.Left);
         window.MouseUp(boxPoint, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
