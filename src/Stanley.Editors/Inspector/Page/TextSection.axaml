@@ -1,0 +1,15 @@
+<!--
+  The selected free text: kind, lettering, alignment and colour.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.TextSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsTextContext}">
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Text" />
+    </StackPanel>
+  </Border>
+</UserControl>

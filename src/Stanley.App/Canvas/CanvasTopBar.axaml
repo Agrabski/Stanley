@@ -1,0 +1,91 @@
+<!--
+  The canvas layout's one bar along the top (docs/ui-shell.md §6), in place of the ribbon
+  layout's title bar and ribbon: the main menu (the File view's pages, Edit and View), the
+  active editor's tools, the comic's caption with the issue switcher in the middle, and
+  undo / redo / save, zoom and AutoSave on the right. The tools and zoom follow
+  Workspace.ActiveEditor, the way the ribbon does.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:editors="using:Stanley.Editors"
+             xmlns:app="using:Stanley.App"
+             x:Class="Stanley.App.CanvasTopBar"
+             x:DataType="app:MainWindowViewModel">
+  <Border Name="Bar" Classes="canvasBar">
+    <Grid ColumnDefinitions="*,Auto,*">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True">
+        <Button Name="MainMenuButton" Classes="barTool" ToolTip.Tip="Menu - new, open, save, export, options">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource MenuIcon}" />
+            <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+          </StackPanel>
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem Name="MenuFileItem" Header="File" Command="{Binding OpenBackstageCommand}" InputGesture="Alt+F" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Rectangle Classes="barDivider" />
+        <!-- The active editor's tools: PageToolbar for a page, CharacterToolbar for a character. -->
+        <ContentControl Name="ToolbarHost" Content="{Binding Workspace.ActiveEditor}" VerticalAlignment="Center">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="editors:PageEditorViewModel">
+              <editors:PageToolbar />
+            </DataTemplate>
+            <DataTemplate DataType="editors:CharacterEditorViewModel">
+              <editors:CharacterToolbar />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+      </StackPanel>
+
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0">
+        <TextBlock Name="CaptionText" Classes="barCaption" Text="{Binding DocumentCaption}" MaxWidth="320" />
+        <!-- Quick issue switcher: shows up once the comic has more than one issue, as in the ribbon layout's title bar. -->
+        <ComboBox Name="IssueSwitcherBox" IsVisible="{Binding HasMultipleIssues}"
+                  ItemsSource="{Binding Issues}" SelectedItem="{Binding SelectedIssue}"
+                  MinWidth="110" MaxWidth="220" FontSize="12" ToolTip.Tip="Switch issue">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="app:IssueEntry">
+              <TextBlock Text="{Binding Caption}" TextTrimming="CharacterEllipsis" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Name="NewIssueButton" Classes="barTool" Command="{Binding NewIssueCommand}" IsVisible="{Binding HasDocument}"
+                ToolTip.Tip="Add a new issue to this comic - its own pages, the same characters">
+          <PathIcon Data="{StaticResource PlusIcon}" />
+        </Button>
+      </StackPanel>
+
+      <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <TextBlock Name="MessageText" Text="{Binding Message}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12"
+                   VerticalAlignment="Center" Margin="0,0,8,0" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+        <Button Name="UndoButton" Classes="barTool" Command="{Binding UndoCommand}" ToolTip.Tip="Undo" editors:Shortcut.Keys="Ctrl+Z">
+          <PathIcon Data="{StaticResource UndoIcon}" />
+        </Button>
+        <Button Name="RedoButton" Classes="barTool" Command="{Binding RedoCommand}" ToolTip.Tip="Redo" editors:Shortcut.Keys="Ctrl+Y">
+          <PathIcon Data="{StaticResource RedoIcon}" />
+        </Button>
+        <Rectangle Classes="barDivider" />
+        <!-- Zoom for a page; nothing for a character. -->
+        <ContentControl Name="ZoomHost" Content="{Binding Workspace.ActiveEditor}" VerticalAlignment="Center">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="editors:PageEditorViewModel">
+              <editors:PageZoomControl />
+            </DataTemplate>
+            <DataTemplate DataType="editors:CharacterEditorViewModel">
+              <Panel />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+        <Rectangle Classes="barDivider" />
+        <TextBlock Text="AutoSave" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0" />
+        <ToggleSwitch Name="AutoSaveSwitch" IsChecked="{Binding AutoSaveEnabled}" IsEnabled="{Binding HasDocument}"
+                      OnContent="" OffContent="" MinWidth="0" ToolTip.Tip="{Binding AutoSaveTip}" Focusable="False" />
+        <Button Name="SaveButton" Classes="barTool" Command="{Binding SaveCommand}" ToolTip.Tip="Save" editors:Shortcut.Keys="Ctrl+S">
+          <PathIcon Data="{StaticResource SaveIcon}" />
+        </Button>
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

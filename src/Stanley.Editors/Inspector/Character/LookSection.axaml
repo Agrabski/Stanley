@@ -1,0 +1,15 @@
+<!--
+  What the character wears, slot by slot, and the colours of the slots in use.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.LookSection"
+             x:DataType="local:CharacterEditorViewModel">
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Look" />
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,15 @@
+<!--
+  What any selection can do: copy, duplicate, group, put in front or behind, delete.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ArrangeSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding !IsPageContext}">
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Arrange" />
+    </StackPanel>
+  </Border>
+</UserControl>

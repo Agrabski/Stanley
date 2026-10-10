@@ -1,0 +1,17 @@
+<!--
+  The canvas layout's tools for a page, in the top bar (docs/ui-shell.md §6): the tool in hand
+  (Select, Pan, Panel, Bubble, Text, shapes) and Insert. Hosted by the top bar whenever a page
+  editor is the active pane, with its PageEditorViewModel as DataContext.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PageToolbar"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Name="Tools" Orientation="Horizontal" VerticalAlignment="Center">
+    <RadioButton Name="SelectToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select and move" local:Shortcut.Keys="V">
+      <PathIcon Data="{StaticResource PointerIcon}" />
+    </RadioButton>
+  </StackPanel>
+</UserControl>

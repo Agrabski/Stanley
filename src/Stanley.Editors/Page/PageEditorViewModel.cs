@@ -757,6 +757,9 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// <summary>A comic panel (and nothing in it) is selected: the ribbon shows its "Panel" contextual groups.</summary>
     public bool IsPanelContext => HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter && !HasSelectedElement;
 
+    /// <summary>Nothing on the page is selected - no panel, nor anything in one: the canvas layout's inspector shows the page's own settings (layout, spacing, numbering).</summary>
+    public bool IsPageContext => !HasSelectedPanel && !HasSelectedBubble && !HasSelectedCharacter && !HasSelectedElement;
+
     /// <summary>A placed character is selected: the ribbon shows its "Character" contextual groups.</summary>
     public bool IsCharacterContext => HasSelectedCharacter;
 
@@ -1002,6 +1005,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         OnPropertyChanged(nameof(HasMultiSelection));
         OnPropertyChanged(nameof(IsSelectedPanelCloud));
         OnPropertyChanged(nameof(IsPanelContext));
+        OnPropertyChanged(nameof(IsPageContext));
         OnPropertyChanged(nameof(IsBubbleContext));
         OnPropertyChanged(nameof(IsCharacterContext));
         OnPropertyChanged(nameof(SelectedCharacterName));

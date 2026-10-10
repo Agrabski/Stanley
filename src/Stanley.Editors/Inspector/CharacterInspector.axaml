@@ -1,0 +1,20 @@
+<!--
+  The canvas layout's inspector for a character (docs/ui-shell.md §6): what the character
+  editor's ribbon (Body, Look and the contextual Sticker tab) does, as sections down the right
+  of the window. Hosted by the window's inspector column whenever a character editor is the
+  active pane, with its CharacterEditorViewModel as DataContext.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterInspector"
+             x:DataType="local:CharacterEditorViewModel">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Name="Sections">
+      <TextBlock Name="TitleText" Classes="inspectorTitle" Text="{Binding Name}" />
+      <local:StickerSection Name="StickerProperties" />
+      <local:BodySection Name="BodyProperties" />
+      <local:LookSection Name="LookProperties" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

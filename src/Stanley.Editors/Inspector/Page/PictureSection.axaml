@@ -1,0 +1,15 @@
+<!--
+  The selected picture: replace, layer.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PictureSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsPictureContext}">
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Picture" />
+    </StackPanel>
+  </Border>
+</UserControl>

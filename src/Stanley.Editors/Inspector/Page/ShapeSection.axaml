@@ -1,0 +1,15 @@
+<!--
+  The selected drawn shape: fill, outline, points and layer.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ShapeSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsShapeContext}">
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Shape" />
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,10 @@
+<!--
+  The canvas layout's zoom control for a page, at the right of the top bar (docs/ui-shell.md §6).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PageZoomControl"
+             x:DataType="local:PageEditorViewModel">
+  <TextBlock Name="ZoomText" Text="{Binding ZoomText}" VerticalAlignment="Center" FontSize="12" Margin="6,0" />
+</UserControl>

@@ -1,0 +1,199 @@
+<!--
+  The canvas layout's look (File › Options › Layout › Canvas; docs/ui-shell.md §6): the thin
+  toolbar along the top, and the inspector down the right with the selection's properties in
+  sections. Everything here hangs off its own classes, so the ribbon layout never picks any of
+  it up. Included once, application-wide, from App.axaml, after RibbonStyles.axaml (whose icons
+  and .small buttons it reuses).
+
+  Building blocks for an inspector section:
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Fill" />
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Margin" />
+          <NumericUpDown ... />
+        </DockPanel>
+        <StackPanel Classes="iconRow"> <Button Classes="iconButton"> <PathIcon .../> </Button> ... </StackPanel>
+        <Button Classes="inspectorButton" Content="Add tail" />
+      </StackPanel>
+    </Border>
+  Buttons here never take keyboard focus (like the ribbon's), so Delete, arrows and the tool
+  keys keep going to the page after a click; text and number boxes do take it.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="StanleyCanvasBarBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="StanleyInspectorBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="StanleyCanvasRuleBrush" Color="#E5E5E5" />
+          <SolidColorBrush x:Key="StanleyCanvasHoverBrush" Color="#F0F0F0" />
+          <SolidColorBrush x:Key="StanleyCanvasMutedTextBrush" Color="#6B6B6B" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="StanleyCanvasBarBrush" Color="#2C2C2C" />
+          <SolidColorBrush x:Key="StanleyInspectorBrush" Color="#2C2C2C" />
+          <SolidColorBrush x:Key="StanleyCanvasRuleBrush" Color="#444444" />
+          <SolidColorBrush x:Key="StanleyCanvasHoverBrush" Color="#3A3A3A" />
+          <SolidColorBrush x:Key="StanleyCanvasMutedTextBrush" Color="#B3B3B3" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+      <!-- The main menu: three bars. -->
+      <StreamGeometry x:Key="MenuIcon">M3,5 H21 V7 H3 Z M3,11 H21 V13 H3 Z M3,17 H21 V19 H3 Z</StreamGeometry>
+      <!-- A small "there's more" chevron, beside a toolbar button that opens a menu. -->
+      <StreamGeometry x:Key="ChevronDownIcon">M6.4,8.6 L12,14.2 L17.6,8.6 L19,10 L12,17 L5,10 Z</StreamGeometry>
+      <!-- The same pictures as the Home tab's Select, Panel and Pan tools. -->
+      <StreamGeometry x:Key="PointerIcon">M5,2 L5,19 L9.5,14.5 L12.7,21.5 L15.3,20.3 L12.1,13.4 L18.5,13.4 Z</StreamGeometry>
+      <StreamGeometry x:Key="PanelToolIcon">M2,2 H22 V22 H2 Z M4,4 V11 H11 V4 Z M13,4 V11 H20 V4 Z M4,13 V20 H20 V13 Z</StreamGeometry>
+      <StreamGeometry x:Key="PanToolIcon">M12,1 L15.5,4.5 H13 V11 H19.5 V8.5 L23,12 L19.5,15.5 V13 H13 V19.5 H15.5 L12,23 L8.5,19.5 H11 V13 H4.5 V15.5 L1,12 L4.5,8.5 V11 H11 V4.5 H8.5 Z</StreamGeometry>
+      <StreamGeometry x:Key="PlusIcon">M11,4 H13 V11 H20 V13 H13 V20 H11 V13 H4 V11 H11 Z</StreamGeometry>
+      <StreamGeometry x:Key="MinusIcon">M4,11 H20 V13 H4 Z</StreamGeometry>
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- ============================== the top bar ============================== -->
+
+  <Style Selector="Border.canvasBar">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Background" Value="{DynamicResource StanleyCanvasBarBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="6,0" />
+  </Style>
+  <!-- A tool in the top bar: an icon (sometimes with a chevron) in a 32px square, checked while it's the tool in hand. -->
+  <Style Selector=":is(Button).barTool">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="MinWidth" Value="32" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Margin" Value="1,0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).barTool PathIcon">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+  </Style>
+  <Style Selector=":is(Button).barTool PathIcon.chevron">
+    <Setter Property="Width" Value="9" />
+    <Setter Property="Height" Value="9" />
+    <Setter Property="Margin" Value="3,0,0,0" />
+  </Style>
+  <Style Selector=":is(Button).barTool TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- A thin upright rule between groups of tools. -->
+  <Style Selector="Rectangle.barDivider">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Fill" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+  </Style>
+  <Style Selector="TextBlock.barCaption">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+
+  <!-- ============================== the inspector ============================== -->
+
+  <!-- The column down the right: a fixed width, so a change of selection never resizes the page. -->
+  <Style Selector="Border.inspector">
+    <Setter Property="Width" Value="288" />
+    <Setter Property="Background" Value="{DynamicResource StanleyInspectorBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
+  </Style>
+  <!-- What's selected, at the top of the inspector ("Bubble", "Panel", "Page"). -->
+  <Style Selector="TextBlock.inspectorTitle">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="12,12,12,4" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <!-- One section ("Style", "Fill", "Arrange"), ruled off from the next. -->
+  <Style Selector="Border.inspectorSection">
+    <Setter Property="Padding" Value="12,10,12,12" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+  </Style>
+  <Style Selector="TextBlock.sectionHeader">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,2" />
+  </Style>
+  <!-- A sentence of help under a section's header or controls. -->
+  <Style Selector="TextBlock.inspectorHint">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyCanvasMutedTextBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- A labelled row: the label on the left, the control filling the rest. -->
+  <Style Selector="DockPanel.propertyRow">
+    <Setter Property="LastChildFill" Value="True" />
+    <Setter Property="MinHeight" Value="28" />
+  </Style>
+  <Style Selector="DockPanel.propertyRow > TextBlock.propertyLabel">
+    <Setter Property="DockPanel.Dock" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.propertyLabel">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Width" Value="76" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource StanleyCanvasMutedTextBrush}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <!-- A row of square icon buttons (styles, alignment, arrange). -->
+  <Style Selector="StackPanel.iconRow">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="2" />
+  </Style>
+  <Style Selector=":is(Button).iconButton">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).iconButton PathIcon">
+    <Setter Property="Width" Value="15" />
+    <Setter Property="Height" Value="15" />
+  </Style>
+  <!-- A text button in a section: compact, left-aligned label when stretched. -->
+  <Style Selector=":is(Button).inspectorButton">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Button).inspectorButton PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+  </Style>
+  <Style Selector="Border.inspector :is(Button).inspectorButton, Border.inspector :is(Button).iconButton">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.inspector :is(Button).inspectorButton">
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+</Styles>

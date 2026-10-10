@@ -13,6 +13,7 @@ namespace Stanley.EditorFramework;
 public sealed class EditorWorkspace : ObservableObject
 {
     private IEditorPane? _activeEditor;
+    /// <summary>The dock the right tools sit in: the main row, or the side column when stacked.</summary>
     private readonly IDock? _row;
     private readonly IDock? _rightDock;
     private IReadOnlyList<(IDockable Dockable, double Proportion)> _rowProportions = [];
@@ -28,15 +29,18 @@ public sealed class EditorWorkspace : ObservableObject
     {
     }
 
-    /// <param name="rightTools">Side panes docked right of the editors (the Layers pane). Like the left ones they never change <see cref="ActiveEditor"/>; unlike them they can be shown and hidden (<see cref="SetRightToolsVisible"/>).</param>
+    /// <param name="rightTools">Side panes docked right of the editors (the Layers pane) - or under the left ones, <see cref="SidePaneArrangement.Stacked"/>. Like the left ones they never change <see cref="ActiveEditor"/>; unlike them they can be shown and hidden (<see cref="SetRightToolsVisible"/>).</param>
     /// <param name="rightToolsVisible">Whether the right-hand panes start out showing.</param>
+    /// <param name="arrangement">Where the side panes go: <see cref="SidePaneArrangement.Beside"/> the editors (the ribbon layout), or stacked in one column left of them (the canvas layout).</param>
     public EditorWorkspace(EditorHistory history, IReadOnlyList<IEditorPane> panes, IReadOnlyList<IDockable> leftTools,
-        IReadOnlyList<IDockable> rightTools, bool rightToolsVisible = true)
+        IReadOnlyList<IDockable> rightTools, bool rightToolsVisible = true, SidePaneArrangement arrangement = SidePaneArrangement.Beside)
     {
         History = history;
-        (Factory, Layout) = EditorDockHost.CreateLayout(panes, leftTools, rightTools);
+        Arrangement = arrangement;
+        (Factory, Layout) = EditorDockHost.CreateLayout(panes, leftTools, rightTools, arrangement);
         _activeEditor = panes.FirstOrDefault();
-        _row = FindDock(EditorDockHost.MainRowId);
+        // Whatever holds the right tools: the main row beside the editors, or the side column they're stacked in.
+        _row = FindDock(EditorDockHost.SideColumnId) ?? FindDock(EditorDockHost.MainRowId);
         _rightDock = FindDock(EditorDockHost.RightToolsDockId);
 
         Factory.ActiveDockableChanged += (_, e) => Follow(e.Dockable);
@@ -52,6 +56,9 @@ public sealed class EditorWorkspace : ObservableObject
     }
 
     public EditorHistory History { get; }
+
+    /// <summary>Where the side panes are: beside the editors, or stacked in one column left of them.</summary>
+    public SidePaneArrangement Arrangement { get; }
 
     public IFactory Factory { get; }
 
@@ -141,7 +148,7 @@ public sealed class EditorWorkspace : ObservableObject
     public bool RightToolsVisible => _row?.VisibleDockables is { } shown && _rightDock != null && shown.Contains(_rightDock);
 
     /// <summary>
-    /// Shows or hides the right-hand panes; the editors reclaim the room when they go. Showing
+    /// Shows or hides the right-hand panes; the editors (or, stacked, the left tools above them) reclaim the room when they go. Showing
     /// them again gives every column the width it had when they were hidden - without that,
     /// Dock re-normalises the proportions on each toggle and the pane creeps narrower every
     /// time. Does nothing for a workspace without right-hand panes.
