@@ -105,8 +105,8 @@
               </StackPanel>
               <DropDownButton.Flyout>
                   <Flyout Placement="BottomEdgeAlignedLeft" FlyoutPresenterClasses="wide">
-                      <!-- Wider than Fluent lets a flyout be (456 px; the "wide" presenter lifts that): the presets seven to a row, a mixer row's nine choices in one line. -->
-                      <StackPanel Spacing="4" Width="490">
+                      <!-- Wider than Fluent lets a flyout be (456 px; the "wide" presenter lifts that): the presets seven to a row, a mixer row's ten choices in one line. -->
+                      <StackPanel Spacing="4" Width="520">
                           <ItemsControl Name="ExpressionChoices" ItemsSource="{Binding ExpressionChoices}">
                               <ItemsControl.ItemsPanel>
                                   <ItemsPanelTemplate>

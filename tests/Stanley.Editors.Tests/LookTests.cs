@@ -190,12 +190,26 @@ public sealed class LookTests : IDisposable
     public void Every_library_face_draws_the_whole_expression_vocabulary()
     {
         // So every expression preset shows as itself on any library face - a Skeptical
-        // "doubtful" mouth included (#153), not the neutral one a missing variant falls back to.
+        // "doubtful" mouth (#153) and a Sinister grin (#152) included, not the neutral one a
+        // missing variant falls back to.
         foreach (var slot in ExpressionPresets.FaceSlots)
         {
             var faces = StickerLibrary.StickerLibrary.ForSlot(slot).ToList();
             Assert.NotEmpty(faces);
             Assert.All(faces, face => Assert.Empty(ExpressionPresets.MissingVariants(face.Asset.Sticker)));
+        }
+    }
+
+    [Fact]
+    public void Every_library_mouth_draws_the_sinister_grin_front_and_side()
+    {
+        // Sinister (#152) has a mouth of its own: it's declared, and drawn for both views, on all of them.
+        var mouths = StickerLibrary.StickerLibrary.ForSlot(StickerSlots.Mouth).ToList();
+        Assert.NotEmpty(mouths);
+        foreach (var mouth in mouths)
+        {
+            Assert.Contains("sinister", mouth.Asset.Sticker.Variants);
+            Assert.Equal([ViewAngle.Front, ViewAngle.Profile], mouth.Asset.DrawnViews("sinister"));
         }
     }
 
