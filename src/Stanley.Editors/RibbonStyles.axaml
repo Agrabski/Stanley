@@ -29,6 +29,9 @@
         <SolidColorBrush x:Key="StanleySelectionBrush" Color="#1E5AA8" />
         <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#1A1E5AA8" />
         <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#261E5AA8" />
+        <SolidColorBrush x:Key="StanleyChoiceTintBrush" Color="#2E1E5AA8" />
+        <SolidColorBrush x:Key="StanleyChoiceHoverTintBrush" Color="#481E5AA8" />
+        <SolidColorBrush x:Key="StanleyOnSelectionBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#0F000000" />
         <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#C8C8C8" />
         <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#FFFFFF" />
@@ -54,6 +57,9 @@
         <SolidColorBrush x:Key="StanleySelectionBrush" Color="#6FA8F0" />
         <SolidColorBrush x:Key="StanleySelectedTintBrush" Color="#2E5B9BEA" />
         <SolidColorBrush x:Key="StanleySelectedHoverTintBrush" Color="#405B9BEA" />
+        <SolidColorBrush x:Key="StanleyChoiceTintBrush" Color="#4A5B9BEA" />
+        <SolidColorBrush x:Key="StanleyChoiceHoverTintBrush" Color="#665B9BEA" />
+        <SolidColorBrush x:Key="StanleyOnSelectionBrush" Color="#0D2038" />
         <SolidColorBrush x:Key="StanleyHoverTintBrush" Color="#14FFFFFF" />
         <SolidColorBrush x:Key="StanleyThumbBorderBrush" Color="#5A5A5A" />
         <SolidColorBrush x:Key="StanleyBackstageBrush" Color="#232427" />
@@ -305,10 +311,6 @@
     <Setter Property="Height" Value="26" />
     <Setter Property="Padding" Value="6,0" />
     <Setter Property="Focusable" Value="False" />
-  </Style>
-  <Style Selector="Button.choice.worn">
-    <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
-    <Setter Property="BorderThickness" Value="2" />
   </Style>
   <!-- A labelled slider row in the character ribbon: name, slider, value. -->
   <Style Selector="Slider.body">
@@ -577,5 +579,51 @@
   <Style Selector=":is(Button).small.choice.sticker.closeup.mini">
     <Setter Property="Width" Value="46" />
     <Setter Property="Height" Value="56" />
+  </Style>
+
+  <!-- A choice in a gallery - a sticker, a pattern, a texture, a look: the one chosen (class
+       "worn") is unmistakable, so nobody has to remember what they clicked last or wonder
+       what's already on. It's framed in the selection colour on a tint, with a check in the
+       corner, and stays that way under the pointer. Declared after ".small" on purpose: that
+       style zeroes the border and, coming later, would cancel this one. Every choice keeps a
+       frame of the same width, so choosing one never nudges its picture. "noCheck" is for
+       choices that are words, like the Hair flyout's tabs, where a check would look odd. -->
+  <Style Selector="Button.choice">
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <ContentPresenter Name="PART_ContentPresenter"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            RecognizesAccessKey="True" />
+          <Border Name="PART_WornBadge" IsVisible="False" IsHitTestVisible="False"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,3,0"
+                  Width="14" Height="14" CornerRadius="7" Background="{DynamicResource StanleySelectionBrush}">
+            <PathIcon Data="{StaticResource CheckIcon}" Width="9" Height="9" Foreground="{DynamicResource StanleyOnSelectionBrush}" />
+          </Border>
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.choice.worn /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource StanleyChoiceTintBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
+  </Style>
+  <!-- The pointer deepens the tint but never takes the frame away (Fluent's own pointer-over
+       and pressed looks sit on the presenter, so they have to be answered there). -->
+  <Style Selector="Button.choice.worn:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.choice.worn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource StanleyChoiceHoverTintBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleySelectionBrush}" />
+  </Style>
+  <Style Selector="Button.choice.worn:not(.noCheck) /template/ Border#PART_WornBadge">
+    <Setter Property="IsVisible" Value="True" />
   </Style>
 </Styles>

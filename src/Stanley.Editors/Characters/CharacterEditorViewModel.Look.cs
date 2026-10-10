@@ -108,6 +108,10 @@ public sealed partial class CharacterEditorViewModel
         var character = LookWorking;
         var worn = character.Stickers.TryGetValue(slot, out var ids) ? ids : [];
         var pose = StagePose;
+        // "Star ×3, HELLO": copies of one design counted, not listed. Each choice's tooltip says a click puts it on over this.
+        var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?")
+            .GroupBy(n => n, StringComparer.CurrentCultureIgnoreCase).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key));
+        var holding = worn.Count == 0 ? null : current;
         var choices = new List<StickerChoice> { new("None", slot, LookEditing.ClearSlot(character, slot), null, null, worn.Count == 0, pose) };
         var owned = character.Wardrobe.Stickers.Values.Where(a => a.Sticker.Slot == slot).OrderBy(a => a.Sticker.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var library = Stanley.StickerLibrary.StickerLibrary.ForSlot(slot).ToList();
@@ -122,21 +126,18 @@ public sealed partial class CharacterEditorViewModel
             var seen = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var byWear = worn.Select(id => character.Wardrobe.Find(id)).OfType<StickerAsset>().Concat(owned);
             foreach (var asset in byWear.Where(a => (!StickerCopies.IsPlaceable(a.Sticker) || !libraryNames.Contains(a.Sticker.Name)) && seen.Add(a.Sticker.Name)))
-                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, IsWornDesign(character, slot, asset.Sticker.Name), pose));
+                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, IsWornDesign(character, slot, asset.Sticker.Name), pose, holding));
             foreach (var item in library.Where(l => seen.Add(l.Name)))
-                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, IsWornDesign(character, slot, item.Name), pose));
+                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, IsWornDesign(character, slot, item.Name), pose, holding));
         }
         else
         {
             foreach (var asset in owned)
-                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id), pose));
+                choices.Add(new(asset.Sticker.Name, slot, LookEditing.Wear(character, asset), asset, null, worn.Contains(asset.Id), pose, holding));
             var ownedSources = owned.Select(a => a.Sticker.Source).OfType<string>().ToHashSet();
             foreach (var item in library.Where(l => !ownedSources.Contains(Stanley.StickerLibrary.StickerLibrary.SourcePrefix + l.Key)))
-                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose));
+                choices.Add(new(item.Name, slot, LookEditing.Wear(character, item.Preview), null, item, false, pose, holding));
         }
-        // "Star ×3, HELLO": copies of one design counted, not listed.
-        var current = worn.Count == 0 ? "None" : string.Join(", ", worn.Select(id => character.Wardrobe.Find(id)?.Sticker.Name ?? "?")
-            .GroupBy(n => n, StringComparer.CurrentCultureIgnoreCase).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key));
         return new(info, current, choices, WearCommand, DrawYourOwnCommand, ImportArtCommand, slot == StickerSlots.Print ? WearTextCommand : null);
     }
 

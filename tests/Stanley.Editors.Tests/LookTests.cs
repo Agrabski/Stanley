@@ -293,6 +293,40 @@ public sealed class LookTests : IDisposable
     }
 
     [Fact]
+    public void A_tooltip_says_what_a_click_will_do_so_layering_is_no_surprise()
+    {
+        var (_, editor) = NewCharacter();
+
+        // Nothing on in the slot: a click just puts it on, and None is the chosen one.
+        Assert.Equal("T-shirt - from the starter library; click to put it on", Choice(editor, StickerSlots.Top, "T-shirt").Tip);
+        Assert.Equal("Nothing on in this slot", Choice(editor, StickerSlots.Top, "None").Tip);
+
+        // Something on: the worn one says it comes off, the rest say they go on over it.
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        Assert.Equal("T-shirt - wearing it; click to take it off", Choice(editor, StickerSlots.Top, "T-shirt").Tip);
+        Assert.Equal("Hoodie - from the starter library; click to put it on over T-shirt", Choice(editor, StickerSlots.Top, "Hoodie").Tip);
+        Assert.Equal("Take off everything in this slot", Choice(editor, StickerSlots.Top, "None").Tip);
+
+        // Several layers: all of them are named, bottom to top.
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "Hoodie"));
+        Assert.Equal("Shirt - from the starter library; click to put it on over T-shirt, Hoodie", Choice(editor, StickerSlots.Top, "Shirt").Tip);
+
+        // Taken off, one of the character's own is just on offer again.
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Top, "T-shirt"));
+        Assert.Equal("T-shirt - click to put it on over Hoodie", Choice(editor, StickerSlots.Top, "T-shirt").Tip);
+    }
+
+    [Fact]
+    public void A_print_says_another_copy_goes_on_rather_than_going_over_anything()
+    {
+        var (_, editor) = NewCharacter();
+        editor.WearCommand.Execute(Choice(editor, StickerSlots.Print, "Skull"));
+
+        Assert.Contains("click for another", Choice(editor, StickerSlots.Print, "Skull").Tip);
+        Assert.DoesNotContain(" over ", Choice(editor, StickerSlots.Print, "Heart").Tip);
+    }
+
+    [Fact]
     public void Face_slots_add_too_and_None_takes_everything_in_the_slot_off()
     {
         var (session, editor) = NewCharacter();
