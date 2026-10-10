@@ -264,7 +264,7 @@ public sealed class MainWindowViewModel : ObservableObject
         catch (Exception e) when (IsFileProblem(e))
         {
             AppLog.Error($"AutoSave of \"{DocumentTitle}\" to {_project.Location} failed.", e);
-            Message = $"AutoSave failed: {e.Message}";
+            ShowProblem($"AutoSave failed: {e.Message}");
         }
     }
 
@@ -653,7 +653,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         if (_project.IsUntitled && !await SaveAsAsync())
         {
-            Message = "Save the comic before adding an issue to it.";
+            ShowProblem("Save the comic before adding an issue to it.");
             return;
         }
         if (!await ConfirmDiscardAsync())
@@ -665,7 +665,7 @@ public sealed class MainWindowViewModel : ObservableObject
             var newIssueId = _project.NewIssue();
             var project = ComicProject.Open(folder, newIssueId);
             Load(project);
-            Message = $"Issue #{project.IssueNumber} added";
+            ShowNotice($"Issue #{project.IssueNumber} added");
             AppLog.Info($"Added issue #{project.IssueNumber} to \"{project.Title}\".");
         }
         catch (Exception e) when (IsFileProblem(e))
@@ -686,12 +686,12 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         if (issueId == _project.IssueId)
         {
-            Message = "Can't delete the issue that's open - switch to another one first.";
+            ShowProblem("Can't delete the issue that's open - switch to another one first.");
             return;
         }
         if (Issues.Count <= 1)
         {
-            Message = "A comic must keep at least one issue.";
+            ShowProblem("A comic must keep at least one issue.");
             return;
         }
 
@@ -705,7 +705,7 @@ public sealed class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(Issues));
             OnPropertyChanged(nameof(HasMultipleIssues));
             OnPropertyChanged(nameof(SelectedIssue));
-            Message = $"Issue #{entry.Number} deleted";
+            ShowNotice($"Issue #{entry.Number} deleted");
             AppLog.Info($"Deleted issue #{entry.Number} from \"{_project.Title}\".");
         }
         catch (Exception e) when (IsFileProblem(e))
@@ -776,6 +776,29 @@ public sealed class MainWindowViewModel : ObservableObject
         private set => SetProperty(ref field, value);
     }
 
+    /// <summary>
+    /// Whether <see cref="Message"/> is a problem rather than good news. Only a problem is shown
+    /// in red: a red "Saved to ..." reads as a failure for a moment, however fine it went.
+    /// </summary>
+    public bool IsMessageProblem
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
+    // The message is only ever set through these, so its text and its colour can't disagree.
+    private void ShowNotice(string message) => SetMessage(message, isProblem: false);
+
+    private void ShowProblem(string message) => SetMessage(message, isProblem: true);
+
+    private void ClearMessage() => SetMessage(null, isProblem: false);
+
+    private void SetMessage(string? message, bool isProblem)
+    {
+        IsMessageProblem = isProblem; // first, so the new text never shows in the old colour
+        Message = message;
+    }
+
     // ---------------------------------------------------------------- backstage (File view)
 
     public bool IsBackstageOpen
@@ -825,7 +848,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public void ShowBackstage(BackstagePage page)
     {
         BackstagePage = page;
-        Message = null;
+        ClearMessage();
         RefreshRecent();
         SetProperty(ref _isBackstageOpen, true, nameof(IsBackstageOpen));
     }
@@ -979,7 +1002,7 @@ public sealed class MainWindowViewModel : ObservableObject
             AppLog.Info($"Saved \"{DocumentTitle}\" as {saved}.");
             RefreshFields(); // a new comic took the name it was saved under
             MarkSaved();
-            Message = $"Saved to {saved}";
+            ShowNotice($"Saved to {saved}");
             OnPropertyChanged(nameof(AutoSaveEnabled)); // no longer untitled - AutoSave can apply
             OnPropertyChanged(nameof(AutoSaveTip));
             return true;
@@ -1025,7 +1048,7 @@ public sealed class MainWindowViewModel : ObservableObject
             else
                 ComicProject.ExportPng(path, current.Editor.PageBounds, current.Editor.Committed, folio: current.Editor.Folio, characters: CommittedCharacters(),
                     issueLooks: _navigator.IssueLooks, pictures: _pictures?.Files, widthPx: _project.ExportWidthPx, fields: _project.Fields);
-            Message = null;
+            ClearMessage();
             AppLog.Info($"Exported \"{DocumentTitle}\" as {format.ToUpperInvariant()} to {path}.");
             IsBackstageOpen = false;
             ShowExportNotice(path);
@@ -1085,15 +1108,15 @@ public sealed class MainWindowViewModel : ObservableObject
             return;
         if (!File.Exists(path))
         {
-            Message = $"\"{Path.GetFileName(path)}\" isn't there any more - it may have been moved or deleted.";
+            ShowProblem($"\"{Path.GetFileName(path)}\" isn't there any more - it may have been moved or deleted.");
             DismissExportNotice();
             return;
         }
         var launched = open ? await _launcher.OpenAsync(path) : await _launcher.ShowInFolderAsync(path);
         if (!launched)
-            Message = open
+            ShowProblem(open
                 ? $"Couldn't open \"{Path.GetFileName(path)}\" - there may be no app set up to open {Path.GetExtension(path).TrimStart('.').ToUpperInvariant()} files."
-                : $"Couldn't show the folder \"{Path.GetFileName(path)}\" is in.";
+                : $"Couldn't show the folder \"{Path.GetFileName(path)}\" is in.");
     }
 
     /// <summary>Before discarding the open comic: nothing to ask if it's clean; otherwise Save / Don't Save / Cancel. Returns whether it's OK to go ahead.</summary>
@@ -1146,7 +1169,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _navigator.CurrentPageChanged += OnCurrentPageChanged;
         _navigator.SpacingChanged += OnSpacingChanged;
         _infoDirty = false;
-        Message = null;
+        ClearMessage();
         SetProperty(ref _isBackstageOpen, false, nameof(IsBackstageOpen));
         RaiseDocumentChanged();
         OnPropertyChanged(nameof(Workspace));
@@ -1201,7 +1224,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _infoDirty = false;
         _recoveredUnsaved = false;
         _recovery?.Clear();
-        Message = null;
+        ClearMessage();
         if (_project?.Location is { } location)
         {
             _recent.Add(location);
@@ -1282,7 +1305,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         if (!IsBackstageOpen)
             ShowBackstage(HasDocument ? BackstagePage.Info : BackstagePage.Open);
-        Message = message;
+        ShowProblem(message);
     }
 
     private static bool IsFileProblem(Exception e) =>

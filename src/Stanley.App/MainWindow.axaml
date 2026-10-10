@@ -98,7 +98,8 @@
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                    <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#FFE3E3" FontSize="12"
+                    <TextBlock Name="TitleMessageText" Grid.Column="2" Classes="titleMessage" Classes.problem="{Binding IsMessageProblem}"
+                               Text="{Binding Message}" FontSize="12"
                                VerticalAlignment="Center" HorizontalAlignment="Right"
                                Margin="0,0,12,0" TextTrimming="CharacterEllipsis" />
                 </Grid>

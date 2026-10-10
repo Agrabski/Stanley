@@ -178,6 +178,67 @@ public sealed class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task SavingAComic_SaysSoAsGoodNews_NotAsAProblem()
+    {
+        var vm = NewViewModel();
+        var folder = Path.Combine(_root, "Good News");
+        _dialogs.Folders.Enqueue(folder);
+
+        Assert.True(await vm.SaveAsAsync());
+
+        Assert.Equal($"Saved to {folder}", vm.Message);
+        Assert.False(vm.IsMessageProblem); // it went fine - it mustn't be shown in the red of an error
+    }
+
+    [Fact]
+    public async Task ASaveThatFails_IsAProblem_AndTheNextOneThatWorksIsGoodNewsAgain()
+    {
+        var vm = NewViewModel();
+        var blocker = Path.Combine(_root, "not a folder");
+        File.WriteAllText(blocker, "in the way");
+        _dialogs.Folders.Enqueue(Path.Combine(blocker, "Comic")); // can't make a folder inside a file
+
+        Assert.False(await vm.SaveAsAsync());
+
+        Assert.StartsWith("Couldn't save: ", vm.Message, StringComparison.Ordinal);
+        Assert.True(vm.IsMessageProblem);
+        Assert.True(vm.IsBackstageOpen); // problems surface in the File view
+
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Comic"));
+        Assert.True(await vm.SaveAsAsync());
+
+        Assert.StartsWith("Saved to ", vm.Message, StringComparison.Ordinal);
+        Assert.False(vm.IsMessageProblem);
+    }
+
+    [Fact]
+    public async Task ClearingTheMessage_AlsoClearsItsProblemFlag()
+    {
+        var vm = NewViewModel();
+        await vm.NewIssueAsync(); // untitled, and the Save As dialog is cancelled: a problem
+        Assert.True(vm.IsMessageProblem);
+
+        vm.ShowBackstage(BackstagePage.Info);
+
+        Assert.Null(vm.Message);
+        Assert.False(vm.IsMessageProblem);
+    }
+
+    [Fact]
+    public async Task GoodNewsAfterAProblem_IsNotShownAsOne()
+    {
+        var vm = NewViewModel();
+        await vm.NewIssueAsync(); // no folder queued: "Save the comic before adding an issue to it."
+        Assert.True(vm.IsMessageProblem);
+
+        _dialogs.Folders.Enqueue(Path.Combine(_root, "Second Try"));
+        await vm.NewIssueAsync();
+
+        Assert.Equal("Issue #2 added", vm.Message);
+        Assert.False(vm.IsMessageProblem);
+    }
+
+    [Fact]
     public async Task SaveAs_ToItsOwnFolderUnderItsOwnName_JustSaves()
     {
         var vm = NewViewModel();
@@ -276,6 +337,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         Assert.Same(editor, vm.Editor);
         Assert.NotNull(vm.Message);
+        Assert.True(vm.IsMessageProblem);
         Assert.True(vm.IsBackstageOpen);
     }
 
@@ -334,6 +396,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal("Exported Moon Pie.pdf", vm.ExportNoticeText);
         Assert.Equal(_dialogs.ExportPath, vm.ExportedPath);
         Assert.Null(vm.Message);
+        Assert.False(vm.IsMessageProblem);
 
         await vm.OpenExportCommand.ExecuteAsync(null);
         await vm.ShowExportInFolderCommand.ExecuteAsync(null);
@@ -371,11 +434,13 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         await vm.OpenExportCommand.ExecuteAsync(null);
         Assert.Contains("Couldn't open \"out.pdf\"", vm.Message, StringComparison.Ordinal);
+        Assert.True(vm.IsMessageProblem);
 
         File.Delete(_dialogs.ExportPath);
         await vm.ShowExportInFolderCommand.ExecuteAsync(null);
         Assert.Empty(launcher.Shown); // never asked: the file's gone
         Assert.Contains("isn't there any more", vm.Message, StringComparison.Ordinal);
+        Assert.True(vm.IsMessageProblem);
         Assert.False(vm.HasExportNotice);
     }
 
@@ -459,6 +524,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(2, vm.Issues.Count);
         Assert.Equal("2", vm.IssueNumber); // now editing the issue just added
         Assert.Equal("Issue #2 added", vm.Message);
+        Assert.False(vm.IsMessageProblem);
     }
 
     [Fact]
@@ -471,6 +537,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.True(vm.Project!.IsUntitled);
         Assert.Single(vm.Issues);
         Assert.Equal("Save the comic before adding an issue to it.", vm.Message);
+        Assert.True(vm.IsMessageProblem);
     }
 
     [Fact]
@@ -570,6 +637,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         var remaining = Assert.Single(vm.Issues);
         Assert.Equal(secondIssueId, remaining.Id);
         Assert.Equal("Issue #1 deleted", vm.Message);
+        Assert.False(vm.IsMessageProblem);
     }
 
     [Fact]
@@ -600,6 +668,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         Assert.Equal(0, _dialogs.DeleteIssuePrompts);
         Assert.Equal(2, vm.Issues.Count);
         Assert.Equal("Can't delete the issue that's open - switch to another one first.", vm.Message);
+        Assert.True(vm.IsMessageProblem);
     }
 
     [Fact]
@@ -614,6 +683,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         await vm.DeleteIssueAsync(onlyId);
 
         Assert.Single(vm.Issues);
+        Assert.True(vm.IsMessageProblem);
     }
 
     [Fact]

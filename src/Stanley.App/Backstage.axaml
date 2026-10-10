@@ -55,8 +55,9 @@
 
     <ScrollViewer Grid.Column="1">
       <StackPanel Margin="48,32,48,32" MaxWidth="920" HorizontalAlignment="Left">
-        <TextBlock Name="MessageText" Text="{Binding Message}" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
-                   Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
+        <TextBlock Name="MessageText" Classes="message" Classes.problem="{Binding IsMessageProblem}" Text="{Binding Message}"
+                   IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   TextWrapping="Wrap" Margin="0,0,0,16" FontSize="13" />
 
         <!-- New: comic book pages (paper + layout), then strip and webcomic templates. -->
         <StackPanel IsVisible="{Binding IsNewPage}">
