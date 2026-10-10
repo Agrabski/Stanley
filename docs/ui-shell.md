@@ -1,8 +1,9 @@
 # UI shell — the window around the editors
 
-**Status: the ribbon shell is implemented (and the only one).** A Figma-style
-alternative ("canvas layout", a setting that applies after a restart) was assessed
-but not built yet: §6.
+**Status: implemented - two layouts.** The ribbon layout (Word-style, the default)
+and the canvas layout (Figma-style: a top bar, Pages and Layers on the left, an
+inspector on the right), picked in File › Options › Layout and applied at startup:
+§6.
 
 Scope: the window's chrome (the title bar, the ribbon, the dock layout, the File
 view, toasts) and how it reaches the editors. Not what the editors draw or how
@@ -92,12 +93,18 @@ fully reflow what's inside them.
 0.15 of the width. `PageEditorHost.CreateWorkspace` hard-codes left = Pages and
 Characters (tabbed), right = Layers.
 
+In the canvas layout (`SidePaneArrangement.Stacked`) the same docks sit in one
+vertical `ProportionalDock` "SideColumn" left of the editors: LeftTools on top,
+RightTools (Layers, min 120 high) below; the right of the window is the inspector,
+outside the dock area.
+
 `EditorWorkspace.SetRightToolsVisible` hides the right dock by removing it and
 re-adding it later with the proportions saved at hiding time (otherwise Dock
 re-normalises them and the pane creeps narrower on each toggle). That's what
 View › Panes › Layers drives, through `LayersPaneMemory` (↔
-`AppSettings.ShowLayers`) and `PageEditorViewModel.LayersHost`. It assumes "the
-right-hand tools" *are* the Layers pane.
+`AppSettings.ShowLayers`) and `PageEditorViewModel.LayersHost`. "The right-hand
+tools" *are* the Layers pane, wherever they sit: the workspace toggles them in
+whichever dock holds them (the main row, or the side column when stacked).
 
 ## 5. Settings and tests
 
@@ -109,78 +116,110 @@ right-hand tools" *are* the Layers pane.
   `DockFluentTheme`, the ColorPicker theme and `RibbonStyles.axaml`.
 - Headless UI tests build `new MainWindow(viewModel?)` and reach ribbon controls
   through `window.RibbonBarControl` → `PageEditorRibbon` / `CharacterEditorRibbon`
-  → `FindControl<T>(name)` or the `TabControl` (about 76 references across the
-  headless tests). Another shell needs its own test hooks; with the ribbon still
-  the default, the existing tests don't change.
+  → `FindControl<T>(name)` or the `TabControl`. The canvas layout's tests go
+  through `CanvasLayoutHarness` (§6.6).
 
-## 6. A Figma-style alternative layout (assessed, not built)
+## 6. The canvas layout
 
-Asked for: an alternative, Figma-inspired layout, chosen in settings; needing a
-restart to switch is acceptable.
+An alternative to the ribbon for people coming from Figma-like tools. The ribbon stays
+the default: priority 1 in `CLAUDE.md` is the flat learning curve, and this is an
+option, not a replacement.
 
-### 6.1 What it would be
+### 6.1 The setting
 
-- A thin top bar (about 40px): a main menu button (the File view's pages, plus
-  Edit / View items), the tools (Select, Panel, Bubble, Text, shapes ▾, Freeform,
-  Speed lines, Pan, Insert ▾), the caption and issue switcher in the middle, zoom ▾
-  on the right.
-- Left sidebar: Pages above Layers (split, not tabbed), with an Assets tab
-  (Characters, My Assets) beside Layers.
-- Right sidebar, fixed width (so a selection change never resizes the page, as the
-  ribbon's fixed height does today): an **inspector** - the selection's properties
-  in sections; page settings (the Layout tab) with nothing selected; the pen's fill
-  and outline while a drawing tool is on (what Home › Shape Fill/Outline does now).
-- The editor panes keep their status bars. Compact density
-  (`FluentTheme.DensityStyle`), which can be chosen at startup since switching
-  needs a restart anyway (check Avalonia 12 still has it; otherwise compact styles
-  of Stanley's own under the shell's class).
+`AppSettings.InterfaceLayout` (`Ribbon` | `Canvas`; unknown values read as `Ribbon`) -
+an application-level preference in `settings.txt`, not part of any comic. File ›
+Options › Layout sets it through `MainWindowViewModel.InterfaceLayout` /
+`IsRibbonLayout` / `IsCanvasLayout`. **It's read once, at startup**:
+`MainWindowViewModel.ActiveInterfaceLayout` (and `IsCanvasActive`) is what this window
+was built with and never changes; `IsLayoutRestartPending` says the two differ, and
+Options shows "applies the next time Stanley starts" with **Restart now**
+(`RestartCommand` → `RestartRequested` → `MainWindow` closes as usual - asking about
+unsaved changes, or saving with AutoSave on - and `OnClosed`, after `EndSession`, calls
+`AppRestart.StartNewInstance`: the AppImage via `APPIMAGE`, else `Environment.ProcessPath`,
+re-adding the dll under `dotnet`). Restart-only keeps it simple: nothing ever swaps the
+dock layout, open flyouts or focus while the app runs.
 
-The ribbon stays the default: priority 1 in `CLAUDE.md` is the flat learning
-curve, and this is an alternative for people coming from Figma-like tools, not a
-replacement.
+### 6.2 The window
 
-### 6.2 Slices
+`MainWindow.UseCanvasLayout` (in the constructor, before the window shows) takes
+`TitleBar` and `RibbonBar` out of `ShellDock` and puts in:
 
-1. **Setting and shell switch.** `AppSettings.InterfaceLayout` (`Ribbon` default,
-   `Canvas`), radio buttons on File › Options with "applies the next time Stanley
-   starts". Split `MainWindow`'s body into a `RibbonShell` and a `CanvasShell`
-   bound to the same `MainWindowViewModel`, picked once in the constructor; title
-   bar pieces, the toast and the File view are shared. Restart-only means no live
-   swapping of the dock layout, open flyouts or focus. The choice must be
-   injectable for headless tests.
-2. **Dock profile.** Give `EditorDockHost.CreateLayout` a description of which
-   tools go where and whether a column is tabbed or split; generalise
-   `SetRightToolsVisible`/`LayersPaneMemory` to "the Layers pane, wherever it is".
-   `PageEditorHost.CreateWorkspace` passes the profile.
-3. **Top bar and main menu.** Everything it needs is already bound by the Home,
-   Insert and View tabs (`IsSelectTool`..., `ZoomText`, `FitPageCommand`...); the
-   Insert flyouts (title page gallery, My Assets) can be reused as they are.
-4. **Inspector, first cut: re-stacked ribbon tabs.** Host the existing tab controls
-   in the right sidebar, under a scoping class that turns `tabContent` vertical with
-   auto height, group labels into section headers and dividers into rules. Every
-   feature reachable on day one; looks like a ribbon turned on its side. Move
-   `CharacterEditorRibbon`'s event handlers (§3) into a helper both hosts attach.
-5. **Inspector, proper.** Figma-like sections with compact rows. Extract the ribbon
-   groups into shared group controls first (`FontGroup` is the precedent: one
-   control used by the Bubble and Text tabs) so both shells compose the same
-   controls and differ only in layout classes. Numeric X / Y / W / H / rotation
-   rows, if wanted, are new view-model properties that go through
-   `EditorViewModel.Apply` (one undo step) and the existing editing functions
-   behind the drags.
-6. **Tests and a parity guard.** Headless smoke tests for the canvas shell, and a
-   test that compares the commands reachable in each shell, so a feature added to
-   one without the other fails CI.
+- `Canvas/CanvasTopBar` (Stanley.App, 44px, `Border.canvasBar`): the main menu
+  (`MainMenuButton`'s `MenuFlyout`: the File view's pages, export, Edit and View - Edit
+  and View act on `MainWindowViewModel.Editor`, the page being edited), the active
+  editor's tools (`ToolbarHost`: `PageToolbar` / `CharacterToolbar`), the caption with
+  the issue switcher in the middle, and undo/redo, zoom (`ZoomHost`: `PageZoomControl`),
+  AutoSave and Save on the right. Both hosts follow `Workspace.ActiveEditor` like the
+  ribbon host, with a `DataTemplate` per editor type (an empty `Panel` where a type has
+  nothing - a `ContentControl` with no template would show the type's name).
+- `Canvas/InspectorColumn` (Stanley.App, `Border.inspector`, a fixed 288 wide so a change
+  of selection never resizes the page): `PageInspector` / `CharacterInspector`, also by
+  `Workspace.ActiveEditor`.
 
-### 6.3 How hard
+The dock area between them is built with `SidePaneArrangement.Stacked` (§4), passed by
+`MainWindowViewModel.Load` → `PageEditorHost.CreateWorkspace`. Window `KeyBindings`, the
+File view (Alt+F, the main menu) and the export toast are shared. In the real app (not
+tests - it's app-wide) `App` also sets Fluent's `DensityStyle.Compact` at startup for the
+canvas layout.
 
-Moderate, and most of it is XAML. In its favour: the chrome is already a
-window-level layer bound to `ActiveEditor` (§1); nothing under it knows about the
-ribbon (§2); keyboard handling doesn't depend on it; tabs are nearly pure bindings
-(§3); settings and Options already have the pattern; and requiring a restart
-removes the hardest part of switching. Rough sizes: slices 1–3 small to medium,
-slice 4 small, slice 5 the bulk (about 2,300 lines of tab XAML to lay out again),
-slice 6 small.
+### 6.3 The inspector
 
-The lasting cost is two UIs: every later feature needs a home in both. Shared
-group controls (slice 5) and the parity test (slice 6) are what keep that cheap;
-without them the canvas layout will drift behind the ribbon.
+`Inspector/PageInspector` stacks one control per kind of thing, each its own
+`UserControl` under `Inspector/Page/` with the page's `PageEditorViewModel` as
+`DataContext`: `ArrangeSection` (any selection: clipboard, group, delete),
+`PanelSection`, `CharacterSection`, `BubbleSection`, `TextSection`, `ShapeSection`,
+`PictureSection`, `SpeedLinesSection`, `PenSection` (a drawing tool in hand: what the
+next shape gets) and `PageSection` (nothing selected - `PageEditorViewModel.IsPageContext`:
+layout presets, spacing, page numbers, title page, guides). **Each section owns its own
+visibility** (its root's `IsVisible`, from the same `Is…Context` flags the ribbon's
+contextual tabs use, sometimes widened - e.g. the Bubble section also shows for the Bubble
+tool's next bubble); `PageInspector` only owns their order and the title over them
+(`PageInspector.TitleFor`: "Bubble", "Panel", "3 selected", "Page"...). Several can show
+at once - a text box is a shape too.
+
+`Inspector/CharacterInspector` does the same for a character: `StickerSection` (the worn
+sticker picked on the stage), `BodySection`, `LookSection` under `Inspector/Character/`.
+The view-model events that need a window (file pickers for Import… / Custom…, the SVG
+editor set-up, focusing a new text print) are handled by a helper both the character
+ribbon and the character inspector attach, so neither layout loses them.
+
+Sections reuse the ribbon's widgets (`ColorMenuButton`, `BackgroundPicker`, the font
+boxes, gallery templates, `LayoutPresetPreview`...) and bind the same view-model
+members; only the arrangement differs. Look: `CanvasStyles.axaml` (Stanley.Editors,
+included app-wide after `RibbonStyles.axaml`) - `Border.inspectorSection`,
+`TextBlock.sectionHeader`, `DockPanel.propertyRow` + `TextBlock.propertyLabel`,
+`StackPanel.iconRow` + `:is(Button).iconButton`, `:is(Button).inspectorButton`,
+`:is(Button).barTool`, the canvas brushes (light and dark) and a few icons. All hang off
+their own classes, so the ribbon layout never picks them up. Usable width inside a section
+is about 250px; big galleries go behind dropdowns. Buttons never take focus (like the
+ribbon's), so Delete, arrows and tool keys keep going to the page.
+
+### 6.4 Adding a feature
+
+A feature lands in **both** layouts: the ribbon tab and the matching canvas section (or the
+top bar / main menu, for a tool or a command). `LayoutParityTests` (Stanley.App.Tests) reads
+the XAML and code-behind of each layout and fails if a view-model member the ribbon uses
+isn't used anywhere in the canvas layout - or vice versa for its "ribbon-only" list, which
+must stay honest. Member-level, not control-level: it can't tell a button from a menu item,
+only that the feature is reachable.
+
+### 6.5 Gotchas
+
+- A section is its own name scope: `PageInspector.FindInSections<T>(name)` /
+  `CharacterInspector.FindInSections<T>(name)` look in every section.
+- A closed flyout's buttons have lost the `DataContext` their commands bind through - close a
+  gallery behind a pick by posting `Flyout.Hide()` (see `InsertRibbonTab.axaml.cs`).
+- Members raised only from `PageEditorViewModel`'s selection-change method (the `Is…Context`
+  flags, `IsPageContext`) follow selection changes made through `Select`; add a new
+  context flag next to `IsPanelContext` and raise it there.
+- Density is app-wide in Avalonia, so it's never switched in tests (tests share one
+  `Application`); the canvas layout's tests run at normal density.
+
+### 6.6 Tests
+
+`CanvasLayoutHarness` (Stanley.App.HeadlessTests) opens a window in the canvas layout with
+in-memory settings and finds its parts (`TopBar`, `InspectorColumn`, `PageInspector`,
+`PageToolbar`, `Find<T>(window, name)` across both). `CanvasLayoutTests` covers the shell;
+each area has its own `Canvas…Tests` file. The ribbon layout's tests are unchanged - it's
+the default.

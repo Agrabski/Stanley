@@ -1153,13 +1153,33 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
 
     // ---------------------------------------------------------------- status
 
+    /// <summary>
+    /// The window has the canvas layout: the selection's properties are in the inspector on the
+    /// right, not on ribbon tabs, so the hints below say so. Set by the navigator, like <see cref="LayersHost"/>.
+    /// </summary>
+    public bool UsesInspector
+    {
+        get;
+        set
+        {
+            if (value == field)
+                return;
+            field = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Hint));
+        }
+    }
+
+    /// <summary>Where something is: on the ribbon (<paramref name="ribbon"/>) or in the canvas layout (<paramref name="canvas"/>).</summary>
+    private string Where(string ribbon, string canvas) => UsesInspector ? canvas : ribbon;
+
     /// <summary>A one-line "what can I do here" for the status bar, so nothing depends on having read a manual.</summary>
     public string Hint => _notice ?? Tool switch
     {
         PageEditorTool.Panel => "Drag on the page to draw a panel. Edges snap to the margins and a gutter away from other panels (hold Alt to place freely).",
         PageEditorTool.Bubble => "Click inside a panel to add a bubble there, or drag to size it. The bubble stays inside that panel.",
         PageEditorTool.Pan => "Drag to move around the page. Ctrl+scroll zooms.",
-        PageEditorTool.Draw => "Drag inside a panel to draw; end where you started to close the shape (it fills). Pick colours on the Home tab · Esc when done.",
+        PageEditorTool.Draw => $"Drag inside a panel to draw; end where you started to close the shape (it fills). {Where("Pick colours on the Home tab", "Pick its colours in the inspector")} · Esc when done.",
         PageEditorTool.Line => "Drag inside a panel to draw a straight line (Shift keeps it level, upright or at 45°).",
         PageEditorTool.Rectangle or PageEditorTool.Ellipse => "Drag inside a panel to draw the shape (Shift for a square or circle), or click for a standard size.",
         PageEditorTool.Freeform => "Click inside a panel to place points one by one - drag as you place one to curve it (Shift keeps it level or at 45°). Click the first point to close the shape, double-click or Enter to finish a line · Backspace takes the last point back.",
@@ -1167,19 +1187,19 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when SelectionIsOneGroup => $"A group of {SelectionCount} - drag to move it together, Delete removes it, Ctrl+Shift+G takes it apart.",
         _ when HasMultiSelection => $"{SelectionCount} selected - drag to move them together, Ctrl+G groups them, Delete removes them, Shift+click adds or removes.",
         _ when IsEditingPoints => "Editing points - drag a point to move it, or the outline to add one there · drag a round handle to bend the curve (Alt bends just that side) · double-click a point to make it smooth or sharp · Delete removes the point · Enter or Esc when done.",
-        _ when HasSelectedShape => "Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · double-click or Enter to edit its points · Home or Shape tab for colours · Delete removes it.",
-        _ when IsPictureContext => "Drag to move the picture · drag a handle to resize it (it keeps its shape) · Picture tab: behind or in front of the characters · Delete removes it.",
-        _ when IsSpeedLinesContext => "Drag the clear circle to move where the lines radiate from · drag a handle to resize it · Speed Lines tab for colour, count and thickness · Delete removes it.",
-        _ when HasSelectedText => "Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · Text tab for size and style · Delete removes it.",
-        _ when HasSelectedCharacter => "Pick a pose on the Character tab, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
+        _ when HasSelectedShape => $"Drag to move the shape (Alt+drag drags off a copy) · drag a handle to resize · double-click or Enter to edit its points · {Where("Home or Shape tab for colours", "colours in the inspector")} · Delete removes it.",
+        _ when IsPictureContext => $"Drag to move the picture · drag a handle to resize it (it keeps its shape) · {Where("Picture tab", "the inspector")}: behind or in front of the characters · Delete removes it.",
+        _ when IsSpeedLinesContext => $"Drag the clear circle to move where the lines radiate from · drag a handle to resize it · {Where("Speed Lines tab", "the inspector")} for colour, count and thickness · Delete removes it.",
+        _ when HasSelectedText => $"Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · {Where("Text tab", "the inspector")} for size and style · Delete removes it.",
+        _ when HasSelectedCharacter => $"Pick a pose {Where("on the Character tab", "in the inspector")}, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
         _ when SelectedBubble is { Tails.Count: > 1 } => "Remove tail takes off the ringed tail - click another tail's orange dot to pick it · drag a dot to aim its tail · drag the bubble to move it (Ctrl takes the tails along) · Enter edits text · Delete removes the bubble.",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
-        _ when HasSelectedPanel && Working.LayoutLocked => "Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock on the Layout tab.",
+        _ when HasSelectedPanel && Working.LayoutLocked => $"Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock {Where("on the Layout tab", "in the menu's View › Lock layout")}.",
         _ when IsSelectedPanelCloud => "Thought cloud - drag the last dot to point at whoever's thinking · drag a corner to resize · it floats over the layout, so re-tiling leaves it be.",
-        _ when HasSelectedPanel => "Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · split it or pick a layout from the ribbon · Home › Shape Fill colours it · Delete removes it.",
-        _ when IsComicTitlePage => "The comic's title page - every issue opens with it, showing its own {issue}. To change it for this issue alone: Insert › Title page › Only this issue.",
-        _ when Working.LayoutLocked => "Layout is locked - click a panel to select it (or a bubble or character to edit it). Double-click inside a panel to add a bubble. Unlock on the Layout tab.",
-        _ => "Pick a page layout from the ribbon, or click a panel to select it. Double-click inside a panel to add a speech bubble; Insert › Character adds a character. Hold Ctrl to see every button's shortcut."
+        _ when HasSelectedPanel => $"Drag to move the panel (Alt+drag drags off a copy) · drag an edge, corner or gutter to resize · {Where("split it or pick a layout from the ribbon · Home › Shape Fill colours it", "split or colour it in the inspector")} · Delete removes it.",
+        _ when IsComicTitlePage => $"The comic's title page - every issue opens with it, showing its own {{issue}}. To change it for this issue alone: {Where("Insert › Title page", "the inspector's Title page, with nothing selected,")} › Only this issue.",
+        _ when Working.LayoutLocked => $"Layout is locked - click a panel to select it (or a bubble or character to edit it). Double-click inside a panel to add a bubble. Unlock {Where("on the Layout tab", "in the inspector")}.",
+        _ => $"Pick a page layout {Where("from the ribbon", "in the inspector")}, or click a panel to select it. Double-click inside a panel to add a speech bubble; {Where("Insert › Character", "the toolbar's Insert menu")} adds a character. Hold Ctrl to see every button's shortcut."
     };
 
     public Rect2D PanelBounds(PanelId id) => AnchorRing.BoundingBox(Working.Panels[id].Shape.Anchors);

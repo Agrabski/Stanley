@@ -155,7 +155,7 @@ public sealed partial class CharacterEditorViewModel
         SelectSticker(asset.Id);
         ShowMessage(result.Report.Count > 0
             ? $"{fileName}: {string.Join("; ", result.Report)}."
-            : $"Imported {fileName} - drag it on the character to move it; size and turn it on the Sticker tab.");
+            : $"Imported {fileName} - drag it on the character to move it; size and turn it {Where("on the Sticker tab", "under Sticker")}.");
         return true;
     }
 

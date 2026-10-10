@@ -28,7 +28,11 @@ public static class PageEditorHost
     {
         layersPane ??= new LayersPaneMemory();
         var history = new EditorHistory();
-        var characters = new CharacterLibraryViewModel(history, project.Characters) { MyAssets = myAssets };
+        var characters = new CharacterLibraryViewModel(history, project.Characters)
+        {
+            MyAssets = myAssets,
+            UsesInspector = arrangement == SidePaneArrangement.Stacked
+        };
         var pictures = new PictureLibrary(project.Pictures);
         var objectGroups = new ObjectGroupLibrary(project.ObjectGroups);
         var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures,
@@ -37,7 +41,9 @@ public static class PageEditorHost
             Fields = project.Fields,
             MyAssets = myAssets,
             ObjectGroups = objectGroups,
-            LayersHost = layersPane
+            LayersHost = layersPane,
+            // Stacked side panes are the canvas layout's, whose page properties are in the inspector, not on ribbon tabs.
+            UsesInspector = arrangement == SidePaneArrangement.Stacked
         };
         var layers = new LayersViewModel();
         var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters], [layers], layersPane.LayersPaneVisible, arrangement);

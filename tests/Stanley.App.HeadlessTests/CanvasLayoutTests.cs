@@ -99,4 +99,19 @@ public class CanvasLayoutTests
         Dispatcher.UIThread.RunJobs();
         Assert.Single(CanvasLayoutHarness.InspectorColumn(window).GetVisualDescendants().OfType<PageInspector>());
     }
+
+    [Fact]
+    public void The_status_bar_hints_point_at_the_inspector_not_the_ribbon()
+    {
+        var canvas = CanvasLayoutHarness.Open();
+        Assert.True(canvas.Editor.UsesInspector);
+        Assert.DoesNotContain("ribbon", canvas.Editor.Hint);
+        canvas.Editor.Select(canvas.Editor.Working.PanelOrder[0]);
+        Assert.Contains("inspector", canvas.Editor.Hint);
+
+        var ribbon = new MainWindow();
+        ribbon.Show();
+        Assert.False(ribbon.Editor.UsesInspector);
+        Assert.Contains("ribbon", ribbon.Editor.Hint);
+    }
 }

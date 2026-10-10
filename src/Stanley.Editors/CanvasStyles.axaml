@@ -90,6 +90,16 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <!-- Disabled (nothing to undo yet), a bar tool or inspector button just fades - no grey slab behind it, as Fluent's default would have. -->
+  <Style Selector=":is(Button).barTool:disabled /template/ ContentPresenter#PART_ContentPresenter, :is(Button).iconButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector=":is(Button).barTool:disabled, :is(Button).iconButton:disabled, :is(Button).inspectorButton:disabled">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="Border.inspector :is(Button).inspectorButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
   <!-- A thin upright rule between groups of tools. -->
   <Style Selector="Rectangle.barDivider">
     <Setter Property="Width" Value="1" />

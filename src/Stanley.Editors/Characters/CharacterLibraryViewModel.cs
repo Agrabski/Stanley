@@ -135,6 +135,9 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 	/// <summary>Which characters keep their old whole hairstyle (the upgrade bar's "Keep"); the app points it at the user's settings, tests at memory.</summary>
 	public HairUpgradeMemory HairUpgrades { get; set; } = new();
 
+	/// <summary>The window has the canvas layout - the character's properties are in the inspector, not on ribbon tabs - so the editors' hints say so.</summary>
+	public bool UsesInspector { get; set; }
+
 	// ---------------------------------------------------------------- ICharacterCatalog
 
 	public IReadOnlyDictionary<CharacterId, CharacterDefinition> Characters => _snapshot;

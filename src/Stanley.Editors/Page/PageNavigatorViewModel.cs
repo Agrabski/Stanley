@@ -237,6 +237,17 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
         }
     }
 
+    /// <summary>The window has the canvas layout - an inspector on the right instead of the ribbon - handed to every page so its status-bar hints point at the right places.</summary>
+    public bool UsesInspector
+    {
+        get;
+        set
+        {
+            field = value;
+            SyncPages();
+        }
+    }
+
     /// <summary>The comic's copies of kept object groups, shared by every page; null for a comic edited without them.</summary>
     public ObjectGroupLibrary? ObjectGroups
     {
@@ -563,6 +574,7 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             page.Editor.MyAssets = MyAssets;
             page.Editor.ObjectGroups = ObjectGroups;
             page.Editor.LayersHost = LayersHost;
+            page.Editor.UsesInspector = UsesInspector;
         }
     }
 
@@ -600,7 +612,8 @@ public sealed class PageNavigatorViewModel : Tool, IPageNumberingHost, IIssueLoo
             Fields = _fields,
             MyAssets = MyAssets,
             ObjectGroups = ObjectGroups,
-            LayersHost = LayersHost
+            LayersHost = LayersHost,
+            UsesInspector = UsesInspector
         };
         if (settingsFrom != null)
         {

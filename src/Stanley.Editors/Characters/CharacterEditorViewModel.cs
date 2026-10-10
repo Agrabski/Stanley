@@ -235,8 +235,11 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 	public string Hint => _message ??
 		ExpressionWarning ??
 		(SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
-		"Pick a body type and fine-tune it with the sliders; dress them on the Look tab, and click something they wear to adjust it. " +
+		$"Pick a body type and fine-tune it with the sliders; dress them {Where("on the Look tab", "under Look")}, and click something they wear to adjust it. " +
 		"Every panel this character is in updates as you go.";
+
+	/// <summary>Where something is: on the ribbon's tabs (<paramref name="ribbon"/>) or in the canvas layout's inspector (<paramref name="canvas"/>).</summary>
+	internal string Where(string ribbon, string canvas) => Library?.UsesInspector == true ? canvas : ribbon;
 
 	private string? _message;
 
