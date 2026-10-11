@@ -1,0 +1,25 @@
+<!--
+  Looks the page inspector's Panel, Text and Speed lines sections share on top of
+  CanvasStyles.axaml, included by each of them (so nothing outside those sections picks them
+  up). Candidates for CanvasStyles itself once other sections want them too.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- A colour button (ColorMenuButton: Shape Fill, Text Outline...) boxed like the section's
+       other buttons and drop-downs, so it reads as something to press rather than a label. -->
+  <Style Selector="SplitButton.colorMenu">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <!-- A slider in a property row: as tall as the row, and never holding the keyboard (like the ribbon's Slider.body). -->
+  <Style Selector="DockPanel.propertyRow > Slider">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+</Styles>

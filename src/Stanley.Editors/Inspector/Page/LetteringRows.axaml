@@ -1,0 +1,50 @@
+<!--
+  The inspector's lettering rows: the ribbon's Font group (FontGroup.axaml) laid out for the
+  canvas layout's narrow column - typeface across the top, then size, bigger/smaller, bold and
+  italic, then alignment. Bound to the same view-model members as FontGroup, so it shows and
+  changes the selected bubble's or text's lettering, or what the next one gets. Used by the
+  Bubble and Text sections; its DataContext is the page editor's view model.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.LetteringRows"
+             x:DataType="local:PageEditorViewModel">
+  <StackPanel Spacing="6">
+    <!-- fontBox brings the font previews; its ribbon width gives way to the column's. -->
+    <ComboBox Name="FontBox" Classes="fontBox" Width="NaN" HorizontalAlignment="Stretch"
+              ItemsSource="{Binding FontChoices}" SelectedItem="{Binding SelectedFont}"
+              PlaceholderText="{Binding FontPlaceholder}" ToolTip.Tip="{Binding FontTip}" />
+    <DockPanel>
+      <local:FontSizeBox Name="SizeBox" DockPanel.Dock="Left" Value="{Binding TextSizePt}" Sizes="{Binding TextSizeChoices}"
+                         Command="{Binding SetTextSizeCommand}"
+                         ToolTip.Tip="Font Size - in points, as in Word: pick one, or type any size and press Enter" />
+      <StackPanel Classes="iconRow" DockPanel.Dock="Right">
+        <ToggleButton Name="BoldButton" Classes="iconButton" IsChecked="{Binding IsTextBold}" ToolTip.Tip="Bold"
+                      FontSize="14" FontWeight="Bold" Content="B" />
+        <ToggleButton Name="ItalicButton" Classes="iconButton" IsChecked="{Binding IsTextItalic}" ToolTip.Tip="Italic"
+                      FontSize="14" FontWeight="SemiBold" FontStyle="Italic" Content="I" />
+      </StackPanel>
+      <StackPanel Classes="iconRow" Margin="4,0,0,0">
+        <Button Name="BiggerButton" Classes="iconButton" Command="{Binding BiggerTextCommand}" ToolTip.Tip="Bigger letters"
+                FontWeight="SemiBold" Content="A+" />
+        <Button Name="SmallerButton" Classes="iconButton" Command="{Binding SmallerTextCommand}" ToolTip.Tip="Smaller letters"
+                Content="A−" />
+      </StackPanel>
+    </DockPanel>
+    <StackPanel Classes="iconRow">
+      <RadioButton Name="AlignLeftButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsTextAlignLeft}" ToolTip.Tip="Line up on the left">
+        <PathIcon Data="{StaticResource AlignLeftIcon}" />
+      </RadioButton>
+      <RadioButton Name="AlignCenterButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsTextAlignCenter}" ToolTip.Tip="Centre each line">
+        <PathIcon Data="{StaticResource AlignCenterIcon}" />
+      </RadioButton>
+      <RadioButton Name="AlignRightButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsTextAlignRight}" ToolTip.Tip="Line up on the right">
+        <PathIcon Data="{StaticResource AlignRightIcon}" />
+      </RadioButton>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -1,15 +1,100 @@
 <!--
-  The selected panel: split, background, fill and border.
-  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+  The selected panel: split, background, fill and border - the ribbon's Panel tab
+  (PanelRibbonTab.axaml), bound to the same view-model members.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.PanelSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsPanelContext}">
-  <Border Classes="inspectorSection">
-    <StackPanel Spacing="6">
-      <TextBlock Classes="sectionHeader" Text="Panel" />
-    </StackPanel>
-  </Border>
+  <UserControl.Styles>
+    <StyleInclude Source="avares://Stanley.Editors/Inspector/Page/InspectorSectionStyles.axaml" />
+  </UserControl.Styles>
+  <StackPanel>
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <!-- A thought cloud floats over the grid rather than being part of it, so it has nothing to split. -->
+        <TextBlock Classes="sectionHeader" Text="Layout" IsVisible="{Binding !IsSelectedPanelCloud}" />
+        <DockPanel Classes="propertyRow" IsVisible="{Binding !IsSelectedPanelCloud}">
+          <TextBlock Classes="propertyLabel" Text="Split" />
+          <StackPanel Classes="iconRow">
+            <Button Name="SplitColumnsButton" Classes="iconButton" Command="{Binding SplitColumnsCommand}"
+                    ToolTip.Tip="Split this panel into two side-by-side panels">
+              <PathIcon Data="{StaticResource ColumnsIcon}" />
+            </Button>
+            <Button Name="SplitRowsButton" Classes="iconButton" Command="{Binding SplitRowsCommand}"
+                    ToolTip.Tip="Split this panel into two stacked panels">
+              <PathIcon Data="{StaticResource RowsIcon}" />
+            </Button>
+          </StackPanel>
+        </DockPanel>
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <Button Name="PanelAddBubbleButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to this panel and start typing">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" />
+            </StackPanel>
+          </Button>
+          <Button Name="DeletePanelButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles"
+                  local:Shortcut.Keys="Del">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Fill" />
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Background" />
+          <DropDownButton Name="PanelBackgroundButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left"
+                          ToolTip.Tip="Fill this panel behind everything in it: a colour or a sky">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Border Width="22" Height="14" Background="{Binding BackgroundPreview}" BorderBrush="#80808080"
+                      BorderThickness="1" CornerRadius="2" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding BackgroundName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="100" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <!-- Opening leftwards, over the page: the inspector is at the window's right edge. -->
+              <Flyout Placement="BottomEdgeAlignedRight">
+                <local:BackgroundPicker Command="{Binding SetBackgroundCommand}"
+                                        PictureCommand="{Binding BackgroundPictureCommand}" />
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+        </DockPanel>
+        <local:ColorMenuButton Name="PanelFillButton" Label="Shape Fill"
+                               Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                               Command="{Binding SetPanelFillCommand}" NoneLabel="No Fill"
+                               MoreLabel="More Fill Colors…"
+                               CurrentColor="{Binding CurrentPanelStyle.Fill}"
+                               ToolTip.Tip="Shape Fill - this panel's background colour (No Fill: plain paper)" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Border" />
+        <CheckBox Name="PanelBorderButton" Focusable="False" IsChecked="{Binding SelectedPanelHasBorder}" FontSize="12"
+                  Content="Draw the border"
+                  ToolTip.Tip="Draw this panel's border - switch it off for an open panel, or a background that runs to the page edge" />
+        <local:ColorMenuButton Name="PanelOutlineButton" Label="Shape Outline"
+                               Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                               Command="{Binding SetPanelOutlineCommand}" NoneLabel="No Outline"
+                               MoreLabel="More Outline Colors…"
+                               CurrentColor="{Binding CurrentPanelStyle.Stroke}"
+                               WeightCommand="{Binding SetPanelOutlineWeightCommand}"
+                               CurrentWeight="{Binding CurrentPanelStyle.StrokeWidthMm}"
+                               DashCommand="{Binding SetPanelOutlineDashCommand}"
+                               CurrentDash="{Binding CurrentPanelStyle.Dash}"
+                               ToolTip.Tip="Shape Outline - this panel's border: its colour, weight and dashes (No Outline: none)" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
 </UserControl>
