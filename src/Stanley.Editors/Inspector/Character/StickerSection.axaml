@@ -1,0 +1,187 @@
+<!--
+  The worn sticker picked on the stage (or just put on from a gallery): which one, how it's
+  worn (its styles), its own colour, its art's size and turn, a print's text, a garment's fit,
+  and where it sits in its slot. Part of the canvas layout's inspector (docs/ui-shell.md §6);
+  the ribbon's contextual Sticker tab does the same. Each group shows only when it applies.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.StickerSection"
+             x:DataType="local:CharacterEditorViewModel" IsVisible="{Binding HasSelectedSticker}">
+  <UserControl.Styles>
+    <!-- A slider filling its row, between the label and the value (as in the Body section). -->
+    <Style Selector="Slider.inspectorSlider">
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.propertyRow > TextBlock.sliderValue">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.sliderValue">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- A heading over a group of rows: smaller than the section's own. -->
+    <Style Selector="TextBlock.groupHeader">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource StanleyCanvasMutedTextBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <TextBlock Classes="sectionHeader" Text="Sticker" />
+
+      <!-- What you're working on; Done lets go of it, back to the whole character. -->
+      <DockPanel>
+        <Button Name="DeselectStickerButton" DockPanel.Dock="Right" Classes="inspectorButton" Margin="4,0,0,0" Command="{Binding DeselectStickerCommand}"
+                ToolTip.Tip="Done with it - back to the whole character">Done</Button>
+        <ComboBox Name="WornPicker" HorizontalAlignment="Stretch" FontSize="12" ItemsSource="{Binding WornStickers}" SelectedItem="{Binding SelectedWorn}"
+                  ToolTip.Tip="What you're working on - or click it on the character" />
+      </DockPanel>
+
+      <!-- Ways to wear it - a hood up or down, a cap's brim forward, back or to a side - each previewed on the character (not for faces: their variants are expressions). -->
+      <StackPanel Spacing="2" IsVisible="{Binding HasSelectedStickerStyles}">
+        <TextBlock Classes="groupHeader" Text="Worn" ToolTip.Tip="How it's worn - kept with the look you're editing; right-click it on a page for one panel only" />
+        <ItemsControl Name="StyleGallery" ItemsSource="{Binding SelectedStickerStyles}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:StickerStyleChoice">
+              <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="56" Height="72" Padding="2" Margin="0,0,2,2"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                      Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetStyleCommand}"
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Angle="{Binding Angle}" Closeup="{Binding Closeup}" />
+                </DockPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- Its own colour - a hair piece or streak (and its dye), or one sticker of several in a slot: it follows the Hair colour (or the slot's)
+           until it's given its own here - and, for hair, whether it paints over glasses. -->
+      <StackPanel Spacing="4" IsVisible="{Binding HasSelectedHairColor}">
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="{Binding SelectedColorGroupLabel}" />
+          <ContentControl Name="StickerColor" Content="{Binding SelectedColorEditor}" HorizontalAlignment="Left" VerticalAlignment="Center">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="local:ColorSlotEditor">
+                <local:ColorSlotDropdown />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </DockPanel>
+        <StackPanel Spacing="2" IsVisible="{Binding CanFollowHair}">
+          <Button Name="SameAsHairButton" Classes="inspectorButton" Command="{Binding SameAsHairCommand}" HorizontalAlignment="Left"
+                  ToolTip.Tip="{Binding FollowTip}" Content="{Binding FollowLabel}" />
+          <TextBlock Name="SameAsHairNote" Classes="inspectorHint" Text="{Binding SameAsHairNote}" IsVisible="{Binding HasSameAsHairNote}" />
+        </StackPanel>
+        <CheckBox Name="OverGlassesBox" IsChecked="{Binding SelectedOverGlasses}" IsVisible="{Binding CanSetOverGlasses}" FontSize="11" Focusable="False" MinHeight="0"
+                  ToolTip.Tip="Paint it over glasses too - a long fringe over one eye covers that lens">Over glasses</CheckBox>
+      </StackPanel>
+
+      <!-- Drawn or imported art: its size and turn (drag it on the character to move it). -->
+      <StackPanel Spacing="0" IsVisible="{Binding HasArtParts}">
+        <TextBlock Classes="groupHeader" Text="Art" ToolTip.Tip="Drag it on the character to move it" />
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Size" />
+          <TextBlock Classes="sliderValue" Text="{Binding SelectedArtScale, StringFormat='{}{0:0}%'}" />
+          <Slider Name="ArtScaleSlider" Classes="inspectorSlider" Minimum="10" Maximum="300" Value="{Binding SelectedArtScale}"
+                  ToolTip.Tip="How big it is, compared with how it was drawn" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Turn" />
+          <TextBlock Classes="sliderValue" Text="{Binding SelectedArtRotation, StringFormat='{}{0:0}°'}" />
+          <Slider Name="ArtTurnSlider" Classes="inspectorSlider" Minimum="-180" Maximum="180" Value="{Binding SelectedArtRotation}"
+                  ToolTip.Tip="Turn it" />
+        </DockPanel>
+        <WrapPanel IsVisible="{Binding HasDrawnArt}">
+          <CheckBox Name="HugShapeBox" IsChecked="{Binding SelectedHugsShape}" FontSize="11" Focusable="False" MinHeight="0" Margin="0,0,8,4"
+                    ToolTip.Tip="Bend with the body (hair, prints) instead of keeping its own shape (eyes, logos)">Hug the shape</CheckBox>
+          <Button Name="EditArtButton" Classes="inspectorButton" Command="{Binding EditSelectedArtCommand}"
+                  ToolTip.Tip="Open this view of it in your SVG editor - saves come back here">Edit drawing...</Button>
+        </WrapPanel>
+      </StackPanel>
+
+      <!-- A text print: what it says (Enter or leaving the box applies it), bold or not, and a few emoji a click away. -->
+      <StackPanel Spacing="4" IsVisible="{Binding SelectedIsTextPrint}">
+        <TextBlock Classes="groupHeader" Text="Text" />
+        <DockPanel>
+          <ToggleButton Name="PrintBoldButton" DockPanel.Dock="Right" Classes="iconButton" Margin="4,0,0,0" IsChecked="{Binding SelectedTextBold}"
+                        FontWeight="Bold" ToolTip.Tip="Bold">B</ToggleButton>
+          <TextBox Name="PrintTextBox" Height="28" MinHeight="0" Padding="6,0" FontSize="12" VerticalContentAlignment="Center"
+                   Text="{Binding SelectedText, UpdateSourceTrigger=LostFocus}" ToolTip.Tip="What it says - emoji too (Enter to apply)" />
+        </DockPanel>
+        <ItemsControl Name="PrintEmoji" ItemsSource="{Binding CommonEmoji}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Button Classes="iconButton" Content="{Binding}" FontSize="15" FontFamily="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji" ToolTip.Tip="Add it to the text"
+                      Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).InsertEmojiCommand}" CommandParameter="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- Clothes that cover: how far down, the sleeves, and skin tight to baggy. -->
+      <StackPanel Spacing="0" IsVisible="{Binding HasFit}">
+        <TextBlock Classes="groupHeader" Text="Fit" />
+        <DockPanel Classes="propertyRow" IsVisible="{Binding HasLength}">
+          <TextBlock Classes="propertyLabel" Text="Length" />
+          <TextBlock Classes="sliderValue" Text="{Binding SelectedLength, StringFormat='{}{0:0}'}" />
+          <Slider Name="LengthSlider" Classes="inspectorSlider" Minimum="0" Maximum="100" Value="{Binding SelectedLength}"
+                  ToolTip.Tip="How far down it reaches: crop top to long, shorts to trousers, mini to maxi" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow" IsVisible="{Binding HasSleeves}">
+          <TextBlock Classes="propertyLabel" Text="Sleeves" />
+          <TextBlock Classes="sliderValue" Text="{Binding SelectedSleeves, StringFormat='{}{0:0}'}" />
+          <Slider Name="SleevesSlider" Classes="inspectorSlider" Minimum="0" Maximum="100" Value="{Binding SelectedSleeves}"
+                  ToolTip.Tip="How far down the arm the sleeves reach" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Fit" />
+          <TextBlock Classes="sliderValue" Text="{Binding SelectedFit, StringFormat='{}{0:0}'}" />
+          <Slider Name="FitSlider" Classes="inspectorSlider" Minimum="0" Maximum="50" Value="{Binding SelectedFit}"
+                  ToolTip.Tip="Skin tight to baggy" />
+        </DockPanel>
+      </StackPanel>
+
+      <!-- Where it sits among the slot's other stickers, and off it comes. -->
+      <StackPanel Spacing="4">
+        <TextBlock Classes="groupHeader" Text="Wear" />
+        <WrapPanel>
+          <Button Name="StickerUpButton" Classes="inspectorButton" Margin="0,0,4,4" Command="{Binding MoveSelectedUpCommand}"
+                  ToolTip.Tip="Over the next one in the same slot">
+            <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource ForwardIcon}" /><TextBlock Text="Forward" /></StackPanel>
+          </Button>
+          <Button Name="StickerDownButton" Classes="inspectorButton" Margin="0,0,4,4" Command="{Binding MoveSelectedDownCommand}"
+                  ToolTip.Tip="Under the previous one in the same slot">
+            <StackPanel Orientation="Horizontal" Spacing="4"><PathIcon Data="{StaticResource BackwardIcon}" /><TextBlock Text="Back" /></StackPanel>
+          </Button>
+          <!-- Prints and badges only: as many of the same one as you like. -->
+          <Button Name="DuplicateStickerButton" Classes="inspectorButton" Margin="0,0,4,4" Command="{Binding DuplicateSelectedCommand}" IsVisible="{Binding CanDuplicateSelected}"
+                  ToolTip.Tip="Another one just like it, a step aside - drag it where it goes">Duplicate</Button>
+          <Button Name="TakeOffButton" Classes="inspectorButton" Margin="0,0,4,4" Command="{Binding TakeOffSelectedCommand}"
+                  ToolTip.Tip="Stop wearing it - it stays in the wardrobe">Take off</Button>
+          <Button Name="RemoveStickerButton" Classes="inspectorButton" Margin="0,0,4,4" Command="{Binding RemoveSelectedCommand}"
+                  ToolTip.Tip="Out of the wardrobe altogether">Remove</Button>
+        </WrapPanel>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

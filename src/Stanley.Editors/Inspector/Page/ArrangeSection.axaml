@@ -1,0 +1,55 @@
+<!--
+  What any selection can do - cut, copy, paste, duplicate, group, ungroup, delete - as one row
+  of icons at the top of the inspector: the Home tab's Clipboard and Arrange groups and its
+  Delete. Shown whenever something is selected, a multi-selection too. Putting things in front
+  or behind stays with each kind's own section, since what "front" means differs (a character
+  goes in front of the other characters, a shape in front of everything but the bubbles).
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ArrangeSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding !IsPageContext}">
+  <UserControl.Resources>
+    <!-- Two shapes inside a selection frame's corners: tied together into one. -->
+    <StreamGeometry x:Key="GroupIcon">M2,2 H8 V4 H4 V8 H2 Z M16,2 H22 V8 H20 V4 H16 Z M2,16 H4 V20 H8 V22 H2 Z M20,16 H22 V22 H16 V20 H20 Z M6.5,6.5 H12.5 V12.5 H6.5 Z M11.5,11.5 H17.5 V17.5 H11.5 Z</StreamGeometry>
+    <!-- The same two shapes pulled apart, each its own thing again. -->
+    <StreamGeometry x:Key="UngroupIcon">M2,2 H11 V11 H2 Z M4,4 V9 H9 V4 Z M13,13 H22 V22 H13 Z M15,15 V20 H20 V15 Z</StreamGeometry>
+  </UserControl.Resources>
+  <Border Classes="inspectorSection" Padding="12,4,12,6">
+    <DockPanel>
+      <!-- Each kind's ribbon tab words its Delete for what it deletes; the code-behind keeps this one's tip in step. -->
+      <Button Name="DeleteButton" Classes="iconButton" DockPanel.Dock="Right" Command="{Binding DeleteSelectionCommand}"
+              ToolTip.Tip="Delete what's selected" local:Shortcut.Keys="Del">
+        <PathIcon Data="{StaticResource DeleteIcon}" />
+      </Button>
+      <StackPanel Classes="iconRow">
+        <Button Name="CutButton" Classes="iconButton" Command="{Binding CutCommand}" local:Shortcut.Keys="Ctrl+X"
+                ToolTip.Tip="Cut - take what's selected off the page, to paste somewhere else">
+          <PathIcon Data="{StaticResource CutIcon}" />
+        </Button>
+        <Button Name="CopyButton" Classes="iconButton" Command="{Binding CopyCommand}" local:Shortcut.Keys="Ctrl+C"
+                ToolTip.Tip="Copy what's selected, with its words, colours and pose - then paste it on any page">
+          <PathIcon Data="{StaticResource CopyIcon}" />
+        </Button>
+        <Button Name="PasteButton" Classes="iconButton" Command="{Binding PasteCommand}" local:Shortcut.Keys="Ctrl+V"
+                ToolTip.Tip="Paste what you copied - into the selected panel, stepped aside from anything in the same spot">
+          <PathIcon Data="{StaticResource PasteIcon}" />
+        </Button>
+        <Button Name="DuplicateButton" Classes="iconButton" Command="{Binding DuplicateCommand}" local:Shortcut.Keys="Ctrl+D"
+                ToolTip.Tip="Duplicate - a copy of what's selected, right beside it (or hold Alt and drag it to pull a copy away)">
+          <PathIcon Data="{StaticResource DuplicateIcon}" />
+        </Button>
+        <Button Name="GroupButton" Classes="iconButton" Margin="8,0,0,0" Command="{Binding GroupSelectionCommand}" local:Shortcut.Keys="Ctrl+G"
+                ToolTip.Tip="Group what's selected - shapes, text, characters, bubbles - so it is picked, moved and deleted as one">
+          <PathIcon Data="{StaticResource GroupIcon}" />
+        </Button>
+        <Button Name="UngroupButton" Classes="iconButton" Command="{Binding UngroupSelectionCommand}" local:Shortcut.Keys="Ctrl+Shift+G"
+                ToolTip.Tip="Ungroup - take a group back apart into its separate pieces">
+          <PathIcon Data="{StaticResource UngroupIcon}" />
+        </Button>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

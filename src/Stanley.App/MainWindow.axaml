@@ -28,7 +28,10 @@
     </Window.DataTemplates>
 
     <Grid>
-        <DockPanel>
+        <!-- The ribbon layout's chrome. With the canvas layout (File › Options › Layout) the window
+             swaps the title bar and ribbon for a CanvasTopBar and adds an InspectorColumn on the right
+             when it's built - see MainWindow.UseCanvasLayout and docs/ui-shell.md. -->
+        <DockPanel Name="ShellDock">
             <!-- Title row with the quick access toolbar (Save / Undo / Redo), as in Word. -->
             <Border Name="TitleBar" DockPanel.Dock="Top" Classes="titleBar">
                 <Grid ColumnDefinitions="*,Auto,*">

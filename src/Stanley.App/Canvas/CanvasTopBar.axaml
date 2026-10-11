@@ -1,0 +1,210 @@
+<!--
+  The canvas layout's one bar along the top (docs/ui-shell.md §6), in place of the ribbon
+  layout's title bar and ribbon: the main menu (the File view's pages, Edit and View), the
+  active editor's tools, the comic's caption with the issue switcher in the middle, and
+  undo / redo / save, zoom and AutoSave on the right. The tools and zoom follow
+  Workspace.ActiveEditor, the way the ribbon does.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:editors="using:Stanley.Editors"
+             xmlns:app="using:Stanley.App"
+             x:Class="Stanley.App.CanvasTopBar"
+             x:DataType="app:MainWindowViewModel">
+  <Border Name="Bar" Classes="canvasBar">
+    <Grid ColumnDefinitions="*,Auto,*">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True">
+        <Button Name="MainMenuButton" Classes="barTool" ToolTip.Tip="Menu - new, open, save, export, options">
+          <StackPanel Orientation="Horizontal">
+            <PathIcon Data="{StaticResource MenuIcon}" />
+            <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+          </StackPanel>
+          <!-- The File view's pages, then Edit and View for the page. Shortcuts here are only shown
+               (InputGesture): the window's KeyBindings and the page canvas handle the keys, so a
+               menu item and its key always do the same thing. What acts on the page is off while
+               a character is being edited (IsPageEditor) - or with no comic open. -->
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+              <MenuItem Name="MenuNewItem" Header="New" Command="{Binding NewCommand}" InputGesture="Ctrl+N"
+                        ToolTip.Tip="Start a new blank comic straight away">
+                <MenuItem.Icon><PathIcon Data="{StaticResource NewIcon}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Name="MenuNewFromTemplateItem" Header="New from a template…"
+                        Command="{Binding OpenBackstageCommand}" CommandParameter="{x:Static app:BackstagePage.New}"
+                        ToolTip.Tip="A comic book page with a starting layout, a comic strip or a webcomic" />
+              <MenuItem Name="MenuOpenItem" Header="Open…" Command="{Binding OpenBackstageCommand}"
+                        CommandParameter="{x:Static app:BackstagePage.Open}" InputGesture="Ctrl+O"
+                        ToolTip.Tip="Open a comic - a recent one, or browse for its folder">
+                <MenuItem.Icon><PathIcon Data="{StaticResource FolderIcon}" /></MenuItem.Icon>
+              </MenuItem>
+              <Separator />
+              <MenuItem Name="MenuSaveItem" Header="Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S">
+                <MenuItem.Icon><PathIcon Data="{StaticResource SaveIcon}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Name="MenuSaveAsItem" Header="Save As…" Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S"
+                        ToolTip.Tip="Save the comic under another name or somewhere else" />
+              <MenuItem Name="MenuExportItem" Header="Export" IsEnabled="{Binding HasDocument}">
+                <MenuItem Name="MenuExportPdfItem" Header="PDF…" Command="{Binding ExportPdfCommand}"
+                          ToolTip.Tip="Every page, vector, at print size. For printers and sharing." />
+                <MenuItem Name="MenuExportPngItem" Header="PNG…" Command="{Binding ExportPngCommand}"
+                          ToolTip.Tip="{Binding PngExportText}" />
+                <Separator />
+                <MenuItem Name="MenuExportPageItem" Header="Export in the File view…"
+                          Command="{Binding OpenBackstageCommand}" CommandParameter="{x:Static app:BackstagePage.Export}"
+                          ToolTip.Tip="PDF and PNG side by side, with what each is for" />
+              </MenuItem>
+              <Separator />
+              <MenuItem Name="MenuEditItem" Header="Edit" IsEnabled="{Binding HasDocument}">
+                <MenuItem Name="MenuUndoItem" Header="Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource UndoIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuRedoItem" Header="Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource RedoIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Name="MenuCutItem" Header="Cut" Command="{Binding Editor.CutCommand}" InputGesture="Ctrl+X"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Take what's selected off the page, to paste somewhere else">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource CutIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuCopyItem" Header="Copy" Command="{Binding Editor.CopyCommand}" InputGesture="Ctrl+C"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Copy what's selected, with its words, colours and pose - then paste it on any page">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource CopyIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuPasteItem" Header="Paste" Command="{Binding Editor.PasteCommand}" InputGesture="Ctrl+V"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Paste what you copied - into the selected panel, stepped aside from anything in the same spot">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource PasteIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuDuplicateItem" Header="Duplicate" Command="{Binding Editor.DuplicateCommand}" InputGesture="Ctrl+D"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="A copy of what's selected, right beside it - or hold Alt and drag it to pull a copy away">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource DuplicateIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuDeleteItem" Header="Delete" Command="{Binding Editor.DeleteSelectionCommand}" InputGesture="Delete"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Delete what's selected">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource DeleteIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuEditTextItem" Header="Edit text" Command="{Binding Editor.EditTextCommand}" InputGesture="Enter"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Edit the selected bubble's or text's words - or double-click it">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource TextIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <Separator />
+                <MenuItem Name="MenuGroupItem" Header="Group" Command="{Binding Editor.GroupSelectionCommand}" InputGesture="Ctrl+G"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Group what's selected - shapes, text, characters, bubbles - so it is picked, moved and deleted as one" />
+                <MenuItem Name="MenuUngroupItem" Header="Ungroup" Command="{Binding Editor.UngroupSelectionCommand}" InputGesture="Ctrl+Shift+G"
+                          IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}"
+                          ToolTip.Tip="Take a group back apart into its separate pieces" />
+              </MenuItem>
+              <MenuItem Name="MenuViewItem" Header="View"
+                        IsEnabled="{Binding Workspace.ActiveEditor, Converter={x:Static app:CanvasTopBar.IsPageEditor}, FallbackValue=False}">
+                <MenuItem Name="MenuZoomInItem" Header="Zoom in" Command="{Binding Editor.ZoomInCommand}" InputGesture="Ctrl+OemPlus">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource PlusIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuZoomOutItem" Header="Zoom out" Command="{Binding Editor.ZoomOutCommand}" InputGesture="Ctrl+OemMinus">
+                  <MenuItem.Icon><PathIcon Data="{StaticResource MinusIcon}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Name="MenuFitPageItem" Header="Fit page" Command="{Binding Editor.FitPageCommand}" InputGesture="Ctrl+D0"
+                          ToolTip.Tip="Show the whole page" />
+                <MenuItem Name="MenuActualSizeItem" Header="Actual size" Command="{Binding Editor.ActualSizeCommand}" InputGesture="Ctrl+D1"
+                          ToolTip.Tip="Show the page at its printed size" />
+                <Separator />
+                <MenuItem Name="MenuMarginGuidesItem" Header="Margin guides" ToggleType="CheckBox"
+                          IsChecked="{Binding Editor.ShowMarginGuides, Mode=TwoWay, FallbackValue=False}" />
+                <MenuItem Name="MenuSnapItem" Header="Snap to margins and gutters" ToggleType="CheckBox"
+                          IsChecked="{Binding Editor.SnapEnabled, Mode=TwoWay, FallbackValue=False}" />
+                <MenuItem Name="MenuLockLayoutItem" Header="Lock layout" ToggleType="CheckBox"
+                          IsChecked="{Binding Editor.IsLayoutLocked, Mode=TwoWay, FallbackValue=False}"
+                          ToolTip.Tip="Prevent panels on this page from being moved, resized, split, deleted or re-tiled - bubbles and characters are unaffected" />
+                <Separator IsVisible="{Binding Editor.HasLayersPane, FallbackValue=False}" />
+                <MenuItem Name="MenuLayersItem" Header="Layers pane" ToggleType="CheckBox"
+                          IsVisible="{Binding Editor.HasLayersPane, FallbackValue=False}"
+                          IsChecked="{Binding Editor.ShowLayers, Mode=TwoWay, FallbackValue=False}"
+                          ToolTip.Tip="Show the Layers pane: every panel's contents in drawing order, to pick or move overlapping things" />
+              </MenuItem>
+              <Separator />
+              <!-- The File view itself (Alt+F), at its Info page. -->
+              <MenuItem Name="MenuFileItem" Header="Info" Command="{Binding OpenBackstageCommand}" InputGesture="Alt+F"
+                        ToolTip.Tip="The File view: the comic's title, issues, where it's saved and how it's doing" />
+              <MenuItem Name="MenuMyAssetsItem" Header="My Assets" IsVisible="{Binding HasMyAssets}"
+                        Command="{Binding OpenBackstageCommand}" CommandParameter="{x:Static app:BackstagePage.MyAssets}"
+                        ToolTip.Tip="Everything you've kept to use again in any comic">
+                <MenuItem.Icon><PathIcon Data="{StaticResource StarIcon}" /></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Name="MenuOptionsItem" Header="Options" Command="{Binding OpenBackstageCommand}"
+                        CommandParameter="{x:Static app:BackstagePage.Options}"
+                        ToolTip.Tip="Light or dark, the layout, updates, your SVG editor and where My Assets live" />
+              <Separator />
+              <MenuItem Name="MenuCloseItem" Header="Close" Command="{Binding CloseDocumentCommand}"
+                        ToolTip.Tip="Close the comic - asking first if it has unsaved changes" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Rectangle Classes="barDivider" />
+        <!-- The active editor's tools: PageToolbar for a page, CharacterToolbar for a character. -->
+        <ContentControl Name="ToolbarHost" Content="{Binding Workspace.ActiveEditor}" VerticalAlignment="Center">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="editors:PageEditorViewModel">
+              <editors:PageToolbar />
+            </DataTemplate>
+            <DataTemplate DataType="editors:CharacterEditorViewModel">
+              <editors:CharacterToolbar />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+      </StackPanel>
+
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0">
+        <TextBlock Name="CaptionText" Classes="barCaption" Text="{Binding DocumentCaption}" MaxWidth="320" />
+        <!-- Quick issue switcher: shows up once the comic has more than one issue, as in the ribbon layout's title bar. -->
+        <ComboBox Name="IssueSwitcherBox" IsVisible="{Binding HasMultipleIssues}"
+                  ItemsSource="{Binding Issues}" SelectedItem="{Binding SelectedIssue}"
+                  MinWidth="110" MaxWidth="220" FontSize="12" ToolTip.Tip="Switch issue">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="app:IssueEntry">
+              <TextBlock Text="{Binding Caption}" TextTrimming="CharacterEllipsis" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Name="NewIssueButton" Classes="barTool" Command="{Binding NewIssueCommand}" IsVisible="{Binding HasDocument}"
+                ToolTip.Tip="Add a new issue to this comic - its own pages, the same characters">
+          <PathIcon Data="{StaticResource PlusIcon}" />
+        </Button>
+      </StackPanel>
+
+      <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <TextBlock Name="MessageText" Text="{Binding Message}" Foreground="{DynamicResource StanleyErrorBrush}" FontSize="12"
+                   VerticalAlignment="Center" Margin="0,0,8,0" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+        <Button Name="UndoButton" Classes="barTool" Command="{Binding UndoCommand}" ToolTip.Tip="Undo" editors:Shortcut.Keys="Ctrl+Z">
+          <PathIcon Data="{StaticResource UndoIcon}" />
+        </Button>
+        <Button Name="RedoButton" Classes="barTool" Command="{Binding RedoCommand}" ToolTip.Tip="Redo" editors:Shortcut.Keys="Ctrl+Y">
+          <PathIcon Data="{StaticResource RedoIcon}" />
+        </Button>
+        <Rectangle Classes="barDivider" />
+        <!-- Zoom for a page; nothing for a character. -->
+        <ContentControl Name="ZoomHost" Content="{Binding Workspace.ActiveEditor}" VerticalAlignment="Center">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="editors:PageEditorViewModel">
+              <editors:PageZoomControl />
+            </DataTemplate>
+            <DataTemplate DataType="editors:CharacterEditorViewModel">
+              <Panel />
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+        <Rectangle Classes="barDivider" />
+        <TextBlock Text="AutoSave" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0" />
+        <ToggleSwitch Name="AutoSaveSwitch" IsChecked="{Binding AutoSaveEnabled}" IsEnabled="{Binding HasDocument}"
+                      OnContent="" OffContent="" MinWidth="0" ToolTip.Tip="{Binding AutoSaveTip}" Focusable="False" />
+        <Button Name="SaveButton" Classes="barTool" Command="{Binding SaveCommand}" ToolTip.Tip="Save" editors:Shortcut.Keys="Ctrl+S">
+          <PathIcon Data="{StaticResource SaveIcon}" />
+        </Button>
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

@@ -102,6 +102,7 @@ public sealed class MainWindowViewModel : ObservableObject
         _launcher = launcher;
         _recent = recent;
         _settings = settings ?? new AppSettings(null);
+        ActiveInterfaceLayout = _settings.InterfaceLayout;
         _recovery = recovery;
         _scheduler = scheduler;
         _tokenStore = tokenStore ?? new GithubTokenStore(null);
@@ -130,6 +131,7 @@ public sealed class MainWindowViewModel : ObservableObject
         OpenRecoveredCommand = new AsyncRelayCommand<RecoveredComic>(comic => comic is null ? Task.CompletedTask : OpenRecoveredAsync(comic));
         CheckForUpdatesCommand = new AsyncRelayCommand(CheckForUpdatesAsync);
         InstallUpdateCommand = new AsyncRelayCommand(InstallUpdateAsync, () => HasUpdateAvailable);
+        RestartCommand = new RelayCommand(() => RestartRequested?.Invoke(this, EventArgs.Empty), () => IsLayoutRestartPending);
         ChooseSvgEditorCommand = new AsyncRelayCommand(ChooseSvgEditorAsync);
         ChooseMyAssetsFolderCommand = new AsyncRelayCommand(ChooseMyAssetsFolderAsync, () => MyAssets != null);
         ShowMyAssetsFolderCommand = new AsyncRelayCommand(ShowMyAssetsFolderAsync, () => MyAssets != null && _launcher != null);
@@ -200,6 +202,44 @@ public sealed class MainWindowViewModel : ObservableObject
     public bool IsSystemTheme { get => Theme == AppTheme.System; set { if (value) Theme = AppTheme.System; } }
     public bool IsLightTheme { get => Theme == AppTheme.Light; set { if (value) Theme = AppTheme.Light; } }
     public bool IsDarkTheme { get => Theme == AppTheme.Dark; set { if (value) Theme = AppTheme.Dark; } }
+
+    // ---------------------------------------------------------------- layout
+
+    /// <summary>The layout this window was built with: the setting as it was at startup. Changing <see cref="InterfaceLayout"/> doesn't touch it - the new layout applies the next time Stanley starts.</summary>
+    public InterfaceLayout ActiveInterfaceLayout { get; }
+
+    /// <summary>This window has the canvas layout (thin toolbar, Pages and Layers on the left, the inspector on the right) rather than the ribbon.</summary>
+    public bool IsCanvasActive => ActiveInterfaceLayout == InterfaceLayout.Canvas;
+
+    /// <summary>File &gt; Options &gt; Layout: the ribbon or the canvas layout. Remembered straight away; applied the next time Stanley starts.</summary>
+    public InterfaceLayout InterfaceLayout
+    {
+        get => _settings.InterfaceLayout;
+        set
+        {
+            if (value == _settings.InterfaceLayout)
+                return;
+            _settings.InterfaceLayout = value;
+            AppLog.Info($"Interface layout set to {value} (applies on restart).");
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsRibbonLayout));
+            OnPropertyChanged(nameof(IsCanvasLayout));
+            OnPropertyChanged(nameof(IsLayoutRestartPending));
+            RestartCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool IsRibbonLayout { get => InterfaceLayout == InterfaceLayout.Ribbon; set { if (value) InterfaceLayout = InterfaceLayout.Ribbon; } }
+    public bool IsCanvasLayout { get => InterfaceLayout == InterfaceLayout.Canvas; set { if (value) InterfaceLayout = InterfaceLayout.Canvas; } }
+
+    /// <summary>The layout picked in Options isn't the one showing: it takes a restart.</summary>
+    public bool IsLayoutRestartPending => InterfaceLayout != ActiveInterfaceLayout;
+
+    /// <summary>Options' "Restart now": the window closes as usual (asking about unsaved changes, or saving with AutoSave on) and Stanley starts again in the new layout.</summary>
+    public IRelayCommand RestartCommand { get; }
+
+    /// <summary>Raised by <see cref="RestartCommand"/>; the window closes itself and starts Stanley again once it's closed.</summary>
+    public event EventHandler? RestartRequested;
 
     // ---------------------------------------------------------------- AutoSave
 
@@ -1155,7 +1195,8 @@ public sealed class MainWindowViewModel : ObservableObject
         AppLog.Info($"Loaded \"{project.Title}\" ({(project.IsUntitled ? "new, unsaved" : project.Location)}).");
         _project = project;
         (_workspace, _navigator, _characters, _pictures, _objectGroups) =
-            PageEditorHost.CreateWorkspace(project, MyAssets, new LayersPaneMemory(() => _settings.ShowLayers, on => _settings.ShowLayers = on));
+            PageEditorHost.CreateWorkspace(project, MyAssets, new LayersPaneMemory(() => _settings.ShowLayers, on => _settings.ShowLayers = on),
+                IsCanvasActive ? SidePaneArrangement.Stacked : SidePaneArrangement.Beside);
         _characters.ArtEditing = new SystemArtEditing(AppPaths.ArtEditingDirectory, () => _settings.SvgEditorPath, path =>
         {
             _settings.SvgEditorPath = path;

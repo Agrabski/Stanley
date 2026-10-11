@@ -12,6 +12,18 @@ public enum AppTheme
 }
 
 /// <summary>
+/// How the window is laid out around the page. <see cref="Ribbon"/> is the default: Word-style
+/// tabs above the page. <see cref="Canvas"/> is the alternative for people used to Figma-like
+/// tools: a thin toolbar on top, Pages and Layers on the left, the selection's properties on
+/// the right. Read once at startup - switching applies the next time Stanley starts.
+/// </summary>
+public enum InterfaceLayout
+{
+    Ribbon,
+    Canvas
+}
+
+/// <summary>
 /// Per-user preferences, as <c>key=value</c> lines (trivially AOT-safe, readable by hand).
 /// Unknown keys are kept, so an older version doesn't drop a newer one's settings. A
 /// missing or unreadable file means defaults.
@@ -58,6 +70,15 @@ public sealed class AppSettings
             ? theme
             : AppTheme.System;
         set => Set(nameof(Theme), value.ToString());
+    }
+
+    /// <summary>File &gt; Options &gt; Layout: the ribbon (the default) or the canvas layout. Applies the next time Stanley starts.</summary>
+    public InterfaceLayout InterfaceLayout
+    {
+        get => _values.TryGetValue(nameof(InterfaceLayout), out var value) && Enum.TryParse<InterfaceLayout>(value, ignoreCase: true, out var layout) && Enum.IsDefined(layout)
+            ? layout
+            : InterfaceLayout.Ribbon;
+        set => Set(nameof(InterfaceLayout), value.ToString());
     }
 
     /// <summary>File &gt; Options &gt; Updates: check automatically on startup. Off by default - Stanley

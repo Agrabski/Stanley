@@ -1,0 +1,25 @@
+<!--
+  The canvas layout's inspector column, down the right of the window outside the dock area
+  (docs/ui-shell.md §6): the active editor's inspector - PageInspector for a page,
+  CharacterInspector for a character - following Workspace.ActiveEditor the way the ribbon
+  does. A fixed width, so a change of selection never resizes the page.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:editors="using:Stanley.Editors"
+             xmlns:app="using:Stanley.App"
+             x:Class="Stanley.App.InspectorColumn"
+             x:DataType="app:MainWindowViewModel">
+  <Border Name="Column" Classes="inspector">
+    <ContentControl Name="InspectorHost" Content="{Binding Workspace.ActiveEditor}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="editors:PageEditorViewModel">
+          <editors:PageInspector />
+        </DataTemplate>
+        <DataTemplate DataType="editors:CharacterEditorViewModel">
+          <editors:CharacterInspector />
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+  </Border>
+</UserControl>

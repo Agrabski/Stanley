@@ -290,6 +290,19 @@
           </StackPanel>
           <TextBlock Text="Pages always stay white, so what you see is what prints." Opacity="0.7" Margin="0,8,0,0" />
 
+          <TextBlock Classes="backstageSubheading" Text="Layout" Margin="0,24,0,8" />
+          <StackPanel Spacing="4">
+            <RadioButton Name="RibbonLayoutButton" GroupName="InterfaceLayout" IsChecked="{Binding IsRibbonLayout}"
+                         Content="Ribbon - tabs of tools above the page, like Word" />
+            <RadioButton Name="CanvasLayoutButton" GroupName="InterfaceLayout" IsChecked="{Binding IsCanvasLayout}"
+                         Content="Canvas - tools along the top, pages and layers on the left, what's selected on the right, like Figma" />
+          </StackPanel>
+          <StackPanel Name="LayoutRestartNote" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding IsLayoutRestartPending}">
+            <TextBlock Text="The new layout applies the next time Stanley starts." VerticalAlignment="Center" Opacity="0.8" />
+            <Button Name="RestartButton" Content="Restart now" Command="{Binding RestartCommand}"
+                    ToolTip.Tip="Close Stanley - asking about unsaved changes first - and start it again in the new layout" />
+          </StackPanel>
+
           <TextBlock Classes="backstageSubheading" Text="Updates" Margin="0,24,0,8" />
           <CheckBox Name="AutoCheckForUpdatesBox" Content="Check for updates automatically" IsChecked="{Binding AutoCheckForUpdates}" />
           <StackPanel Spacing="4" Margin="0,8,0,0">

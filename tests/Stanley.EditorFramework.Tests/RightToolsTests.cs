@@ -134,4 +134,59 @@ public class RightToolsTests
 
         Assert.Same(editor, workspace.ActiveEditor);
     }
+
+    private static (EditorWorkspace Workspace, TestEditor Editor) BuildStacked(bool rightVisible = true)
+    {
+        var history = new EditorHistory();
+        var editor = new TestEditor(history, new TestDocument(0));
+        var workspace = new EditorWorkspace(history, [editor], [new Tool { Id = "Pages" }], [new Tool { Id = "Layers" }], rightVisible,
+            SidePaneArrangement.Stacked);
+        return (workspace, editor);
+    }
+
+    /// <summary>The side column's docks top to bottom, with a splitter shown as "|".</summary>
+    private static string Stack(EditorWorkspace workspace) =>
+        string.Join(' ', (DockById(workspace, EditorDockHost.SideColumnId).VisibleDockables ?? []).Select(d => d is IProportionalDockSplitter ? "|" : d.Id));
+
+    [Fact]
+    public void Stacked_the_right_tools_go_under_the_left_ones_in_one_column_left_of_the_editors()
+    {
+        var (workspace, _) = BuildStacked();
+
+        Assert.Equal("SideColumn | Editors", Columns(workspace));
+        Assert.Equal("LeftTools | RightTools", Stack(workspace));
+        Assert.Equal(Orientation.Vertical, ((IProportionalDock)DockById(workspace, EditorDockHost.SideColumnId)).Orientation);
+        Assert.Equal(SidePaneArrangement.Stacked, workspace.Arrangement);
+        Assert.True(workspace.RightToolsVisible);
+    }
+
+    [Fact]
+    public void Stacked_right_tools_hide_and_come_back_under_the_left_ones()
+    {
+        var (workspace, _) = BuildStacked();
+        var column = DockById(workspace, EditorDockHost.SideColumnId);
+        var docks = (column.VisibleDockables ?? []).Where(d => d is not IProportionalDockSplitter).ToList();
+        docks[0].Proportion = 0.3;
+        docks[1].Proportion = 0.7;
+
+        workspace.SetRightToolsVisible(false);
+        Assert.Equal("LeftTools", Stack(workspace));
+        Assert.Equal("SideColumn | Editors", Columns(workspace));
+        Assert.False(workspace.RightToolsVisible);
+
+        docks[0].Proportion = 1; // Dock hands the room to what's left
+        workspace.SetRightToolsVisible(true);
+        Assert.Equal("LeftTools | RightTools", Stack(workspace));
+        Assert.Equal(0.3, docks[0].Proportion, 6);
+        Assert.Equal(0.7, docks[1].Proportion, 6);
+    }
+
+    [Fact]
+    public void Stacked_right_tools_can_start_hidden()
+    {
+        var (workspace, _) = BuildStacked(rightVisible: false);
+
+        Assert.Equal("LeftTools", Stack(workspace));
+        Assert.False(workspace.RightToolsVisible);
+    }
 }

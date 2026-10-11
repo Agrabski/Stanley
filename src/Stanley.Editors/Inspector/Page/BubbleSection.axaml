@@ -1,0 +1,95 @@
+<!--
+  The selected bubble: style, lettering, text, tails and arrange - the ribbon's Bubble tab
+  (BubbleRibbonTab.axaml), bound to the same view-model members. With the Bubble tool in hand
+  and no bubble selected it shows just the style and lettering the next bubble gets, as the
+  Home tab's Bubble style and Font groups do.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.BubbleSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding ShowBubbleStyle}">
+  <StackPanel>
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Style" IsVisible="{Binding IsBubbleContext}" />
+        <TextBlock Name="NewBubbleHeader" Classes="sectionHeader" Text="New bubble" IsVisible="{Binding !IsBubbleContext}" />
+        <TextBlock Classes="inspectorHint" Text="How the next bubble you add looks."
+                   IsVisible="{Binding !IsBubbleContext}" />
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Classes="propertyLabel" Width="NaN" Text="{Binding CurrentBubbleStyle}" />
+          <StackPanel Classes="iconRow">
+            <RadioButton Name="SpeechStyleButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsSpeechStyle}" ToolTip.Tip="Rounded speech bubble">
+              <PathIcon Data="{StaticResource SpeechIcon}" />
+            </RadioButton>
+            <RadioButton Name="ShoutStyleButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsShoutStyle}" ToolTip.Tip="Spiky shout bubble">
+              <PathIcon Data="{StaticResource ShoutIcon}" />
+            </RadioButton>
+            <RadioButton Name="WhisperStyleButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsWhisperStyle}" ToolTip.Tip="Dashed whisper bubble">
+              <PathIcon Data="{StaticResource WhisperIcon}" />
+            </RadioButton>
+            <RadioButton Name="ThoughtStyleButton" Classes="iconButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                         IsChecked="{Binding IsThoughtStyle}" ToolTip.Tip="Cloud-shaped thought bubble">
+              <PathIcon Data="{StaticResource ThoughtIcon}" />
+            </RadioButton>
+          </StackPanel>
+        </DockPanel>
+        <Button Name="EditTextButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                IsVisible="{Binding IsBubbleContext}" Command="{Binding EditTextCommand}"
+                ToolTip.Tip="Edit the bubble's text - or double-click the bubble" local:Shortcut.Keys="Enter">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <!-- With the Bubble tool in hand over a selected text, the lettering rows would show the text's: the Text section has those. -->
+    <Border Classes="inspectorSection" IsVisible="{Binding !IsTextContext}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Lettering" />
+        <local:LetteringRows Name="BubbleLettering" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection" IsVisible="{Binding IsBubbleContext}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Tails" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <Button Name="AddTailButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding AddTailCommand}"
+                  ToolTip.Tip="Add another tail - drag its orange tip onto the speaker">
+            Add tail
+          </Button>
+          <Button Name="RemoveTailButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding RemoveTailCommand}"
+                  ToolTip.Tip="{Binding RemoveTailTip}" ToolTip.ShowOnDisabled="True">
+            Remove tail
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection" IsVisible="{Binding IsBubbleContext}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Order" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <Button Name="BubbleToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding BringToFrontCommand}"
+                  ToolTip.Tip="Draw this bubble above the others in its panel">
+            To front
+          </Button>
+          <Button Name="BubbleToBackButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding SendToBackCommand}"
+                  ToolTip.Tip="Draw this bubble below the others in its panel">
+            To back
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

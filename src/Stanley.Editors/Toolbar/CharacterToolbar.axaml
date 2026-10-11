@@ -1,0 +1,93 @@
+<!--
+  The canvas layout's top-bar tools for a character editor (docs/ui-shell.md §6): back to the
+  page, and how the stage shows the character - front or side, beside the others or alone, in
+  another expression. All of it is view, not part of the character: what the character is
+  (body, look, the sticker picked) is in the inspector. Hosted by the top bar whenever a
+  character editor is the active pane, with its CharacterEditorViewModel as DataContext.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterToolbar"
+             x:DataType="local:CharacterEditorViewModel">
+  <UserControl.Resources>
+    <!-- Two figures side by side, one taller: the line-up of the other characters. -->
+    <StreamGeometry x:Key="LineUpIcon">M6,1.5 A2.5,2.5 0 1 1 5.99,1.5 Z M3,7.5 H9 V22 H3 Z M17,7.5 A2.2,2.2 0 1 1 16.99,7.5 Z M14.3,12.6 H19.7 V22 H14.3 Z</StreamGeometry>
+    <!-- A smiling face: the expression preview. -->
+    <StreamGeometry x:Key="FaceIcon">M12,2 A10,10 0 1 1 11.99,2 Z M12,4 A8,8 0 1 0 12.01,4 Z M8.5,7.5 A1.5,1.5 0 1 1 8.49,7.5 Z M15.5,7.5 A1.5,1.5 0 1 1 15.49,7.5 Z M7,13 H9 A3,3 0 0 0 15,13 H17 A5,5 0 0 1 7,13 Z</StreamGeometry>
+  </UserControl.Resources>
+  <StackPanel Name="Tools" Orientation="Horizontal" VerticalAlignment="Center">
+    <!-- Like Word's "Close Header and Footer": the way back to the page being worked on. -->
+    <Button Name="BackToPageButton" Classes="barTool" Command="{Binding BackToPageCommand}" ToolTip.Tip="Back to the page (the Pages pane works too)">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <PathIcon Data="{StaticResource BackIcon}" />
+        <TextBlock Text="Back to page" />
+      </StackPanel>
+    </Button>
+    <Rectangle Classes="barDivider" />
+
+    <RadioButton Name="FrontPreviewButton" Classes="barTool" GroupName="CanvasCharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsFrontPreview}" ToolTip.Tip="Look at the character from the front">
+      <PathIcon Data="{StaticResource CharacterIcon}" />
+    </RadioButton>
+    <RadioButton Name="SidePreviewButton" Classes="barTool" GroupName="CanvasCharacterView" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsSidePreview}" ToolTip.Tip="Look at the character from the side - the same body, seen side on">
+      <PathIcon Data="{StaticResource SideViewIcon}" />
+    </RadioButton>
+    <ToggleButton Name="LineUpToggle" Classes="barTool" IsChecked="{Binding ShowLineUp}"
+                  ToolTip.Tip="Compare with others - the comic's other characters, faded beside this one">
+      <PathIcon Data="{StaticResource LineUpIcon}" />
+    </ToggleButton>
+    <Rectangle Classes="barDivider" />
+
+    <!-- The stage in another expression while you pick a face: a preview only. -->
+    <Button Name="PreviewExpressionButton" Classes="barTool"
+            ToolTip.Tip="See the face in another expression while you pick - a preview only; expressions are set per panel">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <PathIcon Data="{StaticResource FaceIcon}" />
+        <TextBlock Name="PreviewExpressionText" Text="{Binding PreviewExpression.Name}" />
+        <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      </StackPanel>
+      <Button.Flyout>
+        <!-- Transient: nothing in it takes focus, and a standard flyout would hand focus on to the inspector's Name box. -->
+        <Flyout Placement="BottomEdgeAlignedLeft" ShowMode="Transient">
+          <StackPanel Spacing="6" MaxWidth="320">
+            <ItemsControl Name="PreviewExpressionChoices" ItemsSource="{Binding PreviewExpressionChoices}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="local:ExpressionPresetChoice">
+                  <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                          HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                          Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).PreviewExpressionCommand}"
+                          CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <local:CharacterFigure Character="{Binding Character}" Pose="{Binding Pose}" Closeup="True" />
+                    </DockPanel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- Eyes split left/right (the Look section's "Different left/right eyes"): each eye's own expression. -->
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEyesSplit}">
+              <StackPanel Spacing="1" Width="100">
+                <TextBlock Text="Left eye" FontSize="10" Opacity="0.7" />
+                <ComboBox Name="LeftEyePreviewBox" ItemsSource="{Binding EyeExpressionOptions}" SelectedValue="{Binding PreviewLeftEye}" SelectedValueBinding="{Binding Value}"
+                          DisplayMemberBinding="{Binding Label}" FontSize="11" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Preview the left eye's own expression - a preview only; expressions are set per panel" />
+              </StackPanel>
+              <StackPanel Spacing="1" Width="100">
+                <TextBlock Text="Right eye" FontSize="10" Opacity="0.7" />
+                <ComboBox Name="RightEyePreviewBox" ItemsSource="{Binding EyeExpressionOptions}" SelectedValue="{Binding PreviewRightEye}" SelectedValueBinding="{Binding Value}"
+                          DisplayMemberBinding="{Binding Label}" FontSize="11" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="Preview the right eye's own expression - a preview only; expressions are set per panel" />
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
+  </StackPanel>
+</UserControl>

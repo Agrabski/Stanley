@@ -51,7 +51,11 @@ in the root `Directory.Build.props`; the solution file is `Stanley.slnx`
 The project/data model (persistence layer), editing operations (validation +
 transformation), editor framework (undo/redo + gesture lifecycle), and one
 concrete page/panel/bubble editor (Word-style tabbed ribbon + File view, zoom,
-snapping, page navigator) all exist. The GUI opens/saves real project folders, one
+snapping, page navigator) all exist. File › Options › Layout swaps the ribbon for a
+Figma-style **canvas layout** (an app-level setting, applied at the next start): one top
+bar of tools and a main menu, Pages and Layers stacked on the left, and an inspector of the
+selection's properties on the right - every feature in both layouts, held there by
+`LayoutParityTests` (docs/ui-shell.md). The GUI opens/saves real project folders, one
 issue at a time: a comic can have **several issues**, added, deleted (File › Info's
 "Delete" beside a non-current one, with a "can't be undone" confirmation - the comic's
 last issue can't go) and switched from File › Info or the title bar's issue switcher

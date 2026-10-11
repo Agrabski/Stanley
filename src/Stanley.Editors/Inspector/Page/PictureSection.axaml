@@ -1,0 +1,51 @@
+<!--
+  The selected picture: its layer, and arrange - the ribbon's Picture tab
+  (PictureRibbonTab.axaml), bound to the same view-model members.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PictureSection"
+             x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsPictureContext}">
+  <StackPanel>
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Layer" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <RadioButton Name="PictureBehindButton" Classes="inspectorButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                       HorizontalAlignment="Stretch" IsChecked="{Binding IsElementBehind}"
+                       ToolTip.Tip="Scenery: drawn behind the panel's characters">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" />
+            </StackPanel>
+          </RadioButton>
+          <RadioButton Name="PictureInFrontButton" Grid.Column="1" Classes="inspectorButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                       HorizontalAlignment="Stretch" IsChecked="{Binding IsElementInFront}"
+                       ToolTip.Tip="Foreground: drawn in front of the panel's characters (bubbles stay on top)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" />
+            </StackPanel>
+          </RadioButton>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Order" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <Button Name="PictureToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding BringToFrontCommand}"
+                  ToolTip.Tip="In front of everything in the panel except bubbles">
+            To front
+          </Button>
+          <Button Name="PictureToBackButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything in the panel">
+            To back
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

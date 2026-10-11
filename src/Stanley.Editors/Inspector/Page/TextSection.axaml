@@ -1,0 +1,170 @@
+<!--
+  The selected free text: kind, lettering, colours, layer, fields and arrange - the ribbon's
+  Text tab (TextRibbonTab.axaml), bound to the same view-model members. With the Text tool in
+  hand and no text selected it shows what the next text gets (kind, lettering, colours, layer),
+  the way the Bubble section does for the Bubble tool.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             xmlns:editing="using:Stanley.Editing"
+             x:Class="Stanley.Editors.TextSection"
+             x:DataType="local:PageEditorViewModel">
+  <UserControl.IsVisible>
+    <MultiBinding Converter="{x:Static BoolConverters.Or}">
+      <Binding Path="IsTextContext" />
+      <Binding Path="IsTextTool" />
+    </MultiBinding>
+  </UserControl.IsVisible>
+  <StackPanel>
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Kind" IsVisible="{Binding IsTextContext}" />
+        <TextBlock Name="NewTextHeader" Classes="sectionHeader" Text="New text" IsVisible="{Binding !IsTextContext}" />
+        <TextBlock Classes="inspectorHint" Text="How the next text you add looks."
+                   IsVisible="{Binding !IsTextContext}" />
+        <DockPanel>
+          <TextBlock Name="TextKindName" DockPanel.Dock="Right" Classes="propertyLabel" Width="NaN" Text="{Binding TextPresetName}" />
+          <StackPanel Classes="iconRow">
+            <Button Name="CaptionKindButton" Classes="iconButton" Command="{Binding ApplyTextPresetCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.Caption}" ToolTip.Tip="Caption - narration in a box">
+              <PathIcon Data="{StaticResource CaptionIcon}" />
+            </Button>
+            <Button Name="PlainKindButton" Classes="iconButton" Command="{Binding ApplyTextPresetCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.Plain}" ToolTip.Tip="Plain - bare lettering">
+              <PathIcon Data="{StaticResource TextIcon}" />
+            </Button>
+            <Button Name="SoundEffectKindButton" Classes="iconButton" Command="{Binding ApplyTextPresetCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.SoundEffect}" ToolTip.Tip="Sound effect - big, bold and outlined">
+              <PathIcon Data="{StaticResource ShoutIcon}" />
+            </Button>
+          </StackPanel>
+        </DockPanel>
+        <Button Name="EditElementTextButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                IsVisible="{Binding IsTextContext}" Command="{Binding EditTextCommand}"
+                ToolTip.Tip="Edit the words - or double-click the text" local:Shortcut.Keys="Enter">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource TextIcon}" /><TextBlock Text="Edit text" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Lettering" />
+        <local:LetteringRows Name="TextLettering" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Letters" />
+        <local:ColorMenuButton Name="TextFillButton" Label="Text Fill"
+                               Icon="{StaticResource TextFillIcon}" DefaultColor="#ff0000"
+                               Command="{Binding SetTextColorCommand}" NoneLabel="No Fill"
+                               MoreLabel="More Fill Colors…"
+                               CurrentColor="{Binding CurrentTextStyle.Color}"
+                               ToolTip.Tip="Text Fill - the letters' colour (No Fill leaves hollow letters, only their outline showing)" />
+        <local:ColorMenuButton Name="TextOutlineButton" Label="Text Outline"
+                               Icon="{StaticResource TextFillIcon}" IconOutlined="True"
+                               DefaultColor="#000000"
+                               Command="{Binding SetTextOutlineCommand}" NoneLabel="No Outline"
+                               MoreLabel="More Outline Colors…"
+                               CurrentColor="{Binding CurrentTextStyle.Outline}"
+                               WeightCommand="{Binding SetTextOutlineWeightCommand}"
+                               CurrentWeight="{Binding CurrentTextStyle.OutlineWidthMm}"
+                               ToolTip.Tip="Text Outline - an outline round every letter, as for a sound effect: colour and weight" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Box" />
+        <local:ColorMenuButton Name="TextBoxFillButton" Label="Shape Fill"
+                               Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                               Command="{Binding SetBoxFillCommand}" NoneLabel="No Fill"
+                               MoreLabel="More Fill Colors…"
+                               CurrentColor="{Binding CurrentTextStyle.BoxFill}"
+                               ToolTip.Tip="Shape Fill - a box behind the text, as for a caption, or none" />
+        <local:ColorMenuButton Name="TextBoxOutlineButton" Label="Shape Outline"
+                               Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                               Command="{Binding SetBoxOutlineCommand}" NoneLabel="No Outline"
+                               MoreLabel="More Outline Colors…"
+                               CurrentColor="{Binding CurrentTextStyle.BoxStroke}"
+                               WeightCommand="{Binding SetBoxWeightCommand}"
+                               CurrentWeight="{Binding CurrentTextStyle.BoxStrokeWidthMm}"
+                               DashCommand="{Binding SetBoxDashCommand}"
+                               CurrentDash="{Binding CurrentTextStyle.BoxDash}"
+                               ToolTip.Tip="Shape Outline - the border round the text's box: colour, weight and dashes" />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Layer" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <RadioButton Name="TextBehindButton" Classes="inspectorButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                       HorizontalAlignment="Stretch" IsChecked="{Binding IsElementBehind}"
+                       ToolTip.Tip="Behind the panel's characters - a sign on a wall">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource BehindIcon}" /><TextBlock Text="Background" />
+            </StackPanel>
+          </RadioButton>
+          <RadioButton Name="TextInFrontButton" Grid.Column="1" Classes="inspectorButton" Theme="{StaticResource {x:Type ToggleButton}}"
+                       HorizontalAlignment="Stretch" IsChecked="{Binding IsElementInFront}"
+                       ToolTip.Tip="In front of the panel's characters (bubbles stay on top)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource InFrontIcon}" /><TextBlock Text="Foreground" />
+            </StackPanel>
+          </RadioButton>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- Fields, like Word's: Stanley fills them in from File › Info. The buttons don't take the keyboard, so while typing they go in at the caret. -->
+    <Border Classes="inspectorSection" IsVisible="{Binding IsTextContext}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Fields" />
+        <ItemsControl Name="FieldButtons" ItemsSource="{Binding TextFieldChoices}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:TextFieldChoice">
+              <Button Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                      ToolTip.Tip="{Binding Description}"
+                      Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertFieldCommand}"
+                      CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" />
+                  <TextBlock Text="{Binding Token}" FontFamily="monospace" Opacity="0.6" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection" IsVisible="{Binding IsTextContext}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Order" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+          <Button Name="TextToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding BringToFrontCommand}"
+                  ToolTip.Tip="In front of everything in the panel except bubbles">
+            To front
+          </Button>
+          <Button Name="TextToBackButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                  Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything in the panel">
+            To back
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+</UserControl>

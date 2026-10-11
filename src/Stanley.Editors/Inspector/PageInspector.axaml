@@ -1,0 +1,29 @@
+<!--
+  The canvas layout's inspector for a page (docs/ui-shell.md §6): down the right of the
+  window, the properties of what's selected, in sections - the page's own settings when
+  nothing is. Hosted by the window's inspector column whenever a page editor is the active
+  pane, with that pane's PageEditorViewModel as DataContext, the way PageEditorRibbon is in
+  the ribbon layout. Each section decides when it shows (its own IsVisible), so the order
+  here is all this control owns.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.PageInspector"
+             x:DataType="local:PageEditorViewModel">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Name="Sections">
+      <TextBlock Name="TitleText" Classes="inspectorTitle" Text="Page" />
+      <local:ArrangeSection Name="ArrangeProperties" />
+      <local:PanelSection Name="PanelProperties" />
+      <local:CharacterSection Name="CharacterProperties" />
+      <local:BubbleSection Name="BubbleProperties" />
+      <local:TextSection Name="TextProperties" />
+      <local:ShapeSection Name="ShapeProperties" />
+      <local:PictureSection Name="PictureProperties" />
+      <local:SpeedLinesSection Name="SpeedLinesProperties" />
+      <local:PenSection Name="PenProperties" />
+      <local:PageSection Name="PageProperties" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

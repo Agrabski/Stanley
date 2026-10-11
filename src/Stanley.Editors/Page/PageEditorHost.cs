@@ -19,13 +19,20 @@ public static class PageEditorHost
     /// whichever tab is active, never the side panes. With <paramref name="myAssets"/>, the
     /// Characters pane and every page can keep things in My Assets and take them from there.
     /// The Layers pane is docked on the right, showing or hidden as <paramref name="layersPane"/>
-    /// says (showing, in memory only, if none is given) and following it as it changes.
+    /// says (showing, in memory only, if none is given) and following it as it changes -
+    /// or, with <paramref name="arrangement"/> <see cref="SidePaneArrangement.Stacked"/> (the
+    /// canvas layout), under the Pages and Characters panes, leaving the right for the inspector.
     /// </summary>
-    public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null, LayersPaneMemory? layersPane = null)
+    public static EditorSession CreateWorkspace(ComicProject project, MyAssetsLibrary? myAssets = null, LayersPaneMemory? layersPane = null,
+        SidePaneArrangement arrangement = SidePaneArrangement.Beside)
     {
         layersPane ??= new LayersPaneMemory();
         var history = new EditorHistory();
-        var characters = new CharacterLibraryViewModel(history, project.Characters) { MyAssets = myAssets };
+        var characters = new CharacterLibraryViewModel(history, project.Characters)
+        {
+            MyAssets = myAssets,
+            UsesInspector = arrangement == SidePaneArrangement.Stacked
+        };
         var pictures = new PictureLibrary(project.Pictures);
         var objectGroups = new ObjectGroupLibrary(project.ObjectGroups);
         var navigator = new PageNavigatorViewModel(history, project.Pages, project.PageNumbering, characters, project.IssueLooks, pictures,
@@ -34,10 +41,12 @@ public static class PageEditorHost
             Fields = project.Fields,
             MyAssets = myAssets,
             ObjectGroups = objectGroups,
-            LayersHost = layersPane
+            LayersHost = layersPane,
+            // Stacked side panes are the canvas layout's, whose page properties are in the inspector, not on ribbon tabs.
+            UsesInspector = arrangement == SidePaneArrangement.Stacked
         };
         var layers = new LayersViewModel();
-        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters], [layers], layersPane.LayersPaneVisible);
+        var workspace = new EditorWorkspace(history, [navigator.CurrentPage.Editor], [navigator, characters], [layers], layersPane.LayersPaneVisible, arrangement);
         layersPane.LayersPaneVisibleChanged += () => workspace.SetRightToolsVisible(layersPane.LayersPaneVisible);
 
         IEditorPane shownPage = navigator.CurrentPage.Editor;

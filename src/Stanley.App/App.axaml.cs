@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Stanley.App.Diagnostics;
 
@@ -16,6 +17,11 @@ public partial class App : Application
         {
             var window = new MainWindow();
             desktop.MainWindow = window;
+
+            // The canvas layout is compact throughout, like the tools it takes after. App-wide, so
+            // only here at startup (the layout only ever changes with a restart), never in tests.
+            if (window.ViewModel.IsCanvasActive && Styles.OfType<FluentTheme>().FirstOrDefault() is { } fluent)
+                fluent.DensityStyle = DensityStyle.Compact;
 
             // A bug on the UI thread: log it and snapshot the open comic for crash recovery,
             // then let it crash - carrying on in an unknown state risks corrupting the save.

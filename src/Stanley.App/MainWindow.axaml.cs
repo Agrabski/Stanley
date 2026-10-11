@@ -12,6 +12,7 @@ namespace Stanley.App;
 public partial class MainWindow : Window
 {
     private bool _closeConfirmed;
+    private bool _restartAfterClose;
 
     public MainWindow() : this(null)
     {
@@ -39,6 +40,13 @@ public partial class MainWindow : Window
         }
         ViewModel = viewModel;
         DataContext = ViewModel;
+        if (ViewModel.IsCanvasActive)
+            UseCanvasLayout();
+        ViewModel.RestartRequested += (_, _) =>
+        {
+            _restartAfterClose = true;
+            Close();
+        };
         ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainWindowViewModel.Workspace))
@@ -81,8 +89,32 @@ public partial class MainWindow : Window
     /// <summary>Exposed for headless UI tests: the window-level ribbon bar, above the dock area.</summary>
     public Control RibbonBarControl => RibbonBar;
 
+    /// <summary>Exposed for headless UI tests: the canvas layout's top bar, or null in the ribbon layout.</summary>
+    public CanvasTopBar? CanvasTopBarControl { get; private set; }
+
+    /// <summary>Exposed for headless UI tests: the canvas layout's inspector column, or null in the ribbon layout.</summary>
+    public InspectorColumn? InspectorControl { get; private set; }
+
     /// <summary>Exposed for headless UI tests: the File view.</summary>
     public Backstage BackstageControl => BackstageView;
+
+    /// <summary>
+    /// The canvas layout (File › Options › Layout, read at startup): the title bar and the ribbon
+    /// give way to one top bar, and the inspector takes the right-hand side - the dock area
+    /// between them keeps the Pages, Characters and Layers panes stacked on the left
+    /// (<see cref="SidePaneArrangement.Stacked"/>). Done once, before the window shows.
+    /// </summary>
+    private void UseCanvasLayout()
+    {
+        ShellDock.Children.Remove(TitleBar);
+        ShellDock.Children.Remove(RibbonBar);
+        CanvasTopBarControl = new CanvasTopBar();
+        DockPanel.SetDock(CanvasTopBarControl, Avalonia.Controls.Dock.Top);
+        InspectorControl = new InspectorColumn();
+        DockPanel.SetDock(InspectorControl, Avalonia.Controls.Dock.Right);
+        ShellDock.Children.Insert(0, CanvasTopBarControl);
+        ShellDock.Children.Insert(1, InspectorControl);
+    }
 
     private void ShowWorkspace()
     {
@@ -111,6 +143,9 @@ public partial class MainWindow : Window
     {
         base.OnClosed(e);
         ViewModel.EndSession();
+        // Options' "Restart now": only once this session has ended cleanly, so the new one doesn't take it for a crash.
+        if (_restartAfterClose)
+            AppRestart.StartNewInstance();
     }
 
     /// <summary>Closing the window with unsaved changes asks first, like Word (or just saves, with AutoSave on); Cancel keeps the window open.</summary>
@@ -126,6 +161,9 @@ public partial class MainWindow : Window
                     _closeConfirmed = true;
                     Close();
                 }
+                else
+                    _restartAfterClose = false; // kept open: a later close isn't a restart
+
             });
         }
         base.OnClosing(e);

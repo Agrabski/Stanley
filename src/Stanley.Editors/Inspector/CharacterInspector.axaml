@@ -1,0 +1,23 @@
+<!--
+  The canvas layout's inspector for a character (docs/ui-shell.md §6): what the character
+  editor's ribbon (Body, Look and the contextual Sticker tab) does, as sections down the right
+  of the window. Hosted by the window's inspector column whenever a character editor is the
+  active pane, with its CharacterEditorViewModel as DataContext.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.CharacterInspector"
+             x:DataType="local:CharacterEditorViewModel">
+  <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Name="Sections">
+      <TextBlock Name="TitleText" Classes="inspectorTitle" Text="{Binding Name}" />
+      <local:BodySection Name="BodyProperties" />
+      <local:LookSection Name="LookProperties" />
+      <!-- Last, like the ribbon's contextual tab: a gallery pick selects what it puts on, and a
+           section appearing above the galleries would push them away from under the pointer.
+           A sticker picked on the stage scrolls it into view instead (CharacterInspector.axaml.cs). -->
+      <local:StickerSection Name="StickerProperties" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
