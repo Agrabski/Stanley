@@ -206,4 +206,37 @@
     <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
+  <Style Selector="Border.inspector :is(Button).inspectorButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+  </Style>
+  <!-- Buttons sharing a row in equal parts (To front | To back) read as one segmented control: labels centred. -->
+  <Style Selector="Border.inspector UniformGrid > :is(Button).inspectorButton">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <!-- A colour button (ColorMenuButton: Fill, Outline, Text Fill...) boxed like the section's other
+       buttons, so it reads as something to press rather than a label. -->
+  <Style Selector="Border.inspector SplitButton.colorMenu">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <!-- A slider in a property row: as tall as the row, and never holding the keyboard (like the ribbon's Slider.body). -->
+  <Style Selector="Border.inspector DockPanel.propertyRow > Slider">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Check boxes are switches, not text: they leave the keyboard with the page. Number boxes do take it, to type in. -->
+  <Style Selector="Border.inspector CheckBox">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Border.inspector NumericUpDown">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
 </Styles>

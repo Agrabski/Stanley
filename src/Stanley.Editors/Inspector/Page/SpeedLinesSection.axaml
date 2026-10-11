@@ -8,9 +8,6 @@
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.SpeedLinesSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsSpeedLinesContext}">
-  <UserControl.Styles>
-    <StyleInclude Source="avares://Stanley.Editors/Inspector/Page/InspectorSectionStyles.axaml" />
-  </UserControl.Styles>
   <StackPanel>
     <Border Classes="inspectorSection">
       <StackPanel Spacing="6">
@@ -70,8 +67,8 @@
 
     <Border Classes="inspectorSection">
       <StackPanel Spacing="6">
-        <TextBlock Classes="sectionHeader" Text="Arrange" />
-        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+        <TextBlock Classes="sectionHeader" Text="Order" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
           <Button Name="SpeedLinesToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
                   Command="{Binding BringToFrontCommand}"
                   ToolTip.Tip="In front of everything in the panel except bubbles">
@@ -80,12 +77,6 @@
           <Button Name="SpeedLinesToBackButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
                   Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything in the panel">
             To back
-          </Button>
-          <Button Name="DeleteSpeedLinesButton" Grid.Column="2" Classes="inspectorButton" HorizontalAlignment="Stretch"
-                  Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete these speed lines" local:Shortcut.Keys="Del">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
-            </StackPanel>
           </Button>
         </Grid>
       </StackPanel>

@@ -19,12 +19,7 @@
     <Style Selector="DropDownButton.inspectorButton TextBlock">
       <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
-    <!-- A button that can't be used now (Mirror and Reset before any pose) is only faded, not filled grey like a pressed one. -->
-    <Style Selector=":is(Button).inspectorButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
-    </Style>
-    <Style Selector="UniformGrid > :is(Button).inspectorButton, Grid#SizeRow > :is(Button).inspectorButton">
+    <Style Selector="Grid#SizeRow > :is(Button).inspectorButton">
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
   </UserControl.Styles>

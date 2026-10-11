@@ -9,22 +9,9 @@
              x:Class="Stanley.Editors.ShapeSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsShapeContext}">
   <UserControl.Styles>
-    <!-- Fill and Outline share a row here, so the colour buttons drop the ribbon's minimum width,
-         and take the inspector buttons' outline. -->
+    <!-- Fill and Outline share a row here, so the colour buttons drop the ribbon's minimum width. -->
     <Style Selector="SplitButton.colorMenu">
       <Setter Property="MinWidth" Value="0" />
-      <Setter Property="Height" Value="28" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
-    </Style>
-    <!-- A button that can't be used now is only faded, not filled grey like a pressed one. -->
-    <Style Selector=":is(Button).inspectorButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
-    </Style>
-    <Style Selector="UniformGrid > :is(Button).inspectorButton">
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
     <!-- The point tools sit under the Points row's label column: a little less padding so "Open at point" fits. -->
     <Style Selector="Grid#PointTools :is(Button).inspectorButton">

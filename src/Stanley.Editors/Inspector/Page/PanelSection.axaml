@@ -8,9 +8,6 @@
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.PanelSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsPanelContext}">
-  <UserControl.Styles>
-    <StyleInclude Source="avares://Stanley.Editors/Inspector/Page/InspectorSectionStyles.axaml" />
-  </UserControl.Styles>
   <StackPanel>
     <Border Classes="inspectorSection">
       <StackPanel Spacing="6">
@@ -29,18 +26,11 @@
             </Button>
           </StackPanel>
         </DockPanel>
-        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+        <Grid ColumnDefinitions="*" ColumnSpacing="6">
           <Button Name="PanelAddBubbleButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
                   Command="{Binding AddBubbleCommand}" ToolTip.Tip="Add a bubble to this panel and start typing">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Data="{StaticResource AddBubbleIcon}" /><TextBlock Text="Add bubble" />
-            </StackPanel>
-          </Button>
-          <Button Name="DeletePanelButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
-                  Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this panel and its bubbles"
-                  local:Shortcut.Keys="Del">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
             </StackPanel>
           </Button>
         </Grid>

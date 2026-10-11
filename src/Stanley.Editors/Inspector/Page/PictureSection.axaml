@@ -33,8 +33,8 @@
 
     <Border Classes="inspectorSection">
       <StackPanel Spacing="6">
-        <TextBlock Classes="sectionHeader" Text="Arrange" />
-        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+        <TextBlock Classes="sectionHeader" Text="Order" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
           <Button Name="PictureToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
                   Command="{Binding BringToFrontCommand}"
                   ToolTip.Tip="In front of everything in the panel except bubbles">
@@ -43,12 +43,6 @@
           <Button Name="PictureToBackButton" Grid.Column="1" Classes="inspectorButton" HorizontalAlignment="Stretch"
                   Command="{Binding SendToBackCommand}" ToolTip.Tip="Behind everything in the panel">
             To back
-          </Button>
-          <Button Name="DeletePictureButton" Grid.Column="2" Classes="inspectorButton" HorizontalAlignment="Stretch"
-                  Command="{Binding DeleteSelectionCommand}" ToolTip.Tip="Delete this picture" local:Shortcut.Keys="Del">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <PathIcon Data="{StaticResource DeleteIcon}" /><TextBlock Text="Delete" />
-            </StackPanel>
           </Button>
         </Grid>
       </StackPanel>

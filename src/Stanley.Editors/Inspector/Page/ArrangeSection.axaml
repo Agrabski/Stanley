@@ -17,12 +17,6 @@
     <!-- The same two shapes pulled apart, each its own thing again. -->
     <StreamGeometry x:Key="UngroupIcon">M2,2 H11 V11 H2 Z M4,4 V9 H9 V4 Z M13,13 H22 V22 H13 Z M15,15 V20 H20 V15 Z</StreamGeometry>
   </UserControl.Resources>
-  <UserControl.Styles>
-    <!-- An icon that can't be used now (nothing to paste, nothing to group) is only faded, not filled grey like a pressed one. -->
-    <Style Selector=":is(Button).iconButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-    </Style>
-  </UserControl.Styles>
   <Border Classes="inspectorSection" Padding="12,4,12,6">
     <DockPanel>
       <!-- Each kind's ribbon tab words its Delete for what it deletes; the code-behind keeps this one's tip in step. -->

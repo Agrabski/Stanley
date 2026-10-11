@@ -33,14 +33,6 @@
     <Style Selector="Button.layoutPreset:disabled local|LayoutPresetPreview">
       <Setter Property="Opacity" Value="0.35" />
     </Style>
-    <Style Selector="CheckBox">
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="FontSize" Value="12" />
-    </Style>
-    <Style Selector="NumericUpDown">
-      <Setter Property="Height" Value="28" />
-      <Setter Property="FontSize" Value="12" />
-    </Style>
   </UserControl.Styles>
 
   <StackPanel>

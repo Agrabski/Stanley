@@ -17,17 +17,9 @@
     </MultiBinding>
   </UserControl.IsVisible>
   <UserControl.Styles>
-    <!-- Fill and Outline share a row here, so the colour buttons drop the ribbon's minimum width,
-         and take the inspector buttons' outline. -->
+    <!-- Fill and Outline share a row here, so the colour buttons drop the ribbon's minimum width. -->
     <Style Selector="SplitButton.colorMenu">
       <Setter Property="MinWidth" Value="0" />
-      <Setter Property="Height" Value="28" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
-      <Setter Property="CornerRadius" Value="4" />
-    </Style>
-    <Style Selector="UniformGrid > :is(Button).inspectorButton">
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
   </UserControl.Styles>
   <Border Classes="inspectorSection">

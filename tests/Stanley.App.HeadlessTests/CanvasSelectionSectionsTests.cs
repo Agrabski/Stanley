@@ -135,7 +135,8 @@ public class CanvasSelectionSectionsTests
         editor.Select(panelId);
         Dispatcher.UIThread.RunJobs();
         var panels = editor.Working.PanelOrder.Count;
-        Execute(Named<Button>(section, "DeletePanelButton"));
+        // Delete is the Arrange row's, for whatever is selected.
+        Execute(Named<Button>(Section<ArrangeSection>(window), "DeleteButton"));
         Assert.Equal(panels - 1, editor.Working.PanelOrder.Count);
     }
 
@@ -209,7 +210,8 @@ public class CanvasSelectionSectionsTests
         Assert.NotEqual(-1, other);
 
         var count = editor.Working.Panels[panelId].Bubbles.Count;
-        Execute(Named<Button>(section, "DeleteBubbleButton"));
+        // Delete is the Arrange row's, for whatever is selected.
+        Execute(Named<Button>(Section<ArrangeSection>(window), "DeleteButton"));
         Assert.Equal(count - 1, editor.Working.Panels[panelId].Bubbles.Count);
     }
 
@@ -228,7 +230,7 @@ public class CanvasSelectionSectionsTests
         // Only what a bubble that doesn't exist yet can have.
         Assert.False(Named<Button>(section, "EditTextButton").IsEffectivelyVisible);
         Assert.False(Named<Button>(section, "AddTailButton").IsEffectivelyVisible);
-        Assert.False(Named<Button>(section, "DeleteBubbleButton").IsEffectivelyVisible);
+        Assert.False(Named<Button>(section, "BubbleToFrontButton").IsEffectivelyVisible);
         AssertFitsTheColumn(window, section);
 
         Click(window, Named<RadioButton>(section, "WhisperStyleButton"));
@@ -280,7 +282,8 @@ public class CanvasSelectionSectionsTests
 
         Assert.True(Named<Button>(section, "EditElementTextButton").Command!.CanExecute(null));
         var count = editor.Working.Panels[panelId].Elements.Count;
-        Execute(Named<Button>(section, "DeleteTextButton"));
+        // Delete is the Arrange row's, for whatever is selected.
+        Execute(Named<Button>(Section<ArrangeSection>(window), "DeleteButton"));
         Assert.Equal(count - 1, editor.Working.Panels[panelId].Elements.Count);
     }
 
@@ -310,7 +313,7 @@ public class CanvasSelectionSectionsTests
         Assert.True(section.IsVisible);
         Assert.True(Named<TextBlock>(section, "NewTextHeader").IsEffectivelyVisible);
         Assert.False(Named<Button>(section, "EditElementTextButton").IsEffectivelyVisible);
-        Assert.False(Named<Button>(section, "DeleteTextButton").IsEffectivelyVisible);
+        Assert.False(Named<Button>(section, "TextToFrontButton").IsEffectivelyVisible);
         Assert.False(Named<ItemsControl>(section, "FieldButtons").IsEffectivelyVisible);
 
         Click(window, Named<Button>(section, "SoundEffectKindButton"));
@@ -346,7 +349,8 @@ public class CanvasSelectionSectionsTests
         Assert.False(Named<RadioButton>(section, "PictureBehindButton").IsChecked);
 
         Assert.True(Named<Button>(section, "PictureToBackButton").Command!.CanExecute(null));
-        Execute(Named<Button>(section, "DeletePictureButton"));
+        // Delete is the Arrange row's, for whatever is selected.
+        Execute(Named<Button>(Section<ArrangeSection>(window), "DeleteButton"));
         Assert.DoesNotContain(editor.Working.Panels[panelId].Elements, e => e is PictureElement);
     }
 
@@ -383,7 +387,8 @@ public class CanvasSelectionSectionsTests
         Click(window, Named<RadioButton>(section, "SpeedLinesInFrontButton"));
         Assert.Equal(ElementLayer.Foreground, editor.Working.Panels[panelId].Elements[index].Layer);
 
-        Execute(Named<Button>(section, "DeleteSpeedLinesButton"));
+        // Delete is the Arrange row's, for whatever is selected.
+        Execute(Named<Button>(Section<ArrangeSection>(window), "DeleteButton"));
         Assert.DoesNotContain(editor.Working.Panels[panelId].Elements, e => e is SpeedLinesElement);
     }
 }
