@@ -152,13 +152,13 @@ just presses **Group** (Ctrl+G) and the editor picks the mechanism:
 - **Anything that copies must not copy the link into the original's group.**
   `Clippings.Copy` (bubble, element, character) sets `Link = null`;
   `Clippings.Copy(Panel)` keeps a panel's groups (they're all inside it);
-  `BeginDuplicateSelection` (Alt+drag) gives the copies a group of their own via
-  `Clippings.Relinker`. `Grouping.Group` clears the link of what it wraps. New
+  `BeginDuplicateSelection` (Alt+drag) and Copy/Cut/Paste/Duplicate of a
+  multi-selection (`Clippings.Copy(SelectionClipping)`, `docs/clipboard.md`) give the
+  copies a group of their own via `Clippings.Relinker`. `Grouping.Group` clears the link of what it wraps. New
   code that builds a copy of one of these three records needs the same care —
   `with { ... }` alone carries the link over.
 - **Not for linked groups (yet):** resizing as one (a handle drags only the
-  primary member, as in any multi-selection today), Copy/Cut/Paste of the whole
-  group (the clipboard holds only the primary item), *Keep in My Assets*
+  primary member, as in any multi-selection today), *Keep in My Assets*
   (`GroupElement` only — a character's own copy is kept via §6), and being one
   z-order slot (each member keeps its own place in the panel's stack, `docs/layers-panel.md`).
 

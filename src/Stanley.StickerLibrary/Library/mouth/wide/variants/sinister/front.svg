@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Stanley starter library art, CC0 1.0 (see LICENSE at the library root). -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="160" height="150" viewBox="-80 -1010 160 150" data-stanley-view="front" data-stanley-slot="mouth">
+  <g id="mouth" inkscape:groupmode="layer" inkscape:label="mouth">
+    <path d="M-27.6,-899 C-17.4,-889 17.4,-889 27.6,-899 C20.3,-876 -20.3,-876 -27.6,-899 Z" fill="#7a2b2b" stroke="#1a1a1a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M-18.9,-893 L-11.3,-891.2 L-3.8,-890.4 L3.8,-890.4 L11.3,-891.2 L18.9,-893 L15.1,-887.1 L11.3,-889.6 L7.6,-885.8 L3.8,-888.8 L0,-885.4 L-3.8,-888.8 L-7.6,-885.8 L-11.3,-889.6 L-15.1,-887.1 Z" fill="#ffffff"/>
+  </g>
+</svg>

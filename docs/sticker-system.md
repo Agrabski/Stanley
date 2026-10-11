@@ -353,7 +353,7 @@ The standard vocabulary for the library and the presets:
 |---|---|
 | `eyes` | neutral, happy, sad, angry, wide, closed, wink, halfClosed |
 | `brows` | neutral, raised, angry, sad, skeptical |
-| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk, doubtful |
+| `mouth` | neutral, smile, grin, open, shout, frown, o, smirk, doubtful, sinister |
 
 `ExpressionPresets` (Stanley.Editing, next to `PosePresets`). Each preset sets all
 three slots:
@@ -369,6 +369,7 @@ three slots:
 | Scared | wide | sad | open |
 | Skeptical | neutral | skeptical | doubtful |
 | Seductive | halfClosed | skeptical | smirk |
+| Sinister | halfClosed | angry | sinister |
 | Wink | wink | raised | grin |
 | Talking | neutral | neutral | open |
 | Shouting | angry | angry | shout |
@@ -712,6 +713,24 @@ Ribbon groups, left to right:
   previews on the selected character. Clicking an item puts it on over what the slot
   already holds and selects it; clicking a worn item takes it off. Each click is one
   undo step (§8).
+- **What is on is marked, and a tooltip says what a click does** (#62, #126). Layering
+  isn't obvious, so every worn item in a gallery (and the current pattern, texture,
+  look, expression, hair tab...) is framed in the theme's selection colour on a tint,
+  with a check in its corner - several at once when a slot is layered, and *None* while
+  the slot is empty. It stays marked under the pointer (the tint just deepens), and in
+  both themes. All of it is one set of styles for any `Button.choice` in
+  `RibbonStyles.axaml`: bind `Classes.worn` and the button's template does the rest,
+  nothing per gallery. Gotchas for the next gallery: those styles must stay *after*
+  `:is(Button).small`, which zeroes the border and, declared later, cancels them (the
+  first frame, a plain 2px border, was cancelled that way and never showed); Fluent's
+  pointer-over and pressed looks sit on `ContentPresenter#PART_ContentPresenter`, so the
+  worn look is restated there; the template keeps that part name for the same reason;
+  and a button made of words (the Hair flyout's tabs, a rainbow's bands) takes
+  `noCheck`, which keeps the frame and tint but drops the check. A tooltip names the
+  click: *T-shirt - wearing it; click to take it off* on what's worn, *Hoodie - click to put
+  it on over T-shirt* (`StickerChoice.Holding`, what the slot holds, bottom to top) on
+  the rest, and *click for another* on a print that stamps copies. Tested in
+  `ChoiceHighlightTests` and `LookTests`.
 - **Colours** shows only the colour slots the worn stickers use. Each is a swatch
   dropdown like Skin. For a clothing slot, the same dropdown continues below the
   colours:

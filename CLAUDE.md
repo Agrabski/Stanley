@@ -64,9 +64,12 @@ faces, clothes, prints — symbols and your own text, emoji too — and accessor
 see "Stickers (implemented)" below and docs/sticker-system.md §19), in any colour
 ("More Colors…"), **in layers** (a gallery click puts an item on over what the slot
 already holds — a cap under a hood, a shirt over a T-shirt — and a click on a worn one
-takes it off) and **in styles** (a hood up or down, a cap's brim any way; picked on the
+takes it off; the chosen item in every gallery is framed, tinted and ticked, and each
+item's tooltip says what a click will do — docs/sticker-system.md §13.1) and **in styles** (a hood up or down, a cap's brim any way; picked on the
 Sticker tab or for one panel — docs/sticker-system.md §8, §20); in the character editor, clicking a compared (faded) character
-switches to it. **Hair is built from pieces** (docs/sticker-system.md §22, #59): top, fringe,
+switches to it. In the Characters pane a click only **picks** a character; its row's
+pencil, Enter or right-click › Edit body opens the body editor, and a double-click or a
+drag puts it on the page (#149). **Hair is built from pieces** (docs/sticker-system.md §22, #59): top, fringe,
 sides, back and extras are stickers in their own slots, each following the Hair colour until
 given its own (`hairFringe`, ...), with hairstyles as one-click presets of pieces
 (`StickerLibrary.Hairstyles`), dyes fitted to each piece (tips, roots, ombré, streaks,
@@ -85,7 +88,8 @@ webcomic** rather than a comic book page (File › New templates) — see "Title
 and comic formats (implemented)" below. Anything selected on a page (bubble,
 character, element, whole panel) can be **copied, cut, pasted and duplicated**
 (Ctrl+C/X/V/D, Home › Clipboard, right-click) through Stanley's own clipboard
-(`PageClipboard`, pictures carried along so it pastes into another comic), or
+(`PageClipboard`, pictures carried along so it pastes into another comic; a
+multi-selection goes as one `SelectionClipping`, keeping its layout — docs/clipboard.md), or
 **Alt+dragged** to pull a copy away (`Clippings` in Stanley.Editing). Home › Shape
 Fill / Shape Outline act on the **selection** — a shape, a text's box, or a panel's
 background colour and border (`Panel.BorderStyle`: colour, weight, dashes) — and set
@@ -93,9 +97,12 @@ the pen only with nothing selected or a drawing tool on. **Holding Ctrl** shows 
 on-screen button's shortcut in a keycap right by it, like Office's KeyTips
 (`local:Shortcut.Keys`, drawn in the adorner layer so nothing moves); menus show theirs
 all the time via `InputGesture`. After File › Export a note offers **Open** and
-**Show in folder** (`IFileLauncher`). **Shift+click** adds a bubble, character or
+**Show in folder** (`IFileLauncher`). File-view messages go through `ShowNotice`
+(green: "Saved to …") or `ShowProblem` (red), never a bare `Message =` (#85); a button
+that confirms something that can't be undone (Delete an issue, Remove from My Assets,
+Discard recovered work) carries `Classes="danger"` (red, RibbonStyles.axaml, #145). **Shift+click** adds a bubble, character or
 element to the selection, or drops it: a multi-selection stays in one panel and drags
-(tails along), nudges, Alt+drags and deletes as one undo step; the last one clicked
+(tails along), nudges, copies/cuts/pastes/duplicates, Alt+drags and deletes as one undo step; the last one clicked
 drives the ribbon. **Lock layout** protects a page's panel geometry (move, resize,
 split, delete, re-tile) but leaves panels selectable, so a double-clicked character
 still lands in the selected one. **Resizing a panel scales what's in it** as one picture

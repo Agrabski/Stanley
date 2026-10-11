@@ -7,9 +7,10 @@ namespace Stanley.Editing;
 
 /// <summary>
 /// One thing taken off a page to be put back as a copy - by Copy and Paste, Duplicate or an
-/// Alt+drag: a bubble, a placed character, an element (shape, text, picture, speed lines) or a
-/// whole panel with everything in it, exactly as it was, with the panel it came from - where it
-/// sat in that panel is where it goes in the next.
+/// Alt+drag: a bubble, a placed character, an element (shape, text, picture, speed lines), several
+/// of those selected together (<see cref="SelectionClipping"/>) or a whole panel with everything in
+/// it, exactly as it was, with the panel it came from - where it sat in that panel is where it
+/// goes in the next.
 /// </summary>
 public abstract record Clipping(PanelId FromPanel, Rect2D FromPanelBounds);
 
@@ -20,6 +21,21 @@ public sealed record CharacterClipping(PanelId FromPanel, Rect2D FromPanelBounds
 public sealed record ElementClipping(PanelId FromPanel, Rect2D FromPanelBounds, PanelElement Element) : Clipping(FromPanel, FromPanelBounds);
 
 public sealed record PanelClipping(PanelId FromPanel, Rect2D FromPanelBounds, Panel Panel) : Clipping(FromPanel, FromPanelBounds);
+
+/// <summary>
+/// Everything that was selected together in one panel - a bubble and the character it speaks for,
+/// say - so Copy takes all of it, not just the last thing clicked. Each list is in the panel's own
+/// order (the end is the front), so what was in front of what among them stays so.
+/// </summary>
+public sealed record SelectionClipping(
+    PanelId FromPanel,
+    Rect2D FromPanelBounds,
+    IReadOnlyList<Bubble> Bubbles,
+    IReadOnlyList<CharacterInstance> Characters,
+    IReadOnlyList<PanelElement> Elements) : Clipping(FromPanel, FromPanelBounds)
+{
+    public int Count => Bubbles.Count + Characters.Count + Elements.Count;
+}
 
 /// <summary>
 /// Making the copies <see cref="Clipping"/>s put back: fresh ids, so a copy is never mistaken for
@@ -66,6 +82,31 @@ public static class Clippings
     }
 
     /// <summary>
+    /// Copies of everything in <paramref name="clipping"/>, each under a new id. What was grouped
+    /// together (<see cref="PanelElement.Link"/>) and is copied together is a group of its own in the
+    /// copies, never joined to the original's; a member copied without the rest of its group is
+    /// left ungrouped, since a group of one is no group.
+    /// </summary>
+    public static SelectionClipping Copy(SelectionClipping clipping)
+    {
+        var links = clipping.Bubbles.Select(b => b.Link)
+            .Concat(clipping.Characters.Select(c => c.Link))
+            .Concat(clipping.Elements.Select(e => e.Link))
+            .OfType<GroupLinkId>()
+            .GroupBy(link => link)
+            .ToDictionary(group => group.Key, group => group.Count());
+        var relinker = new Relinker();
+        GroupLinkId? Fresh(GroupLinkId? original) => original is { } link && links[link] > 1 ? relinker.For(link) : null;
+
+        return clipping with
+        {
+            Bubbles = clipping.Bubbles.Select(b => Copy(b) with { Link = Fresh(b.Link) }).ToList(),
+            Characters = clipping.Characters.Select(c => Copy(c) with { Link = Fresh(c.Link) }).ToList(),
+            Elements = clipping.Elements.Select(e => Copy(e) with { Link = Fresh(e.Link) }).ToList()
+        };
+    }
+
+    /// <summary>
     /// Hands out new group links for a set of copies, one per link they came from, so copying a
     /// whole group gives a whole new group rather than joining the original (or splitting into
     /// singles): <c>Copy(x) with { Link = relinker.For(x.Link) }</c>.
@@ -95,23 +136,40 @@ public static class Clippings
     /// </summary>
     public static Rect2D FreeSpot(Rect2D bounds, IReadOnlyCollection<Rect2D> taken, Rect2D container, double stepX = CascadeStepMm, double stepY = CascadeStepMm)
     {
-        var tolerance = Math.Max(Math.Abs(stepX), Math.Abs(stepY)) / 2;
-        bool Clear(Rect2D r) => taken.All(t => Math.Abs(t.Left - r.Left) >= tolerance || Math.Abs(t.Top - r.Top) >= tolerance);
-        bool Inside(Rect2D r) => r.MidX >= container.Left && r.MidX <= container.Right && r.MidY >= container.Top && r.MidY <= container.Bottom;
+        var (dx, dy) = FreeOffset([bounds], taken, container, stepX, stepY);
+        return bounds with { X = bounds.X + dx, Y = bounds.Y + dy };
+    }
 
-        if (tolerance <= 0 || Clear(bounds))
-            return bounds;
+    /// <summary>
+    /// <see cref="FreeSpot"/> for several things that are pasted together and must keep their
+    /// places relative to each other: the one offset (dx, dy) to move all of <paramref name="boxes"/>
+    /// by, stepped until none of their corners is on one of <paramref name="taken"/>, and until
+    /// they stand out of the way together - forwards, else backwards once forwards would take their
+    /// combined centre out of <paramref name="container"/>. (0, 0) when they're clear already or
+    /// there's no room.
+    /// </summary>
+    public static (double Dx, double Dy) FreeOffset(IReadOnlyCollection<Rect2D> boxes, IReadOnlyCollection<Rect2D> taken, Rect2D container, double stepX = CascadeStepMm, double stepY = CascadeStepMm)
+    {
+        var tolerance = Math.Max(Math.Abs(stepX), Math.Abs(stepY)) / 2;
+        bool Clear(double dx, double dy) => boxes.All(b => taken.All(t => Math.Abs(t.Left - (b.Left + dx)) >= tolerance || Math.Abs(t.Top - (b.Top + dy)) >= tolerance));
+
+        if (boxes.Count == 0 || tolerance <= 0 || Clear(0, 0))
+            return (0, 0);
+        var all = boxes.Count == 1 ? boxes.Single() : Rect2D.Union(boxes);
+        bool Inside(double dx, double dy) =>
+            all.MidX + dx >= container.Left && all.MidX + dx <= container.Right && all.MidY + dy >= container.Top && all.MidY + dy <= container.Bottom;
+
         foreach (var direction in new[] { 1, -1 })
         {
             for (var k = 1; k <= 50; k++)
             {
-                var candidate = bounds with { X = bounds.X + direction * k * stepX, Y = bounds.Y + direction * k * stepY };
-                if (!Inside(candidate))
+                var (dx, dy) = (direction * k * stepX, direction * k * stepY);
+                if (!Inside(dx, dy))
                     break;
-                if (Clear(candidate))
-                    return candidate;
+                if (Clear(dx, dy))
+                    return (dx, dy);
             }
         }
-        return bounds;
+        return (0, 0);
     }
 }

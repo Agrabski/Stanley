@@ -139,6 +139,124 @@ public class ClipboardAndShortcutTests
         LookTabTests.Snapshot(window, "home-clipboard-group");
     }
 
+    /// <summary>A bubble up in the corner and a character standing in the middle of the panel, neither selected.</summary>
+    private static (MainWindow Window, PageCanvasControl Canvas, PanelId Panel, Point BubblePoint, Point CharacterPoint) OpenWithBubbleAndCharacter()
+    {
+        var (window, canvas, panelId, bounds) = Open();
+        var editor = window.Editor;
+        editor.InsertCharacter(window.ViewModel.Characters!.CreateCharacter().Id, panelId);
+        editor.CreateBubble(panelId, new Point2D(bounds.Left + bounds.Width * 0.2, bounds.Top + bounds.Height * 0.15));
+        editor.SetBubbleText(panelId, 0, "Psst");
+        editor.ClearSelection();
+        Dispatcher.UIThread.RunJobs();
+
+        var bubble = BubbleBox(window, panelId, 0);
+        var body = editor.CharacterBounds(editor.Working.Panels[panelId].CharacterInstances[0]);
+        return (window, canvas, panelId,
+            At(window, canvas, bubble.MidX, bubble.MidY),
+            At(window, canvas, body.MidX, body.Top + body.Height * 0.35));
+    }
+
+    /// <summary>Issue #124: Shift+click a bubble and a character, Ctrl+C, Ctrl+V - both come, not just the one clicked last.</summary>
+    [Fact]
+    public void Shift_clicking_a_bubble_and_a_character_then_Ctrl_C_and_Ctrl_V_pastes_both()
+    {
+        var (window, canvas, panelId, bubblePoint, characterPoint) = OpenWithBubbleAndCharacter();
+        var editor = window.Editor;
+        window.MouseDown(characterPoint, MouseButton.Left);
+        window.MouseUp(characterPoint, MouseButton.Left);
+        window.MouseDown(bubblePoint, MouseButton.Left, RawInputModifiers.Shift);
+        window.MouseUp(bubblePoint, MouseButton.Left, RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(2, editor.SelectionCount);
+        canvas.Focus();
+
+        Ctrl(window, Key.C, PhysicalKey.C);
+        Ctrl(window, Key.V, PhysicalKey.V);
+
+        var panel = editor.Working.Panels[panelId];
+        Assert.Equal(2, panel.Bubbles.Count);
+        Assert.Equal(2, panel.CharacterInstances.Count);
+        Assert.Equal("Psst", panel.Bubbles[1].Text);
+        Assert.Equal(2, editor.SelectionCount); // the copies, to be moved or pasted again together
+        Assert.True(editor.IsPartOfSelection(panelId, bubbleIndex: 1));
+        Assert.True(editor.IsPartOfSelection(panelId, characterIndex: 1));
+
+        window.History.Undo(); // one step took both
+        Assert.Single(editor.Working.Panels[panelId].Bubbles);
+        Assert.Single(editor.Working.Panels[panelId].CharacterInstances);
+    }
+
+    [Fact]
+    public void Ctrl_X_and_Ctrl_D_take_and_duplicate_everything_selected_too()
+    {
+        var (window, canvas, panelId, _, _) = OpenWithBubbleAndCharacter();
+        var editor = window.Editor;
+        editor.ToggleSelect(panelId, bubbleIndex: 0);
+        editor.ToggleSelect(panelId, characterIndex: 0);
+        canvas.Focus();
+
+        Ctrl(window, Key.D, PhysicalKey.D);
+        Assert.Equal(2, editor.Working.Panels[panelId].Bubbles.Count);
+        Assert.Equal(2, editor.Working.Panels[panelId].CharacterInstances.Count);
+
+        Ctrl(window, Key.X, PhysicalKey.X); // the copies, which are what's selected now
+        Assert.Single(editor.Working.Panels[panelId].Bubbles);
+        Assert.Single(editor.Working.Panels[panelId].CharacterInstances);
+        Ctrl(window, Key.V, PhysicalKey.V);
+        Assert.Equal(2, editor.Working.Panels[panelId].Bubbles.Count);
+        Assert.Equal(2, editor.Working.Panels[panelId].CharacterInstances.Count);
+    }
+
+    [Fact]
+    public void Right_clicking_a_multi_selection_offers_cut_copy_paste_and_duplicate_for_all_of_it()
+    {
+        var (window, canvas, panelId, _, _) = OpenWithBubbleAndCharacter();
+        var editor = window.Editor;
+        editor.ToggleSelect(panelId, bubbleIndex: 0);
+        editor.ToggleSelect(panelId, characterIndex: 0);
+        var box = BubbleBox(window, panelId, 0);
+
+        var items = canvas.ContextMenuItems(new Point2D(box.MidX, box.MidY)).OfType<MenuItem>().ToList();
+
+        MenuItem Item(string header) => items.Single(i => i.Header as string == header);
+        Assert.Equal(KeyGesture.Parse("Ctrl+X"), Item("Cut").InputGesture);
+        Assert.Equal(KeyGesture.Parse("Ctrl+C"), Item("Copy").InputGesture);
+        Assert.False(Item("Paste").IsEnabled); // nothing copied yet
+        Assert.Equal(KeyGesture.Parse("Ctrl+D"), Item("Duplicate").InputGesture);
+        Assert.Equal(2, editor.SelectionCount); // opening the menu didn't collapse the selection
+
+        Item("Copy").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        var again = canvas.ContextMenuItems(new Point2D(box.MidX, box.MidY)).OfType<MenuItem>().ToList();
+        var paste = again.Single(i => i.Header as string == "Paste");
+        Assert.True(paste.IsEnabled);
+        paste.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+
+        Assert.Equal(2, editor.Working.Panels[panelId].Bubbles.Count);
+        Assert.Equal(2, editor.Working.Panels[panelId].CharacterInstances.Count);
+    }
+
+    [Fact]
+    public void The_home_tabs_clipboard_buttons_take_a_multi_selection_whole()
+    {
+        var (window, _, panelId, _, _) = OpenWithBubbleAndCharacter();
+        var editor = window.Editor;
+        editor.ToggleSelect(panelId, bubbleIndex: 0);
+        editor.ToggleSelect(panelId, characterIndex: 0);
+        Dispatcher.UIThread.RunJobs();
+        var buttons = Ribbon(window).GetVisualDescendants().OfType<Button>().ToList();
+        Button Named(string name) => buttons.Single(b => b.Name == name);
+
+        Assert.True(Named("CopyButton").IsEffectivelyEnabled);
+        Named("CopyButton").Command!.Execute(null);
+        Named("PasteButton").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(2, editor.Working.Panels[panelId].Bubbles.Count);
+        Assert.Equal(2, editor.Working.Panels[panelId].CharacterInstances.Count);
+        Assert.Equal(2, editor.SelectionCount);
+    }
+
     private sealed class ExportDialogs(string exportPath) : Stanley.App.Documents.IFileDialogs
     {
         public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(null);

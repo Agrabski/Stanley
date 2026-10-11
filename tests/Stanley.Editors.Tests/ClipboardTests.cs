@@ -316,4 +316,302 @@ public sealed class ClipboardTests
         Assert.Equal(before.Top + 8, page.PanelBounds(copy.Value).Top, 6);
         Assert.Equal(copy, page.SelectedPanelId);
     }
+
+    // ---------------------------------------------------------------- several things at once (Shift+click)
+
+    /// <summary>A character and, above them, a bubble with a tail, both in <paramref name="panel"/> and selected together (the character last clicked).</summary>
+    private static void SelectBubbleAndCharacter(EditorSession session, PageEditorViewModel page, PanelId panel)
+    {
+        page.InsertCharacter(session.Characters.CreateCharacter().Id, panel);
+        var bounds = page.PanelBounds(panel);
+        page.CreateBubble(panel, new Point2D(bounds.MidX, bounds.Top + bounds.Height * 0.25));
+        page.AddBubbleTail(panel, 0);
+        page.SetBubbleText(panel, 0, "Hi!");
+        page.ToggleSelect(panel, characterIndex: 0);
+        Assert.Equal(2, page.SelectionCount);
+    }
+
+    /// <summary>A bubble and a line of text, both in <paramref name="panel"/> and selected together.</summary>
+    private static void SelectBubbleAndText(PageEditorViewModel page, PanelId panel)
+    {
+        var bounds = page.PanelBounds(panel);
+        var text = page.CreateText(panel, new Point2D(bounds.Left + bounds.Width * 0.3, bounds.Top + bounds.Height * 0.2));
+        page.SetElementText(panel, text, "Meanwhile...");
+        var bubble = page.CreateBubble(panel, new Point2D(bounds.Left + bounds.Width * 0.6, bounds.Top + bounds.Height * 0.5));
+        page.ToggleSelect(panel, elementIndex: text);
+        Assert.Equal(2, page.SelectionCount);
+        Assert.Equal(0, bubble);
+    }
+
+    private static Rect2D CharacterBox(PageEditorViewModel page, PanelId panel, int index) =>
+        page.CharacterBounds(page.Working.Panels[panel].CharacterInstances[index]);
+
+    [Fact]
+    public void A_bubble_and_a_character_copied_together_paste_together_keeping_their_places_in_one_undo_step()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndCharacter(session, page, left);
+        var character = page.Working.Panels[left].CharacterInstances[0].CharacterId;
+
+        Assert.True(page.Copy());
+        var clipping = Assert.IsType<SelectionClipping>(page.Clipboard.Content);
+        Assert.Equal((1, 1, 0), (clipping.Bubbles.Count, clipping.Characters.Count, clipping.Elements.Count));
+        Assert.True(page.Paste());
+
+        var panel = page.Working.Panels[left];
+        Assert.Equal(2, panel.Bubbles.Count);
+        Assert.Equal(2, panel.CharacterInstances.Count);
+        Assert.Equal("Hi!", panel.Bubbles[1].Text);
+        Assert.Equal(character, panel.CharacterInstances[1].CharacterId);
+        Assert.NotEqual(panel.Bubbles[0].Id, panel.Bubbles[1].Id);
+
+        // One shared offset - sideways, with a character among them, as for a lone character - and the bubble's tail went with it.
+        var dx = Box(panel.Bubbles[1]).Left - Box(panel.Bubbles[0]).Left;
+        Assert.True(dx > 0);
+        Assert.Equal(dx, CharacterBox(page, left, 1).Left - CharacterBox(page, left, 0).Left, 6);
+        Assert.Equal(Box(panel.Bubbles[0]).Top, Box(panel.Bubbles[1]).Top, 6);
+        Assert.Equal(CharacterBox(page, left, 0).Top, CharacterBox(page, left, 1).Top, 6);
+        Assert.Equal(panel.Bubbles[0].Tails[0].Target.X + dx, panel.Bubbles[1].Tails[0].Target.X, 6);
+        Assert.Equal(panel.Bubbles[0].Tails[0].Target.Y, panel.Bubbles[1].Tails[0].Target.Y, 6);
+
+        // The copies are the selection now, and only they are.
+        Assert.True(page.HasMultiSelection);
+        Assert.Equal(2, page.SelectionCount);
+        Assert.True(page.IsPartOfSelection(left, bubbleIndex: 1));
+        Assert.True(page.IsPartOfSelection(left, characterIndex: 1));
+        Assert.False(page.IsPartOfSelection(left, bubbleIndex: 0));
+        Assert.False(page.IsPartOfSelection(left, characterIndex: 0));
+
+        session.Workspace.History.Undo();
+        Assert.Single(page.Working.Panels[left].Bubbles);
+        Assert.Single(page.Working.Panels[left].CharacterInstances);
+    }
+
+    [Fact]
+    public void Pasting_the_same_selection_again_steps_it_once_more_so_a_row_of_pastes_fans_out()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndCharacter(session, page, left);
+        page.Copy();
+
+        page.Paste();
+        page.Paste();
+
+        var panel = page.Working.Panels[left];
+        Assert.Equal(3, panel.Bubbles.Count);
+        Assert.Equal(3, panel.CharacterInstances.Count);
+        Assert.Equal(Box(panel.Bubbles[0]).Left + 2 * Clippings.CascadeStepMm, Box(panel.Bubbles[2]).Left, 6);
+        Assert.Equal(CharacterBox(page, left, 0).Left + 2 * Clippings.CascadeStepMm, CharacterBox(page, left, 2).Left, 6);
+        Assert.True(page.IsPartOfSelection(left, bubbleIndex: 2));
+        Assert.True(page.IsPartOfSelection(left, characterIndex: 2));
+        Assert.Equal(2, page.SelectionCount);
+    }
+
+    [Fact]
+    public void Duplicate_copies_everything_selected_beside_it_and_leaves_the_clipboard_alone()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndText(page, left);
+        var bubbleBefore = Box(page.Working.Panels[left].Bubbles[0]);
+        var textBefore = PanelElements.Bounds(page.Working.Panels[left].Elements[0]);
+
+        Assert.True(page.Duplicate());
+
+        var panel = page.Working.Panels[left];
+        Assert.Equal(2, panel.Bubbles.Count);
+        Assert.Equal(2, panel.Elements.Count);
+        // No character among them, so they step down and across.
+        Assert.Equal(bubbleBefore.Left + Clippings.CascadeStepMm, Box(panel.Bubbles[1]).Left, 6);
+        Assert.Equal(bubbleBefore.Top + Clippings.CascadeStepMm, Box(panel.Bubbles[1]).Top, 6);
+        Assert.Equal(textBefore.Left + Clippings.CascadeStepMm, PanelElements.Bounds(panel.Elements[1]).Left, 6);
+        Assert.Equal(textBefore.Top + Clippings.CascadeStepMm, PanelElements.Bounds(panel.Elements[1]).Top, 6);
+        Assert.Equal("Meanwhile...", Assert.IsType<TextElement>(panel.Elements[1]).Text);
+        Assert.True(page.IsPartOfSelection(left, bubbleIndex: 1));
+        Assert.True(page.IsPartOfSelection(left, elementIndex: 1));
+        Assert.Equal(2, page.SelectionCount);
+        Assert.Null(page.Clipboard.Content);
+
+        session.Workspace.History.Undo();
+        Assert.Single(page.Working.Panels[left].Bubbles);
+        Assert.Single(page.Working.Panels[left].Elements);
+    }
+
+    [Fact]
+    public void Cut_takes_the_whole_selection_off_in_one_undo_step_and_paste_puts_it_back_where_it_was()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndText(page, left);
+        var bubbleBefore = Box(page.Working.Panels[left].Bubbles[0]);
+        var textBefore = PanelElements.Bounds(page.Working.Panels[left].Elements[0]);
+
+        Assert.True(page.Cut());
+        Assert.Empty(page.Working.Panels[left].Bubbles);
+        Assert.Empty(page.Working.Panels[left].Elements);
+
+        page.Select(left);
+        Assert.True(page.Paste());
+        var panel = page.Working.Panels[left];
+        // Nothing in the way, so no stepping aside (to rounding: refitting maps through the panel's fractions).
+        var bubbleAfter = Box(Assert.Single(panel.Bubbles));
+        var textAfter = PanelElements.Bounds(Assert.Single(panel.Elements));
+        Assert.Equal(bubbleBefore.Left, bubbleAfter.Left, 6);
+        Assert.Equal(bubbleBefore.Top, bubbleAfter.Top, 6);
+        Assert.Equal(textBefore.Left, textAfter.Left, 6);
+        Assert.Equal(textBefore.Top, textAfter.Top, 6);
+        Assert.Equal(2, page.SelectionCount);
+
+        session.Workspace.History.Undo(); // the paste
+        Assert.Empty(page.Working.Panels[left].Bubbles);
+        session.Workspace.History.Undo(); // the cut, all of it in one step
+        Assert.Single(page.Working.Panels[left].Bubbles);
+        Assert.Single(page.Working.Panels[left].Elements);
+    }
+
+    [Fact]
+    public void A_selection_pasted_into_another_panel_keeps_its_places_relative_to_each_other_and_to_the_panel()
+    {
+        var (_, page, left, right) = NewSession();
+        SelectBubbleAndText(page, left);
+        var from = page.PanelBounds(left);
+        var bubble = Box(page.Working.Panels[left].Bubbles[0]);
+        var text = PanelElements.Bounds(page.Working.Panels[left].Elements[0]);
+        page.Copy();
+
+        page.Select(right);
+        Assert.True(page.Paste());
+
+        var to = page.PanelBounds(right);
+        var pasted = page.Working.Panels[right];
+        var pastedBubble = Box(Assert.Single(pasted.Bubbles));
+        var pastedText = PanelElements.Bounds(Assert.Single(pasted.Elements));
+        Assert.Equal((bubble.MidX - from.Left) / from.Width, (pastedBubble.MidX - to.Left) / to.Width, 6);
+        Assert.Equal((text.MidY - from.Top) / from.Height, (pastedText.MidY - to.Top) / to.Height, 6);
+        Assert.Equal(text.MidX - bubble.MidX, pastedText.MidX - pastedBubble.MidX, 6); // the panels are the same size
+        Assert.Equal(text.MidY - bubble.MidY, pastedText.MidY - pastedBubble.MidY, 6);
+        Assert.Equal(right, page.SelectedPanelId);
+        Assert.Equal(2, page.SelectionCount);
+        Assert.Single(page.Working.Panels[left].Bubbles); // the originals stay
+    }
+
+    [Fact]
+    public void A_character_this_comic_hasnt_got_is_left_out_of_a_pasted_selection_with_a_note()
+    {
+        var clipboard = new PageClipboard();
+        var (session, page, left, _) = NewSession(clipboard);
+        SelectBubbleAndCharacter(session, page, left);
+        page.Copy();
+
+        var (_, other, otherLeft, _) = NewSession(clipboard);
+        other.Select(otherLeft);
+        Assert.True(other.Paste());
+
+        var panel = other.Working.Panels[otherLeft];
+        Assert.Equal("Hi!", Assert.Single(panel.Bubbles).Text);
+        Assert.Empty(panel.CharacterInstances);
+        Assert.Equal(0, other.SelectedBubbleIndex);
+        Assert.Contains("isn't in this comic", other.Hint);
+    }
+
+    [Fact]
+    public void A_selection_of_only_characters_this_comic_hasnt_got_isnt_pasted()
+    {
+        var clipboard = new PageClipboard();
+        var (session, page, left, _) = NewSession(clipboard);
+        page.InsertCharacter(session.Characters.CreateCharacter().Id, left);
+        page.InsertCharacter(session.Characters.CreateCharacter().Id, left);
+        page.ToggleSelect(left, characterIndex: 0);
+        page.Copy();
+
+        var (_, other, otherLeft, _) = NewSession(clipboard);
+        other.Select(otherLeft);
+
+        Assert.False(other.Paste());
+        Assert.Empty(other.Working.Panels[otherLeft].CharacterInstances);
+        Assert.Contains("aren't in this comic", other.LastError);
+    }
+
+    [Fact]
+    public void The_pictures_of_a_copied_selection_come_along_into_another_comic()
+    {
+        var clipboard = new PageClipboard();
+        var (session, page, left, _) = NewSession(clipboard);
+        page.ImportPicture(new PictureImportRequest(left, AsBackground: false), "tree.png", Png(SKColors.Green));
+        var bounds = page.PanelBounds(left);
+        page.CreateBubble(left, new Point2D(bounds.MidX, bounds.MidY));
+        page.ToggleSelect(left, elementIndex: 0);
+        page.Copy();
+
+        var (otherSession, other, otherLeft, _) = NewSession(clipboard);
+        other.Select(otherLeft);
+        Assert.True(other.Paste());
+
+        var panel = other.Working.Panels[otherLeft];
+        Assert.Single(panel.Bubbles);
+        var picture = Assert.IsType<PictureElement>(Assert.Single(panel.Elements));
+        Assert.True(otherSession.Pictures.Files.ContainsKey(picture.ArtFileName));
+        Assert.Equal(session.Pictures.Files[picture.ArtFileName].Bytes, otherSession.Pictures.Files[picture.ArtFileName].Bytes);
+    }
+
+    [Fact]
+    public void A_copied_group_pastes_as_a_group_of_its_own_and_the_original_stays_one()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndCharacter(session, page, left);
+        page.GroupSelectionCommand.Execute(null);
+        var link = page.Working.Panels[left].Bubbles[0].Link;
+        Assert.NotNull(link);
+
+        page.Copy();
+        page.Paste();
+
+        var panel = page.Working.Panels[left];
+        Assert.Equal(link, panel.Bubbles[0].Link);
+        Assert.Equal(link, panel.CharacterInstances[0].Link);
+        Assert.NotNull(panel.Bubbles[1].Link);
+        Assert.NotEqual(link, panel.Bubbles[1].Link);
+        Assert.Equal(panel.Bubbles[1].Link, panel.CharacterInstances[1].Link);
+
+        // Clicking one of the copies picks all of the copies, and none of the originals.
+        page.ClearSelection();
+        Assert.True(page.SelectGroupOf(left, bubbleIndex: 1));
+        Assert.Equal(2, page.SelectionCount);
+        Assert.True(page.IsPartOfSelection(left, characterIndex: 1));
+        Assert.False(page.IsPartOfSelection(left, characterIndex: 0));
+    }
+
+    [Fact]
+    public void A_selection_pasted_into_a_panel_stacked_by_hand_leaves_the_stacking_it_has_alone()
+    {
+        var (session, page, left, _) = NewSession();
+        SelectBubbleAndCharacter(session, page, left);
+        page.MoveInStack(left, new StackItem(StackKind.Bubble, 0), StackMove.ToBack); // behind the character
+        var before = page.Working.Panels[left];
+        Assert.NotNull(before.Stack);
+        page.Copy();
+
+        Assert.True(page.Paste());
+
+        var panel = page.Working.Panels[left];
+        Assert.Equal(before.Stack, panel.Stack);
+        Assert.Null(panel.CharacterInstances[1].Id); // no id of the original's to be stacked under
+        var order = PanelStack.Order(panel).ToList();
+        Assert.Equal(4, order.Count);
+        Assert.True(order.IndexOf(new StackItem(StackKind.Bubble, 0)) < order.IndexOf(new StackItem(StackKind.Character, 0)));
+    }
+
+    [Fact]
+    public void A_selection_pastes_into_a_panel_of_a_locked_layout()
+    {
+        var (session, page, left, right) = NewSession();
+        SelectBubbleAndCharacter(session, page, left);
+        page.Copy();
+        page.IsLayoutLocked = true;
+
+        Assert.True(page.CanPaste);
+        Assert.True(page.PasteInto(right));
+
+        var panel = page.Working.Panels[right];
+        Assert.Single(panel.Bubbles);
+        Assert.Single(panel.CharacterInstances);
+    }
 }

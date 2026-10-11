@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using Stanley.Editing;
 using Stanley.Editing.Abstractions;
+using Stanley.ProjectModel.Bubbles;
 using Stanley.ProjectModel.Characters;
 using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
@@ -9,9 +10,10 @@ using Stanley.ProjectModel.Issues;
 namespace Stanley.Editors;
 
 /// <summary>
-/// What Copy (Ctrl+C) put away for Paste (Ctrl+V): one thing off a page (<see cref="Clipping"/>)
-/// and the pictures it shows, so it pastes into another page, issue or comic too. Stanley's own
-/// rather than the system clipboard: what's on it is a piece of a comic, not text or an image.
+/// What Copy (Ctrl+C) put away for Paste (Ctrl+V): one thing off a page, or everything selected
+/// together (<see cref="Clipping"/>), and the pictures it shows, so it pastes into another page,
+/// issue or comic too. Stanley's own rather than the system clipboard: what's on it is a piece of
+/// a comic, not text or an image.
 /// </summary>
 public sealed class PageClipboard
 {
@@ -34,8 +36,9 @@ public sealed class PageClipboard
 
 /// <summary>
 /// Copy, Cut, Paste and Duplicate for whatever is selected - a bubble, a character, a shape,
-/// text, a picture, speed lines or a whole panel - with everything about it: its style, its
-/// words, its pose. And Alt+drag, which drags a copy away and leaves the original where it was.
+/// text, a picture, speed lines or a whole panel, or several of those at once (Shift+click) - with
+/// everything about it: its style, its words, its pose. And Alt+drag, which drags a copy away and
+/// leaves the original where it was.
 /// </summary>
 public sealed partial class PageEditorViewModel
 {
@@ -88,12 +91,20 @@ public sealed partial class PageEditorViewModel
         _ => Working.PanelOrder.Count > 0
     };
 
-    /// <summary>What's selected, as a clipping - null with nothing selected (or only a panel, on a locked layout).</summary>
+    /// <summary>What's selected, as a clipping - null with nothing selected (or only a panel, on a locked layout). Everything of a multi-selection, not just the last thing clicked.</summary>
     private Clipping? SelectedClipping()
     {
         if (_selectedPanelId is not { } panelId || SelectedPanel is not { } panel)
             return null;
         var bounds = Bounds(panel);
+        if (HasMultiSelection && SelectedItemsInPanel(panel) is { Count: > 1 } items)
+        {
+            // Each kind in the panel's own order, so the copies stack the way the originals did.
+            List<T> Of<T>(SelectionKind kind, IReadOnlyList<T> list) =>
+                items.Where(item => item.Kind == kind).Select(item => item.Index).Order().Select(index => list[index]).ToList();
+            return new SelectionClipping(panelId, bounds, Of(SelectionKind.Bubble, panel.Bubbles),
+                Of(SelectionKind.Character, panel.CharacterInstances), Of(SelectionKind.Element, panel.Elements));
+        }
         if (SelectedBubble is { } bubble)
             return new BubbleClipping(panelId, bounds, bubble);
         if (SelectedElement is { } element)
@@ -124,16 +135,17 @@ public sealed partial class PageEditorViewModel
 
     /// <summary>
     /// Ctrl+V: a copy of what's on the clipboard, selected, in one undo step - a bubble, character
-    /// or element in the selected panel (the one whatever is selected is in), else back in the
-    /// panel it was copied from, else the first; where it sat in its old panel, stepped aside
-    /// from anything already in that spot. A panel goes onto the page. False if nothing was pasted.
+    /// or element (or several copied together, which stay where they were relative to each other)
+    /// in the selected panel (the one whatever is selected is in), else back in the panel it was
+    /// copied from, else the first; where it sat in its old panel, stepped aside from anything
+    /// already in that spot. A panel goes onto the page. False if nothing was pasted.
     /// </summary>
     public bool Paste() => Clipboard.Content is { } content && PutBack(content, Clipboard.Pictures, PasteTarget(content));
 
     /// <summary>Paste into <paramref name="panelId"/> - right-click › Paste on a panel of a locked layout, which can't be selected itself. A panel on the clipboard goes onto the page as usual.</summary>
     public bool PasteInto(PanelId panelId) => Clipboard.Content is { } content && PutBack(content, Clipboard.Pictures, panelId);
 
-    /// <summary>Ctrl+D: a copy of what's selected, beside it and selected - one undo step. The clipboard is left as it was.</summary>
+    /// <summary>Ctrl+D: a copy of what's selected (all of a multi-selection), beside it and selected - one undo step. The clipboard is left as it was.</summary>
     public bool Duplicate() => SelectedClipping() is { } clipping && PutBack(clipping, PictureSnapshot, clipping.FromPanel);
 
     private PanelId? PasteTarget(Clipping clipping)
@@ -155,6 +167,8 @@ public sealed partial class PageEditorViewModel
         var bounds = Bounds(panel);
         switch (clipping)
         {
+            case SelectionClipping selection:
+                return PutBackSelection(selection, pictures, panelId, panel);
             case BubbleClipping { Bubble: var original }:
                 {
                     var bubble = BubbleEditing.Refit(Clippings.Copy(original), clipping.FromPanelBounds, bounds);
@@ -206,6 +220,85 @@ public sealed partial class PageEditorViewModel
         }
     }
 
+    /// <summary>
+    /// Everything that was copied together into <paramref name="panel"/>, in one undo step, selected
+    /// together afterwards. Each is brought in as a lone one would be (<c>Refit</c>), then all of
+    /// them are moved by the one offset that gets them out of the way of what's already there, so
+    /// they stay where they were relative to each other - a bubble's tails with it. They're added
+    /// at the end of their lists in the order they had, with no stacking of their own to carry over
+    /// (<see cref="PanelStack"/> places what it doesn't name). A character this comic doesn't have
+    /// is left behind, with a note, and if that's all there was, nothing is pasted.
+    /// </summary>
+    private bool PutBackSelection(SelectionClipping clipping, IReadOnlyDictionary<string, ArtFile> pictures, PanelId panelId, Panel panel)
+    {
+        var here = clipping.Characters.Where(IsInThisComic).ToList();
+        var left = clipping.Characters.Count - here.Count;
+        if (left > 0 && clipping.Bubbles.Count + clipping.Elements.Count + here.Count == 0)
+        {
+            Apply(EditResult<PageDocument>.Failure(left == 1
+                ? "That character isn't in this comic - bring them in from the Characters pane first."
+                : "Those characters aren't in this comic - bring them in from the Characters pane first."));
+            return false;
+        }
+
+        var bounds = Bounds(panel);
+        var from = clipping.FromPanelBounds;
+        var copies = Clippings.Copy(clipping with { Characters = here });
+        var renames = TakeInPictures(pictures);
+        var bubbles = copies.Bubbles.Select(b => BubbleEditing.Refit(b, from, bounds)).ToList();
+        var characters = copies.Characters.Select(c => CharacterPlacementEditing.Refit(c, from, bounds)).ToList();
+        var elements = copies.Elements.Select(e => WithPictures(ElementEditing.Refit(e, from, bounds), renames)).ToList();
+
+        var boxes = bubbles.Select(BubbleBox).Concat(characters.Select(CharacterBounds)).Concat(elements.Select(PanelElements.Bounds)).ToList();
+        var taken = panel.Bubbles.Select(BubbleBox).Concat(panel.CharacterInstances.Select(CharacterBounds)).Concat(panel.Elements.Select(PanelElements.Bounds)).ToList();
+        // With a character among them it's sideways only, as for a lone character: along the same floor, not down into it.
+        var (dx, dy) = Clippings.FreeOffset(boxes, taken, bounds, stepY: characters.Count > 0 ? 0 : Clippings.CascadeStepMm);
+        bubbles = bubbles.Select(b => BubbleEditing.KeepInside(BubbleEditing.Move(b, dx, dy, withTails: true).Value, bounds)).ToList();
+        characters = characters.Select(c =>
+        {
+            var moved = CharacterPlacementEditing.Move(c, dx, dy);
+            return CharacterPlacementEditing.KeepReachable(moved, InstanceExtent(moved), bounds);
+        }).ToList();
+        elements = elements.Select(e => ElementEditing.KeepReachable(ElementEditing.Move(e, dx, dy), bounds)).ToList();
+
+        var (firstBubble, firstCharacter, firstElement) = (panel.Bubbles.Count, panel.CharacterInstances.Count, panel.Elements.Count);
+        Apply(EditPanel(Working, panelId, p => EditResult<Panel>.Success(p with
+        {
+            Bubbles = [.. p.Bubbles, .. bubbles],
+            CharacterInstances = [.. p.CharacterInstances, .. characters],
+            Elements = [.. p.Elements, .. elements]
+        })));
+        var pasted = Working.Panels[panelId];
+        if (pasted.Bubbles.Count != firstBubble + bubbles.Count || pasted.CharacterInstances.Count != firstCharacter + characters.Count
+            || pasted.Elements.Count != firstElement + elements.Count)
+            return false;
+
+        // The ribbon follows the first of them in the order it always does: a bubble, else a character, else a drawing.
+        SelectCopies(panelId,
+        [
+            .. bubbles.Select((_, i) => new SelectedItem(SelectionKind.Bubble, firstBubble + i)),
+            .. characters.Select((_, i) => new SelectedItem(SelectionKind.Character, firstCharacter + i)),
+            .. elements.Select((_, i) => new SelectedItem(SelectionKind.Element, firstElement + i))
+        ]);
+        if (left > 0)
+        {
+            ShowNotice(left == 1
+                ? "Pasted without the character who isn't in this comic - bring them in from the Characters pane first."
+                : $"Pasted without {left} characters who aren't in this comic - bring them in from the Characters pane first.");
+        }
+        return true;
+    }
+
+    /// <summary>Selects <paramref name="copies"/> together in <paramref name="panelId"/>, the first the one the ribbon follows - what a paste or Duplicate of several things leaves.</summary>
+    private void SelectCopies(PanelId panelId, IReadOnlyList<SelectedItem> copies)
+    {
+        Select(panelId);
+        _extraSelection.AddRange(copies.Skip(1));
+        SetPrimaryIndex(copies[0]);
+    }
+
+    private static Rect2D BubbleBox(Bubble bubble) => AnchorRing.BoundingBox(bubble.Shape.Anchors);
+
     /// <summary>A panel, with all that's in it, onto the page: where it was, stepped aside from any panel in that spot (it overlaps its neighbours until moved or resized).</summary>
     private bool PutBackPanel(PanelClipping clipping, IReadOnlyDictionary<string, ArtFile> pictures)
     {
@@ -251,6 +344,7 @@ public sealed partial class PageEditorViewModel
         {
             PanelClipping p => PanelElements.ArtFileNames(p.Panel),
             ElementClipping { Element: var element } => PanelElements.ArtFileNames(element),
+            SelectionClipping { Elements: var elements } => elements.SelectMany(PanelElements.ArtFileNames),
             _ => []
         };
         var files = PictureSnapshot;

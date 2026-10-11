@@ -275,10 +275,13 @@ public class GroupingMixedTests
     }
 
     [Fact]
-    public void A_copy_of_one_member_joins_no_group()
+    public void Copying_a_group_and_pasting_it_gives_a_group_of_its_own()
     {
-        var (editor, _, panel, _, character) = ShapeAndCharacterSelected();
+        // Selecting one member picks the whole group, so Copy takes all of it (issue #124) -
+        // it used to take only the member clicked, which joined no group.
+        var (editor, _, panel, shape, character) = ShapeAndCharacterSelected();
         editor.GroupSelectionCommand.Execute(null);
+        var original = PanelOf(editor, panel).Elements[shape].Link;
         editor.Select(panel);
         editor.SelectCharacter(panel, character); // the whole group, with the character as the primary
 
@@ -287,8 +290,13 @@ public class GroupingMixedTests
 
         var pasted = PanelOf(editor, panel);
         Assert.Equal(2, pasted.CharacterInstances.Count);
-        Assert.Null(pasted.CharacterInstances[^1].Link);
-        Assert.NotNull(pasted.CharacterInstances[character].Link); // the original is still grouped
-        Assert.Equal(1, editor.SelectionCount);
+        Assert.Equal(2, pasted.Elements.Count);
+        Assert.Equal(original, pasted.CharacterInstances[character].Link); // the original is still grouped
+        Assert.Equal(original, pasted.Elements[shape].Link);
+        var copyLink = pasted.CharacterInstances[^1].Link;
+        Assert.NotNull(copyLink);
+        Assert.NotEqual(original, copyLink);
+        Assert.Equal(copyLink, pasted.Elements[^1].Link);
+        Assert.Equal(2, editor.SelectionCount); // the copies are what's selected
     }
 }

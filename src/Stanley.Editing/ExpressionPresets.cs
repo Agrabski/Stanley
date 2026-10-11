@@ -16,6 +16,7 @@ public enum ExpressionPreset
     Scared,
     Skeptical,
     Seductive,
+    Sinister,
     Wink,
     Talking,
     Shouting,
@@ -51,7 +52,7 @@ public static class ExpressionPresets
     {
         [StickerSlots.Eyes] = [Neutral, "happy", "sad", "angry", "wide", "closed", "wink", "halfClosed"],
         [StickerSlots.Brows] = [Neutral, "raised", "angry", "sad", "skeptical"],
-        [StickerSlots.Mouth] = [Neutral, "smile", "grin", "open", "shout", "frown", "o", "smirk", "doubtful"],
+        [StickerSlots.Mouth] = [Neutral, "smile", "grin", "open", "shout", "frown", "o", "smirk", "doubtful", "sinister"],
     };
 
     /// <summary>The face slots an expression sets, in the order a mix of your own lists them.</summary>
@@ -70,6 +71,10 @@ public static class ExpressionPresets
         // with that brow read as a come-on rather than doubt (#153) - that's Seductive.
         new(ExpressionPreset.Skeptical, "Skeptical", Neutral, "skeptical", "doubtful"),
         new(ExpressionPreset.Seductive, "Seductive", "halfClosed", "skeptical", "smirk"),
+        // A villain's grin (#152): narrowed eyes under brows pulled down to the middle, over a wide
+        // toothy grin whose corners curl up to points. Its own mouth, because no other grin
+        // looks wicked - Laughing's and Wink's are friendly, and a smirk is only one-sided.
+        new(ExpressionPreset.Sinister, "Sinister", "halfClosed", "angry", "sinister"),
         new(ExpressionPreset.Wink, "Wink", "wink", "raised", "grin"),
         new(ExpressionPreset.Talking, "Talking", Neutral, Neutral, "open"),
         new(ExpressionPreset.Shouting, "Shouting", "angry", "angry", "shout"),
