@@ -174,7 +174,7 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="local:HairTab">
-                      <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="8,2"
+                      <Button Classes="small choice noCheck" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="8,2"
                               Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowHairTabCommand}"
                               CommandParameter="{Binding}" Content="{Binding Label}" />
                     </DataTemplate>
