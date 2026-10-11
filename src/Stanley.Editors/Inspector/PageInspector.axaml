@@ -14,7 +14,7 @@
   <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel Name="Sections">
       <TextBlock Name="TitleText" Classes="inspectorTitle" Text="Page" />
-      <local:ArrangeSection Name="Arrange" />
+      <local:ArrangeSection Name="ArrangeProperties" />
       <local:PanelSection Name="PanelProperties" />
       <local:CharacterSection Name="CharacterProperties" />
       <local:BubbleSection Name="BubbleProperties" />

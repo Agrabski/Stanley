@@ -69,11 +69,14 @@ code-behinds are 12-line stubs. The ones that aren't:
   pick (posted - a closed flyout's buttons have lost their `DataContext`).
 - `BodyRibbonTab`, `StickerRibbonTab`: `SliderDrag.Wire` (a slider drag is one undo
   step) and Enter/Escape on the name and print-text boxes.
-- **`CharacterEditorRibbon` handles view-model events that need a window**:
-  `TileImportRequested`, `ArtImportRequested` and `SvgEditorConfigurationRequested`
-  open file pickers / dialogs, and `TextPrintWorn` switches to the Sticker tab and
-  focuses its text box. They're plain events: any other host of the character
-  editor's controls must subscribe too, or Import… / Custom… silently do nothing.
+- **View-model events that need a window**: `TileImportRequested`,
+  `ArtImportRequested` and `SvgEditorConfigurationRequested` open file pickers / dialogs;
+  `Characters/CharacterEditorDialogs` handles them, and every host of the character
+  editor's controls `Attach`es it to its view model as its `DataContext` changes (the
+  ribbon and `CharacterInspector` both do). They're plain events: a host that forgets
+  leaves Import… / Custom… silently doing nothing. `TextPrintWorn` is each host's own: the
+  ribbon switches to the Sticker tab and focuses its text box, the inspector scrolls the
+  Sticker section's text box into view and focuses it.
 
 The ribbon look comes from classes in `RibbonStyles.axaml` (included app-wide from
 `App.axaml`): `StackPanel.tabContent` is horizontal and 92px high, a
@@ -193,11 +196,16 @@ tool's next bubble); `PageInspector` only owns their order and the title over th
 (`PageInspector.TitleFor`: "Bubble", "Panel", "3 selected", "Page"...). Several can show
 at once - a text box is a shape too.
 
-`Inspector/CharacterInspector` does the same for a character: `StickerSection` (the worn
-sticker picked on the stage), `BodySection`, `LookSection` under `Inspector/Character/`.
-The view-model events that need a window (file pickers for Import… / Custom…, the SVG
-editor set-up, focusing a new text print) are handled by a helper both the character
-ribbon and the character inspector attach, so neither layout loses them.
+`Inspector/CharacterInspector` does the same for a character: `BodySection`,
+`LookSection` and `StickerSection` (the worn sticker picked on the stage), under
+`Inspector/Character/`, **in that order on purpose**: every gallery pick selects what it
+puts on, so a Sticker section appearing above the galleries would push them out from under
+the pointer. A sticker clicked on the stage scrolls the Sticker section into view instead.
+The window-needing events go through `CharacterEditorDialogs` (§3), so neither layout loses
+them. What changes how the stage *looks* rather than the character - Front / Side, compare
+with others (`ShowLineUp`), the expression preview - is on `CharacterToolbar`, with Back to
+the page. `InspectorFlyouts` opens a section's gallery flyouts flush against the
+inspector's left edge, over the stage, whichever column its button is in.
 
 Sections reuse the ribbon's widgets (`ColorMenuButton`, `BackgroundPicker`, the font
 boxes, gallery templates, `LayoutPresetPreview`...) and bind the same view-model
@@ -215,9 +223,11 @@ ribbon's), so Delete, arrows and tool keys keep going to the page.
 A feature lands in **both** layouts: the ribbon tab and the matching canvas section (or the
 top bar / main menu, for a tool or a command). `LayoutParityTests` (Stanley.App.Tests) reads
 the XAML and code-behind of each layout and fails if a view-model member the ribbon uses
-isn't used anywhere in the canvas layout - or vice versa for its "ribbon-only" list, which
-must stay honest. Member-level, not control-level: it can't tell a button from a menu item,
-only that the feature is reachable.
+isn't used anywhere in the canvas layout, unless it's on the test's "ribbon-only" list - and
+fails too if an entry there goes stale, so the list stays honest. Each entry carries its
+reason; today the only one is the Sticker tab's label (`SelectedStickerName`), which the
+Sticker section shows through its picker instead. Member-level, not control-level: it
+can't tell a button from a menu item, only that the feature is reachable.
 
 ### 6.5 Gotchas
 
@@ -248,6 +258,14 @@ only that the feature is reachable.
   focuses the page again first.
 - The window applies the saved theme when it's built, so a test that wants dark sets
   `RequestedThemeVariant` after `CanvasLayoutHarness.Open()`.
+- A standard flyout whose content can't take focus hands it to the first text box in the
+  window (in the character inspector, the Name box) and the inspector scrolls back up to it,
+  opening the flyout away from its button. The character sections' flyouts use
+  `ShowMode="Transient"` (they still close on a click elsewhere), and the inspector's
+  `ScrollViewer` has `BringIntoViewOnFocusChange="False"` for the shared ones it can't change
+  (`ColorSlotDropdown`).
+- A slot gallery's flyout closes itself after a pick: the galleries are rebuilt, taking the
+  open flyout with them - nothing needs to `Hide()` it.
 
 ### 6.6 Tests
 

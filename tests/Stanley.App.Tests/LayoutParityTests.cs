@@ -24,6 +24,8 @@ public sealed class LayoutParityTests
     /// <summary>Character-editor members only the ribbon needs, and why.</summary>
     private static readonly Dictionary<string, string> RibbonOnlyCharacterMembers = new()
     {
+        [nameof(CharacterEditorViewModel.SelectedStickerName)] =
+            "The Sticker tab's label names the picked sticker; the inspector's Sticker section shows it in its picker (SelectedWorn) instead.",
     };
 
     [Fact]
