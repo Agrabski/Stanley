@@ -1,15 +1,130 @@
 <!--
-  The selected drawn shape: fill, outline, points and layer.
-  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+  The selected drawn shape: fill, outline, points and layer - the ribbon's Shape tab. Delete
+  is the Arrange row's, at the top of the inspector.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6).
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.ShapeSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsShapeContext}">
+  <UserControl.Styles>
+    <!-- Fill and Outline share a row here, so the colour buttons drop the ribbon's minimum width,
+         and take the inspector buttons' outline. -->
+    <Style Selector="SplitButton.colorMenu">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <!-- A button that can't be used now is only faded, not filled grey like a pressed one. -->
+    <Style Selector=":is(Button).inspectorButton:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource StanleyCanvasRuleBrush}" />
+    </Style>
+    <Style Selector="UniformGrid > :is(Button).inspectorButton">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <!-- The point tools sit under the Points row's label column: a little less padding so "Open at point" fits. -->
+    <Style Selector="Grid#PointTools :is(Button).inspectorButton">
+      <Setter Property="Padding" Value="4,0" />
+    </Style>
+  </UserControl.Styles>
   <Border Classes="inspectorSection">
     <StackPanel Spacing="6">
       <TextBlock Classes="sectionHeader" Text="Shape" />
+      <UniformGrid Columns="2" ColumnSpacing="4">
+        <local:ColorMenuButton Name="ShapeFillButton" Label="Fill"
+                               Icon="{StaticResource ShapeFillIcon}" DefaultColor="#4472c4"
+                               Command="{Binding SetFillColorCommand}" NoneLabel="No Fill"
+                               MoreLabel="More Fill Colors…"
+                               CurrentColor="{Binding CurrentShapeStyle.Fill}"
+                               ToolTip.Tip="Shape Fill - the colour inside the shape (a closed one)" />
+        <local:ColorMenuButton Name="ShapeOutlineButton" Label="Outline"
+                               Icon="{StaticResource ShapeOutlineIcon}" DefaultColor="#000000"
+                               Command="{Binding SetStrokeColorCommand}" NoneLabel="No Outline"
+                               MoreLabel="More Outline Colors…"
+                               CurrentColor="{Binding CurrentShapeStyle.Stroke}"
+                               WeightCommand="{Binding SetStrokeWeightCommand}"
+                               CurrentWeight="{Binding CurrentShapeStyle.StrokeWidthMm}"
+                               DashCommand="{Binding SetStrokeDashCommand}"
+                               CurrentDash="{Binding CurrentShapeStyle.Dash}"
+                               ToolTip.Tip="Shape Outline - the line's colour, weight and dashes" />
+      </UniformGrid>
+
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Points" />
+        <ToggleButton Name="EditPointsButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                      IsChecked="{Binding IsEditingPoints}" IsEnabled="{Binding CanEditPoints}"
+                      ToolTip.Tip="Edit Points - drag the shape's points to reshape it, drag its outline to add a point, drag a point's round handles to bend the curve, double-click a point to make it smooth or sharp"
+                      local:Shortcut.Keys="Enter">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource EditPointsIcon}" />
+            <TextBlock Text="Edit Points" VerticalAlignment="Center" />
+          </StackPanel>
+        </ToggleButton>
+      </DockPanel>
+      <!-- What a point can do, only while the points are being edited: none of it works otherwise. -->
+      <Grid Name="PointTools" ColumnDefinitions="76,*" IsVisible="{Binding IsEditingPoints}">
+        <UniformGrid Grid.Column="1" Columns="2" ColumnSpacing="4" RowSpacing="4">
+          <RadioButton Name="SmoothPointButton" Classes="inspectorButton" GroupName="InspectorPointKind"
+                       Theme="{StaticResource {x:Type ToggleButton}}" HorizontalAlignment="Stretch"
+                       IsChecked="{Binding IsSelectedPointSmooth}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Smooth point - the outline curves through it">
+            Smooth
+          </RadioButton>
+          <RadioButton Name="CornerPointButton" Classes="inspectorButton" GroupName="InspectorPointKind"
+                       Theme="{StaticResource {x:Type ToggleButton}}" HorizontalAlignment="Stretch"
+                       IsChecked="{Binding IsSelectedPointCorner}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Corner point - the outline turns sharply there">
+            Corner
+          </RadioButton>
+          <Button Name="CloseShapeButton" Classes="inspectorButton" HorizontalAlignment="Stretch" Command="{Binding CloseShapeCommand}"
+                  ToolTip.Tip="Join the line's two ends into a closed shape, which Shape Fill fills">
+            Close shape
+          </Button>
+          <Button Name="OpenShapeButton" Classes="inspectorButton" HorizontalAlignment="Stretch" Command="{Binding OpenShapeCommand}"
+                  ToolTip.Tip="Cut the shape open at the selected point, leaving a line whose ends can be pulled apart">
+            Open at point
+          </Button>
+          <Button Name="DeletePointButton" Classes="inspectorButton" HorizontalAlignment="Stretch" Command="{Binding DeletePointCommand}"
+                  ToolTip.Tip="Delete the selected point (the Delete key does too, while editing points)">
+            Delete point
+          </Button>
+        </UniformGrid>
+      </Grid>
+
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Layer" />
+        <UniformGrid Columns="2" ColumnSpacing="4">
+          <RadioButton Name="ShapeBehindButton" Classes="inspectorButton" GroupName="InspectorShapeLayer"
+                       Theme="{StaticResource {x:Type ToggleButton}}" HorizontalAlignment="Stretch"
+                       IsChecked="{Binding IsElementBehind}"
+                       ToolTip.Tip="Background - scenery, drawn behind the panel's characters">
+            Behind
+          </RadioButton>
+          <RadioButton Name="ShapeInFrontButton" Classes="inspectorButton" GroupName="InspectorShapeLayer"
+                       Theme="{StaticResource {x:Type ToggleButton}}" HorizontalAlignment="Stretch"
+                       IsChecked="{Binding IsElementInFront}"
+                       ToolTip.Tip="Foreground - drawn in front of the panel's characters (bubbles stay on top)">
+            In front
+          </RadioButton>
+        </UniformGrid>
+      </DockPanel>
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Order" />
+        <UniformGrid Columns="2" ColumnSpacing="4">
+          <Button Name="ShapeToFrontButton" Classes="inspectorButton" HorizontalAlignment="Stretch" Command="{Binding BringToFrontCommand}"
+                  ToolTip.Tip="In front of everything in the panel except bubbles">
+            To front
+          </Button>
+          <Button Name="ShapeToBackButton" Classes="inspectorButton" HorizontalAlignment="Stretch" Command="{Binding SendToBackCommand}"
+                  ToolTip.Tip="Behind everything in the panel">
+            To back
+          </Button>
+        </UniformGrid>
+      </DockPanel>
     </StackPanel>
   </Border>
 </UserControl>
