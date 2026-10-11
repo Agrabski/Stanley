@@ -1,10 +1,34 @@
 <!--
-  The canvas layout's zoom control for a page, at the right of the top bar (docs/ui-shell.md §6).
+  The canvas layout's zoom control for a page, at the right of the top bar (docs/ui-shell.md §6):
+  the zoom it's at, opening the View tab's Zoom group - in, out, the whole page, printed size.
+  The keys are the page's own (PageCanvasControl.OnKeyDown); the menu only shows them.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.PageZoomControl"
              x:DataType="local:PageEditorViewModel">
-  <TextBlock Name="ZoomText" Text="{Binding ZoomText}" VerticalAlignment="Center" FontSize="12" Margin="6,0" />
+  <Button Name="ZoomButton" Classes="barTool" ToolTip.Tip="Zoom - or Ctrl+scroll on the page">
+    <StackPanel Orientation="Horizontal">
+      <TextBlock Name="ZoomText" Text="{Binding ZoomText}" MinWidth="34" TextAlignment="Right" />
+      <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+    </StackPanel>
+    <Button.Flyout>
+      <MenuFlyout Placement="BottomEdgeAlignedRight">
+        <MenuItem Name="ZoomInItem" Header="Zoom in" Command="{Binding ZoomInCommand}" InputGesture="Ctrl+OemPlus"
+                  ToolTip.Tip="Zoom in - or Ctrl+scroll">
+          <MenuItem.Icon><PathIcon Data="{StaticResource PlusIcon}" /></MenuItem.Icon>
+        </MenuItem>
+        <MenuItem Name="ZoomOutItem" Header="Zoom out" Command="{Binding ZoomOutCommand}" InputGesture="Ctrl+OemMinus"
+                  ToolTip.Tip="Zoom out - or Ctrl+scroll">
+          <MenuItem.Icon><PathIcon Data="{StaticResource MinusIcon}" /></MenuItem.Icon>
+        </MenuItem>
+        <Separator />
+        <MenuItem Name="FitPageItem" Header="Fit page" Command="{Binding FitPageCommand}" InputGesture="Ctrl+D0"
+                  ToolTip.Tip="Show the whole page" />
+        <MenuItem Name="ActualSizeItem" Header="Actual size" Command="{Binding ActualSizeCommand}" InputGesture="Ctrl+D1"
+                  ToolTip.Tip="Show the page at its printed size" />
+      </MenuFlyout>
+    </Button.Flyout>
+  </Button>
 </UserControl>

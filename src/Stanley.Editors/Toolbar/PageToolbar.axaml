@@ -1,17 +1,427 @@
 <!--
   The canvas layout's tools for a page, in the top bar (docs/ui-shell.md §6): the tool in hand
-  (Select, Pan, Panel, Bubble, Text, shapes) and Insert. Hosted by the top bar whenever a page
-  editor is the active pane, with its PageEditorViewModel as DataContext.
+  (Select, Pan, Panel, Bubble, Text, shapes), Picture, Speed lines and Insert - the ribbon's
+  Home › Tools and the whole Insert tab. Hosted by the top bar whenever a page editor is the
+  active pane, with its PageEditorViewModel as DataContext.
+
+  A tool's button picks the tool (checked while it's in hand, the keys agreeing through the same
+  Is…Tool flags); the chevron beside it drops one in straight away instead (Insert › Speech,
+  Caption...). The shapes button shows whichever shape tool was used last. Galleries (title
+  page, background, characters, My Assets) are behind Insert ▾, one at a time.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
+             xmlns:bubbles="using:Stanley.ProjectModel.Bubbles"
+             xmlns:characters="using:Stanley.ProjectModel.Characters"
+             xmlns:objects="using:Stanley.ProjectModel.Objects"
+             xmlns:editing="using:Stanley.Editing"
              x:Class="Stanley.Editors.PageToolbar"
              x:DataType="local:PageEditorViewModel">
+  <UserControl.Styles>
+    <!-- The narrow chevron beside a tool: opens what it can drop in. Tight against the tool, so the two read as one. -->
+    <Style Selector="Button.barTool.toolMenu">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="-1,0,3,0" />
+    </Style>
+    <Style Selector="Button.barTool.toolMenu PathIcon.chevron">
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <!-- A tool's tooltip: its name and key, then what it does. -->
+    <Style Selector="StackPanel.toolTip">
+      <Setter Property="MaxWidth" Value="280" />
+      <Setter Property="Spacing" Value="2" />
+    </Style>
+    <Style Selector="StackPanel.toolTip > TextBlock">
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="StackPanel.toolTip > TextBlock.tipTitle">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Insert ▾'s pages: one gallery at a time. -->
+    <Style Selector="RadioButton.insertPage">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="10,3" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="TextBlock.insertHint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource StanleyCanvasMutedTextBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </UserControl.Styles>
+
   <StackPanel Name="Tools" Orientation="Horizontal" VerticalAlignment="Center">
     <RadioButton Name="SelectToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
-                 IsChecked="{Binding IsSelectTool}" ToolTip.Tip="Select and move" local:Shortcut.Keys="V">
+                 IsChecked="{Binding IsSelectTool}" local:Shortcut.Keys="V">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Select   V" />
+          <TextBlock Text="Select, move and resize panels and bubbles - hold Alt and drag to pull a copy away" />
+        </StackPanel>
+      </ToolTip.Tip>
       <PathIcon Data="{StaticResource PointerIcon}" />
     </RadioButton>
+    <RadioButton Name="PanToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsPanTool}" local:Shortcut.Keys="H">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Pan   H" />
+          <TextBlock Text="Move around the page - or hold Space and drag, with any tool" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource PanToolIcon}" />
+    </RadioButton>
+    <Rectangle Classes="barDivider" />
+
+    <!-- Panel: the tool, and a new panel or thought cloud. -->
+    <RadioButton Name="PanelToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsPanelTool}" local:Shortcut.Keys="P">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Panel   P" />
+          <TextBlock Text="Draw a new panel by dragging on the page" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource PanelToolIcon}" />
+    </RadioButton>
+    <Button Name="PanelMenuButton" Classes="barTool toolMenu" ToolTip.Tip="New panel or thought cloud">
+      <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      <Button.Flyout>
+        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+          <MenuItem Name="DrawPanelItem" Header="Panel" Command="{Binding DrawPanelCommand}" InputGesture="P"
+                    ToolTip.Tip="Drag on the page to draw a new panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource PanelToolIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertThoughtCloudItem" Header="Thought cloud" Command="{Binding InsertThoughtCloudCommand}"
+                    ToolTip.Tip="A cloud-shaped panel for what a character imagines - floats over the layout, and works like any other panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource ThoughtCloudIcon}" /></MenuItem.Icon>
+          </MenuItem>
+        </MenuFlyout>
+      </Button.Flyout>
+    </Button>
+
+    <!-- Bubble: the tool, and a bubble of each style dropped in the selected panel. -->
+    <RadioButton Name="BubbleToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsBubbleTool}" local:Shortcut.Keys="B">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Bubble   B" />
+          <TextBlock Text="Click inside a panel to add a speech bubble" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource SpeechIcon}" />
+    </RadioButton>
+    <Button Name="BubbleMenuButton" Classes="barTool toolMenu" ToolTip.Tip="Insert a speech, shout, whisper or thought bubble">
+      <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      <Button.Flyout>
+        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+          <MenuItem Name="InsertSpeechItem" Header="Speech" Command="{Binding InsertBubbleCommand}"
+                    CommandParameter="{x:Static bubbles:BubbleStylePreset.Speech}"
+                    ToolTip.Tip="Insert a speech bubble into the selected panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource SpeechIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertShoutItem" Header="Shout" Command="{Binding InsertBubbleCommand}"
+                    CommandParameter="{x:Static bubbles:BubbleStylePreset.Shout}"
+                    ToolTip.Tip="Insert a shout bubble into the selected panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource ShoutIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertWhisperItem" Header="Whisper" Command="{Binding InsertBubbleCommand}"
+                    CommandParameter="{x:Static bubbles:BubbleStylePreset.Whisper}"
+                    ToolTip.Tip="Insert a whisper bubble into the selected panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource WhisperIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertThoughtBubbleItem" Header="Thought" Command="{Binding InsertBubbleCommand}"
+                    CommandParameter="{x:Static bubbles:BubbleStylePreset.Thought}"
+                    ToolTip.Tip="Insert a thought bubble into the selected panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource ThoughtIcon}" /></MenuItem.Icon>
+          </MenuItem>
+        </MenuFlyout>
+      </Button.Flyout>
+    </Button>
+
+    <!-- Text: the tool, and a caption, plain text or sound effect dropped in the selected panel. -->
+    <RadioButton Name="TextToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                 IsChecked="{Binding IsTextTool}" local:Shortcut.Keys="T">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Text   T" />
+          <TextBlock Text="Click inside a panel to type a caption or other text there" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource TextIcon}" />
+    </RadioButton>
+    <Button Name="TextMenuButton" Classes="barTool toolMenu" ToolTip.Tip="Insert a caption, text or sound effect">
+      <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      <Button.Flyout>
+        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+          <MenuItem Name="InsertCaptionItem" Header="Caption" Command="{Binding InsertTextCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.Caption}"
+                    ToolTip.Tip="A narration box in the corner of the selected panel - start typing">
+            <MenuItem.Icon><PathIcon Data="{StaticResource CaptionIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertPlainTextItem" Header="Text" Command="{Binding InsertTextCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.Plain}"
+                    ToolTip.Tip="Plain lettering in the selected panel - a sign, a label, a note">
+            <MenuItem.Icon><PathIcon Data="{StaticResource TextIcon}" /></MenuItem.Icon>
+          </MenuItem>
+          <MenuItem Name="InsertSoundEffectItem" Header="Sound effect" Command="{Binding InsertTextCommand}"
+                    CommandParameter="{x:Static editing:TextStylePreset.SoundEffect}"
+                    ToolTip.Tip="Big outlined lettering - BLAM! - in the selected panel">
+            <MenuItem.Icon><PathIcon Data="{StaticResource ShoutIcon}" /></MenuItem.Icon>
+          </MenuItem>
+        </MenuFlyout>
+      </Button.Flyout>
+    </Button>
+
+    <!-- Shapes: one button, showing the shape tool in hand (or used last) - the code-behind shows
+         just that one of these five; the chevron offers them all. -->
+    <Panel Name="ShapeToolButtons">
+      <RadioButton Name="DrawToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsDrawTool}" local:Shortcut.Keys="D">
+        <ToolTip.Tip>
+          <StackPanel Classes="toolTip">
+            <TextBlock Classes="tipTitle" Text="Draw   D" />
+            <TextBlock Text="Draw freehand inside a panel - end where you started to close and fill the shape" />
+          </StackPanel>
+        </ToolTip.Tip>
+        <PathIcon Data="{StaticResource PenIcon}" />
+      </RadioButton>
+      <RadioButton Name="FreeformToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsFreeformTool}" local:Shortcut.Keys="F" IsVisible="False">
+        <ToolTip.Tip>
+          <StackPanel Classes="toolTip">
+            <TextBlock Classes="tipTitle" Text="Freeform   F" />
+            <TextBlock Text="Build your own shape point by point: click to place each one (drag as you place it to curve the outline), click the first point to close the shape, double-click or Enter to finish a line" />
+          </StackPanel>
+        </ToolTip.Tip>
+        <PathIcon Data="{StaticResource FreeformIcon}" />
+      </RadioButton>
+      <RadioButton Name="LineToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsLineTool}" local:Shortcut.Keys="L" IsVisible="False">
+        <ToolTip.Tip>
+          <StackPanel Classes="toolTip">
+            <TextBlock Classes="tipTitle" Text="Line   L" />
+            <TextBlock Text="Drag to draw a straight line - Shift keeps it level or at 45°" />
+          </StackPanel>
+        </ToolTip.Tip>
+        <PathIcon Data="{StaticResource LineIcon}" />
+      </RadioButton>
+      <RadioButton Name="RectangleToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsRectangleTool}" local:Shortcut.Keys="R" IsVisible="False">
+        <ToolTip.Tip>
+          <StackPanel Classes="toolTip">
+            <TextBlock Classes="tipTitle" Text="Rectangle   R" />
+            <TextBlock Text="Drag to draw a rectangle - Shift for a square" />
+          </StackPanel>
+        </ToolTip.Tip>
+        <PathIcon Data="{StaticResource RectangleIcon}" />
+      </RadioButton>
+      <RadioButton Name="EllipseToolButton" Classes="barTool" GroupName="CanvasTool" Theme="{StaticResource {x:Type ToggleButton}}"
+                   IsChecked="{Binding IsEllipseTool}" local:Shortcut.Keys="E" IsVisible="False">
+        <ToolTip.Tip>
+          <StackPanel Classes="toolTip">
+            <TextBlock Classes="tipTitle" Text="Ellipse   E" />
+            <TextBlock Text="Drag to draw an ellipse - Shift for a circle" />
+          </StackPanel>
+        </ToolTip.Tip>
+        <PathIcon Data="{StaticResource EllipseIcon}" />
+      </RadioButton>
+    </Panel>
+    <Button Name="ShapeMenuButton" Classes="barTool toolMenu" ToolTip.Tip="Shapes - draw, freeform, line, rectangle, ellipse">
+      <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      <Button.Flyout>
+        <MenuFlyout Placement="BottomEdgeAlignedLeft">
+          <MenuItem Name="DrawToolItem" Header="Draw" InputGesture="D" ToggleType="Radio" GroupName="CanvasShapeTool"
+                    IsChecked="{Binding IsDrawTool, Mode=OneWay}"
+                    Command="{Binding UseToolCommand}" CommandParameter="{x:Static local:PageEditorTool.Draw}"
+                    ToolTip.Tip="Draw freehand inside a panel" />
+          <MenuItem Name="FreeformToolItem" Header="Freeform" InputGesture="F" ToggleType="Radio" GroupName="CanvasShapeTool"
+                    IsChecked="{Binding IsFreeformTool, Mode=OneWay}"
+                    Command="{Binding UseToolCommand}" CommandParameter="{x:Static local:PageEditorTool.Freeform}"
+                    ToolTip.Tip="Build your own shape point by point: click to place each one (drag as you place it to curve the outline), click the first point to close the shape, double-click or Enter to finish a line" />
+          <MenuItem Name="LineToolItem" Header="Line" InputGesture="L" ToggleType="Radio" GroupName="CanvasShapeTool"
+                    IsChecked="{Binding IsLineTool, Mode=OneWay}"
+                    Command="{Binding UseToolCommand}" CommandParameter="{x:Static local:PageEditorTool.Line}"
+                    ToolTip.Tip="Drag to draw a straight line - Shift keeps it level or at 45°" />
+          <MenuItem Name="RectangleToolItem" Header="Rectangle" InputGesture="R" ToggleType="Radio" GroupName="CanvasShapeTool"
+                    IsChecked="{Binding IsRectangleTool, Mode=OneWay}"
+                    Command="{Binding UseToolCommand}" CommandParameter="{x:Static local:PageEditorTool.Rectangle}"
+                    ToolTip.Tip="Drag to draw a rectangle - Shift for a square" />
+          <MenuItem Name="EllipseToolItem" Header="Ellipse" InputGesture="E" ToggleType="Radio" GroupName="CanvasShapeTool"
+                    IsChecked="{Binding IsEllipseTool, Mode=OneWay}"
+                    Command="{Binding UseToolCommand}" CommandParameter="{x:Static local:PageEditorTool.Ellipse}"
+                    ToolTip.Tip="Drag to draw an ellipse - Shift for a circle" />
+        </MenuFlyout>
+      </Button.Flyout>
+    </Button>
+    <Rectangle Classes="barDivider" />
+
+    <Button Name="InsertPictureButton" Classes="barTool" Command="{Binding InsertPictureCommand}">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Picture" />
+          <TextBlock Text="Place a picture from a file (PNG, JPEG, SVG...) in the selected panel - behind or in front of the characters" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource BackgroundIcon}" />
+    </Button>
+    <Button Name="InsertSpeedLinesButton" Classes="barTool" Command="{Binding InsertSpeedLinesCommand}">
+      <ToolTip.Tip>
+        <StackPanel Classes="toolTip">
+          <TextBlock Classes="tipTitle" Text="Speed lines" />
+          <TextBlock Text="A burst of lines radiating out from a point, in the selected panel - drag the clear circle to where they should converge" />
+        </StackPanel>
+      </ToolTip.Tip>
+      <PathIcon Data="{StaticResource SpeedLinesIcon}" />
+    </Button>
+
+    <!-- Insert ▾: the ribbon's Insert galleries, one page at a time. -->
+    <Button Name="InsertButton" Classes="barTool" ToolTip.Tip="Insert a character, a background, a title page or something from My Assets">
+      <StackPanel Orientation="Horizontal">
+        <PathIcon Data="{StaticResource PlusIcon}" />
+        <PathIcon Classes="chevron" Data="{StaticResource ChevronDownIcon}" />
+      </StackPanel>
+      <Button.Flyout>
+        <Flyout Placement="BottomEdgeAlignedLeft">
+          <StackPanel Name="InsertPages" Spacing="10" MinWidth="360">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <RadioButton Name="InsertCharactersPage" Classes="insertPage" GroupName="CanvasInsertPage" Theme="{StaticResource {x:Type ToggleButton}}"
+                           Content="Characters" IsVisible="{Binding HasCharacterCatalog}" IsChecked="True" />
+              <RadioButton Name="InsertBackgroundPage" Classes="insertPage" GroupName="CanvasInsertPage" Theme="{StaticResource {x:Type ToggleButton}}"
+                           Content="Background" />
+              <RadioButton Name="InsertTitlePagePage" Classes="insertPage" GroupName="CanvasInsertPage" Theme="{StaticResource {x:Type ToggleButton}}"
+                           Content="Title page" IsVisible="{Binding HasTitlePageHost}" />
+              <RadioButton Name="InsertMyAssetsPage" Classes="insertPage" GroupName="CanvasInsertPage" Theme="{StaticResource {x:Type ToggleButton}}"
+                           IsVisible="{Binding HasMyAssets}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource StarIcon}" Width="11" Height="11" />
+                  <TextBlock Text="My Assets" />
+                </StackPanel>
+              </RadioButton>
+            </StackPanel>
+
+            <!-- Characters: the comic's cast, each put in the selected panel with a click, and a brand-new one. -->
+            <StackPanel Spacing="8" IsVisible="{Binding #InsertCharactersPage.IsChecked}">
+              <ScrollViewer MaxWidth="460" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                            IsVisible="{Binding HasCharacterChoices}">
+                <ItemsControl Name="CharacterGallery" ItemsSource="{Binding CharacterChoices}" Margin="0,0,0,6">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="2" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="characters:CharacterDefinition">
+                      <Button Classes="small" MinWidth="56" MaxWidth="104" Height="72" Padding="3,2"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertCharacterCommand}"
+                              CommandParameter="{Binding}"
+                              ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel (or drag from the Characters pane)'}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="10"
+                                     HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <local:CharacterFigure Character="{Binding}" />
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <TextBlock Classes="insertHint" IsVisible="{Binding !HasCharacterChoices}" MaxWidth="360" HorizontalAlignment="Left"
+                         Text="No characters yet. Make one here, then shape its body - double-click it on the page." />
+              <Button Name="NewCharacterButton" Classes="small" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Left"
+                      ToolTip.Tip="Create a new character and put it in the selected panel - double-click it to shape its body">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource CharacterIcon}" />
+                  <TextBlock Text="New character" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+
+            <!-- Background: fills the selected panel. Stays open, so a few can be tried in turn. -->
+            <StackPanel Spacing="6" IsVisible="{Binding #InsertBackgroundPage.IsChecked}">
+              <TextBlock Classes="insertHint" Text="{Binding InsertBackgroundTip}" MaxWidth="350" HorizontalAlignment="Left" />
+              <local:BackgroundPicker Name="InsertBackgroundPicker" IsEnabled="{Binding HasSelectedPanel}"
+                                      Command="{Binding SetBackgroundCommand}"
+                                      PictureCommand="{Binding BackgroundPictureCommand}" />
+            </StackPanel>
+
+            <!-- Title page: Word's Cover Page gallery - a title page at the front of the comic; picking again redoes it, keeping its words. -->
+            <StackPanel Spacing="8" IsVisible="{Binding #InsertTitlePagePage.IsChecked}">
+              <ItemsControl Name="TitlePageGallery" ItemsSource="{Binding TitlePageChoices}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="6" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="local:TitlePageChoice">
+                    <Button Classes="small" Width="112" Height="156" Padding="6"
+                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertTitlePageCommand}"
+                            CommandParameter="{Binding}"
+                            ToolTip.Tip="{Binding Description}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        <local:TitlePagePreview Design="{Binding Design}"
+                                                Page="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext)}" />
+                      </DockPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="insertHint" MaxWidth="350" HorizontalAlignment="Left"
+                         Text="The comic's title page opens every issue, each showing its own issue number. Everything on it stays editable - words, colours, the background." />
+              <CheckBox Name="OwnTitlePageBox" IsChecked="{Binding IsOwnTitlePage, Mode=TwoWay}"
+                        IsEnabled="{Binding HasTitlePage}" Focusable="False"
+                        ToolTip.Tip="This issue gets a title page of its own - a copy of the comic's to change freely. Untick to go back to the comic's.">
+                <TextBlock Text="Only this issue - the other issues keep the comic's title page" TextWrapping="Wrap" MaxWidth="320" />
+              </CheckBox>
+              <Button Name="RemoveTitlePageButton" Classes="small" Command="{Binding RemoveTitlePageCommand}" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource DeleteIcon}" />
+                  <TextBlock Text="{Binding RemoveTitlePageText}" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+
+            <!-- My Assets (docs/asset-packs.md §6.3): a group kept from any comic, dropped in the selected panel as Paste would. -->
+            <StackPanel Spacing="8" MaxWidth="420" IsVisible="{Binding #InsertMyAssetsPage.IsChecked}">
+              <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding HasMyAssetsObjectGroups}">
+                <ItemsControl Name="MyAssetsGroupGallery" ItemsSource="{Binding MyAssetsObjectGroups}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="objects:ObjectGroup">
+                      <Button Classes="small" Width="96" Height="96" Padding="4" Margin="0,0,4,4"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertObjectGroupCommand}"
+                              CommandParameter="{Binding}"
+                              ToolTip.Tip="{Binding Name, StringFormat='Put {0} in the selected panel'}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11"
+                                     HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <Border Background="White" CornerRadius="2">
+                            <local:ObjectGroupPreview Group="{Binding}" />
+                          </Border>
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <TextBlock Classes="insertHint" IsVisible="{Binding !HasMyAssetsObjectGroups}"
+                         Text="Nothing kept yet. Group a few things on a page (Ctrl+G), right-click the group and choose Keep in My Assets - it'll be here in every comic." />
+            </StackPanel>
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
   </StackPanel>
 </UserControl>

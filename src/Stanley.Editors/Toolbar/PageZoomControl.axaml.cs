@@ -9,4 +9,7 @@ public partial class PageZoomControl : UserControl
     {
         InitializeComponent();
     }
+
+    /// <summary>The zoom menu, for headless UI tests (a closed flyout's items aren't in the visual tree).</summary>
+    public MenuFlyout ZoomMenu => (MenuFlyout)ZoomButton.Flyout!;
 }
