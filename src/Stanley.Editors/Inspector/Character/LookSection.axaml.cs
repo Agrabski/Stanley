@@ -9,4 +9,6 @@ public partial class LookSection : UserControl
     {
         InitializeComponent();
     }
+
+    private void OnGalleryOpening(object? sender, EventArgs e) => InspectorFlyouts.BesideInspector(sender, this);
 }

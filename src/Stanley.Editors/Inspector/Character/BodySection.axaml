@@ -1,15 +1,147 @@
 <!--
-  The character's body: body types, sliders, skin, name and view.
-  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+  The character's name and body: the body types, the five body sliders and the skin.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6); the ribbon's Body tab does the
+  same. Its View group (Front / Side), "Compare with others" and Close are in the top bar's
+  CharacterToolbar: they change how the stage looks, not the character.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.BodySection"
              x:DataType="local:CharacterEditorViewModel">
+  <UserControl.Styles>
+    <!-- A slider filling its row, between the label and the value. -->
+    <Style Selector="Slider.inspectorSlider">
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.propertyRow > TextBlock.sliderValue">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.sliderValue">
+      <Setter Property="Width" Value="50" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.skinSwatch">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
   <Border Classes="inspectorSection">
     <StackPanel Spacing="6">
       <TextBlock Classes="sectionHeader" Text="Body" />
+
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Name" />
+        <TextBox Name="NameBox" Height="28" MinHeight="0" Padding="6,0" FontSize="12" VerticalContentAlignment="Center"
+                 Text="{Binding Name, UpdateSourceTrigger=LostFocus}" ToolTip.Tip="The character's name (Enter to apply)" />
+      </DockPanel>
+
+      <!-- The body types, each previewed in this character's skin: a starting point for the sliders. -->
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Body type" />
+        <DropDownButton Name="BodyTypeButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Content="Choose..." ToolTip.Tip="Pick a body type - then fine-tune it with the sliders">
+          <DropDownButton.Flyout>
+            <Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Opening="OnGalleryOpening">
+              <ItemsControl Name="PresetGallery" ItemsSource="{Binding Presets}" MaxWidth="420">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="local:BodyPresetChoice">
+                    <Button Classes="small" Width="44" Height="72" Padding="2" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                            Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ApplyPresetCommand}"
+                            CommandParameter="{Binding}" ToolTip.Tip="{Binding Name, StringFormat='{}{0} body - fine-tune with the sliders'}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" />
+                        <local:CharacterFigure Character="{Binding Preview}" />
+                      </DockPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Flyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+      </DockPanel>
+
+      <StackPanel Spacing="0">
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Height" />
+          <TextBlock Classes="sliderValue" Text="{Binding HeightText}" />
+          <Slider Name="HeightSlider" Classes="inspectorSlider" Minimum="{Binding MinHeightPercent}" Maximum="{Binding MaxHeightPercent}"
+                  Value="{Binding HeightPercent}" ToolTip.Tip="How tall, relative to an average adult (100%)" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Weight" />
+          <TextBlock Classes="sliderValue" Text="{Binding Weight, StringFormat='{}{0:0}'}" />
+          <Slider Name="WeightSlider" Classes="inspectorSlider" Minimum="0" Maximum="100" Value="{Binding Weight}" ToolTip.Tip="Slim to heavy" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Muscle" />
+          <TextBlock Classes="sliderValue" Text="{Binding Muscle, StringFormat='{}{0:0}'}" />
+          <Slider Name="MuscleSlider" Classes="inspectorSlider" Minimum="0" Maximum="100" Value="{Binding Muscle}"
+                  ToolTip.Tip="Soft to muscular - shoulders, arms, chest and thighs" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Head size" />
+          <TextBlock Classes="sliderValue" Text="{Binding HeadsTallText}" />
+          <Slider Name="HeadSlider" Classes="inspectorSlider" Minimum="{Binding MinHeadsTall}" Maximum="{Binding MaxHeadsTall}" IsDirectionReversed="True"
+                  Value="{Binding HeadsTall}" ToolTip.Tip="Big head (chibi, child) to small head (heroic) - measured in heads tall" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Shape" />
+          <TextBlock Classes="sliderValue" Text="{Binding Frame, StringFormat='{}{0:0}'}" />
+          <Slider Name="FrameSlider" Classes="inspectorSlider" Minimum="0" Maximum="100" Value="{Binding Frame}"
+                  ToolTip.Tip="Broad shoulders (left) to wide hips (right)" />
+        </DockPanel>
+      </StackPanel>
+
+      <StackPanel Spacing="2">
+        <TextBlock Classes="propertyLabel" Text="Skin" HorizontalAlignment="Left" />
+        <DockPanel>
+          <!-- Any colour at all: Word's "More Colors…". -->
+          <Button Name="MoreSkinColorsButton" DockPanel.Dock="Right" Classes="iconButton" VerticalAlignment="Top" Height="22"
+                  ToolTip.Tip="More Colors… - pick any skin colour" Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">
+            <UniformGrid Rows="2" Columns="2" Width="12" Height="12">
+              <Border Background="#ed7d31" />
+              <Border Background="#ffc000" />
+              <Border Background="#4472c4" />
+              <Border Background="#70ad47" />
+            </UniformGrid>
+          </Button>
+          <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:SkinSwatch">
+                <Button Classes="skinSwatch"
+                        Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetSkinCommand}"
+                        CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                  <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </DockPanel>
+      </StackPanel>
     </StackPanel>
   </Border>
 </UserControl>

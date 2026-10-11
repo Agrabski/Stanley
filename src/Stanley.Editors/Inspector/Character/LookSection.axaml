@@ -1,15 +1,237 @@
 <!--
-  What the character wears, slot by slot, and the colours of the slots in use.
-  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+  What the character wears, slot by slot, and the colours of the slots in use: the named
+  look being edited, the one Hair button (docs/sticker-system.md §22), a gallery button per
+  face, clothes and accessory slot - each opening its choices, previewed on the character -
+  and a colour dropdown per colour slot in use. Part of the canvas layout's inspector
+  (docs/ui-shell.md §6); the ribbon's Look tab does the same. Its "Preview" expression (a
+  preview only, not part of the look) is in the top bar's CharacterToolbar.
+
+  The galleries open beside the inspector, over the stage, so the inspector stays in view
+  while you pick (InspectorFlyouts.BesideInspector), and without taking keyboard focus
+  (ShowMode Transient): a standard flyout with nothing focusable in it passes focus on to the
+  window's first text box - the Name box - and the inspector would scroll back up to it.
+
+  The choice templates are the Look tab's (LookRibbonTab.axaml): a StaticResource can't reach
+  another control's resources, so they're repeated here.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.LookSection"
              x:DataType="local:CharacterEditorViewModel">
+  <UserControl.Styles>
+    <!-- A slot's gallery: its name over what's worn, three to a row. -->
+    <Style Selector="DropDownButton.lookSlot">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="38" />
+      <Setter Property="Margin" Value="0,0,3,3" />
+      <Setter Property="Padding" Value="4,1,2,1" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- A heading over a group of slots: smaller than the section's own. -->
+    <Style Selector="TextBlock.groupHeader">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource StanleyCanvasMutedTextBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <!-- A slot's choices, each previewed on the character (hair, face and hats as close-ups). -->
+    <DataTemplate x:Key="StickerChoicesTemplate" x:DataType="local:SlotGallery">
+      <DockPanel MaxWidth="440">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="1,6,1,0">
+          <Button Name="DrawYourOwnButton" Classes="small" Command="{Binding Draw}" CommandParameter="{Binding Info.Name}"
+                  ToolTip.Tip="Draw one in your own SVG editor (Inkscape...), on a template of this body - every save updates it here">Draw your own...</Button>
+          <Button Name="ImportArtButton" Classes="small" Command="{Binding Import}" CommandParameter="{Binding Info.Name}"
+                  ToolTip.Tip="An SVG or PNG: a file drawn on a template goes where it was drawn; anything else is placed here to move and size">Import...</Button>
+          <!-- Prints only: your own words (emoji too) on the clothes - put on as HELLO, then typed over in the Sticker section. -->
+          <Button Name="WearTextButton" Classes="small" Command="{Binding WearText}" CommandParameter="HELLO" IsVisible="{Binding WearText, Converter={x:Static ObjectConverters.IsNotNull}}"
+                  ToolTip.Tip="Put your own words on the clothes - emoji too; type them in the Sticker section">Text</Button>
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Choices}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:StickerChoice">
+              <Button Classes="small choice sticker" Classes.worn="{Binding IsWorn}" Classes.closeup="{Binding Closeup}" Margin="1" Padding="2"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                      Command="{Binding $parent[ItemsControl].((local:SlotGallery)DataContext).Wear}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Closeup="{Binding Closeup}" />
+                </DockPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+    </DataTemplate>
+
+    <!-- The Hairstyles tab of the Hair flyout: bald, the hairstyles, then the character's own whole hairstyles - each a close-up on this character. -->
+    <DataTemplate x:Key="HairstyleChoicesTemplate" x:DataType="local:HairstyleGallery">
+      <DockPanel MaxWidth="440">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="1,6,1,0">
+          <Button Name="DrawYourOwnButton" Classes="small" Command="{Binding Draw}" CommandParameter="hair"
+                  ToolTip.Tip="Draw a whole hairstyle in your own SVG editor (Inkscape...), on a template of this body - every save updates it here">Draw your own...</Button>
+          <Button Name="ImportArtButton" Classes="small" Command="{Binding Import}" CommandParameter="hair"
+                  ToolTip.Tip="An SVG or PNG of a whole hairstyle: a file drawn on a template goes where it was drawn; anything else is placed here to move and size">Import...</Button>
+        </StackPanel>
+        <ItemsControl Name="HairstyleChoices" ItemsSource="{Binding Choices}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:HairstyleChoice">
+              <Button Classes="small choice sticker closeup" Classes.worn="{Binding IsWorn}" Margin="1" Padding="2"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                      Command="{Binding $parent[ItemsControl].((local:HairstyleGallery)DataContext).Wear}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <local:CharacterFigure Character="{Binding Preview}" Pose="{Binding Pose}" Closeup="{Binding Closeup}" />
+                </DockPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+    </DataTemplate>
+
+    <!-- A slot's gallery button: its name and what's worn, opening the choices. -->
+    <DataTemplate x:Key="SlotGalleryTemplate" x:DataType="local:SlotGallery">
+      <DropDownButton Classes="lookSlot" ToolTip.Tip="{Binding Tip}">
+        <StackPanel Spacing="0">
+          <TextBlock Text="{Binding Label}" FontSize="11" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="60" />
+          <TextBlock Text="{Binding Current}" FontSize="9" Opacity="0.7" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="60" />
+        </StackPanel>
+        <DropDownButton.Flyout>
+          <Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Opening="OnGalleryOpening">
+            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StickerChoicesTemplate}" />
+          </Flyout>
+        </DropDownButton.Flyout>
+      </DropDownButton>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <Border Classes="inspectorSection">
     <StackPanel Spacing="6">
       <TextBlock Classes="sectionHeader" Text="Look" />
+
+      <!-- Named looks: everything below changes the look shown here. -->
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Look" />
+        <DropDownButton Name="LookPicker" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        ToolTip.Tip="Named looks - winter clothes, after the haircut... Everything in this section changes the look shown here">
+          <TextBlock Text="{Binding CurrentLookName}" TextTrimming="CharacterEllipsis" />
+          <DropDownButton.Flyout>
+            <Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Opening="OnGalleryOpening">
+              <StackPanel Spacing="6" MaxWidth="440">
+                <ItemsControl Name="LookItems" ItemsSource="{Binding Looks}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:LookItem">
+                      <Button Classes="small choice sticker" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowLookCommand}"
+                              CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <local:CharacterFigure Character="{Binding Preview}" />
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Name="NewLookButton" Classes="small" Command="{Binding NewLookCommand}"
+                          ToolTip.Tip="A new look, starting as a copy of this one">New look</Button>
+                  <TextBox Name="LookNameBox" Width="150" FontSize="12" Text="{Binding CurrentLookName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                           IsEnabled="{Binding IsNamedLook}" ToolTip.Tip="The look's name" />
+                  <Button Name="DeleteLookButton" Classes="small" Command="{Binding DeleteLookCommand}" ToolTip.Tip="{Binding DeleteLookTip}">Delete</Button>
+                </StackPanel>
+              </StackPanel>
+            </Flyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+      </DockPanel>
+
+      <!-- The one Hair button: its flyout has a row of tabs - Hairstyles first, then a tab per piece and Streaks - and that tab's choices under them.
+           Not in a list like the slots below, so it stays open while hair after hair is tried on. -->
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Hair" />
+        <DropDownButton Name="HairButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" ToolTip.Tip="{Binding HairTip}">
+          <TextBlock Text="{Binding HairCurrent}" TextTrimming="CharacterEllipsis" />
+          <DropDownButton.Flyout>
+            <Flyout Placement="LeftEdgeAlignedTop" ShowMode="Transient" Opening="OnGalleryOpening">
+              <StackPanel Spacing="6" MaxWidth="440">
+                <ItemsControl Name="HairTabItems" ItemsSource="{Binding HairTabs}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:HairTab">
+                      <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="8,2"
+                              Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ShowHairTabCommand}"
+                              CommandParameter="{Binding}" Content="{Binding Label}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- Only the tab in view is built: previews are expensive. -->
+                <ContentControl Name="HairTabContentHost" Content="{Binding HairTabContent}">
+                  <ContentControl.DataTemplates>
+                    <DataTemplate DataType="local:HairstyleGallery" x:DataType="local:HairstyleGallery">
+                      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource HairstyleChoicesTemplate}" />
+                    </DataTemplate>
+                    <DataTemplate DataType="local:SlotGallery" x:DataType="local:SlotGallery">
+                      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StickerChoicesTemplate}" />
+                    </DataTemplate>
+                  </ContentControl.DataTemplates>
+                </ContentControl>
+              </StackPanel>
+            </Flyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+      </DockPanel>
+
+      <TextBlock Classes="groupHeader" Text="Face" />
+      <ItemsControl Name="FaceGalleries" ItemsSource="{Binding FaceGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+      </ItemsControl>
+      <CheckBox Name="SplitEyesCheck" IsChecked="{Binding IsEyesSplit}" IsEnabled="{Binding CanSplitEyes}" Focusable="False" FontSize="11" MinHeight="0"
+                ToolTip.Tip="Set the eyes' shape, colour and expression separately for left and right">Different left/right eyes</CheckBox>
+
+      <TextBlock Classes="groupHeader" Text="Clothes" />
+      <ItemsControl Name="ClothesGalleries" ItemsSource="{Binding ClothesGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+      </ItemsControl>
+
+      <TextBlock Classes="groupHeader" Text="Accessories" />
+      <ItemsControl Name="AccessoryGalleries" ItemsSource="{Binding AccessoryGalleries}" ItemTemplate="{StaticResource SlotGalleryTemplate}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+      </ItemsControl>
+
+      <!-- Only the colour slots the worn stickers use, skin first; each opens colour, pattern (or dye) and texture. -->
+      <TextBlock Classes="groupHeader" Text="Colours" />
+      <ItemsControl Name="ColorEditors" ItemsSource="{Binding ColorEditors}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:ColorSlotEditor">
+            <local:ColorSlotDropdown />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
   </Border>
 </UserControl>

@@ -12,9 +12,12 @@
   <ScrollViewer Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel Name="Sections">
       <TextBlock Name="TitleText" Classes="inspectorTitle" Text="{Binding Name}" />
-      <local:StickerSection Name="StickerProperties" />
       <local:BodySection Name="BodyProperties" />
       <local:LookSection Name="LookProperties" />
+      <!-- Last, like the ribbon's contextual tab: a gallery pick selects what it puts on, and a
+           section appearing above the galleries would push them away from under the pointer.
+           A sticker picked on the stage scrolls it into view instead (CharacterInspector.axaml.cs). -->
+      <local:StickerSection Name="StickerProperties" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>
