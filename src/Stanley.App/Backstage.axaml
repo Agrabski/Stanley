@@ -101,7 +101,7 @@
                       </StackPanel>
                       <Button Grid.Column="1" Classes="accent" Content="Open" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).OpenRecoveredCommand}" CommandParameter="{Binding}" />
-                      <Button Grid.Column="2" Content="Discard" VerticalAlignment="Center"
+                      <Button Grid.Column="2" Classes="danger" Content="Discard" VerticalAlignment="Center"
                               Command="{Binding $parent[ItemsControl].((app:MainWindowViewModel)DataContext).DiscardRecoveredCommand}" CommandParameter="{Binding}" />
                     </Grid>
                   </DataTemplate>

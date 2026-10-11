@@ -109,6 +109,25 @@ public class DangerButtonTests
     }
 
     [Fact]
+    public void Discarding_recovered_work_is_a_red_button_beside_Open()
+    {
+        var window = new MainWindow();
+        window.Show();
+        // Recovered work turns up after a crash; one made-up entry is enough to draw its row.
+        window.ViewModel.RecoveredEntries.Add(new RecoveredComic("session", "snapshot", "Lost Comic", null, DateTime.Now));
+        window.ViewModel.ShowBackstage(BackstagePage.Open);
+        window.BackstageControl.FindControl<Border>("RecoveredSection")!.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var row = window.BackstageControl.FindControl<ItemsControl>("RecoveredList")!.GetVisualDescendants().OfType<Button>().ToList();
+        var discard = row.Single(b => b.Content as string is "Discard");
+        var open = row.Single(b => b.Content as string is "Open");
+        Assert.True(discard.IsEffectivelyVisible);
+        Assert.Contains("danger", discard.Classes); // it throws the work away for good, with no confirmation
+        Assert.DoesNotContain("danger", open.Classes);
+    }
+
+    [Fact]
     public void A_danger_button_is_white_on_red_and_darkens_under_the_pointer_and_when_pressed()
     {
         var (window, button) = ShowDanger();
