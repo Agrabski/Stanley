@@ -11,12 +11,6 @@
              xmlns:app="using:Stanley.App"
              x:Class="Stanley.App.CanvasTopBar"
              x:DataType="app:MainWindowViewModel">
-  <UserControl.Styles>
-    <!-- A tool that can't be used just now (Redo with nothing to redo, Picture with nowhere to put one) only dims, as Figma's do, without Fluent's grey box. -->
-    <Style Selector=":is(Button).barTool:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-    </Style>
-  </UserControl.Styles>
   <Border Name="Bar" Classes="canvasBar">
     <Grid ColumnDefinitions="*,Auto,*">
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True">

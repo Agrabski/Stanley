@@ -146,11 +146,21 @@ dock layout, open flyouts or focus while the app runs.
 `TitleBar` and `RibbonBar` out of `ShellDock` and puts in:
 
 - `Canvas/CanvasTopBar` (Stanley.App, 44px, `Border.canvasBar`): the main menu
-  (`MainMenuButton`'s `MenuFlyout`: the File view's pages, export, Edit and View - Edit
-  and View act on `MainWindowViewModel.Editor`, the page being edited), the active
-  editor's tools (`ToolbarHost`: `PageToolbar` / `CharacterToolbar`), the caption with
-  the issue switcher in the middle, and undo/redo, zoom (`ZoomHost`: `PageZoomControl`),
-  AutoSave and Save on the right. Both hosts follow `Workspace.ActiveEditor` like the
+  (`MainMenuButton`'s `MenuFlyout`: New, Open, Save, Save As, Export ▸, Edit ▸, View ▸,
+  Info, My Assets, Options, Close - the File view's pages through `OpenBackstageCommand`
+  with a `BackstagePage`; Edit and View act on `MainWindowViewModel.Editor`, the page being
+  edited, and are off while a character editor is active - `CanvasTopBar.IsPageEditor` on
+  `Workspace.ActiveEditor` - since that page is hidden behind it), the active editor's
+  tools (`ToolbarHost`: `PageToolbar` / `CharacterToolbar`), the caption with the issue
+  switcher in the middle, and undo/redo, zoom (`ZoomHost`: `PageZoomControl`, the % as a
+  menu of zoom in/out, fit, actual size), AutoSave and Save on the right. `PageToolbar` is
+  the Home tab's tools and the Insert tab: Select, Pan; Panel, Bubble and Text each with a
+  narrow chevron menu that inserts at once (thought cloud; speech/shout/whisper/thought;
+  caption/text/sound effect); one Shapes button showing the shape tool in hand (five radio
+  buttons on the `Is…Tool` flags, only the current one shown) with a chevron menu of all
+  five; Picture; Speed lines; and Insert ▾ (characters, background, title page, My Assets).
+  It listens to its view model only while on screen - a new one is built each time a page
+  comes back after a character, and the view model would otherwise keep every old one alive. Both hosts follow `Workspace.ActiveEditor` like the
   ribbon host, with a `DataTemplate` per editor type (an empty `Panel` where a type has
   nothing - a `ContentControl` with no template would show the type's name).
 - `Canvas/InspectorColumn` (Stanley.App, `Border.inspector`, a fixed 288 wide so a change
@@ -171,7 +181,12 @@ canvas layout.
 `PanelSection`, `CharacterSection`, `BubbleSection`, `TextSection`, `ShapeSection`,
 `PictureSection`, `SpeedLinesSection`, `PenSection` (a drawing tool in hand: what the
 next shape gets) and `PageSection` (nothing selected - `PageEditorViewModel.IsPageContext`:
-layout presets, spacing, page numbers, title page, guides). **Each section owns its own
+layout presets, spacing, page numbers, title page, guides). **Delete is the Arrange row's
+alone**, for whatever is selected (its tooltip follows the kind, in the ribbon tab's words);
+each kind's own section keeps only its "Order" (To front / To back), whose meaning differs by
+kind. `LetteringRows` is the ribbon's `FontGroup` laid out for the column, shared by the
+Bubble and Text sections; both also show for their tool in hand ("New bubble", "New text")
+with what a thing that doesn't exist yet can have. **Each section owns its own
 visibility** (its root's `IsVisible`, from the same `Is…Context` flags the ribbon's
 contextual tabs use, sometimes widened - e.g. the Bubble section also shows for the Bubble
 tool's next bubble); `PageInspector` only owns their order and the title over them
@@ -215,6 +230,24 @@ only that the feature is reachable.
   context flag next to `IsPanelContext` and raise it there.
 - Density is app-wide in Avalonia, so it's never switched in tests (tests share one
   `Application`); the canvas layout's tests run at normal density.
+- Radio buttons in a section group by their parent panel - no `GroupName`: a shared name
+  would tie together the two `LetteringRows`, or the Text, Picture and Speed lines layer
+  toggles, across sections.
+- A gallery flyout in the inspector opens towards the page (`BottomEdgeAlignedRight`), not
+  off the window's right edge.
+- Avalonia doesn't template a `UserControl` that has never been shown, so in a test a
+  hidden section's controls have no visual parents and `IsEffectivelyVisible` lies - check
+  the logical ancestors' `IsVisible`.
+- A closed `MenuFlyout`'s items (and an unopened submenu's) have no `DataContext`, so their
+  `Command` is null: a test `ShowAt`s the menu and `Open()`s each parent first. Raising
+  `MenuItem.ClickEvent` runs the command but doesn't flip a `ToggleType="CheckBox"` item - a
+  pointer click does.
+- Headless, opening a flyout with nothing focusable in it moves the keyboard to the first
+  focusable control in the window - in the canvas layout an inspector number box. (The real
+  app's popups are windows of their own.) A test that checks where keys go after a flyout
+  focuses the page again first.
+- The window applies the saved theme when it's built, so a test that wants dark sets
+  `RequestedThemeVariant` after `CanvasLayoutHarness.Open()`.
 
 ### 6.6 Tests
 
