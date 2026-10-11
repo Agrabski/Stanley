@@ -1,15 +1,209 @@
 <!--
-  Nothing selected: the page itself - layout, spacing, numbering, title page, guides.
-  Part of the canvas layout's inspector (docs/ui-shell.md §6). 
+  Nothing selected: the page itself - layout, spacing, guides, numbering, title page.
+  Part of the canvas layout's inspector (docs/ui-shell.md §6). What the ribbon spreads over
+  Layout (presets, margin, gutter, snap, lock, page numbers), View › Show (margin guides) and
+  Insert › Pages (title page), bound to the same view-model members. Splitting a panel and a
+  panel's background need a panel, so they're the Panel section's.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
+             xmlns:editing="using:Stanley.Editing"
              x:Class="Stanley.Editors.PageSection"
              x:DataType="local:PageEditorViewModel" IsVisible="{Binding IsPageContext}">
-  <Border Classes="inspectorSection">
-    <StackPanel Spacing="6">
-      <TextBlock Classes="sectionHeader" Text="Page" />
-    </StackPanel>
-  </Border>
+  <UserControl.Styles>
+    <!-- A preset's thumbnail in the Layout gallery, centred in its column, and never the keyboard's (the page keeps it). -->
+    <Style Selector="Button.layoutPreset">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Width" Value="48" />
+      <Setter Property="Height" Value="62" />
+      <Setter Property="Margin" Value="0,1" />
+      <Setter Property="Padding" Value="3" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <!-- A locked layout's presets: faded thumbnails (they draw their own colours), not Fluent's grey slabs. -->
+    <Style Selector="Button.layoutPreset:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.layoutPreset:disabled local|LayoutPresetPreview">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="Height" Value="28" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel>
+    <!-- Every preset at once, one click to apply - like the ribbon's gallery, wrapped to the column. -->
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Layout" />
+        <ItemsControl Name="LayoutGallery" ItemsSource="{x:Static editing:PanelLayoutPresets.All}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="5" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="editing:PanelLayoutPreset">
+              <Button Classes="layoutPreset"
+                      Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).ApplyLayoutCommand}"
+                      CommandParameter="{Binding}" ToolTip.ShowOnDisabled="True"
+                      ToolTip.Tip="{Binding Name, StringFormat='{}{0} - existing panels and their bubbles move into the new slots in reading order'}">
+                <local:LayoutPresetPreview Preset="{Binding}" />
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <CheckBox Name="LockLayoutCheck" IsChecked="{Binding IsLayoutLocked}"
+                  ToolTip.Tip="Prevent panels on this page from being moved, resized, split, deleted or re-tiled - bubbles and characters are unaffected">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <PathIcon Data="{StaticResource LockIcon}" Width="12" Height="12" />
+            <TextBlock Text="Lock layout" />
+          </StackPanel>
+        </CheckBox>
+        <TextBlock Classes="inspectorHint" IsVisible="{Binding IsLayoutLocked}"
+                   Text="Panels stay where they are; unlock to move, split or re-tile them." />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Spacing" />
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Margin" />
+          <NumericUpDown Name="MarginInput" Minimum="0" Maximum="40" Increment="1" FormatString="0.# mm"
+                         ToolTip.Tip="Distance from the page edge to the panels, for every page - panel edges on the margin move with it, and panels snap to it" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Gutter" />
+          <NumericUpDown Name="GutterInput" Minimum="0" Maximum="20" Increment="0.5" FormatString="0.# mm"
+                         ToolTip.Tip="Space between neighbouring panels, for every page - new layouts and snapping use it" />
+        </DockPanel>
+        <TextBlock Classes="inspectorHint" Text="Both apply to every page of the comic." />
+      </StackPanel>
+    </Border>
+
+    <Border Classes="inspectorSection">
+      <StackPanel Spacing="2">
+        <TextBlock Classes="sectionHeader" Text="Guides" />
+        <CheckBox Name="MarginGuidesCheck" IsChecked="{Binding ShowMarginGuides}" Content="Margin guides"
+                  ToolTip.Tip="Show the page margin as a dashed line while you work" />
+        <CheckBox Name="SnapCheck" IsChecked="{Binding SnapEnabled}" Content="Snap to margins and gutters"
+                  ToolTip.Tip="Snap panel edges to the page margin and a gutter's width from other panels (hold Alt while dragging to place freely)" />
+      </StackPanel>
+    </Border>
+
+    <!-- Word's Page Number menu, laid flat: where, then how the numbering runs once there is one. -->
+    <Border Classes="inspectorSection" IsVisible="{Binding HasPageNumbering}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Page numbers" />
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Position" />
+          <DropDownButton Name="PageNumbersButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left"
+                          ToolTip.Tip="Print page numbers on every page of the comic (not just this one)">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource PageNumberIcon}" />
+              <TextBlock Text="{Binding PageNumbersSummary}" VerticalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                <MenuItem Name="TopOuterItem" Header="Top of page, outer corner" ToggleType="Radio"
+                          GroupName="InspectorPageNumberPosition"
+                          IsChecked="{Binding IsPageNumbersTopOuter, Mode=TwoWay}" />
+                <MenuItem Name="BottomCenterItem" Header="Bottom of page, centre" ToggleType="Radio"
+                          GroupName="InspectorPageNumberPosition"
+                          IsChecked="{Binding IsPageNumbersBottomCenter, Mode=TwoWay}" />
+                <MenuItem Name="BottomOuterItem" Header="Bottom of page, outer corner" ToggleType="Radio"
+                          GroupName="InspectorPageNumberPosition"
+                          IsChecked="{Binding IsPageNumbersBottomOuter, Mode=TwoWay}" />
+                <Separator />
+                <MenuItem Name="RemovePageNumbersItem" Header="Remove page numbers"
+                          Command="{Binding RemovePageNumbersCommand}" />
+              </MenuFlyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+        </DockPanel>
+        <!-- Only once the comic has numbers: until then there's nothing for these to change. -->
+        <CheckBox Name="NumberFirstPageCheck" IsVisible="{Binding PageNumbersEnabled}"
+                  IsChecked="{Binding NumberFirstPage, Mode=TwoWay}" Content="Number the first page"
+                  ToolTip.Tip="Covers usually aren't numbered; the cover still counts as page 1" />
+        <DockPanel Classes="propertyRow" IsVisible="{Binding PageNumbersEnabled}">
+          <TextBlock Classes="propertyLabel" Text="Start at" />
+          <NumericUpDown Name="PageNumberStartInput" Minimum="0" Maximum="9999" Increment="1" FormatString="0"
+                         ToolTip.Tip="The number the first page would carry - to continue numbering from an earlier book" />
+        </DockPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Insert › Title page, as a page setting: the design gallery behind a dropdown, and what to do with the one there is. -->
+    <Border Classes="inspectorSection" IsVisible="{Binding HasTitlePageHost}">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="sectionHeader" Text="Title page" />
+        <DockPanel>
+          <Button Name="RemoveTitlePageButton" Classes="iconButton" DockPanel.Dock="Right" Margin="4,0,0,0"
+                  IsVisible="{Binding HasTitlePage}" Command="{Binding RemoveTitlePageCommand}"
+                  ToolTip.Tip="{Binding RemoveTitlePageText}">
+            <PathIcon Data="{StaticResource DeleteIcon}" />
+          </Button>
+          <DropDownButton Name="TitlePageButton" Classes="inspectorButton" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left"
+                          ToolTip.Tip="Start every issue with the comic's title page: pick a design, then double-click its words to retype them. Picking another design redoes it and keeps its words.">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource TitlePageIcon}" />
+              <TextBlock Text="Add a title page" IsVisible="{Binding !HasTitlePage}" VerticalAlignment="Center" />
+              <TextBlock Text="Change its design" IsVisible="{Binding HasTitlePage}" VerticalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <Flyout Placement="BottomEdgeAlignedRight">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Title page" FontWeight="SemiBold" />
+                  <ItemsControl Name="TitlePageGallery" ItemsSource="{Binding TitlePageChoices}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="local:TitlePageChoice">
+                        <Button Classes="small" Width="112" Height="156" Padding="6"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                Command="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext).InsertTitlePageCommand}"
+                                CommandParameter="{Binding}" ToolTip.Tip="{Binding Description}">
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="11"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            <local:TitlePagePreview Design="{Binding Design}"
+                                                    Page="{Binding $parent[ItemsControl].((local:PageEditorViewModel)DataContext)}" />
+                          </DockPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock
+                    Text="The comic's title page opens every issue, each showing its own issue number. Everything on it stays editable - words, colours, the background."
+                    FontSize="11" Opacity="0.7" TextWrapping="Wrap" MaxWidth="350" HorizontalAlignment="Left" />
+                </StackPanel>
+              </Flyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+        </DockPanel>
+        <CheckBox Name="OwnTitlePageBox" IsVisible="{Binding HasTitlePage}" IsChecked="{Binding IsOwnTitlePage, Mode=TwoWay}"
+                  ToolTip.Tip="This issue gets a title page of its own - a copy of the comic's to change freely. Untick to go back to the comic's.">
+          <TextBlock Text="Only this issue - the other issues keep the comic's title page" TextWrapping="Wrap" />
+        </CheckBox>
+      </StackPanel>
+    </Border>
+  </StackPanel>
 </UserControl>
