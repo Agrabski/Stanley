@@ -285,11 +285,34 @@ public sealed class CharacterEditingTests : IDisposable
     }
 
     [Fact]
-    public void Placing_a_character_from_the_pane_puts_it_on_the_page_and_closes_the_tab_the_first_click_opened()
+    public void Editing_a_character_from_the_pane_opens_its_editor_and_placing_a_never_opened_one_leaves_the_page_showing()
     {
         var (session, page, _, _) = NewSession();
         var item = Add(session, "A");
-        session.Characters.Show(item); // a double-click's first click opens it
+        var other = Add(session, "B");
+        session.Characters.ReturnToPage();
+        Assert.Same(page, session.Workspace.ActiveEditor);
+
+        // Placing needs no editor opened first: a click on the row only picks it.
+        session.Characters.PlaceOnPage(item);
+        Assert.Same(page, session.Workspace.ActiveEditor);
+        Assert.Null(session.Characters.Current);
+        Assert.DoesNotContain(item.Editor, Dockables(session));
+        Assert.Single(page.Working.Panels.Values.SelectMany(p => p.CharacterInstances));
+
+        // The pencil, "Edit body" and Enter all run this command with the row's character.
+        session.Characters.EditCharacterCommand.Execute(other);
+        Assert.Same(other.Editor, session.Workspace.ActiveEditor);
+        Assert.Same(other, session.Characters.Current);
+        Assert.Contains(other.Editor, Dockables(session));
+    }
+
+    [Fact]
+    public void Placing_a_character_from_the_pane_puts_it_on_the_page_and_closes_its_tab_if_it_was_open()
+    {
+        var (session, page, _, _) = NewSession();
+        var item = Add(session, "A");
+        session.Characters.Show(item); // opened for editing
         Assert.Same(item.Editor, session.Workspace.ActiveEditor);
 
         session.Characters.PlaceOnPage(item);

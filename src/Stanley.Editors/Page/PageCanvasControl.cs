@@ -1746,6 +1746,8 @@ public sealed class PageCanvasControl : Control
         if (hit.PanelId is { } multiPanel && hit.Kind is HitKind.BubbleBody or HitKind.CharacterBody or HitKind.ElementBody
             && vm.IsPartOfSelection(multiPanel, hit.BubbleIndex, hit.CharacterIndex, hit.ElementIndex) && vm.HasMultiSelection)
         {
+            // Cut, Copy, Paste and Duplicate take the whole selection, as Group does.
+            items.AddRange(ClipboardItems(vm));
             var group = Item("Group", () => vm.GroupSelectionCommand.Execute(null), "Ctrl+G");
             group.IsEnabled = vm.GroupSelectionCommand.CanExecute(null);
             items.Add(group);

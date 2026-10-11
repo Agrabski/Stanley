@@ -1,12 +1,15 @@
 <!--
   The Characters pane (docked left, a tab beside Pages): every character in the comic
-  with a little figure, its name, height and where it's used. Click to edit its body,
+  with a little figure, its name, height and where it's used. Click to pick one,
   double-click to put it on the page, drag onto a panel to place it there, right-click
-  for more (Keep in My Assets among it). At the bottom, "New character" and "Reuse a
-  character": one kept in My Assets or from another recent comic. Like the page navigator it's not an editor - the ribbon keeps showing
-  whatever is being edited. The list's selection only *shows* which character is
-  open: opening happens on a click's release (or Enter), never on press, so pressing
-  to drag a character out leaves the page on screen to drop it onto.
+  for more (Edit body, Keep in My Assets among it). At the bottom, "New character" and
+  "Reuse a character": one kept in My Assets or from another recent comic. Like the page
+  navigator it's not an editor - the ribbon keeps showing whatever is being edited.
+  A click never opens the editor, so a stray one can't pull you off the page (and
+  pressing to drag a character out leaves the page on screen to drop it onto): editing
+  its body is the pencil on the picked or pointed-at row, Enter, or right-click > Edit
+  body. The list's highlight is the character you picked - or the one that was just
+  opened, created or added, which the highlight follows.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -47,6 +50,27 @@
         </Style>
         <Style Selector="ListBox#CharacterList ListBoxItem:selected TextBlock.name">
             <Setter Property="Foreground" Value="{DynamicResource StanleySelectionBrush}" />
+        </Style>
+        <!-- The row's pencil: only on the row you've picked or are pointing at, but it keeps its
+             place meanwhile (a name doesn't re-trim as the mouse passes), can't be pressed
+             while it's invisible, and never takes the keyboard from the list (Enter, Delete). -->
+        <Style Selector="ListBox#CharacterList Button.editBody">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="ListBox#CharacterList ListBoxItem:selected Button.editBody, ListBox#CharacterList ListBoxItem:pointerover Button.editBody">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="IsHitTestVisible" Value="True" />
         </Style>
     </UserControl.Styles>
 
@@ -112,12 +136,19 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="local:CharacterItem">
                         <DockPanel
-                            ToolTip.Tip="Click to edit this character's body · double-click to put it on the page · drag onto a panel to place it there">
+                            ToolTip.Tip="Double-click to put this character on the page · drag it onto a panel to place it there · click the pencil (or press Enter) to edit its body">
                             <Border DockPanel.Dock="Left" Width="40" Height="56" Margin="0,0,8,0" CornerRadius="3"
                                     Background="White"
                                     BorderBrush="{DynamicResource StanleyThumbBorderBrush}" BorderThickness="1">
                                 <local:CharacterFigure Character="{Binding Character}" />
                             </Border>
+                            <Button DockPanel.Dock="Right" Classes="editBody"
+                                    Command="{Binding $parent[UserControl].((local:CharacterLibraryViewModel)DataContext).EditCharacterCommand}"
+                                    CommandParameter="{Binding}"
+                                    ToolTip.Tip="Edit this character's body (Enter)"
+                                    AutomationProperties.Name="Edit body">
+                                <PathIcon Data="{StaticResource PenIcon}" Width="13" Height="13" />
+                            </Button>
                             <PathIcon DockPanel.Dock="Right" Data="{StaticResource StarIcon}" Width="12" Height="12" Margin="4,0,0,0"
                                       VerticalAlignment="Center" IsVisible="{Binding IsKept}" Foreground="{DynamicResource StanleySelectionBrush}"
                                       ToolTip.Tip="Kept in My Assets - you can add this character to any comic" />

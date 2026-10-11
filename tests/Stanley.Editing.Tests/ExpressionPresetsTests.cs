@@ -15,6 +15,7 @@ public class ExpressionPresetsTests
     [InlineData(ExpressionPreset.Surprised, "wide", "raised", "o")]
     [InlineData(ExpressionPreset.Skeptical, "neutral", "skeptical", "doubtful")]
     [InlineData(ExpressionPreset.Seductive, "halfClosed", "skeptical", "smirk")]
+    [InlineData(ExpressionPreset.Sinister, "halfClosed", "angry", "sinister")]
     [InlineData(ExpressionPreset.Asleep, "closed", "neutral", "neutral")]
     public void A_preset_sets_each_face_slot(ExpressionPreset preset, string eyes, string brows, string mouth)
     {
@@ -96,6 +97,7 @@ public class ExpressionPresetsTests
     [InlineData(StickerSlots.Eyes, "wide", "Wide open")]
     [InlineData(StickerSlots.Mouth, "o", "Oh")]
     [InlineData(StickerSlots.Mouth, "grin", "Grin")]
+    [InlineData(StickerSlots.Mouth, "sinister", "Sinister")]
     [InlineData(StickerSlots.Brows, "neutral", "Neutral")]
     public void Variants_have_names_people_can_read(string slot, string variant, string name) =>
         Assert.Equal(name, ExpressionPresets.VariantName(slot, variant));
@@ -111,6 +113,16 @@ public class ExpressionPresetsTests
             foreach (var (slot, variant) in preset.Variants)
                 Assert.Contains(variant, ExpressionPresets.Vocabulary[slot]);
         Assert.Equal(Enum.GetValues<ExpressionPreset>().Length, ExpressionPresets.All.Count);
+    }
+
+    [Fact]
+    public void The_villains_grin_is_a_mouth_of_its_own_in_the_vocabulary()
+    {
+        // Sinister (#152) is narrowed eyes and angry brows over a mouth no other preset uses.
+        Assert.Contains("sinister", ExpressionPresets.Vocabulary[StickerSlots.Mouth]);
+        var sinister = ExpressionPresets.Get(ExpressionPreset.Sinister);
+        Assert.Equal("Sinister", sinister.Name);
+        Assert.Single(ExpressionPresets.All, p => p.Mouth == sinister.Mouth);
     }
 
     [Fact]

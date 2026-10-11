@@ -219,13 +219,40 @@ public interface ICharacterRenderer
 └────────────────────┘
 ```
 
-- Click → opens that character's editor in the editor area (`SwitchTo`, like pages).
+- Click → **picks** the row (highlights it) and nothing else. It used to open that
+  character's editor, which threw people off the page they were working on whenever
+  they clicked one by accident (#149). Opening the editor in the editor area (like
+  pages) is one deliberate step: the **pencil** on the picked or pointed-at row, **Enter**
+  on the picked row, or right-click › *Edit body* - all `EditCharacterCommand`.
+- **Double-click → places it** on the page being edited (the page stays showing).
 - **Drag onto the page canvas → places it** in the panel under the drop point, feet
   at the drop point. (The main placement gesture, direct manipulation.)
 - "New character" → creates "Character N" with the Adult preset and opens it.
-- Right-click: Rename, Delete. Delete of a character that's placed anywhere is
-  refused with "Used in N panels" in the status line for the POC (cross-page undo
-  of a cascading removal isn't worth it yet).
+- Right-click: Rename, Edit body, Place on page, Keep in My Assets, Duplicate, Delete.
+  Delete of a character that's placed anywhere is refused with "Used in N panels" in
+  the status line for the POC (cross-page undo of a cascading removal isn't worth it yet).
+
+As built (`CharacterLibraryView`), for whoever touches the pane's input next:
+
+- **The highlight is the picked character**, not "the one open". The list's
+  `SelectedItem` is bound *one-way* to `CharacterLibraryViewModel.Current`, so opening a
+  character from anywhere (New character, a double-click on the page, undo) moves the
+  highlight to it, while a click moves only the highlight - `Current` stays whatever is
+  open. Closing the editor (`Current` → null) clears the highlight.
+- **Presses are tracked by hand** (`OnListPointerPressed` / `Moved` / `Released`, with
+  `handledEventsToo`, because the list box handles a press itself to select). A plain
+  click only records `_clickedItem`; a press with `ClickCount >= 2` on that same row
+  places the character, and is marked handled on the way down so the list doesn't take
+  the focus the page gets. Three kinds of press are left alone: one inside the rename
+  box (text editing), one on the row's pencil (the button's own click - otherwise two
+  quick clicks on it would count as a double-click and place the character), and one
+  that starts a drag (the drag threshold is 6 px).
+- **The pencil** (`Button.editBody`) keeps its place in the row but is invisible and not
+  hit-testable (`Opacity` 0, `IsHitTestVisible` false) until its row is selected or under
+  the pointer, so a name never re-trims as the mouse passes. It is `Focusable="False"` so
+  clicking it doesn't steal the keyboard from the list (Enter, Delete).
+- `PlaceOnPage` still closes the character's own tab when it was open (opened with the
+  pencil earlier, say), as placing means going back to the page.
 
 ### 5.3 Character editor (`CharacterEditorViewModel : EditorViewModel<CharacterDefinition>`)
 
