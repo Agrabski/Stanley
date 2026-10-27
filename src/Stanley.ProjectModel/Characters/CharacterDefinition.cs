@@ -47,6 +47,7 @@ public sealed record CharacterDefinition(
     ModularBody? Modules = null)
 {
     /// <summary>Whether the body is built from shapes rather than generated from sliders.</summary>
+    [JsonIgnore]
     public bool IsModular => Modules is not null;
 
     /// <summary>
