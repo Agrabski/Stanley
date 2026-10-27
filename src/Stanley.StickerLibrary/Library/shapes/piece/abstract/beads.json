@@ -1,0 +1,94 @@
+{
+  "anchors": [
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": -0.0102,
+        "y": 0
+      },
+      "outHandle": {
+        "x": 1.0635,
+        "y": 0
+      },
+      "point": {
+        "x": 0.5063,
+        "y": 0
+      }
+    },
+    {
+      "handleKind": "corner",
+      "inHandle": {
+        "x": 1.1356,
+        "y": 0.2185
+      },
+      "outHandle": {
+        "x": 1.0355,
+        "y": 0.4271
+      },
+      "point": {
+        "x": 0.7829,
+        "y": 0.3606
+      }
+    },
+    {
+      "handleKind": "corner",
+      "inHandle": {
+        "x": 1.0723,
+        "y": 0.6009
+      },
+      "outHandle": {
+        "x": 1.1899,
+        "y": 0.763
+      },
+      "point": {
+        "x": 0.7829,
+        "y": 0.652
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.9853,
+        "y": 1.0043
+      },
+      "outHandle": {
+        "x": -0.0241,
+        "y": 0.9954
+      },
+      "point": {
+        "x": 0.495,
+        "y": 0.9999
+      }
+    },
+    {
+      "handleKind": "corner",
+      "inHandle": {
+        "x": -0.1577,
+        "y": 0.7169
+      },
+      "outHandle": {
+        "x": -0.0804,
+        "y": 0.5463
+      },
+      "point": {
+        "x": 0.2567,
+        "y": 0.6476
+      }
+    },
+    {
+      "handleKind": "corner",
+      "inHandle": {
+        "x": 0.1052,
+        "y": 0.4588
+      },
+      "outHandle": {
+        "x": -0.1965,
+        "y": 0.2612
+      },
+      "point": {
+        "x": 0.2572,
+        "y": 0.3651
+      }
+    }
+  ]
+}

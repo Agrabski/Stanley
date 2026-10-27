@@ -1,0 +1,124 @@
+{
+  "anchors": [
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.5625,
+        "y": -0.0002
+      },
+      "outHandle": {
+        "x": 0.8767,
+        "y": 0.0021
+      },
+      "point": {
+        "x": 0.6866,
+        "y": 0.0007
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 1.0042,
+        "y": 0.1445
+      },
+      "outHandle": {
+        "x": 0.9961,
+        "y": 0.4782
+      },
+      "point": {
+        "x": 0.9999,
+        "y": 0.3212
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.9862,
+        "y": 0.6111
+      },
+      "outHandle": {
+        "x": 0.9509,
+        "y": 0.9001
+      },
+      "point": {
+        "x": 0.9672,
+        "y": 0.7671
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.85,
+        "y": 0.9983
+      },
+      "outHandle": {
+        "x": 0.569,
+        "y": 1.0002
+      },
+      "point": {
+        "x": 0.7061,
+        "y": 0.9993
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.431,
+        "y": 1.0002
+      },
+      "outHandle": {
+        "x": 0.15,
+        "y": 0.9983
+      },
+      "point": {
+        "x": 0.2939,
+        "y": 0.9993
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.0491,
+        "y": 0.9001
+      },
+      "outHandle": {
+        "x": 0.0138,
+        "y": 0.6111
+      },
+      "point": {
+        "x": 0.0328,
+        "y": 0.7671
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.0039,
+        "y": 0.4782
+      },
+      "outHandle": {
+        "x": -0.0042,
+        "y": 0.1445
+      },
+      "point": {
+        "x": 0.0001,
+        "y": 0.3212
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.1233,
+        "y": 0.0021
+      },
+      "outHandle": {
+        "x": 0.4375,
+        "y": -0.0002
+      },
+      "point": {
+        "x": 0.3134,
+        "y": 0.0007
+      }
+    }
+  ]
+}

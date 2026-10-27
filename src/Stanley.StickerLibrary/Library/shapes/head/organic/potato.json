@@ -1,0 +1,184 @@
+{
+  "anchors": [
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.4243,
+        "y": -0.0009
+      },
+      "outHandle": {
+        "x": 0.6069,
+        "y": 0.0065
+      },
+      "point": {
+        "x": 0.5155,
+        "y": 0.0028
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.7236,
+        "y": 0.0043
+      },
+      "outHandle": {
+        "x": 0.8825,
+        "y": 0.1001
+      },
+      "point": {
+        "x": 0.8038,
+        "y": 0.0526
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.9619,
+        "y": 0.2041
+      },
+      "outHandle": {
+        "x": 1.0095,
+        "y": 0.3786
+      },
+      "point": {
+        "x": 0.9859,
+        "y": 0.2919
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.9523,
+        "y": 0.473
+      },
+      "outHandle": {
+        "x": 0.9581,
+        "y": 0.6305
+      },
+      "point": {
+        "x": 0.9555,
+        "y": 0.5611
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 1.0154,
+        "y": 0.7103
+      },
+      "outHandle": {
+        "x": 0.9726,
+        "y": 0.8543
+      },
+      "point": {
+        "x": 0.996,
+        "y": 0.7755
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.878,
+        "y": 0.9415
+      },
+      "outHandle": {
+        "x": 0.7144,
+        "y": 1.0151
+      },
+      "point": {
+        "x": 0.8038,
+        "y": 0.9749
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.5859,
+        "y": 0.9966
+      },
+      "outHandle": {
+        "x": 0.3924,
+        "y": 0.983
+      },
+      "point": {
+        "x": 0.4902,
+        "y": 0.9899
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.2615,
+        "y": 0.9822
+      },
+      "outHandle": {
+        "x": 0.1033,
+        "y": 0.8851
+      },
+      "point": {
+        "x": 0.1766,
+        "y": 0.93
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.0299,
+        "y": 0.7941
+      },
+      "outHandle": {
+        "x": -0.011,
+        "y": 0.6253
+      },
+      "point": {
+        "x": 0.0096,
+        "y": 0.7107
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.0574,
+        "y": 0.5296
+      },
+      "outHandle": {
+        "x": 0.0533,
+        "y": 0.3689
+      },
+      "point": {
+        "x": 0.0552,
+        "y": 0.4415
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": -0.0186,
+        "y": 0.2772
+      },
+      "outHandle": {
+        "x": 0.0328,
+        "y": 0.1329
+      },
+      "point": {
+        "x": 0.0046,
+        "y": 0.2122
+      }
+    },
+    {
+      "handleKind": "smooth",
+      "inHandle": {
+        "x": 0.1618,
+        "y": 0.0576
+      },
+      "outHandle": {
+        "x": 0.3235,
+        "y": -0.0065
+      },
+      "point": {
+        "x": 0.2373,
+        "y": 0.0277
+      }
+    }
+  ]
+}
