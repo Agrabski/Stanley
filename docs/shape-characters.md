@@ -1,6 +1,7 @@
 # Characters built from shapes — design
 
-**Status: proposed, not implemented** (issue #173). This is the working plan for a
+**Status: in progress** (issue #173). Slices 1–4 are built (§14 records how); the rest
+is the working plan. This is the design for a
 second way to build a character: by snapping together ready-made shapes instead of
 moving body sliders. It builds on the character POC (`docs/character-authoring-poc.md`)
 and the sticker system (`docs/sticker-system.md`). It changes neither of them: it adds
@@ -127,43 +128,33 @@ skipped.
 ### 4.1 Records (`Stanley.ProjectModel/Characters/ModularBody.cs`)
 
 ```csharp
-/// The shapes a body is built from (docs/shape-characters.md). Null parts are left out.
+// As built (nullable optionals keep files sparse: null is the default)
 public sealed record ModularBody(
-    ShapeModule? Head,
-    ShapeModule? Torso,
-    LimbModule? Arms,
-    LimbModule? Legs,
-    IReadOnlyList<ExtraModule>? Extras = null,   // ears, tails, horns: slice 9
-    bool Separate = false);                      // false: joints drawn seamless (one creature); true: every piece outlined (building blocks)
+    ShapeModule? Head, ShapeModule? Torso, LimbModule? Arms, LimbModule? Legs,
+    bool? Separate = null);                      // null/false: joints seamless (one creature); true: every piece outlined
 
-/// A head or a torso: an outline in its own unit box, sized and placed on its socket.
-public sealed record ShapeModule(
+public sealed record ShapeModule(                // a head or a torso
     ModuleShape Shape,
     double Width, double Height,                 // figure units (1.0 = an average adult's height)
-    double Rotation = 0, bool FlipX = false, bool FlipY = false,   // "upside-down triangle" is FlipY
+    double? Rotation = null, bool? FlipX = null, bool? FlipY = null,   // "upside-down triangle" is FlipY
     Point2D? Offset = null,                      // nudge off the socket, figure units
     string? Color = null);                       // colour slot; null = "skin"
 
-/// An outline and its sockets, in a unit box (0,0)-(1,1), y down.
-public sealed record ModuleShape(
+public sealed record ModuleShape(                // an outline in a unit box (0,0)-(1,1), y down
     IReadOnlyList<ShapeAnchor> Anchors,
-    SortedDictionary<ModuleSocket, Point2D>? Sockets = null,   // only the ones dragged by hand; the rest are derived
-    string? Source = null);                      // "library:shapes/organic/bean" while unmodified
+    SortedDictionary<string, Point2D>? Sockets = null,   // ModuleSockets names; only hand-set ones
+    string? Source = null);                      // "library:shapes/<kind>/<category>/<name>" while unmodified
 
-public enum ModuleSocket { Neck, LeftShoulder, RightShoulder, LeftHip, RightHip, Face }
-
-/// A pair of arms or legs: two bones each (so IK works), drawn in a style.
-public sealed record LimbModule(
+public sealed record LimbModule(                 // a pair of arms or legs, two bones each
     LimbStyle Style,                             // Tube, Taper, Pieces, Stick
-    double Length,                               // root to wrist/ankle, figure units
-    double Thickness,
-    double Taper = 0,                            // end radius / root radius - 1
-    double Elbow = 0.5,                          // where the bend sits along the length
-    ModuleShape? End = null, double EndSize = 0, // hand/foot shape; null = the style's own round end
-    ModuleShape? Upper = null, ModuleShape? Lower = null,   // Pieces only
-    LimbSides Sides = LimbSides.Both,            // one arm only, say
-    string? Color = null);
+    double Length, double Thickness,             // root to wrist/ankle; width at the root
+    double? Taper = null, double? Bend = null,   // 0.5 each when null
+    ModuleShape? End = null, double? EndSize = null,          // hand/foot, hung from the wrist/ankle in an EndSize box
+    ModuleShape? Upper = null, ModuleShape? Lower = null,     // Pieces only
+    LimbSides? Sides = null, string? Color = null);
 ```
+
+Extras (ears, tails, horns) are not in the record yet; they come with slice 9.
 
 - **Sizes are figure units**, like everything in a `BodyFigure`: 1.0 is an average
   adult's height, so the panel's shared scale (`CharacterPlacement.UnitHeightMm`)
@@ -185,9 +176,9 @@ needs no setup:
 | Socket | Derived as | Used by |
 |---|---|---|
 | `Neck` | top of the outline at its centre line | the head (on a torso), the torso (under a head, as its top) |
-| `LeftShoulder` / `RightShoulder` | the outline's left/right edge, 15% down from its top, inset by the arm's radius | arms |
-| `LeftHip` / `RightHip` | the outline's bottom edge at 30% / 70% across | legs |
-| `Face` | the largest inscribed ellipse of the outline, upper two-thirds | the `head` region (face stickers, hair, headwear) |
+| `LeftShoulder` / `RightShoulder` | the outline's edges, 15% down from its top (the rig then moves the arm in by its radius) | arms |
+| `LeftHip` / `RightHip` | the outline's bottom edge at 70% / 30% across (the character's own left is the viewer's right from the front, as in VRM) | legs |
+| `Face` | the centre of the largest ellipse with the outline's proportions that fits inside it (a torso: its upper two-thirds) | the `head` region (face stickers, hair, headwear) |
 
 A socket dragged by hand in the character editor is stored in `Sockets` and wins.
 Flip and rotation transform sockets with the outline, so the upside-down triangle's
@@ -293,7 +284,7 @@ CC0, original art, `ShapeLibrary` next to `StickerLibrary`):
   bolt, spiral blob).
 - **Limb styles**: Tube, Taper, Pieces, Stick; hand ends (mitten, ball, three-finger,
   claw, none) and foot ends (shoe, ball, paw, flat, none).
-- **Creature presets** (`ModularPresets`, a one-click whole body, the on-ramp):
+- **Creature presets** (`CreaturePresets`, a one-click whole body, the on-ramp):
   e.g. Bean, Mr. Square, Robot, Stick figure, Blob, Big-head, Head-on-legs. Applying
   one replaces the modules; everything stays editable afterwards.
 - First release target: about 8 heads, 8 torsos, 5 hands, 5 feet, 6 presets. Size
@@ -390,8 +381,8 @@ No new files or folders: modules live in `character.json`. A character without
 |---|---|
 | ProjectModel | `ModularBody`, `ShapeModule`, `ModuleShape`, `LimbModule`, `ModuleSocket`; `ModuleSockets.Derive`; `ModularRig`; `CharacterRig` (dispatch + `Height`); `CharacterDefinition.Modules`; `FigureLayer.Shapes`, `FigureShape`; `BodyFigure.Absent` |
 | Rendering | `FigureRenderer` per-colour body items and shape fills; sticker parts skipped on absent regions; module thumbnails |
-| Editing | `ModuleEditing` (swap keeping size/colour, resize, turn, flip, remove/add with defaults, height scale, socket drag); `ModularPresets` |
-| StickerLibrary | `Library/shapes/…` (CC0), `ShapeLibrary` |
+| Editing | `ModuleEditing` (swap keeping size/colour, resize, turn, flip, remove/add with defaults, height scale, socket drag) |
+| StickerLibrary | `Library/shapes/…` (CC0), `ShapeLibrary`, `CreaturePresets` (next to `Hairstyles`) |
 | Editors | `CharacterEditorViewModel.Modules.cs`; Shapes and Module ribbon tabs; stage selection, handles and + ghosts; Edit Points on a module; `ShapesSection`/`ModuleSection` inspector sections and toolbar; New character split; page handles filtered by `Absent`; My Assets shape kind |
 | App | nothing structural |
 
@@ -442,3 +433,109 @@ shapes*, then grow the editor in 5.
    with a strong, consistent look plus easy custom shapes seems the better bet.
 5. **Clothes on shape bodies**: is the face/head-sticker set enough at first, or do
    T-shirts and trousers need to fit a triangle torso early (slice 9 today)?
+
+## 14. Implementation notes (slices 1–4, as built)
+
+### 14.1 The seam and the contract
+
+- `CharacterRig.Build/Extent/Height(CharacterDefinition, ...)` is the only way code gets a
+  character's figure. `BodyRig` is called directly only for `BodyShape.Default` (the
+  missing-character placeholder, sticker templates). New code must not call
+  `BodyRig.Build(character.Body, ...)`.
+- `BodyFigure.Absent` (`FigurePart(region, side?)`) is the whole contract for missing parts:
+  the renderer infers nothing except that a skirt needs at least one leg. Absent regions
+  still get finite frames (`ModularRig.Degenerate`, 1e-3) because extents, posing and the
+  editors read them. `Neck` is always absent on a shape body; `Head` is absent only when
+  there is neither a head nor a torso (with no head the face goes on the torso), so the
+  page's head-tilt ring must check `Modules.Head is null`, not `Has(Head)`.
+- Computed properties on the records (`IsModular`, `IsSeparate`, `ColorSlot`) carry
+  `[JsonIgnore]`; without it every existing character would gain `"isModular": false` on its
+  next save. `ModularBodyJsonTests` pins this.
+
+### 14.2 Rig (`ModularRig`, `ModuleSockets`, `ModuleFrame`, `ModularBodies`)
+
+- **Sockets** are derived in the outline's curve bounds (§4.2) and cached per `ModuleShape`
+  instance (an IK drag builds the figure ~160 times). `ModularBodies.Normalized` returns the
+  same instance when nothing needed fixing, which keeps that cache warm - keep it that way.
+  `ModuleSockets.Flipped` mirrors the outline and its hand-set sockets (swapping left/right
+  names on an X flip) and derived sockets are re-derived from the flipped outline: that is
+  what puts an upside-down triangle's neck and shoulders on its wide top. Rotation is
+  applied afterwards by `ModuleFrame` (centre, size, rotation: one affine map), so sockets
+  turn with the outline. `ModuleSockets.Chin` (bottom of the centre line) is internal.
+- **Stacking**: the torso, else the head, is the *host*. Legs hang from the host's hip
+  sockets (raised by the leg radius, measured before the host's Offset - a nudge moves a
+  part and what sits on it, never what it stands on); the head's chin sits on the neck
+  socket, sunk by `HeadSink` (0.08 × head height); arms hang from the shoulder sockets moved
+  in by their radius, `ArmSpread` (8°) off vertical - out to the side from the front,
+  forward side on, the same both ways so a legless figure is as tall from either side.
+  Hand-set sockets get no raise or inset. Side on, limbs sit on the host's centre line with
+  the far ones set back (arms 0.6 × radius, legs 0.4).
+- **Trunk joints**: Hips midway between the leg roots, Neck = Head = the neck socket, Spine
+  and Chest at 0.3 / 0.65 of hips→neck. With no torso all five sit at the head's bottom (a
+  lean tilts the head about the hips) and the arms turn rigidly with the head in a step
+  after the trunk bend. BodyRig's `Trunk` (now `internal`) and `FootTilt` are reused, so the
+  torso outline bends exactly as the mannequin's back does.
+- **Ground and height**: two passes - at rest to find the ground (bottom of everything
+  drawn) and the height, then posed (`HipsShift` is a fraction of that height). The rest
+  Hips joint is at x = 0. Long arms on a legless body stand on the hands.
+- **Limbs**: Tube/Taper are `BodyCapsule`s (taper end radius r × (1 − taper)); Stick uses
+  `StickRadius` (0.006); Pieces are `FigureShape`s per bone (capsules when null); default
+  ends are ellipses. A limb with its own colour slot is emitted as anchor outlines of its
+  capsules (`CapsuleOutline`/`EllipseOutline`), because the layer's capsules are always
+  skin-filled. From the front the right-side end and pieces are mirrored so a thumb or
+  claw drawn on +x points outward on both sides; side on nothing is mirrored.
+- `Blobs[0]` is the head's bounding ellipse (or the face ellipse): `CharacterPosing.HeadTop`
+  reads it. The torso's `TorsoFrame.RestOutline` is its outline flattened to a polygon, so
+  torso covers and warped torso art (`SmoothClosed` + `RowAt`) see a polygon.
+- **Seams** (unless Separate): hip discs 1.5 × leg radius (on the torso layer, else the
+  head's), the neck at 0.3 × the narrower of head and torso, arm roots 1.4 × arm radius.
+- **Normalising** clamps sizes 0.02–2, lengths 0.02–1.5, thickness 0.005–0.5, taper 0–0.9,
+  bend 0.2–0.8, end size 0.005–0.6, offsets ±1; a broken outline becomes an ellipse (head,
+  torso) or the style's own shape (end, piece). `ModuleEditing` validates with its own,
+  similar ranges and refuses zero/negative/NaN sizes with a message.
+
+### 14.3 Drawing
+
+- `FigureGeometry.LayerFills(layer)` gives (colour slot, path) pairs back to front: skin
+  first (torso outline, capsules, ellipses, skin shapes, unioned as before), then each other
+  slot in first-appearance order. `LayerSkin` is their union, so silhouettes, hit-testing,
+  `PartClip.Body` and highlighting include shapes. A mannequin's layers are one skin fill
+  each and draw pixel-identical to before (`ShapeBodyRenderingTests` pins it).
+- Every fill in a layer shares that layer's seam mask, which only covers what *earlier*
+  layers painted: two colours in one layer always get a line between them, while a joint to
+  an earlier layer stays seamless even across colours (a red head on a skin torso shows no
+  neck line). A skin shape meant to sit in front of a coloured one in the same layer would
+  be hidden, so the rig puts such shapes in a later layer. In Separate mode, pieces sharing a
+  layer and a colour (a limb and its hand) still union.
+- A colour slot the character never set falls back to the resolved skin colour (after any
+  per-panel skin override).
+- `StickerArtPieces.Sides(figure, part)` is the one place sticker parts learn which sides
+  they draw on, minus absent ones; covers, art and text all use it.
+- Close-up framing (`CharacterFigure.Arrange`) frames from `Regions.Head` (the face
+  ellipse), so a head shape much larger than its face can be cropped - check when touching it.
+
+### 14.4 Library and presets
+
+- One `ModuleShape` per file under `Library/shapes/<kind>/<category>/<name>.json`, written in
+  the project format; the key comes from the resource path. Files carry no `source`:
+  `ShapeLibrary.Instantiate` sets `library:shapes/<key>`. The existing `Library\**\*`
+  embed rule covers the folder, and sticker loading ignores it.
+- Box conventions the rig honours: heads, torsos and pieces fill the unit box (Width ×
+  Height, or thickness × bone length for a piece, set the aspect). Hands and feet keep their
+  own proportions: long side 1, centred, top at y = 0, so (0.5, 0) is the wrist/ankle and the
+  end hangs in an EndSize box; a shoe only fills its top ~0.44, and the ground goes under
+  what is drawn. Mitten and claw have their thumb/claws on +x.
+- The shapes were generated by a throwaway script (rounded polygons with bowed edges and
+  filleted corners, centripetal Catmull-Rom splines through hand-placed points, unions of
+  circles, a polar wobble; one least-squares cubic per segment) and checked on rendered
+  contact sheets. To add one: drop an original CC0 `ModuleShape` file in the right folder -
+  closed, at least 3 anchors, filling its box - and `ShapeLibraryTests` checks it.
+- `CreaturePresets` (StickerLibrary): Default (egg head, pear torso, tube arms with ball
+  hands, tube legs with shoes), Bean, Mr. Square, Hero (square head on an upside-down
+  triangle), Robot (Pieces, Separate), Stick figure (a hair-thin torso rather than none, so
+  arms and legs meet on a line), Blob, Big-head, Head-on-legs; creatures stand about
+  0.6–1.05 tall. Every read builds fresh library copies.
+- `ModuleEditing`: a head or torso always stays (removing both is refused); giving a limb an
+  Upper or Lower piece switches it to `Pieces`; `SetAnchors` stores the outline as given
+  (re-fitting to the box is Edit Points' job, slice 7) and drops the library `Source`.
+
