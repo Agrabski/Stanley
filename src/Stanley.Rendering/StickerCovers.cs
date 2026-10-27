@@ -36,13 +36,15 @@ internal static class StickerCovers
             ? cover with { Ease = below + LayerMargin }
             : cover;
 
-    /// <summary>The pieces of one cover part on <paramref name="figure"/>; <paramref name="height"/> is the character's height (ease is a fraction of it).</summary>
+    /// <summary>The pieces of one cover part on <paramref name="figure"/> (none on a region it leaves out); <paramref name="height"/> is the character's height (ease is a fraction of it).</summary>
     public static IEnumerable<PartPiece> Pieces(BodyFigure figure, StickerPart part, PartCover cover, double height)
     {
         var ease = cover.EaseOrDefault * height;
         var (from, to) = (Math.Clamp(Math.Min(cover.From, cover.To), 0, 1), Math.Clamp(Math.Max(cover.From, cover.To), 0, 1));
         var regions = figure.Regions;
-        IEnumerable<LimbSide> Sides() => part.Side is { } side ? [side] : [LimbSide.Left, LimbSide.Right];
+        var sides = StickerArtPieces.Sides(figure, part);
+        if (sides.Count == 0)
+            yield break; // a region the figure leaves out
         FigureLayerKind Layer(LimbSide side = LimbSide.Left) =>
             part.Depth switch
             {
@@ -62,7 +64,7 @@ internal static class StickerCovers
                 yield return Segment(neck, from, to, capStart: true, capEnd: false, Layer());
                 break;
             case BodyRegion.Arm or BodyRegion.Leg:
-                foreach (var side in Sides())
+                foreach (var side in sides)
                 {
                     var limb = part.Region == BodyRegion.Arm ? regions.Arm(side) : regions.Leg(side);
                     foreach (var piece in Limb(limb, from, to, ease, Layer(side)))
@@ -70,7 +72,7 @@ internal static class StickerCovers
                 }
                 break;
             case BodyRegion.Hand or BodyRegion.Foot:
-                foreach (var side in Sides())
+                foreach (var side in sides)
                 {
                     var blob = (part.Region == BodyRegion.Hand ? regions.Hand(side) : regions.Foot(side)).Inflated(ease);
                     yield return new PartPiece(FigureGeometry.Oval(blob), Layer(side), EllipseFrame(blob));
