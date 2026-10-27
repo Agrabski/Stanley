@@ -19,6 +19,7 @@ public sealed record ModularBody(
     LimbModule? Legs,
     bool? Separate = null)
 {
+    [JsonIgnore]
     public bool IsSeparate => Separate == true;
 }
 
@@ -42,6 +43,7 @@ public sealed record ShapeModule(
     Point2D? Offset = null,
     string? Color = null)
 {
+    [JsonIgnore]
     public string ColorSlot => Color ?? CharacterDefinition.SkinSlot;
 }
 
@@ -110,6 +112,7 @@ public sealed record LimbModule(
     LimbSides? Sides = null,
     string? Color = null)
 {
+    [JsonIgnore]
     public string ColorSlot => Color ?? CharacterDefinition.SkinSlot;
 
     public bool Has(LimbSide side) => (Sides ?? LimbSides.Both) switch
