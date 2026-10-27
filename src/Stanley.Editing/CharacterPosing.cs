@@ -34,7 +34,7 @@ public static class CharacterPosing
 {
     /// <summary>A figure with the instance's pose applied (the shapes a renderer draws).</summary>
     public static BodyFigure Figure(CharacterDefinition character, CharacterInstance instance) =>
-        BodyRig.Build(character.Body, instance.Pose.ViewAngle, character.Skeleton, instance.Pose);
+        CharacterRig.Build(character, instance.Pose.ViewAngle, instance.Pose);
 
     public static (HumanoidBone Root, HumanoidBone Middle, HumanoidBone End) Chain(Limb limb) => BodyRig.LimbChains[(int)limb];
 
@@ -124,7 +124,7 @@ public static class CharacterPosing
     /// </summary>
     public static CharacterInstance MoveHips(CharacterDefinition character, CharacterInstance start, Point2D pageDelta)
     {
-        var height = Math.Max(character.Body.Normalized().Height, 1e-6);
+        var height = Math.Max(CharacterRig.Height(character), 1e-6);
         var unit = Math.Max(start.Placement.UnitHeightMm, 1e-6);
         var delta = new Point2D((start.Placement.Mirrored ? -pageDelta.X : pageDelta.X) / unit / height, pageDelta.Y / unit / height);
         var from = start.Pose.HipsShift ?? default;
@@ -191,7 +191,7 @@ public static class CharacterPosing
         Point2D Effector(double[] a)
         {
             var pose = start.Pose with { BoneRotations = start.Pose.BoneRotations.Where(r => joints.All(j => j.Bone != r.Bone)).Concat(joints.Select((j, i) => new BoneRotation(j.Bone, a[i]))).ToList() };
-            return effector(BodyRig.Build(character.Body, start.Pose.ViewAngle, character.Skeleton, pose));
+            return effector(CharacterRig.Build(character, start.Pose.ViewAngle, pose));
         }
 
         const double step = 0.5; // degrees, for the numeric Jacobian
@@ -430,7 +430,7 @@ public static class CharacterPosing
     {
         var standing = instance with { Pose = instance.Pose with { BoneRotations = [], HipsShift = null } };
         var (_, legLength) = LimbFrame(character, standing, Limb.LeftLeg);
-        return 0.55 * legLength / Math.Max(character.Body.Normalized().Height, 1e-6);
+        return 0.55 * legLength / Math.Max(CharacterRig.Height(character), 1e-6);
     }
 
     public static bool IsPosed(PoseData pose) => pose.BoneRotations.Count > 0 || pose.HipsShift is not null;

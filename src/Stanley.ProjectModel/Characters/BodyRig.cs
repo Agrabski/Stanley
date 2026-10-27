@@ -24,6 +24,11 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY,
 /// <param name="NearLimbs">The parts nearest the viewer in a side view (the near arm, with <paramref name="NearBlobs"/> its hand and foot): drawn on top as their own outlined shape, so they still read against the body behind them. Empty in the front view.</param>
 /// <param name="Layers">The same shapes sorted into depth layers, back to front - what the renderer paints (docs/sticker-system.md §4.2).</param>
 /// <param name="Regions">Where each body region is, for attaching sticker parts.</param>
+/// <param name="Absent">
+/// The regions a body built from shapes leaves out (no torso, one arm, ...): each still has a
+/// small frame in <paramref name="Regions"/> at its socket so nothing downstream breaks, but
+/// sticker parts on it aren't drawn and posing offers no handle for it. Null = none absent.
+/// </param>
 public sealed record BodyFigure(
     ViewAngle Angle,
     ViewAngleRestLayout RestLayout,
@@ -36,8 +41,13 @@ public sealed record BodyFigure(
     IReadOnlyList<BodyEllipse> NearBlobs,
     Rect2D Extent,
     IReadOnlyList<FigureLayer> Layers,
-    FigureRegions Regions)
+    FigureRegions Regions,
+    IReadOnlySet<FigurePart>? Absent = null)
 {
+    /// <summary>Whether the figure has <paramref name="region"/> (on the character's <paramref name="side"/>, for a limb region) at all.</summary>
+    public bool Has(BodyRegion region, LimbSide side = LimbSide.Left) =>
+        Absent is null || (!Absent.Contains(new FigurePart(region)) && !Absent.Contains(new FigurePart(region, side)));
+
     /// <summary>
     /// The layer a region is painted in: front view - legs and feet behind the torso (and
     /// neck, and skirt), then the head, then the arms and hands in front, each limb in a

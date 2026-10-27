@@ -28,6 +28,10 @@ namespace Stanley.ProjectModel.Characters;
 /// for a character that was never kept. It changes only through a deliberate keep/save/update
 /// action, never by opening a comic.
 /// </param>
+/// <param name="Modules">
+/// Set for a body built from shapes (docs/shape-characters.md): what <see cref="CharacterRig"/>
+/// builds the figure from instead of <paramref name="Body"/>. Absent for a generated body.
+/// </param>
 public sealed record CharacterDefinition(
     CharacterId Id,
     string Name,
@@ -39,8 +43,12 @@ public sealed record CharacterDefinition(
     IReadOnlyList<SavedExpression>? Expressions = null,
     SortedDictionary<StickerId, string>? StickerVariants = null,
     SortedDictionary<StickerId, LimbSide>? StickerSides = null,
-    string? MyAssetsVersion = null)
+    string? MyAssetsVersion = null,
+    ModularBody? Modules = null)
 {
+    /// <summary>Whether the body is built from shapes rather than generated from sliders.</summary>
+    public bool IsModular => Modules is not null;
+
     /// <summary>
     /// The character's stickers (worn or not) and pattern tiles, loaded from its folder -
     /// not part of <c>character.json</c> (each sticker is its own folder), but part of the

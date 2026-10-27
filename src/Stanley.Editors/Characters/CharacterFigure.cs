@@ -112,7 +112,7 @@ public sealed class CharacterFigure : Control
         if (closeup)
         {
             // The head, what's worn on it, and a little of the shoulders, centred.
-            var head = BodyRig.Build(main.Body, angle, main.Skeleton, pose).Regions.Head;
+            var head = CharacterRig.Build(main, angle, pose).Regions.Head;
             var r = head.RadiusY;
             var worn = CharacterRenderers.Default.Extent(main, angle, pose);
             var top = Math.Max(worn.Top, head.Center.Y - 2.4 * r) - 0.15 * r;
@@ -234,7 +234,7 @@ public sealed class CharacterFigure : Control
                 {
                     canvas.Restore();
                     if (guides)
-                        Label(canvas, character.Name, (float)placement.Ground.X, (float)(groundY - character.Body.Height * unit - 4), SKTextAlign.Center, 10, 140);
+                        Label(canvas, character.Name, (float)placement.Ground.X, (float)(groundY - CharacterRig.Height(character) * unit - 4), SKTextAlign.Center, 10, 140);
                 }
                 else if (highlight is { } sticker)
                 {

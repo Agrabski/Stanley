@@ -49,7 +49,7 @@ public sealed partial class CharacterItem : ObservableObject
 		}
 	}
 
-	public string Details => $"{Editor.Working.Body.Height * 100:0}% tall" + (Usage == 0 ? " · not placed" : Usage == 1 ? " · in 1 panel" : $" · in {Usage} panels");
+	public string Details => $"{CharacterRig.Height(Editor.Working) * 100:0}% tall" + (Usage == 0 ? " · not placed" : Usage == 1 ? " · in 1 panel" : $" · in {Usage} panels");
 
 	public bool IsNotEditingName => !IsEditingName;
 

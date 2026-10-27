@@ -265,7 +265,7 @@ public sealed class FigureRenderer : ICharacterRenderer
     public Rect2D Extent(CharacterDefinition character, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
         CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
     {
-        var body = BodyRig.Extent(character.Body, angle, character.Skeleton, pose);
+        var body = CharacterRig.Extent(character, angle, pose);
         if (character.Wardrobe.Stickers.Count == 0)
             return body;
         var drawing = Drawing(character, angle, pose, overrides, revision);
@@ -301,7 +301,7 @@ public sealed class FigureRenderer : ICharacterRenderer
                 return cached;
             if (cache.Count >= MaxPosesPerCharacter)
                 cache.Clear();
-            var figure = BodyRig.Build(character.Body, angle, character.Skeleton, pose);
+            var figure = CharacterRig.Build(character, angle, pose);
             return cache[key] = Build(character, figure, CharacterLooks.Resolve(character, look, overrides), pose);
         }
     }
@@ -320,7 +320,7 @@ public sealed class FigureRenderer : ICharacterRenderer
     /// </summary>
     public static FigureDrawing Build(CharacterDefinition character, BodyFigure figure, CharacterLook look, PoseData? pose)
     {
-        var height = character.Body.Normalized().Height;
+        var height = CharacterRig.Height(character);
         var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
         var tiles = TileLookup(character);
         var stickers = Geometry(figure, look, pose, height, tiles);

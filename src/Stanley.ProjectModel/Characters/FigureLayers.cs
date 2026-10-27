@@ -70,17 +70,30 @@ public enum FigureLayerKind
 /// crossing the chest still gets its outline.
 /// </summary>
 /// <param name="Torso">The torso outline (drawn smoothed), for the one layer that holds it.</param>
+/// <param name="Shapes">A body built from shapes (docs/shape-characters.md): its outlines in this layer, already in figure space; null for a generated body.</param>
 public sealed record FigureLayer(
     FigureLayerKind Kind,
     IReadOnlyList<Point2D>? Torso,
     IReadOnlyList<BodyCapsule> Capsules,
     IReadOnlyList<BodyEllipse> Ellipses,
-    IReadOnlyList<BodyEllipse> Seams)
+    IReadOnlyList<BodyEllipse> Seams,
+    IReadOnlyList<FigureShape>? Shapes = null)
 {
     public static FigureLayer Empty(FigureLayerKind kind) => new(kind, null, [], [], []);
 
-    public bool HasBody => Torso is { Count: > 0 } || Capsules.Count > 0 || Ellipses.Count > 0;
+    public bool HasBody => Torso is { Count: > 0 } || Capsules.Count > 0 || Ellipses.Count > 0 || Shapes is { Count: > 0 };
 }
+
+/// <summary>
+/// One closed outline of a body built from shapes, in figure space, and the colour slot
+/// it's filled with. <paramref name="ColorSlot"/> is <see cref="CharacterDefinition.SkinSlot"/>
+/// unless the module was given a colour of its own. Capsules and ellipses in the same
+/// layer are filled with the skin colour, as for a generated body.
+/// </summary>
+public sealed record FigureShape(IReadOnlyList<ShapeAnchor> Anchors, string ColorSlot);
+
+/// <summary>A region a figure may leave out (<see cref="BodyFigure.Absent"/>): on both sides (<paramref name="Side"/> null), or one arm, hand, leg or foot.</summary>
+public readonly record struct FigurePart(BodyRegion Region, LimbSide? Side = null);
 
 /// <summary>An arm or leg as drawn: the upper segment (upper arm, thigh) and the lower one (forearm, shin).</summary>
 public sealed record LimbFrame(BodyCapsule Upper, BodyCapsule Lower)

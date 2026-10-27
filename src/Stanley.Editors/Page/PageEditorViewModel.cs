@@ -1933,7 +1933,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// <summary>A character's figure-space bounding box; a default body's for a character missing from the catalog (it draws as a placeholder that size).</summary>
     public Rect2D FigureExtent(CharacterId id, ViewAngle angle = ViewAngle.Front) =>
         CharacterSnapshot.TryGetValue(id, out var character)
-            ? BodyRig.Extent(character.Body, angle, character.Skeleton)
+            ? CharacterRig.Extent(character, angle)
             : BodyRig.Extent(BodyShape.Default, angle);
 
     /// <summary>A placed character's bounding box on the page.</summary>
