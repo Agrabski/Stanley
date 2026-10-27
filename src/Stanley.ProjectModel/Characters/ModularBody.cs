@@ -94,7 +94,7 @@ public enum LimbSides
 /// <param name="Taper">For <see cref="LimbStyle.Taper"/>: how much thinner the end is than the root, 0-0.9; null = 0.5.</param>
 /// <param name="Bend">Where the elbow or knee sits along the length, 0.2-0.8; null = 0.5.</param>
 /// <param name="End">The hand or foot shape (unit box, its top centre at the wrist or ankle); null = the limb's own round end.</param>
-/// <param name="EndSize">The end shape's height, figure units; null = twice the thickness.</param>
+/// <param name="EndSize">The side of the square box the end shape is hung in from the wrist or ankle (it keeps its own proportions inside it), figure units; null = twice the thickness.</param>
 /// <param name="Upper">For <see cref="LimbStyle.Pieces"/>: the upper bone's shape (unit box, top centre at the root); null = a capsule.</param>
 /// <param name="Lower">For <see cref="LimbStyle.Pieces"/>: the lower bone's shape; null = a capsule.</param>
 /// <param name="Sides">Both limbs, or just one (the character's own side); null = both.</param>
