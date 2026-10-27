@@ -27,3 +27,10 @@ and `slot-2` classes.
 Prints (`print/`) are symbols for clothes: one Pin art part named `print` on the
 chest, in `class="slot-print"`, clipped to the clothes underneath (`clip: clothes`);
 leave details as holes rather than fixed colours, so they read in any colour.
+Shapes (`shapes/<kind>/<category>/<name>.json`, kinds `head`, `torso`, `hand`, `foot`,
+`piece`; categories `organic`, `geometric`, `abstract`) are the outlines characters are
+built from (docs/shape-characters.md §8): each is one `ModuleShape` in the project
+format, a closed ring of bezier anchors in a unit box (0,0)-(1,1), y down, with no
+`source` (a copy gets `library:shapes/<key>` when it's taken). Heads, torsos and pieces
+fill the box; hands and feet keep their proportions, their long side spanning it, hung
+from the top centre (the wrist or ankle). Like everything here they are original and CC0.
