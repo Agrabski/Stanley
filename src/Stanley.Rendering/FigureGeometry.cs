@@ -49,9 +49,17 @@ internal static class FigureGeometry
         return merged;
     }
 
-    /// <summary>Whether <paramref name="union"/> contains <paramref name="part"/>, going by a 3 x 3 grid of sample points inside it.</summary>
+    /// <summary>
+    /// Whether <paramref name="union"/> contains <paramref name="part"/>, going by its bounds
+    /// (which catch a thin part dropped whole - a stick leg the grid's points all miss) and
+    /// a 3 x 3 grid of sample points inside it (which catch a dropped inside).
+    /// </summary>
     private static bool Covers(SKPath union, SKPath part)
     {
+        var (outer, inner) = (union.TightBounds, part.TightBounds);
+        var slack = 1e-3f * Math.Max(Math.Max(outer.Width, outer.Height), Math.Max(inner.Width, inner.Height));
+        if (inner.Left < outer.Left - slack || inner.Top < outer.Top - slack || inner.Right > outer.Right + slack || inner.Bottom > outer.Bottom + slack)
+            return false;
         var box = part.Bounds;
         for (var i = 1; i <= 3; i++)
         {
