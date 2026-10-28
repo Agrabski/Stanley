@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Stanley.Editing\Stanley.Editing.csproj" />
+    <ProjectReference Include="..\..\src\Stanley.StickerLibrary\Stanley.StickerLibrary.csproj" />
   </ItemGroup>
 
 </Project>
