@@ -75,6 +75,26 @@ public sealed class ShapeOutlineImportTests
     }
 
     [Fact]
+    public void The_outline_put_back_in_the_files_box_covers_what_the_file_draws()
+    {
+        var svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><path d="M50,5 Q95,10 90,60 A40,40 0 0 1 10,70 Q0,15 50,5 Z"/></svg>""";
+        var drawn = StickerSvg.Parse(svg).Part(ParsedArt.WholeFile).Single().Path;
+        var outline = ShapeOutlineImport.FromFile(ArtFile.Svg(svg)).Outline!;
+
+        using var back = AnchorRingPath.ToSkPath(AnchorRing.Rescale(outline.Shape.Anchors, new Rect2D(0, 0, 1, 1), outline.Bounds));
+        var (samples, differ) = (0, 0);
+        for (var y = outline.Bounds.Y; y <= outline.Bounds.Y + outline.Bounds.Height; y += 1)
+            for (var x = outline.Bounds.X; x <= outline.Bounds.X + outline.Bounds.Width; x += 1)
+            {
+                samples++;
+                if (drawn.Contains((float)x, (float)y) != back.Contains((float)x, (float)y))
+                    differ++;
+            }
+
+        Assert.True(differ < samples / 200, $"{differ} of {samples} samples differ");
+    }
+
+    [Fact]
     public void An_open_path_is_not_a_shape()
     {
         var result = Import("""<path d="M10,10 L90,10 L90,90" fill="none" stroke="#000"/>""");
