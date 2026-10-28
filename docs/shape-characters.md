@@ -1,6 +1,6 @@
 # Characters built from shapes — design
 
-**Status: in progress** (issue #173). Slices 1–4 are built (§14 records how); the rest
+**Status: in progress** (issue #173). Slices 1–4 and 6 are built (§14 records how); the rest
 is the working plan. This is the design for a
 second way to build a character: by snapping together ready-made shapes instead of
 moving body sliders. It builds on the character POC (`docs/character-authoring-poc.md`)
@@ -538,4 +538,24 @@ shapes*, then grow the editor in 5.
 - `ModuleEditing`: a head or torso always stays (removing both is refused); giving a limb an
   Upper or Lower piece switches it to `Pieces`; `SetAnchors` stores the outline as given
   (re-fitting to the box is Edit Points' job, slice 7) and drops the library `Source`.
+
+### 14.5 Posing on the page (slice 6)
+
+- `CharacterPosing.Limbs(character, instance)` and `TrunkParts(character)` say which handles a
+  character has: the hips always, the chest only with a torso, the head only with a head
+  module (`HasHead`, not `Has(Head)`: a head-less body's head region is its face on the
+  torso). The page's `LimbHandles`, `BendHandles` and `TrunkHandles` go through them, and
+  drawing, hit-testing, cursors and the status hint (`PoseDots`) all read those, so a
+  missing part has nothing to show or grab. `TiltHead` with no head is a no-op.
+- `PosePresets.Apply` and `Turn`'s translation skip limbs the body hasn't got instead of
+  solving for a zero-length one; `MaxHipsDrop` goes by the longer leg.
+- `Turn` can't round-trip every preset on a body missing parts: where two presets look the
+  same there (an armless Blob's Cheer is just standing), `Recognize` returns whichever the
+  gallery lists first. Mirror pose on a one-armed body moves the pose onto the missing arm.
+- `FigureGeometry.Covers` (the guard on Skia unions) checks the union's tight bounds as well
+  as a 3×3 grid of samples: a stick figure's thin legs walking side on slipped between the
+  samples and the union dropped them. Coverage tests must not rely on grid samples alone.
+- A shape body builds in ~1.5 ms against the mannequin's ~0.3 (Release): `ModularRig.Build`
+  draws twice (standing, to find the ground; then posed), and `Recognize`, the pose gallery
+  and `Turn` apply all 11 presets. Caching the standing pass is the cheap fix if it shows.
 
