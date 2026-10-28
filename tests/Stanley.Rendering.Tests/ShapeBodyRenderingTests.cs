@@ -4,6 +4,7 @@ using Stanley.ProjectModel.Geometry;
 using Stanley.ProjectModel.Ids;
 using Stanley.ProjectModel.Issues;
 using Stanley.ProjectModel.Poses;
+using Stanley.StickerLibrary;
 using Xunit;
 
 namespace Stanley.Rendering.Tests;
@@ -365,5 +366,34 @@ public class ShapeBodyRenderingTests
                     path.Dispose();
             }
         }
+    }
+
+    /// <summary>
+    /// Skia's union of a stick figure's legs with its thin, slightly bent body came back as the
+    /// body alone, and the 3 x 3 sample grid that guards a union missed it - every point fell
+    /// between the thin legs - so walking side on drew the stick figure with no legs.
+    /// </summary>
+    [Fact]
+    public void A_thin_limb_unioned_with_a_thin_body_is_never_dropped()
+    {
+        var character = CharacterDefinition.Create("Stick") with { Modules = CreaturePresets.Get("Stick figure")!.Body };
+        // Walk, side on, as the pose gallery gives it.
+        var pose = new PoseData(ViewAngle.Profile,
+        [
+            new(HumanoidBone.Spine, 3), new(HumanoidBone.LeftUpperArm, -1.1), new(HumanoidBone.LeftLowerArm, -26.16),
+            new(HumanoidBone.RightUpperArm, 35.14), new(HumanoidBone.RightLowerArm, -24.52),
+            new(HumanoidBone.LeftUpperLeg, 8.48), new(HumanoidBone.LeftLowerLeg, 15.89),
+            new(HumanoidBone.RightUpperLeg, -22.49), new(HumanoidBone.RightLowerLeg, 9.94),
+        ], [], HipsShift: new Point2D(0, 0.012));
+        var figure = CharacterRig.Build(character, ViewAngle.Profile, pose);
+        var body = figure.Layers.Single(l => l.Kind == FigureLayerKind.Body);
+
+        using var skin = FigureGeometry.LayerSkin(body);
+
+        Assert.All(body.Capsules, c =>
+        {
+            var middle = Along(c, 0.5);
+            Assert.True(skin.Contains((float)middle.X, (float)middle.Y), $"the leg bone through {middle} is drawn");
+        });
     }
 }

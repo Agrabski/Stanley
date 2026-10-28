@@ -38,6 +38,34 @@ public static class CharacterPosing
 
     public static (HumanoidBone Root, HumanoidBone Middle, HumanoidBone End) Chain(Limb limb) => BodyRig.LimbChains[(int)limb];
 
+    /// <summary>Whether <paramref name="figure"/> has <paramref name="limb"/> - a body built from shapes may leave out its arms, its legs or one side of either (docs/shape-characters.md §7).</summary>
+    public static bool Has(BodyFigure figure, Limb limb) =>
+        figure.Has(IsLeg(limb) ? BodyRegion.Leg : BodyRegion.Arm, limb is Limb.LeftArm or Limb.LeftLeg ? LimbSide.Left : LimbSide.Right);
+
+    /// <summary>The limbs the character has, to pose by their hand or foot and elbow or knee: all four for a generated body.</summary>
+    public static IReadOnlyList<Limb> Limbs(CharacterDefinition character, CharacterInstance instance)
+    {
+        var figure = Figure(character, instance);
+        return Enum.GetValues<Limb>().Where(limb => Has(figure, limb)).ToList();
+    }
+
+    /// <summary>
+    /// The trunk handles the character has: the hips always (with no legs they move the
+    /// whole body), the chest only with a torso to lean, the head only with a head to tilt -
+    /// a body built from shapes with no head wears its face on its torso, which the chest
+    /// ring already leans.
+    /// </summary>
+    public static IReadOnlyList<TrunkPart> TrunkParts(CharacterDefinition character) =>
+        Enum.GetValues<TrunkPart>().Where(part => part switch
+        {
+            TrunkPart.Chest => character.Modules is not { Torso: null },
+            TrunkPart.Head => HasHead(character),
+            _ => true
+        }).ToList();
+
+    /// <summary>Whether the character has a head of its own - every generated body does; one built from shapes only with a head module.</summary>
+    public static bool HasHead(CharacterDefinition character) => character.Modules is not { Head: null };
+
     /// <summary>Where the limb's hand or foot joint (wrist, ankle) is on the page - the drag handle.</summary>
     public static Point2D EndPoint(CharacterDefinition character, CharacterInstance instance, Limb limb) =>
         instance.Placement.ToPage(Joint(Figure(character, instance).Layout, Chain(limb).End));
@@ -161,9 +189,12 @@ public static class CharacterPosing
     /// Bends the neck and tilts the head so the top of the head goes towards
     /// <paramref name="pageTarget"/> - inverse kinematics over both
     /// (<see cref="BodyRig.NeckJoints"/>), sharing the turn between them. The chest stays.
+    /// A character with no head (<see cref="HasHead"/>) has nothing to tilt.
     /// </summary>
     public static CharacterInstance TiltHead(CharacterDefinition character, CharacterInstance start, Point2D pageTarget)
     {
+        if (!HasHead(character))
+            return start;
         var target = start.Placement.ToFigure(pageTarget);
         return SolveTrunkChain(character, start, BodyRig.NeckJoints, target, HeadTop, smoothness: 0.004);
     }
@@ -386,6 +417,8 @@ public static class CharacterPosing
             var bent = instance.Pose.BoneRotations.Any(r => (r.Bone == root || r.Bone == middle) && Math.Abs(r.Degrees) > 1e-9);
             var (rootBefore, length) = LimbFrame(character, instance, limb);
             var (rootAfter, newLength) = LimbFrame(character, posed, limb);
+            if (length < 1e-9 || newLength < 1e-9)
+                continue; // a limb the character hasn't got
             var at = Joint(figure.Layout, end);
             var outward = PosePresets.Outward(character, posed, limb);
             Point2D target;
@@ -424,12 +457,14 @@ public static class CharacterPosing
     /// <summary>
     /// How far the hips can come down (a fraction of height, as <see cref="PoseData.HipsShift"/>
     /// has it) before the seat would go through the floor: about half the leg's length, so a
-    /// chibi's short legs crouch less far than a heroic figure's long ones.
+    /// chibi's short legs crouch less far than a heroic figure's long ones. The longer leg
+    /// counts (a body built from shapes may have only one); with no legs the hips don't come
+    /// down at all.
     /// </summary>
     public static double MaxHipsDrop(CharacterDefinition character, CharacterInstance instance)
     {
         var standing = instance with { Pose = instance.Pose with { BoneRotations = [], HipsShift = null } };
-        var (_, legLength) = LimbFrame(character, standing, Limb.LeftLeg);
+        var legLength = Math.Max(LimbFrame(character, standing, Limb.LeftLeg).Length, LimbFrame(character, standing, Limb.RightLeg).Length);
         return 0.55 * legLength / Math.Max(CharacterRig.Height(character), 1e-6);
     }
 

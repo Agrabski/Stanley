@@ -150,6 +150,8 @@ public static class PosePresets
             }
 
             var (root, length) = CharacterPosing.LimbFrame(character, posed, limb);
+            if (length < 1e-9)
+                continue; // a limb the character hasn't got (a body built from shapes may leave one out)
             var goalY = root.Y + goal.Down * length;
             // A foot never goes below the floor it stands on (the hips may have come down a long way, as in sitting).
             if (CharacterPosing.IsLeg(limb))
