@@ -51,6 +51,27 @@ public static class ModularRig
     /// <summary>How tall the assembly stands: its top above the ground point.</summary>
     public static double Height(ModularBody body) => Math.Max(0, -Build(body).Extent.Top);
 
+    /// <summary>
+    /// Where the head's or torso's unit box lands in figure space, standing at rest seen from
+    /// <paramref name="angle"/>: the frame <see cref="Build"/> places its outline through once
+    /// flipped (<see cref="ModuleSockets.Flipped"/>), its nudge included. Null when the body
+    /// hasn't that part (or <paramref name="part"/> is a limb). A pose turns the head and bends
+    /// the torso, so this is the figure standing with no pose - what the character editor's
+    /// Edit Points and Edit sockets map through.
+    /// </summary>
+    public static ModuleFrame? FrameOf(ModularBody body, ModulePart part, ViewAngle angle = ViewAngle.Front)
+    {
+        if (!part.IsShape())
+            return null;
+        var provisional = Assemble(body.Normalized(), angle == ViewAngle.Profile);
+        var placed = part == ModulePart.Head ? provisional.Head : provisional.Torso;
+        if (placed is null)
+            return null;
+        var (standing, drawn) = Draw(provisional, 1, null);
+        var hips = provisional.At(HumanoidBone.Hips);
+        return placed.Frame.Moved(new Point2D(-hips.X, -(drawn ? standing.Extent.Bottom : hips.Y)));
+    }
+
     // ---------------------------------------------------------------- stacking the parts at rest
 
     /// <summary>A head or torso as placed: its shape (flipped already), where its unit box is, and its colour slot.</summary>
