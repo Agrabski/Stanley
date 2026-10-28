@@ -110,7 +110,7 @@ public static class ModuleEditing
     {
         if (AnchorsError(anchors) is { } error)
             return Fail(error);
-        return EditShape(body, part, m => m with { Shape = m.Shape with { Anchors = anchors.ToList(), Source = null } });
+        return EditShape(body, part, m => m with { Shape = m.Shape with { Anchors = anchors.ToList(), Source = null, MyAssetsVersion = null } });
     }
 
     /// <summary>A limb's hand, foot or piece outline with its points moved; like the head's, it's the character's own from then on.</summary>
@@ -120,7 +120,7 @@ public static class ModuleEditing
             return Fail(error);
         if (LimbOf(body, part) is { } limb && ShapeOf(limb, piece) is null)
             return Fail(piece == LimbPiece.End ? $"The {part.Noun()} have no {EndNoun(part)} shape to change." : "That piece is a plain capsule: pick a shape for it first.");
-        var edited = (ModuleShape s) => s with { Anchors = anchors.ToList(), Source = null };
+        var edited = (ModuleShape s) => s with { Anchors = anchors.ToList(), Source = null, MyAssetsVersion = null };
         return EditLimb(body, part, l => piece switch
         {
             LimbPiece.End => l with { End = edited(l.End!) },
@@ -149,7 +149,7 @@ public static class ModuleEditing
                 sockets[socket] = new Point2D(Math.Clamp(at.X, -SocketMargin, 1 + SocketMargin), Math.Clamp(at.Y, -SocketMargin, 1 + SocketMargin));
             else
                 sockets.Remove(socket);
-            return m with { Shape = m.Shape with { Sockets = sockets.Count == 0 ? null : sockets, Source = null } };
+            return m with { Shape = m.Shape with { Sockets = sockets.Count == 0 ? null : sockets, Source = null, MyAssetsVersion = null } };
         });
     }
 

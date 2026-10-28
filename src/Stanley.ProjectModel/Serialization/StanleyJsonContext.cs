@@ -34,4 +34,5 @@ namespace Stanley.ProjectModel.Serialization;
 [JsonSerializable(typeof(Panel))]
 [JsonSerializable(typeof(ObjectGroup))]
 [JsonSerializable(typeof(AssetPack))]
+[JsonSerializable(typeof(ShapeAsset))]
 public sealed partial class StanleyJsonContext : JsonSerializerContext;

@@ -53,11 +53,13 @@ public sealed record ShapeModule(
 /// (<see cref="ModuleSockets"/>), so a shape needs no setup to work.
 /// </summary>
 /// <param name="Sockets">Socket name (<see cref="ModuleSockets"/>) -&gt; its point in the unit box, only for those dragged by hand; null = all derived.</param>
-/// <param name="Source">"library:shapes/&lt;kind&gt;/&lt;category&gt;/&lt;name&gt;" while it's an unmodified library copy; null once changed or for one's own.</param>
+/// <param name="Source">"library:shapes/&lt;kind&gt;/&lt;category&gt;/&lt;name&gt;" while it's an unmodified library copy, or "my-assets:shapes/&lt;id&gt;" while it's an unmodified copy of a shape kept in My Assets (<see cref="Objects.ShapeAsset"/>); null once changed or for one's own.</param>
+/// <param name="MyAssetsVersion">For a copy of a kept shape: the My Assets fingerprint it last matched (docs/asset-packs.md §7.1, §7.3); null otherwise. Dropped with <paramref name="Source"/>.</param>
 public sealed record ModuleShape(
     IReadOnlyList<ShapeAnchor> Anchors,
     SortedDictionary<string, Point2D>? Sockets = null,
-    string? Source = null);
+    string? Source = null,
+    string? MyAssetsVersion = null);
 
 /// <summary>How a <see cref="LimbModule"/> is drawn along its two bones.</summary>
 [JsonConverter(typeof(CamelCaseEnumConverter<LimbStyle>))]

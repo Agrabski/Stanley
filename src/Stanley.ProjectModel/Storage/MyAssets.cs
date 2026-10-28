@@ -6,8 +6,8 @@ using Stanley.ProjectModel.Serialization;
 namespace Stanley.ProjectModel.Storage;
 
 /// <summary>
-/// One user's My Assets folder (docs/asset-packs.md §7.2): characters, object groups and
-/// packs, read and written the same way a comic's own folder is - just a different root, so
+/// One user's My Assets folder (docs/asset-packs.md §7.2): characters, object groups, the
+/// outlines of shape characters' parts (<c>shapes/</c>, one file each) and packs, read and written the same way a comic's own folder is - just a different root, so
 /// a comic and My Assets share the exact same <see cref="CharacterStore"/> and
 /// <see cref="ObjectGroupStore"/> (docs/asset-packs.md §9, "share one implementation").
 /// Only the two kinds #99 and the original "My Characters" ask need are usable yet; the
@@ -58,6 +58,43 @@ public sealed class MyAssets
     {
         _objectGroups.Delete(id);
         RemoveMember(AssetKind.ObjectGroup, id.Value);
+    }
+
+    private string ShapesDir => Path.Combine(RootDirectory, ProjectPaths.ShapesDirName);
+
+    /// <summary>Every kept shape (docs/shape-characters.md §9.3) in <c>shapes/</c>, sorted by name - one file each, like a pack. A file that can't be read is left out.</summary>
+    public IReadOnlyList<ShapeAsset> ListShapes()
+    {
+        if (!Directory.Exists(ShapesDir))
+            return [];
+
+        return Directory.EnumerateFiles(ShapesDir, "*." + ProjectPaths.JsonExtension)
+            .Select(path => StoreReads.Read(path, ProjectJson.Read<ShapeAsset>, skipUnreadable: true))
+            .OfType<ShapeAsset>()
+            .OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(s => s.Id.Value, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public ShapeAsset LoadShape(ShapeAssetId id)
+    {
+        var path = ProjectPaths.FindEntityFile(ShapesDir, id, ProjectPaths.JsonExtension)
+            ?? throw new FileNotFoundException($"No shape with id '{id.Value}' was found.");
+        return ProjectJson.Read<ShapeAsset>(path);
+    }
+
+    public void SaveShape(ShapeAsset shape)
+    {
+        var path = ProjectPaths.ResolveOrCreateEntityFilePath(ShapesDir, shape.Id, shape.Name, ProjectPaths.JsonExtension);
+        ProjectJson.Write(path, shape);
+    }
+
+    /// <summary>Removes a kept shape (characters that use it keep their own copy) and drops it from every pack that referenced it. A no-op if it was never saved.</summary>
+    public void RemoveShape(ShapeAssetId id)
+    {
+        if (ProjectPaths.FindEntityFile(ShapesDir, id, ProjectPaths.JsonExtension) is { } path)
+            File.Delete(path);
+        RemoveMember(AssetKind.Shape, id.Value);
     }
 
     /// <summary>Every pack in <c>packs/</c>, sorted by name - there's no index file, matching every other kind. A pack file that can't be read is left out.</summary>

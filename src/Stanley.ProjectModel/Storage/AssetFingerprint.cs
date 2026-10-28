@@ -64,6 +64,17 @@ public static class AssetFingerprint
         return Compute(files);
     }
 
+    /// <summary>
+    /// A kept shape: its outline and hand-placed sockets only. The name is left out - a
+    /// character's copy of the shape has none, so renaming it in My Assets is no change - and
+    /// so are <see cref="ModuleShape.Source"/> and <see cref="ModuleShape.MyAssetsVersion"/>.
+    /// </summary>
+    public static string ShapeFingerprint(ShapeAsset shape) =>
+        Compute(new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["shape.json"] = Encoding.UTF8.GetBytes(ProjectJson.Serialize(shape.Shape with { Source = null, MyAssetsVersion = null }))
+        });
+
     /// <summary><c>group.json</c> (without <see cref="ObjectGroup.MyAssetsVersion"/>) plus its art files.</summary>
     public static string ObjectGroupFingerprint(ObjectGroup group)
     {

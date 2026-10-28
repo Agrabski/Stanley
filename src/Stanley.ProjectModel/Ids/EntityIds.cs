@@ -375,3 +375,22 @@ public readonly record struct AssetPackId : IStrongId<AssetPackId>, IParsable<As
     public int CompareTo(AssetPackId other) => string.CompareOrdinal(Value, other.Value);
     public override string ToString() => Value;
 }
+
+/// <summary>Identifies a <c>shapes/&lt;id&gt;-slug.json</c> outline kept in My Assets (docs/asset-packs.md §5; docs/shape-characters.md §9.3).</summary>
+[JsonConverter(typeof(StrongIdJsonConverter<ShapeAssetId>))]
+public readonly record struct ShapeAssetId : IStrongId<ShapeAssetId>, IParsable<ShapeAssetId>, IComparable<ShapeAssetId>
+{
+    public string Value { get; }
+    private ShapeAssetId(string value) => Value = value;
+    public static ShapeAssetId New() => new(EntityIdValue.NewToken());
+    public static ShapeAssetId FromValue(string value) => new(EntityIdValue.Validate(value, nameof(value)));
+    public static ShapeAssetId Parse(string s, IFormatProvider? provider = null) => FromValue(s);
+    public static bool TryParse(string? s, IFormatProvider? provider, out ShapeAssetId result)
+    {
+        if (EntityIdValue.TryValidate(s, out var validated)) { result = new ShapeAssetId(validated); return true; }
+        result = default;
+        return false;
+    }
+    public int CompareTo(ShapeAssetId other) => string.CompareOrdinal(Value, other.Value);
+    public override string ToString() => Value;
+}
