@@ -99,11 +99,12 @@ public sealed class ColorSlotEditor : CommunityToolkit.Mvvm.ComponentModel.Obser
 	public string Tip =>
 		StickerSlots.IsStreakColorKey(Slot) ? "This streak - its own colour and dye"
 		: StickerSlots.IsStickerColorKey(Slot) ? $"This sticker - its own colour and fabric; Same as slot {_owner.Where("on the Sticker tab", "under Sticker")} gives it back"
+		: ModuleNames.PartOfColorSlot(Slot) is { } part ? $"The {part.Noun()}' own colour - pick one; Same as skin gives {(part.IsLimb() ? "them" : "it")} the skin's again"
 		: StickerSlots.HairPieces.Contains(Slot) ? $"{Label} of the hair - its own colour and dye; Same as hair {_owner.Where("on the Sticker tab", "under Sticker")} gives it back"
 		: $"{Label} - colour and fabric; everything this character wears in it follows";
 
-	/// <summary>Clothes get fabrics; skin and eyes (split left/right or not) are just colours.</summary>
-	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight);
+	/// <summary>Clothes get fabrics; skin, eyes (split left/right or not) and a body part's own colour are just colours.</summary>
+	public bool CanHaveFabric => Slot is not (CharacterDefinition.SkinSlot or StickerSlots.Eyes or StickerSlots.EyesLeft or StickerSlots.EyesRight) && ModuleNames.PartOfColorSlot(Slot) is null;
 
 	public IReadOnlyList<ColorSwatchChoice> Swatches { get; }
 

@@ -90,7 +90,8 @@ public sealed record FigureLayer(
 /// unless the module was given a colour of its own. Capsules and ellipses in the same
 /// layer are filled with the skin colour, as for a generated body.
 /// </summary>
-public sealed record FigureShape(IReadOnlyList<ShapeAnchor> Anchors, string ColorSlot);
+/// <param name="Part">The module that drew it (the character editor picks a module by it); null when no one module owns it.</param>
+public sealed record FigureShape(IReadOnlyList<ShapeAnchor> Anchors, string ColorSlot, ModulePart? Part = null);
 
 /// <summary>A region a figure may leave out (<see cref="BodyFigure.Absent"/>): on both sides (<paramref name="Side"/> null), or one arm, hand, leg or foot.</summary>
 public readonly record struct FigurePart(BodyRegion Region, LimbSide? Side = null);

@@ -8,7 +8,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:Stanley.Editors"
              x:Class="Stanley.Editors.BodySection"
-             x:DataType="local:CharacterEditorViewModel">
+             x:DataType="local:CharacterEditorViewModel" IsVisible="{Binding IsGeneratedBody}">
   <UserControl.Styles>
     <!-- A slider filling its row, between the label and the value. -->
     <Style Selector="Slider.inspectorSlider">

@@ -272,7 +272,7 @@ public static class ModularRig
         if (assembly.Torso is { } torso)
         {
             var restAnchors = torso.Frame.Place(torso.Shape.Anchors);
-            torsoShape = new FigureShape(restAnchors.Select(a => new ShapeAnchor(trunk.Upper(a.Point), trunk.Upper(a.InHandle), trunk.Upper(a.OutHandle), a.HandleKind)).ToList(), torso.ColorSlot);
+            torsoShape = new FigureShape(restAnchors.Select(a => new ShapeAnchor(trunk.Upper(a.Point), trunk.Upper(a.InHandle), trunk.Upper(a.OutHandle), a.HandleKind)).ToList(), torso.ColorSlot, ModulePart.Torso);
             torsoFrame = new TorsoFrame(ModuleSockets.Flatten(restAnchors), trunk.Bend);
         }
         else
@@ -290,7 +290,7 @@ public static class ModularRig
         BodyEllipse headBlob, face;
         if (assembly.Head is { } head)
         {
-            headShape = new FigureShape(head.Frame.Place(head.Shape.Anchors).Select(a => new ShapeAnchor(HeadMap(a.Point), HeadMap(a.InHandle), HeadMap(a.OutHandle), a.HandleKind)).ToList(), head.ColorSlot);
+            headShape = new FigureShape(head.Frame.Place(head.Shape.Anchors).Select(a => new ShapeAnchor(HeadMap(a.Point), HeadMap(a.InHandle), HeadMap(a.OutHandle), a.HandleKind)).ToList(), head.ColorSlot, ModulePart.Head);
             headBlob = new BodyEllipse(HeadMap(head.Frame.Center), head.Frame.Width / 2, head.Frame.Height / 2, head.Frame.Rotation + trunk.HeadAngle);
             var restFace = head.Frame.Place(ModuleSockets.FaceEllipse(head.Shape, upperBand: false));
             face = restFace with { Center = HeadMap(restFace.Center), RotationDegrees = restFace.RotationDegrees + trunk.HeadAngle };
@@ -324,12 +324,13 @@ public static class ModularRig
             // shape drawn pointing out (a thumb, a toe) points out on both sides.
             var mirror = !profile && side.Of == LimbSide.Right;
             var slot = limb.ColorSlot;
+            var part = arm ? ModulePart.Arms : ModulePart.Legs;
             var boneCapsules = new List<BodyCapsule>();
             var boneShapes = new List<FigureShape>();
             foreach (var (bone, piece) in new[] { (frame.Upper, limb.Upper), (frame.Lower, limb.Lower) })
             {
                 if (limb.Style == LimbStyle.Pieces && piece is not null)
-                    boneShapes.Add(new FigureShape(PieceAlong(piece, bone, limb.Thickness, mirror), slot));
+                    boneShapes.Add(new FigureShape(PieceAlong(piece, bone, limb.Thickness, mirror), slot, part));
                 else
                     boneCapsules.Add(bone);
             }
@@ -350,7 +351,7 @@ public static class ModularRig
                 var bounds = AnchorRing.CurveBounds(shape.Anchors);
                 var endFrame = new ModuleFrame(default, endSize, endSize, turn).Pinned(new Point2D(0.5, 0), w);
                 endRegion = endFrame.Place((new Point2D(bounds.MidX, bounds.MidY), bounds.Width / 2, bounds.Height / 2));
-                end = new Items([], [], [new FigureShape(endFrame.Place(shape.Anchors), slot)]);
+                end = new Items([], [], [new FigureShape(endFrame.Place(shape.Anchors), slot, part)]);
             }
             else
             {
@@ -364,7 +365,7 @@ public static class ModularRig
             var bones = new Items(boneCapsules, [], boneShapes);
             // Capsules and ellipses are filled with the skin colour; a limb of its own colour draws them as outlines instead.
             if (slot != CharacterDefinition.SkinSlot)
-                (bones, end) = (AsShapes(bones, slot), AsShapes(end, slot));
+                (bones, end) = (AsShapes(bones, slot, part), AsShapes(end, slot, part));
             return new LimbParts(true, frame, endRegion, bones, end);
         }
 
@@ -457,10 +458,10 @@ public static class ModularRig
     }
 
     /// <summary>Capsules and ellipses as outlines filled with <paramref name="slot"/>.</summary>
-    private static Items AsShapes(Items items, string slot) =>
+    private static Items AsShapes(Items items, string slot, ModulePart part) =>
         new([], [], items.Shapes
-            .Concat(items.Capsules.Select(c => new FigureShape(CapsuleOutline(c), slot)))
-            .Concat(items.Ellipses.Select(e => new FigureShape(EllipseOutline(e), slot)))
+            .Concat(items.Capsules.Select(c => new FigureShape(CapsuleOutline(c), slot, part)))
+            .Concat(items.Ellipses.Select(e => new FigureShape(EllipseOutline(e), slot, part)))
             .ToList());
 
     /// <summary>A turned ellipse as four smooth anchors.</summary>

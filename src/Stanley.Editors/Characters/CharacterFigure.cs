@@ -43,10 +43,99 @@ public sealed class CharacterFigure : Control
     public static readonly StyledProperty<bool> CloseupProperty =
         AvaloniaProperty.Register<CharacterFigure, bool>(nameof(Closeup));
 
+    public static readonly StyledProperty<ModulePart?> ModuleHighlightProperty =
+        AvaloniaProperty.Register<CharacterFigure, ModulePart?>(nameof(ModuleHighlight));
+
+    public static readonly StyledProperty<bool> ShowModuleGhostsProperty =
+        AvaloniaProperty.Register<CharacterFigure, bool>(nameof(ShowModuleGhosts));
+
     static CharacterFigure()
     {
-        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty, HighlightProperty, CloseupProperty);
+        AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty, HighlightProperty, CloseupProperty,
+            ModuleHighlightProperty, ShowModuleGhostsProperty);
     }
+
+    /// <summary>A part of the main character's body built from shapes to outline - with corner handles for a head or torso (the character editor's selection).</summary>
+    public ModulePart? ModuleHighlight
+    {
+        get => GetValue(ModuleHighlightProperty);
+        set => SetValue(ModuleHighlightProperty, value);
+    }
+
+    /// <summary>Show a faint + where each missing part of the main character's body built from shapes would go (the character editor).</summary>
+    public bool ShowModuleGhosts
+    {
+        get => GetValue(ShowModuleGhostsProperty);
+        set => SetValue(ShowModuleGhostsProperty, value);
+    }
+
+    /// <summary>How big a missing part's + is drawn, and how near a click has to be: its radius in pixels.</summary>
+    public const double GhostRadius = 10;
+
+    /// <summary>A corner handle's half size in pixels (drawn and hit alike).</summary>
+    public const double HandleRadius = 4.5;
+
+    /// <summary>The main character as drawn now: its figure (posed) and where it stands, or null.</summary>
+    private (CharacterDefinition Character, CharacterPlacement Placement, BodyFigure Figure)? Main()
+    {
+        if (Character is not { } character || MainPlacement is not { } placement)
+            return null;
+        return (character, placement, CharacterRig.Build(character, Pose?.ViewAngle ?? Angle, Pose));
+    }
+
+    /// <summary>The part of the main character's body built from shapes under <paramref name="point"/> (control coordinates), or null (off it, or a generated body).</summary>
+    public ModulePart? ModuleAt(Point point) =>
+        Main() is { Character.IsModular: true } main ? FigureModules.At(main.Figure, main.Placement.ToFigure(new(point.X, point.Y))) : null;
+
+    /// <summary>The box around a part as drawn now, in control coordinates, or null.</summary>
+    public Rect? ModuleBounds(ModulePart part)
+    {
+        if (Main() is not { Character.IsModular: true } main || FigureModules.BoundsOf(main.Figure, part) is not { } bounds)
+            return null;
+        var page = main.Placement.ToPage(bounds);
+        return new Rect(page.Left, page.Top, page.Width, page.Height);
+    }
+
+    /// <summary>Which corner handle of the highlighted head or torso is under <paramref name="point"/> - 0 top left, then clockwise - or null.</summary>
+    public int? ModuleHandleAt(Point point)
+    {
+        if (ModuleHighlight is not { } part || !part.IsShape() || ModuleBounds(part) is not { } box)
+            return null;
+        var corners = Corners(box);
+        for (var i = 0; i < corners.Length; i++)
+        {
+            if (Math.Abs(point.X - corners[i].X) <= HandleRadius + 2 && Math.Abs(point.Y - corners[i].Y) <= HandleRadius + 2)
+                return i;
+        }
+        return null;
+    }
+
+    /// <summary>The faint + under <paramref name="point"/>, if missing parts are shown, or null.</summary>
+    public ModuleGhost? ModuleGhostAt(Point point) =>
+        GhostsNow().FirstOrDefault(g => Math.Abs(g.At.X - point.X) <= GhostRadius + 2 && Math.Abs(g.At.Y - point.Y) <= GhostRadius + 2) is { } hit
+            ? hit.Ghost
+            : null;
+
+    /// <summary>Each missing part's + as drawn: control coordinates, one per spot (side on, a pair's two would sit on each other).</summary>
+    private List<(ModuleGhost Ghost, Point At)> GhostsNow() =>
+        ShowModuleGhosts && !Closeup && Main() is { Character.Modules: { } body } main
+            ? Ghosts(body, main.Figure, main.Placement)
+            : [];
+
+    private static List<(ModuleGhost Ghost, Point At)> Ghosts(ModularBody body, BodyFigure figure, CharacterPlacement placement)
+    {
+        var result = new List<(ModuleGhost, Point)>();
+        foreach (var ghost in FigureModules.Ghosts(body, figure))
+        {
+            var p = placement.ToPage(ghost.At);
+            var at = new Point(p.X, p.Y);
+            if (result.All(r => Point.Distance(r.Item2, at) > 2 * GhostRadius))
+                result.Add((ghost, at));
+        }
+        return result;
+    }
+
+    private static Point[] Corners(Rect box) => [box.TopLeft, box.TopRight, box.BottomRight, box.BottomLeft];
 
     /// <summary>Head and shoulders only, filling the control - for hair, face and hat galleries.</summary>
     public bool Closeup
@@ -187,11 +276,12 @@ public sealed class CharacterFigure : Control
         if (Character is not { } character || Bounds.Width < 2 || Bounds.Height < 2)
             return;
         var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
-        context.Custom(new FigureDrawOperation(new(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup));
+        context.Custom(new FigureDrawOperation(new(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup,
+            ModuleHighlight, ShowModuleGhosts));
     }
 
     private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
-        ProjectModel.Poses.PoseData? pose, ProjectModel.Ids.StickerId? highlight, bool closeup)
+        ProjectModel.Poses.PoseData? pose, ProjectModel.Ids.StickerId? highlight, bool closeup, ModulePart? moduleHighlight = null, bool ghosts = false)
         : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
@@ -242,8 +332,55 @@ public sealed class CharacterFigure : Control
                     using var selection = new SKPaint { Color = new(0x1E, 0x5A, 0xA8), Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
                     canvas.DrawPath(outline, selection);
                 }
+                if (!faded && character.Modules is { } body && !closeup)
+                    DrawModules(canvas, character, body, placement);
             }
             canvas.Restore();
+        }
+
+        /// <summary>The picked part's outline (and a head's or torso's corner handles), and a faint + where each missing part would go.</summary>
+        private void DrawModules(SKCanvas canvas, CharacterDefinition character, ModularBody body, CharacterPlacement placement)
+        {
+            if (moduleHighlight is null && !ghosts)
+                return;
+            var figure = CharacterRig.Build(character, angle, pose);
+            var accent = new SKColor(0x1E, 0x5A, 0xA8);
+            if (moduleHighlight is { } part)
+            {
+                using var outline = FigureModules.OutlineOf(figure, part, placement);
+                using var selection = new SKPaint { Color = accent, Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
+                canvas.DrawPath(outline, selection);
+                if (part.IsShape() && !outline.IsEmpty)
+                {
+                    var box = outline.TightBounds;
+                    using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill, IsAntialias = true };
+                    using var edge = new SKPaint { Color = accent, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true };
+                    using var frame = new SKPaint { Color = accent.WithAlpha(110), Style = SKPaintStyle.Stroke, StrokeWidth = 1f, IsAntialias = true };
+                    canvas.DrawRect(box, frame);
+                    var r = (float)HandleRadius;
+                    foreach (var corner in new[] { new SKPoint(box.Left, box.Top), new SKPoint(box.Right, box.Top), new SKPoint(box.Right, box.Bottom), new SKPoint(box.Left, box.Bottom) })
+                    {
+                        var handle = new SKRect(corner.X - r, corner.Y - r, corner.X + r, corner.Y + r);
+                        canvas.DrawRect(handle, fill);
+                        canvas.DrawRect(handle, edge);
+                    }
+                }
+            }
+            if (!ghosts)
+                return;
+            var ink = new SKColor(0x1E, 0x5A, 0xA8).WithAlpha(170);
+            using var ring = new SKPaint { Color = ink, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([3f, 2f], 0) };
+            using var back = new SKPaint { Color = (dark ? SKColors.Black : SKColors.White).WithAlpha(190), Style = SKPaintStyle.Fill, IsAntialias = true };
+            using var plus = new SKPaint { Color = ink, Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
+            var g = (float)GhostRadius;
+            foreach (var (_, at) in Ghosts(body, figure, placement))
+            {
+                var (x, y) = ((float)at.X, (float)at.Y);
+                canvas.DrawCircle(x, y, g, back);
+                canvas.DrawCircle(x, y, g, ring);
+                canvas.DrawLine(x - g / 2, y, x + g / 2, y, plus);
+                canvas.DrawLine(x, y - g / 2, x, y + g / 2, plus);
+            }
         }
 
         private void DrawGuides(SKCanvas canvas, double groundY, double unit)

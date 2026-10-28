@@ -25,7 +25,8 @@
     <Grid Grid.Row="0">
       <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
         <local:CharacterFigure Name="Stage" Character="{Binding LookWorking}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
-                               Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}" />
+                               Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}"
+                               ModuleHighlight="{Binding SelectedModule}" ShowModuleGhosts="{Binding IsModular}" />
       </Border>
       <!-- Two small notes about the hair, over the foot of the stage like the export note over the page; neither is ever a dialog. -->
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,12" Spacing="6">

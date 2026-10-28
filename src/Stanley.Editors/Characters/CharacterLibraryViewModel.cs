@@ -41,6 +41,7 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 		CanFloat = false;
 
 		NewCharacterCommand = new RelayCommand(() => Show(AddCharacter(NewDefinition())));
+		NewShapeCharacterCommand = new RelayCommand(() => Show(AddCharacter(NewDefinition(fromShapes: true))));
 		DuplicateCharacterCommand = new RelayCommand<CharacterItem?>(
 			item =>
 			{
@@ -125,7 +126,11 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
 	public IRelayCommand<CharacterItem?> PlaceOnPageCommand { get; }
 
+	/// <summary>A new character with a generated (human) body, opened in its editor.</summary>
 	public IRelayCommand NewCharacterCommand { get; }
+
+	/// <summary>A new character built from shapes (docs/shape-characters.md §9.1), opened in its editor on the creature presets.</summary>
+	public IRelayCommand NewShapeCharacterCommand { get; }
 	public IRelayCommand<CharacterItem?> DuplicateCharacterCommand { get; }
 	public IRelayCommand<CharacterItem?> DeleteCharacterCommand { get; }
 
@@ -160,12 +165,14 @@ public sealed partial class CharacterLibraryViewModel : Tool, ICharacterCatalog
 
 	public event Action? CharactersChanged;
 
-	public CharacterDefinition CreateCharacter() => AddCharacter(NewDefinition()).Character;
+	public CharacterDefinition CreateCharacter(bool fromShapes = false) => AddCharacter(NewDefinition(fromShapes)).Character;
 
-	/// <summary>A new character: the default body, with the library's default face on.</summary>
-	private CharacterDefinition NewDefinition()
+	/// <summary>A new character: the default body - generated, or the default creature built from shapes - with the library's default face on.</summary>
+	private CharacterDefinition NewDefinition(bool fromShapes = false)
 	{
 		var character = CharacterDefinition.Create(NextName());
+		if (fromShapes)
+			character = character with { Modules = Stanley.StickerLibrary.CreaturePresets.Default };
 		foreach (var key in Stanley.StickerLibrary.StickerLibrary.DefaultFace)
 		{
 			if (Stanley.StickerLibrary.StickerLibrary.Find(key) is { } sticker)

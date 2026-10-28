@@ -78,14 +78,25 @@
         <Border DockPanel.Dock="Bottom" Padding="8" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                 BorderThickness="0,1,0,0">
             <StackPanel Spacing="4">
-                <Button Name="NewCharacterButton" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        ToolTip.Tip="Create a character and shape its body">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <PathIcon Data="{StaticResource NewIcon}" Width="14" Height="14" />
-                        <TextBlock Text="New character" />
-                    </StackPanel>
-                </Button>
+                <!-- The two ways to make one (docs/shape-characters.md §9.1): a human body shaped with sliders, or built from shapes. -->
+                <StackPanel Spacing="4">
+                    <Button Name="NewCharacterButton" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            ToolTip.Tip="Create a character with a human body, and shape it with sliders">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="{StaticResource NewIcon}" Width="14" Height="14" />
+                            <TextBlock Text="New character" />
+                        </StackPanel>
+                    </Button>
+                    <Button Name="NewShapeCharacterButton" Command="{Binding NewShapeCharacterCommand}" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            ToolTip.Tip="A new character built from shapes - a head, a body, arms and legs, each swapped in a click">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="{StaticResource ShapesCharacterIcon}" Width="14" Height="14" />
+                            <TextBlock Text="New from shapes" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
                 <!-- Reuse a character: the ones kept in My Assets and the ones in your other recent comics (docs/my-characters.md §4.2). -->
                 <DropDownButton Name="AddCharacterButton" IsVisible="{Binding HasMyAssets}" HorizontalAlignment="Stretch"
                                 ToolTip.Tip="Add a character you kept in My Assets, or one from another of your comics">
