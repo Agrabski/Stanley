@@ -32,6 +32,7 @@ public partial class CharacterEditorView : UserControl
     public CharacterEditorView()
     {
         InitializeComponent();
+        InitializeEditing();
         // Click a garment on the character to work on it (the Sticker tab); click skin or
         // the background to let it go. Drawn art, once selected, drags to move it.
         // Clicking a compared (faded) character switches to it.
@@ -40,6 +41,8 @@ public partial class CharacterEditorView : UserControl
             if (DataContext is not CharacterEditorViewModel vm || !e.GetCurrentPoint(Stage).Properties.IsLeftButtonPressed)
                 return;
             var p = e.GetPosition(Stage);
+            if (PressEditing(vm, p, e))
+                return;
             if (Stage.LineUpCharacterAt(p) is { } lineUpCharacter)
             {
                 ClearLineUpHint(vm);
@@ -63,6 +66,8 @@ public partial class CharacterEditorView : UserControl
             if (DataContext is not CharacterEditorViewModel vm)
                 return;
             var p = e.GetPosition(Stage);
+            if (MoveEditing(vm, p, e))
+                return;
             if (_moduleDrag is { } moduleDrag)
             {
                 if (!_moduleMoving && Math.Abs(p.X - moduleDrag.Pressed.X) < DragThreshold && Math.Abs(p.Y - moduleDrag.Pressed.Y) < DragThreshold)
@@ -195,6 +200,8 @@ public partial class CharacterEditorView : UserControl
 
     private void EndDrag(IPointer? pointer)
     {
+        if (EndEditing(pointer))
+            return;
         if (_moduleDrag is not null)
         {
             _moduleDrag = null;

@@ -1,6 +1,6 @@
 <!--
   The part of a body built from shapes picked on the stage or in the Shapes section (docs/shape-
-  characters.md §9.2), titled with it: a head's or torso's shape, size, turn and flips; a limb's
+  characters.md §9.2), titled with it: a head's or torso's shape, size, turn, flips, points and sockets; a limb's
   style, hand or foot, pieces, proportions and sides; its colour and Remove. Part of the canvas
   layout's inspector (docs/ui-shell.md §6); the ribbon's contextual Module tab does the same.
 -->
@@ -78,6 +78,39 @@
               <PathIcon Data="{StaticResource FlipVerticalIcon}" />
             </ToggleButton>
           </StackPanel>
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Points" />
+          <ToggleButton Name="EditPointsButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        IsChecked="{Binding IsEditingPoints}" IsEnabled="{Binding CanEditPoints}"
+                        ToolTip.Tip="Edit Points - drag the outline's points to reshape it, drag the outline to add a point, drag a point's round handles to bend the curve, double-click a point to make it smooth or sharp (or double-click the part)"
+                        local:Shortcut.Keys="Enter">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource EditPointsIcon}" />
+              <TextBlock Text="Edit Points" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
+        </DockPanel>
+        <!-- What a point can do, only while the points are being edited. -->
+        <Grid Name="PointTools" ColumnDefinitions="76,*" IsVisible="{Binding IsEditingPoints}">
+          <UniformGrid Grid.Column="1" Columns="3" ColumnSpacing="4">
+            <RadioButton Name="SmoothPointButton" Classes="inspectorButton" GroupName="InspectorModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsChecked="{Binding IsSelectedPointSmooth}" IsEnabled="{Binding HasSelectedPoint}"
+                         ToolTip.Tip="Smooth point - the outline curves through it">Smooth</RadioButton>
+            <RadioButton Name="CornerPointButton" Classes="inspectorButton" GroupName="InspectorModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsChecked="{Binding IsSelectedPointCorner}" IsEnabled="{Binding HasSelectedPoint}"
+                         ToolTip.Tip="Corner point - the outline turns sharply there">Corner</RadioButton>
+            <Button Name="DeletePointButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DeletePointCommand}"
+                    ToolTip.Tip="Delete the selected point (the Delete key does too, while editing points) - a shape keeps at least three">Delete</Button>
+          </UniformGrid>
+        </Grid>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Sockets" />
+          <Button Name="ResetSocketsButton" DockPanel.Dock="Right" Classes="inspectorButton" Margin="4,0,0,0" Command="{Binding ResetSocketsCommand}"
+                  ToolTip.Tip="Reset Sockets - put every socket dragged by hand back where the shape puts it" ToolTip.ShowOnDisabled="True">Reset</Button>
+          <ToggleButton Name="EditSocketsButton" Classes="inspectorButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        IsChecked="{Binding IsEditingSockets}" IsEnabled="{Binding CanEditPoints}"
+                        ToolTip.Tip="Edit Sockets - show where the neck, shoulders, hips and face attach, and drag them where they should be (left and right are the character's own)">Edit Sockets</ToggleButton>
         </DockPanel>
       </StackPanel>
 
