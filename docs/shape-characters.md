@@ -1,6 +1,6 @@
 # Characters built from shapes — design
 
-**Status: in progress** (issue #173). Slices 1–6 are built; Edit Points on a part (7), custom shapes (8) and the later items (9) are not (§14 records how); the rest
+**Status: in progress** (issue #173). Slices 1–6 are built; custom shapes (8) are built; Edit Points on a part (7) is in progress and the later items (9) are not (§14 records how); the rest
 is the working plan. This is the design for a
 second way to build a character: by snapping together ready-made shapes instead of
 moving body sliders. It builds on the character POC (`docs/character-authoring-poc.md`)
@@ -595,4 +595,42 @@ shapes*, then grow the editor in 5.
   shared by ribbon and inspector through `ModuleShapeDropdown`. The head/torso dropdown lists
   the part's own kind by category, then the other kind's shapes.
 - Not built yet: the rotation handle (the Rotate slider covers it), Edit Points, Edit sockets.
+
+### 14.7 Your own shapes (slice 8)
+
+- **What they work on**: Import shape…, Draw shape and Keep in My Assets act on the picked
+  head or torso, or the picked limb's **hand or foot**. Pieces get shapes of your own only
+  through the galleries' *My shapes* section. The ribbon's `OwnShapeRibbonGroup`, the
+  inspector's `OwnShapeRow` and the stage's right-click menu
+  (`CharacterEditorView.OwnShapes.cs`) share the same view-model members.
+- **Fitting**: outlines move between steps as a `FittedOutline` (`ModuleOutlines.Fit` /
+  `Refit`: filling the unit box, clockwise, plus the original `Bounds`/`Aspect`, since the
+  unit box alone loses proportions). A head or torso keeps its area and takes the
+  outline's aspect; a hand or foot is refitted keeping its proportions; a piece fills its
+  box. Import and Draw clear rotation and flips (it should look as drawn); a gallery pick
+  keeps them, like a library swap.
+- **Import** (`ShapeOutlineImport`, Rendering) reads through `StickerSvg` and takes the
+  **first closed path in paint order**, not a union: a part is one ring, a union can come
+  out with holes or islands, and Skia's union cuts curves into small pieces, losing the
+  user's points for Edit Points. Cubics stay as they are, quadratics and conics are raised
+  to cubics, lines become corners, arcs already arrive as cubics; a last point on the first
+  is merged into it; points whose handles line up are smooth; a ring under 3 points has
+  edges split. Skipped content is reported in the status line ("1 open path ignored", "2
+  more shapes ignored"). VectSharp sends a path that is both filled and stroked twice, so
+  the converter skips a path identical to the one before it. PNG is refused.
+- **Draw** (`ShapeDrawOverlay` over the stage) reuses `ShapePointEditing.Placed` and
+  `SnapAngle`: click a corner, drag a smooth point, Shift snaps to 45°; the first point,
+  Enter, a double-click or a right-click closes; Backspace takes the last point back; Esc
+  stops. The draft lives in the view model (`DrawnShape`, figure units), so closing it is
+  one undo step. The overlay converts through `Stage.MainPlacement` and `TranslatePoint`,
+  and takes focus when drawing starts so Enter/Esc/Backspace reach it. Placing
+  (`OwnShapeEditing.PlaceDrawnShape`) sizes the part to the drawn box and nudges its
+  `Offset` through the rig at rest (`CentreOf`, up to 4 rounds) until it sits where it was
+  drawn; a torso's offset doesn't move the legs, and offsets are held to ±1.
+- **Keep** stores the outline in its own proportions (long side 1, centred, top at y = 0,
+  no flips) as a `ShapeAsset` named after the character and part ("Bob's head", "Bob's head
+  2"), and links the part to it in one undo step (`Source = "my-assets:shapes/<id>"`,
+  `MyAssetsVersion`). Undo removes the link; My Assets keeps the shape. Storage and
+  fingerprints: docs/asset-packs.md §5, §7.2. `ModuleEditing.SetAnchors`/`SetSocket` clear
+  `MyAssetsVersion` along with `Source`: anything new that drops `Source` must do both.
 

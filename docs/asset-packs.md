@@ -188,6 +188,7 @@ fingerprint, manifest.
 | Pattern | One fill pattern's tile art | Shape Fill picker |
 | Background | A panel's background composition (colour/gradient/picture/props) | Background editor |
 | Pose | Bone rotations + expression preset (angle-agnostic, per `character-and-project-plan.md`) | Pose gallery / "Save pose…" |
+| Shape | One part's outline and hand-set sockets (`ShapeAsset`, docs/shape-characters.md §14.7) - **built** | Module tab / inspector / right-click a part › *Keep in My Assets* |
 
 All six share one mechanism (§6–§9); only the fingerprinted file set and the
 before/after preview renderer differ per kind, matching how `StickerAsset`,
@@ -289,6 +290,7 @@ Documents/Stanley/My Assets/
   patterns/<id>-.../tile art
   backgrounds/<id>-.../background.json + art
   poses/<id>-....json
+  shapes/<id>-slug.json                  # ShapeAsset { id, name, shape }: one file, a shape has no art (built)
   packs/<id>-slug.json                   # { name, members: [{kind, id}, ...] }
 ```
 
@@ -307,6 +309,18 @@ endings normalised; JSON already canonical per `ProjectJsonOptions`) but
 parameterised over which files make up "the asset" for each kind. The states
 table (`my-characters.md` §6.3: Not kept / Matches / Changed here / Changed in
 My Assets / Changed in both / Unknown history) is unchanged and kind-agnostic.
+
+**Shapes (built, #173).** A comic's copy of a kept shape is inline in
+`character.json` - `ModuleShape.Source = "my-assets:shapes/<id>"` plus
+`ModuleShape.MyAssetsVersion` - with no comic-side shapes folder. The fingerprint
+(`ShapeFingerprint`) covers the outline and sockets only, not the name (the comic's copy
+has none), so renaming in My Assets changes nothing for the characters using it. The
+comic's anchors are refitted to the part's box, so "changed in My Assets" must compare
+against the stored `MyAssetsVersion`, never a fingerprint recomputed from the comic's
+anchors. Any edit to a part's points or sockets drops both `Source` and
+`MyAssetsVersion`. `MyAssetsLibrary.Shapes()` is cached (galleries rebuild on every
+slider step) and cleared on its own writes and `MoveTo`, so shapes added on disk outside
+Stanley show only after that.
 
 ### 7.4 The share file
 
