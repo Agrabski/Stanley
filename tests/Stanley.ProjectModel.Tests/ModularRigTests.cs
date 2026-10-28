@@ -517,4 +517,36 @@ public class ModularRigTests
         Assert.Equal(torso.Left, left, 3);
         Assert.Equal(torso.Right, right, 3);
     }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void FrameOf_is_the_frame_the_outline_is_drawn_through_standing_at_rest(bool head, bool torso)
+    {
+        var turned = new ShapeModule(ModuleShapes.Triangle(), 0.3, 0.26, Rotation: 20, FlipX: true, Offset: new Point2D(0.02, -0.01));
+        var body = Creature(head, torso) with { Head = head ? turned : null };
+        foreach (var angle in new[] { ViewAngle.Front, ViewAngle.Profile })
+        {
+            var figure = ModularRig.Build(body, angle);
+            foreach (var (part, module) in new[] { (ModulePart.Head, body.Head), (ModulePart.Torso, body.Torso) })
+            {
+                var frame = ModularRig.FrameOf(body, part, angle);
+                if (module is null)
+                {
+                    Assert.Null(frame);
+                    continue;
+                }
+                var drawn = figure.Layers.SelectMany(l => l.Shapes ?? []).Single(s => s.Part == part).Anchors;
+                var placed = frame!.Value.Place(ModuleSockets.Flipped(module.Shape, module.FlipX == true, module.FlipY == true).Anchors);
+                Assert.Equal(drawn.Count, placed.Count);
+                for (var i = 0; i < drawn.Count; i++)
+                {
+                    Assert.Equal(drawn[i].Point.X, placed[i].Point.X, 9);
+                    Assert.Equal(drawn[i].Point.Y, placed[i].Point.Y, 9);
+                }
+            }
+        }
+        Assert.Null(ModularRig.FrameOf(body, ModulePart.Arms));
+    }
 }

@@ -32,6 +32,9 @@ public sealed partial class CharacterEditorViewModel
     // changing under it can't feed back into where the point goes.
     private (ShapeElement Outline, ModuleFrame Frame, int Index, HandleSide? Side)? _pointDrag;
 
+    // The drag is of a point its press added: cancelled, the point goes, so it's let go of too.
+    private bool _pointDragAdded;
+
     // A drag of a socket: its name and the frame it was shown through when pressed.
     private (string Name, ModuleFrame Frame)? _socketDrag;
 
@@ -245,6 +248,7 @@ public sealed partial class CharacterEditorViewModel
         SelectPoint(index);
         BeginGesture();
         _pointDrag = (outline, frame, index, side);
+        _pointDragAdded = false;
         return true;
     }
 
@@ -276,6 +280,7 @@ public sealed partial class CharacterEditorViewModel
         var (outline, index) = inserted.Value;
         BeginGesture();
         _pointDrag = (outline, frame, index, null);
+        _pointDragAdded = true;
         EditOutlineInDrag(_pointDrag.Value, EditResult<ShapeElement>.Success(outline));
         _selectedPointIndex = index;
         RaisePointsChanged();
@@ -293,6 +298,8 @@ public sealed partial class CharacterEditorViewModel
         else
         {
             CancelGesture();
+            if (_pointDragAdded)
+                _selectedPointIndex = -1;
             DropStalePointEditing();
         }
         OnPropertyChanged(nameof(CreatureChoices));
