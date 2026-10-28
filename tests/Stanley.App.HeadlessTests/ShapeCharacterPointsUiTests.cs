@@ -167,6 +167,18 @@ public class ShapeCharacterPointsUiTests
         Assert.True(module.GetVisualDescendants().OfType<Grid>().Single(g => g.Name == "PointTools").IsVisible);
         LookTabTests.Snapshot(window, "canvas-module-edit-points");
 
+        // A turned, mirrored head edits in place: its points and the picked one's handles sit on its outline.
+        editor.FlipModuleHorizontallyCommand.Execute(null);
+        editor.ModuleRotation = 25;
+        editor.SelectPoint(1);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(editor.IsEditingPoints);
+        var stage = window.GetVisualDescendants().OfType<CharacterEditorView>().Single().Figure;
+        var handle = Stanley.Editing.ShapePointEditing.VisibleHandles(editor.EditedOutline!, 1)[0].Point;
+        var onStage = stage.MainPlacement!.ToPage(handle);
+        Assert.Equal(ModuleEditHitKind.Handle, stage.EditMarkAt(new Point(onStage.X, onStage.Y))?.Kind);
+        LookTabTests.Snapshot(window, "canvas-module-edit-points-turned");
+
         var editSockets = module.GetVisualDescendants().OfType<ToggleButton>().Single(b => b.Name == "EditSocketsButton");
         editSockets.IsChecked = true;
         Dispatcher.UIThread.RunJobs();
