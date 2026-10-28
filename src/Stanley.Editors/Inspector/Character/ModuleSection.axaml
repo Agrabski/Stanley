@@ -1,0 +1,192 @@
+<!--
+  The part of a body built from shapes picked on the stage or in the Shapes section (docs/shape-
+  characters.md §9.2), titled with it: a head's or torso's shape, size, turn and flips; a limb's
+  style, hand or foot, pieces, proportions and sides; its colour and Remove. Part of the canvas
+  layout's inspector (docs/ui-shell.md §6); the ribbon's contextual Module tab does the same.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ModuleSection"
+             x:DataType="local:CharacterEditorViewModel" IsVisible="{Binding HasSelectedModule}">
+  <UserControl.Styles>
+    <Style Selector="Slider.inspectorSlider">
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="DockPanel.propertyRow > TextBlock.sliderValue">
+      <Setter Property="DockPanel.Dock" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.sliderValue">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="inspectorSection">
+    <StackPanel Spacing="6">
+      <DockPanel>
+        <Button Name="DeselectModuleButton" DockPanel.Dock="Right" Classes="inspectorButton" Command="{Binding DeselectModuleCommand}"
+                ToolTip.Tip="Done with it - back to the whole character">Done</Button>
+        <TextBlock Classes="sectionHeader" Text="{Binding SelectedModuleName}" VerticalAlignment="Center" />
+      </DockPanel>
+
+      <!-- A head or torso. -->
+      <StackPanel Spacing="0" IsVisible="{Binding SelectedModuleIsShape}">
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Shape" />
+          <ContentControl Name="ShapeGallery" Content="{Binding ModuleShapeGallery}" HorizontalContentAlignment="Stretch">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="local:ModuleShapeGallery">
+                <local:ModuleShapeDropdown Placement="BottomEdgeAlignedRight" />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Width" />
+          <TextBlock Classes="sliderValue" Text="{Binding ModuleWidth, StringFormat='{}{0:0}%'}" />
+          <Slider Name="ModuleWidthSlider" Classes="inspectorSlider" Minimum="5" Maximum="120" Value="{Binding ModuleWidth}"
+                  ToolTip.Tip="How wide, as a share of an average adult's height - or drag a corner on the character" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Height" />
+          <TextBlock Classes="sliderValue" Text="{Binding ModuleHeight, StringFormat='{}{0:0}%'}" />
+          <Slider Name="ModuleHeightSlider" Classes="inspectorSlider" Minimum="5" Maximum="120" Value="{Binding ModuleHeight}"
+                  ToolTip.Tip="How tall, as a share of an average adult's height - or drag a corner on the character" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Rotate" />
+          <TextBlock Classes="sliderValue" Text="{Binding ModuleRotation, StringFormat='{}{0:0}°'}" />
+          <Slider Name="ModuleRotationSlider" Classes="inspectorSlider" Minimum="-180" Maximum="180" Value="{Binding ModuleRotation}" ToolTip.Tip="Turn it about its middle" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Flip" />
+          <StackPanel Classes="iconRow">
+            <ToggleButton Name="FlipModuleHorizontalButton" Classes="iconButton" IsChecked="{Binding IsModuleFlippedHorizontally, Mode=OneWay}" Command="{Binding FlipModuleHorizontallyCommand}"
+                          ToolTip.Tip="Flip Horizontal - mirror it left to right">
+              <PathIcon Data="{StaticResource FlipIcon}" />
+            </ToggleButton>
+            <ToggleButton Name="FlipModuleVerticalButton" Classes="iconButton" IsChecked="{Binding IsModuleFlippedVertically, Mode=OneWay}" Command="{Binding FlipModuleVerticallyCommand}"
+                          ToolTip.Tip="Flip Vertical - upside down (a triangle torso standing on its point)">
+              <PathIcon Data="{StaticResource FlipVerticalIcon}" />
+            </ToggleButton>
+          </StackPanel>
+        </DockPanel>
+      </StackPanel>
+
+      <!-- Arms or legs. -->
+      <StackPanel Spacing="0" IsVisible="{Binding SelectedModuleIsLimb}">
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Style" />
+          <ItemsControl Name="LimbStyles" ItemsSource="{Binding LimbStyleChoices}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="local:LimbStyleChoice">
+                <Button Classes="small choice noCheck" Classes.worn="{Binding IsCurrent}" Margin="1" Padding="2" FontSize="11" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                        Content="{Binding Label}" Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetLimbStyleCommand}" CommandParameter="{Binding}"
+                        ToolTip.Tip="{Binding Tip}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="{Binding LimbEndName}" />
+          <ContentControl Name="EndGallery" Content="{Binding LimbEndGallery}" HorizontalContentAlignment="Stretch">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="local:ModuleShapeGallery">
+                <local:ModuleShapeDropdown Placement="BottomEdgeAlignedRight" />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </DockPanel>
+        <DockPanel Classes="propertyRow" IsVisible="{Binding HasLimbPieces}">
+          <TextBlock Classes="propertyLabel" Text="Pieces" />
+          <UniformGrid Columns="2">
+            <ContentControl Name="UpperGallery" Content="{Binding LimbUpperGallery}" HorizontalContentAlignment="Stretch" Margin="0,0,2,0">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="local:ModuleShapeGallery">
+                  <local:ModuleShapeDropdown Placement="BottomEdgeAlignedRight" />
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+            <ContentControl Name="LowerGallery" Content="{Binding LimbLowerGallery}" HorizontalContentAlignment="Stretch" Margin="2,0,0,0">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="local:ModuleShapeGallery">
+                  <local:ModuleShapeDropdown Placement="BottomEdgeAlignedRight" />
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+          </UniformGrid>
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Length" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbLength, StringFormat='{}{0:0}%'}" />
+          <Slider Name="LimbLengthSlider" Classes="inspectorSlider" Minimum="3" Maximum="100" Value="{Binding LimbLength}"
+                  ToolTip.Tip="Shoulder or hip to the end, as a share of an average adult's height" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Thickness" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbThickness, StringFormat='{}{0:0}'}" />
+          <Slider Name="LimbThicknessSlider" Classes="inspectorSlider" Minimum="5" Maximum="250" Value="{Binding LimbThickness}" ToolTip.Tip="How thick at the shoulder or hip" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow" IsVisible="{Binding HasLimbTaper}">
+          <TextBlock Classes="propertyLabel" Text="Taper" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbTaper, StringFormat='{}{0:0}%'}" />
+          <Slider Name="LimbTaperSlider" Classes="inspectorSlider" Minimum="0" Maximum="90" Value="{Binding LimbTaper}" ToolTip.Tip="How much thinner the end is than the root" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Bend" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbBend, StringFormat='{}{0:0}%'}" />
+          <Slider Name="LimbBendSlider" Classes="inspectorSlider" Minimum="20" Maximum="80" Value="{Binding LimbBend}"
+                  ToolTip.Tip="Where the elbow or knee is, from near the shoulder or hip to near the end" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="End size" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbEndSize, StringFormat='{}{0:0}%'}" />
+          <Slider Name="LimbEndSizeSlider" Classes="inspectorSlider" Minimum="1" Maximum="{Binding MaxLimbEndSize}" Value="{Binding LimbEndSize}" ToolTip.Tip="How big the hand or foot is" />
+        </DockPanel>
+        <DockPanel Classes="propertyRow">
+          <TextBlock Classes="propertyLabel" Text="Sides" />
+          <UniformGrid Columns="3">
+            <RadioButton Name="BothSidesButton" Classes="small" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsBothSides}" HorizontalAlignment="Stretch"
+                         HorizontalContentAlignment="Center" ToolTip.Tip="Both of them">Both</RadioButton>
+            <RadioButton Name="LeftSideButton" Classes="small" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsLeftSideOnly}" HorizontalAlignment="Stretch"
+                         HorizontalContentAlignment="Center" ToolTip.Tip="Only their own left one - on the right as you look at them">Left</RadioButton>
+            <RadioButton Name="RightSideButton" Classes="small" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsRightSideOnly}" HorizontalAlignment="Stretch"
+                         HorizontalContentAlignment="Center" ToolTip.Tip="Only their own right one - on the left as you look at them">Right</RadioButton>
+          </UniformGrid>
+        </DockPanel>
+      </StackPanel>
+
+      <DockPanel Classes="propertyRow">
+        <TextBlock Classes="propertyLabel" Text="Colour" ToolTip.Tip="{Binding ModuleColorNote}" />
+        <Button Name="ModuleSameAsSkinButton" DockPanel.Dock="Right" Classes="inspectorButton" Margin="4,0,0,0" Command="{Binding ModuleSameAsSkinCommand}"
+                ToolTip.Tip="Fill it with the skin colour again, like the rest">Same as skin</Button>
+        <ContentControl Name="ModuleColor" Content="{Binding SelectedModuleColorEditor}" HorizontalAlignment="Left">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="local:ColorSlotEditor">
+              <local:ColorSlotDropdown />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+      </DockPanel>
+
+      <Button Name="RemoveModuleButton" Classes="inspectorButton" Command="{Binding RemoveModuleCommand}" HorizontalAlignment="Left"
+              ToolTip.Tip="{Binding RemoveModuleTip}" ToolTip.ShowOnDisabled="True">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Data="{StaticResource DeleteIcon}" Width="12" Height="12" />
+          <TextBlock Text="{Binding SelectedModuleName, StringFormat='Remove {0}'}" />
+        </StackPanel>
+      </Button>
+    </StackPanel>
+  </Border>
+</UserControl>

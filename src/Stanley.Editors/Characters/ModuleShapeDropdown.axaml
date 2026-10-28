@@ -1,0 +1,54 @@
+<!--
+  A shape gallery for a part of a body built from shapes (docs/shape-characters.md §9.2): a
+  dropdown showing the current shape - a head's or torso's outline, a limb's hand or foot, or
+  one of its pieces - opening the choices by category (Organic, Geometric, Abstract), each drawn
+  in the part's colour. The one in use is framed and ticked, and each tooltip says what a click
+  does. It stays open after a pick, to try the next. Used by the ribbon's Module tab and the
+  inspector's Module section alike. Its DataContext is a ModuleShapeGallery.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ModuleShapeDropdown"
+             x:DataType="local:ModuleShapeGallery">
+  <DropDownButton Name="Button" Classes="moduleGallery" ToolTip.Tip="{Binding Tip}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <local:ModuleShapeIcon Width="26" Height="26" Shape="{Binding CurrentShape}" Aspect="{Binding Aspect}" Fill="{Binding Fill}" />
+      <StackPanel VerticalAlignment="Center" Spacing="0">
+        <TextBlock Text="{Binding Label}" FontSize="12" />
+        <TextBlock Text="{Binding Current}" FontSize="9" Opacity="0.7" TextTrimming="CharacterEllipsis" MaxWidth="80" />
+      </StackPanel>
+    </StackPanel>
+    <DropDownButton.Flyout>
+      <!-- Transient: nothing in it takes focus (docs/ui-shell.md §6.5). -->
+      <Flyout Placement="BottomEdgeAlignedLeft" ShowMode="Transient">
+        <ItemsControl Name="Sections" ItemsSource="{Binding Sections}" MaxWidth="330">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:ModuleShapeSection">
+              <StackPanel Spacing="2" Margin="0,0,0,4">
+                <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" IsVisible="{Binding Label, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <ItemsControl ItemsSource="{Binding Choices}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:ModuleShapeChoice">
+                      <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="58" Height="62" Padding="2" Margin="1"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                              Command="{Binding $parent[ItemsControl;1].((local:ModuleShapeGallery)DataContext).Pick}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <local:ModuleShapeIcon Shape="{Binding Icon}" Aspect="{Binding Aspect}" Fill="{Binding Fill}" Margin="2" />
+                        </DockPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Flyout>
+    </DropDownButton.Flyout>
+  </DropDownButton>
+</UserControl>

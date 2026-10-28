@@ -1,0 +1,149 @@
+<!--
+  The character ribbon's Shapes tab, in the Body tab's place for a character built from shapes
+  (docs/shape-characters.md §9.2): the creature presets, the four parts (a click picks one for
+  the Module tab, or puts a missing one back), joined or separate pieces and Height %, then -
+  as on the Body tab - skin, name, view and Close.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ShapesRibbonTab"
+             x:DataType="local:CharacterEditorViewModel">
+  <StackPanel Classes="tabContent">
+    <!-- One click to a whole creature, previewed as this character: colours and clothes stay. -->
+    <DockPanel Classes="group">
+      <ItemsControl Name="CreatureGallery" ItemsSource="{Binding CreatureChoices}" Height="72">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="2" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:CreaturePresetChoice">
+            <Button Classes="small choice" Classes.worn="{Binding IsCurrent}" Width="48" Height="72" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).ApplyCreatureCommand}"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Name}" FontSize="9" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <local:CharacterFigure Character="{Binding Preview}" />
+              </DockPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="groupLabel" Text="Creature" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <!-- The parts, each in its own shape and colour: a click picks it (the Module tab), a missing one's + puts it back. -->
+    <DockPanel Classes="group">
+      <ItemsControl Name="PartButtons" ItemsSource="{Binding ModulePartChoices}" Height="72">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" Spacing="2" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:ModulePartChoice">
+            <Button Classes="small choice" Classes.worn="{Binding IsSelected}" Width="46" Height="72" Padding="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).PickModuleCommand}"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="{Binding Label}" FontSize="9" HorizontalAlignment="Center" />
+                <local:ModuleShapeIcon Shape="{Binding Icon}" Aspect="{Binding Aspect}" Fill="{Binding Fill}" Margin="3" />
+              </DockPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="groupLabel" Text="Parts" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <StackPanel Spacing="6" Margin="0,4,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="1">
+          <RadioButton Name="JoinedButton" Classes="small" GroupName="ShapesJoined" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsJoinedBody}"
+                       ToolTip.Tip="Joined - the pieces meet seamlessly, one creature">Joined</RadioButton>
+          <RadioButton Name="SeparateButton" Classes="small" GroupName="ShapesJoined" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsSeparateBody}"
+                       ToolTip.Tip="Separate - every piece keeps its own outline, like building blocks">Separate</RadioButton>
+        </StackPanel>
+        <Grid ColumnDefinitions="Auto,Auto,40" ColumnSpacing="6">
+          <TextBlock Text="Height" FontSize="12" VerticalAlignment="Center" />
+          <Slider Name="BodyHeightSlider" Grid.Column="1" Classes="body" Minimum="{Binding MinBodyHeightPercent}" Maximum="{Binding MaxBodyHeightPercent}"
+                  Value="{Binding BodyHeightPercent}" ToolTip.Tip="How tall, relative to an average adult (100%) - every part grows or shrinks together" />
+          <TextBlock Grid.Column="2" Text="{Binding HeightText}" FontSize="12" VerticalAlignment="Center" />
+        </Grid>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Body" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <Grid ColumnDefinitions="Auto,Auto">
+        <ItemsControl Name="SkinSwatches" ItemsSource="{Binding SkinSwatches}" Width="90">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="local:SkinSwatch">
+              <Button Classes="small" Width="26" Height="22" Padding="3" Margin="1" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                      Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetSkinCommand}"
+                      CommandParameter="{Binding}" ToolTip.Tip="{Binding Name}">
+                <Border Background="{Binding Brush}" BorderBrush="#60000000" BorderThickness="1" CornerRadius="2" />
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Grid.Column="1" Name="MoreSkinColorsButton" Classes="small" Height="70" Padding="4,2" Margin="2,1,0,0" VerticalAlignment="Top"
+                ToolTip.Tip="More Colors… - pick any skin colour" Command="{Binding PickCustomSkinColorCommand}" CommandParameter="{Binding $self}">
+          <StackPanel Spacing="4">
+            <UniformGrid Rows="2" Columns="2" Width="14" Height="14" HorizontalAlignment="Center">
+              <Border Background="#ed7d31" />
+              <Border Background="#ffc000" />
+              <Border Background="#4472c4" />
+              <Border Background="#70ad47" />
+            </UniformGrid>
+            <TextBlock Text="More…" FontSize="11" HorizontalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </Grid>
+      <TextBlock Classes="groupLabel" Text="Skin" ToolTip.Tip="Every part without a colour of its own" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <StackPanel Spacing="6" Margin="0,4,0,0">
+        <TextBox Name="NameBox" Width="150" Height="26" FontSize="12" Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                 ToolTip.Tip="The character's name (Enter to apply)" />
+        <CheckBox Name="LineUpCheck" IsChecked="{Binding ShowLineUp}" Focusable="False" FontSize="12" Content="Compare with others" />
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Character" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <StackPanel Orientation="Horizontal">
+        <RadioButton Name="FrontPreviewButton" Classes="tool" GroupName="ShapesPreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                     IsChecked="{Binding IsFrontPreview}" ToolTip.Tip="Look at the character from the front">
+          <StackPanel><PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="Front" /></StackPanel>
+        </RadioButton>
+        <RadioButton Name="SidePreviewButton" Classes="tool" GroupName="ShapesPreviewAngle" Theme="{StaticResource {x:Type ToggleButton}}"
+                     IsChecked="{Binding IsSidePreview}" ToolTip.Tip="Look at the character from the side - the same body, seen side on">
+          <StackPanel><PathIcon Data="{StaticResource SideViewIcon}" /><TextBlock Text="Side" /></StackPanel>
+        </RadioButton>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="View" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <Button Name="BackToPageButton" Classes="tool" Command="{Binding BackToPageCommand}" ToolTip.Tip="Back to the page (the Pages pane works too)">
+        <StackPanel><PathIcon Data="{StaticResource CloseIcon}" /><TextBlock Text="Close" /></StackPanel>
+      </Button>
+      <TextBlock Classes="groupLabel" Text="Back to page" />
+    </DockPanel>
+  </StackPanel>
+</UserControl>
