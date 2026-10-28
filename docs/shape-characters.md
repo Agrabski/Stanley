@@ -1,6 +1,6 @@
 # Characters built from shapes — design
 
-**Status: in progress** (issue #173). Slices 1–6 are built; custom shapes (8) are built; Edit Points on a part (7) is in progress and the later items (9) are not (§14 records how); the rest
+**Status: in progress** (issue #173). Slices 1–6 are built; Edit Points on a part (7) and custom shapes (8) are built; the later items (9) are not (§14 records how); the rest
 is the working plan. This is the design for a
 second way to build a character: by snapping together ready-made shapes instead of
 moving body sliders. It builds on the character POC (`docs/character-authoring-poc.md`)
@@ -633,4 +633,49 @@ shapes*, then grow the editor in 5.
   `MyAssetsVersion`). Undo removes the link; My Assets keeps the shape. Storage and
   fingerprints: docs/asset-packs.md §5, §7.2. `ModuleEditing.SetAnchors`/`SetSocket` clear
   `MyAssetsVersion` along with `Source`: anything new that drops `Source` must do both.
+
+### 14.8 Edit Points and Edit Sockets on a part (slice 7)
+
+- **Scope**: a head or torso. A Pieces limb's piece and a hand/foot end can't be point-edited
+  yet: hit-testing only knows the part (Arms/Legs), not which piece or side, and ends live in
+  a different box (hung from the wrist, own proportions). They can still take a drawn or
+  imported shape (§14.7).
+- **Entering**: double-click the part, or *Edit Points* (Enter) on the Module tab, the Module
+  section or the right-click menu. Esc, Enter, a click elsewhere, picking another part or a
+  sticker ends it; a press inside the edited part keeps editing. Gestures are the page's
+  (docs/shape-editing.md), and a double-click on a point just added is ignored, as there.
+  Arrows nudge 0.005 figure units (0.025 with Shift). Only one of Edit Points and Edit
+  Sockets is on at a time.
+- **One right-click menu** on the stage (`CharacterEditorView.StageMenuItems`, opened from a
+  tunnel `PointerPressed` handler so it runs before the left-button handler bails): on a point,
+  Smooth / Corner / Delete point; on the outline, Add point; on a head or torso, Edit points /
+  Edit sockets (Reset sockets when any is hand-set); then, when not editing, the part's
+  own-shape items (`OwnShapeItems`). A limb gets only the own-shape items.
+- **Mapping**: `ModularRig.FrameOf(body, part, angle)` is the frame (after the ground shift,
+  nudge included) the flipped outline is drawn through standing at rest. The stage never
+  poses its trunk (`StagePose` carries only the view and expression), so the mapping is
+  exactly affine. A single flip reverses the ring (`ModuleSockets.Flipped`): on-stage point
+  indices are in flipped order, and the write-back reverses the ring and swaps handles again.
+- **Git-friendly write-back**: a point that didn't move gets its exact stored value back
+  (a lookup from figure-space point to stored point); otherwise the round trip through the
+  frame would change the last digits of every point on each edit.
+- **Refit**: the box only ever grows, to the union of (0,0)-(1,1) and the outline's curve
+  bounds (1e-9 slack); Width/Height scale with it and hand-set sockets are remapped. A head on
+  a torso stays exactly where its points were put (its `Offset` absorbs the shift of its
+  re-derived chin, so lifting the chin can leave a gap above the neck). The host (the torso,
+  or a head with no torso) is re-seated on its legs by the rig, because the legs hang from the
+  host as it is before its `Offset`; so a dragged torso point can drift from the pointer when
+  the edit moves the derived hips, and the torso grows from its hips like a corner resize.
+- **Sockets are shown where the rig uses them** (`ModularRig.Attachments`): on the host, a
+  derived hip is raised by the leg's radius and a derived shoulder moved in by the arm's
+  (hips read through the frame before the host's nudge). Hand-set sockets get neither, which
+  is why picking a dot up used to make its limb jump by its radius. The face dot is
+  `FaceEllipse(upperBand: part != Head)`, not `Derive()[Face]` (that one is a torso's band face).
+- **Drags** freeze the placement, the outline and the part's frame at the press
+  (`_pointDrag`, `_socketDrag`) and are computed from `Committed`, like module drags. The
+  edited outline is cached per `ModularBody` instance (each costs two rig builds). Every
+  write goes through `ModuleEditing` (`SetAnchors`, `SetSocket`, `Resize`, `Nudge`), so the
+  library `Source` and `MyAssetsVersion` are dropped there.
+- The "head/torso selected" status hint ends "…or double-click it to edit its points", the
+  one pointer to the feature from the default path.
 

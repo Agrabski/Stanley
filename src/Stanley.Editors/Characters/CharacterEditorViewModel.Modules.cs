@@ -561,7 +561,7 @@ public sealed partial class CharacterEditorViewModel
             if (!IsModular)
                 return null;
             if (SelectedModuleIsShape)
-                return $"{SelectedModuleName}: pick another shape {Where($"on the {SelectedModuleName} tab", "under " + SelectedModuleName)}, drag it to move it off its place, or drag a corner to resize it. " +
+                return $"{SelectedModuleName}: pick another shape {Where($"on the {SelectedModuleName} tab", "under " + SelectedModuleName)}, drag it to move it off its place, drag a corner to resize it, or double-click it to edit its points. " +
                        "Click the background when you're done.";
             if (SelectedModuleIsLimb)
                 return $"{SelectedModuleName}: pick a style and {(SelectedModule == ModulePart.Legs ? "feet" : "hands")}, and set how long and thick they are {Where($"on the {SelectedModuleName} tab", "under " + SelectedModuleName)}. " +
