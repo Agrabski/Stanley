@@ -186,4 +186,22 @@ public sealed class ModulePointEditingTests
         var (dx, dy) = (torsoShift.X - moved.Anchors[0].Point.X, torsoShift.Y - moved.Anchors[0].Point.Y);
         Near(new Point2D(before.X + dx, before.Y + dy), ModulePointEditing.Sockets(edited, ModulePart.Torso).Single(s => s.Name == ModuleSockets.Neck).At);
     }
+
+    [Theory]
+    [InlineData(ModuleSockets.LeftHip, HumanoidBone.LeftUpperLeg)]
+    [InlineData(ModuleSockets.RightShoulder, HumanoidBone.RightUpperArm)]
+    public void A_socket_is_shown_where_its_limb_starts_so_putting_it_down_there_moves_nothing(string socket, HumanoidBone root)
+    {
+        // Nudged: the legs hang from where the torso would be without it.
+        var body = Ok(ModuleEditing.SetOffset(Body(), ModulePart.Torso, new Point2D(0.02, -0.03)));
+        var figure = ModularRig.Build(body);
+        var joint = figure.Layout.Bones.First(b => b.Bone == root).Position;
+        var spot = ModulePointEditing.Sockets(body, ModulePart.Torso).Single(s => s.Name == socket);
+        Near(joint, spot.At);
+
+        var placed = Ok(ModulePointEditing.MoveSocket(body, ModulePart.Torso, ModularRig.FrameOf(body, ModulePart.Torso)!.Value, socket, spot.At));
+
+        Assert.True(ModuleSockets.IsHandSet(placed.Torso!.Shape, socket));
+        Near(joint, ModularRig.Build(placed).Layout.Bones.First(b => b.Bone == root).Position);
+    }
 }

@@ -123,19 +123,21 @@ public static class ModulePointEditing
     /// <summary>
     /// The head's or torso's sockets (<see cref="ModuleSockets.All"/>) where they are now, in
     /// figure space standing at rest from <paramref name="angle"/>, named for the character's own
-    /// sides; empty without that part. The face is the centre of the face the part actually
-    /// carries (a head's is fitted to the whole head).
+    /// sides; empty without that part. Each is where the rig uses it (<see cref="ModularRig.Attachments"/>:
+    /// a derived hip raised by the leg's radius, a shoulder moved in by the arm's), so a socket
+    /// picked up and put down where it was moves nothing. The face is the centre of the face the
+    /// part actually carries (a head's is fitted to the whole head).
     /// </summary>
     public static IReadOnlyList<ModuleSocketSpot> Sockets(ModularBody body, ModulePart part, ViewAngle angle = ViewAngle.Front)
     {
         if (ModuleEditing.ShapeOf(body, part) is not { } module || ModularRig.FrameOf(body, part, angle) is not { } frame)
             return [];
         var shape = Flipped(module);
-        var derived = ModuleSockets.Derive(shape);
+        var used = ModularRig.Attachments(body, part);
         return ModuleSockets.All.Select(name =>
         {
-            var at = name == ModuleSockets.Face ? ModuleSockets.FaceEllipse(shape, upperBand: part != ModulePart.Head).Center : derived[name];
-            return new ModuleSocketSpot(name, frame.ToFigure(at), ModuleSockets.IsHandSet(shape, name));
+            var at = name == ModuleSockets.Face ? ModuleSockets.FaceEllipse(shape, upperBand: part != ModulePart.Head).Center : used[name];
+            return new ModuleSocketSpot(name, SocketFrame(body, part, module, frame, name).ToFigure(at), ModuleSockets.IsHandSet(shape, name));
         }).ToList();
     }
 
@@ -149,7 +151,7 @@ public static class ModulePointEditing
         if (ModuleEditing.ShapeOf(body, part) is not { } module)
             return EditResult<ModularBody>.Failure($"This character has no {part.Noun()}.");
         var (fx, fy) = (module.FlipX == true, module.FlipY == true);
-        return ModuleEditing.SetSocket(body, part, fx ? Mirrored(name) : name, Flip(frame.ToUnit(figure), fx, fy));
+        return ModuleEditing.SetSocket(body, part, fx ? Mirrored(name) : name, Flip(SocketFrame(body, part, module, frame, name).ToUnit(figure), fx, fy));
     }
 
     /// <summary>Whether any of the head's or torso's sockets were placed by hand.</summary>
@@ -170,6 +172,12 @@ public static class ModulePointEditing
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>The frame a socket is read through: the part's own - but the hips of the part the legs hang from are taken before its nudge, as the rig does (a nudge never moves what it stands on).</summary>
+    private static ModuleFrame SocketFrame(ModularBody body, ModulePart part, ShapeModule module, ModuleFrame frame, string socket) =>
+        socket is ModuleSockets.LeftHip or ModuleSockets.RightHip && (part == ModulePart.Torso || body.Torso is null) && module.Offset is { } nudge
+            ? frame.Moved(new Point2D(-nudge.X, -nudge.Y))
+            : frame;
 
     private static ModuleShape Flipped(ShapeModule module) => ModuleSockets.Flipped(module.Shape, module.FlipX == true, module.FlipY == true);
 

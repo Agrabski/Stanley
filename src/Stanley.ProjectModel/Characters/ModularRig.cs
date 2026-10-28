@@ -116,8 +116,7 @@ public static class ModularRig
         // Leg roots: on the hip sockets of the part as it stands (before its nudge), raised by
         // the leg's radius so the thigh's top sits inside it. Side on, both on its centre
         // line, the far one set back a little so both feet show.
-        Point2D Raised(Point2D unit, bool derived) =>
-            derived ? unit with { Y = unit.Y - Math.Min(legRadius / host!.Frame.Height, Math.Max(0, unit.Y - 0.5)) } : unit;
+        Point2D Raised(Point2D unit, bool derived) => derived ? RaisedHip(unit, legRadius, host!.Frame.Height) : unit;
         Point2D HipRoot(LimbSide side)
         {
             var sign = side == LimbSide.Left ? 1 : -1;
@@ -144,12 +143,7 @@ public static class ModularRig
             {
                 var name = side == LimbSide.Left ? ModuleSockets.LeftShoulder : ModuleSockets.RightShoulder;
                 var unit = Socket(name);
-                if (Derived(name))
-                {
-                    var inset = Math.Min(armRadius / host.Frame.Width, Math.Abs(unit.X - 0.5));
-                    unit = unit with { X = unit.X + (unit.X > 0.5 ? -inset : inset) };
-                }
-                return host.Frame.ToFigure(unit);
+                return host.Frame.ToFigure(Derived(name) ? InsetShoulder(unit, armRadius, host.Frame.Width) : unit);
             }
             var middle = Mid(Socket(ModuleSockets.LeftShoulder), Socket(ModuleSockets.RightShoulder));
             var back = (side == LimbSide.Right ? -0.2 : -0.8) * armRadius / host.Frame.Width;
@@ -229,6 +223,43 @@ public static class ModularRig
         }
         var rest = new ViewAngleRestLayout(profile ? ViewAngle.Profile : ViewAngle.Front, bones);
         return new Assembly(body, profile, rest, head, torso, ArmsOnHead: torso is null && head is not null);
+    }
+
+    /// <summary>A derived hip socket (unit box) raised by the leg's radius, so the thigh's top sits inside the part - never above its middle.</summary>
+    private static Point2D RaisedHip(Point2D unit, double legRadius, double height) =>
+        unit with { Y = unit.Y - Math.Min(legRadius / height, Math.Max(0, unit.Y - 0.5)) };
+
+    /// <summary>A derived shoulder socket (unit box) moved in by the arm's radius, so the arm's top sits inside the part - never past its middle.</summary>
+    private static Point2D InsetShoulder(Point2D unit, double armRadius, double width)
+    {
+        var inset = Math.Min(armRadius / width, Math.Abs(unit.X - 0.5));
+        return unit with { X = unit.X + (unit.X > 0.5 ? -inset : inset) };
+    }
+
+    /// <summary>
+    /// The head's or torso's sockets (<see cref="ModuleSockets.All"/>) where the rig actually
+    /// uses them, in its unit box once flipped: on the part the limbs hang from, a derived hip is
+    /// raised by the leg's radius and a derived shoulder moved in by the arm's, which is where
+    /// the leg or arm starts; hand-placed sockets, and every socket of a head sitting on a
+    /// torso, are as they are. Empty when the body hasn't that part.
+    /// </summary>
+    public static IReadOnlyDictionary<string, Point2D> Attachments(ModularBody body, ModulePart part)
+    {
+        var normalized = body.Normalized();
+        var module = part switch { ModulePart.Head => normalized.Head, ModulePart.Torso => normalized.Torso, _ => null };
+        if (module is null)
+            return new Dictionary<string, Point2D>();
+        var shape = ModuleSockets.Flipped(module.Shape, module.FlipX == true, module.FlipY == true);
+        var sockets = new Dictionary<string, Point2D>(ModuleSockets.Derive(shape));
+        if (part == ModulePart.Head && normalized.Torso is not null)
+            return sockets;
+        foreach (var name in new[] { ModuleSockets.LeftHip, ModuleSockets.RightHip })
+            if (normalized.Legs is { } legs && !ModuleSockets.IsHandSet(shape, name))
+                sockets[name] = RaisedHip(sockets[name], Radii(legs).Root, module.Height);
+        foreach (var name in new[] { ModuleSockets.LeftShoulder, ModuleSockets.RightShoulder })
+            if (normalized.Arms is { } arms && !ModuleSockets.IsHandSet(shape, name))
+                sockets[name] = InsetShoulder(sockets[name], Radii(arms).Root, module.Width);
+        return sockets;
     }
 
     /// <summary>A limb's three joints hanging from <paramref name="root"/> along <paramref name="direction"/>; all on the root when the character hasn't that limb.</summary>

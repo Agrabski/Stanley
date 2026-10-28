@@ -162,16 +162,19 @@ public sealed partial class CharacterFigure
             using var ring = Stroke(socket.HandSet ? SKColors.White : EditAccent, 1.5f);
             canvas.DrawCircle(at, SocketRadius, fill);
             canvas.DrawCircle(at, SocketRadius, ring);
-            // The label beside the dot, on the outer side for a shoulder or hip so the pair don't run into each other.
+            // The label beside the dot - on the outer side for a shoulder, below and outward for a
+            // hip (where the leg would hide it) - so a pair never run into each other.
             var text = CharacterEditorViewModel.SocketLabel(socket.Name);
-            var (x, align) = socket.Name switch
+            var (x, y, align) = socket.Name switch
             {
-                ProjectModel.Characters.ModuleSockets.LeftShoulder or ProjectModel.Characters.ModuleSockets.LeftHip => (at.X + SocketRadius + 3, SKTextAlign.Left),
-                ProjectModel.Characters.ModuleSockets.RightShoulder or ProjectModel.Characters.ModuleSockets.RightHip => (at.X - SocketRadius - 3, SKTextAlign.Right),
-                _ => (at.X + SocketRadius + 3, SKTextAlign.Left),
+                ProjectModel.Characters.ModuleSockets.LeftShoulder => (at.X + SocketRadius + 3, at.Y + 3.5f, SKTextAlign.Left),
+                ProjectModel.Characters.ModuleSockets.RightShoulder => (at.X - SocketRadius - 3, at.Y + 3.5f, SKTextAlign.Right),
+                ProjectModel.Characters.ModuleSockets.LeftHip => (at.X + 2, at.Y + SocketRadius + 11, SKTextAlign.Left),
+                ProjectModel.Characters.ModuleSockets.RightHip => (at.X - 2, at.Y + SocketRadius + 11, SKTextAlign.Right),
+                _ => (at.X + SocketRadius + 3, at.Y + 3.5f, SKTextAlign.Left),
             };
-            canvas.DrawText(text, x, at.Y + 3.5f, align, font, halo);
-            canvas.DrawText(text, x, at.Y + 3.5f, align, font, label);
+            canvas.DrawText(text, x, y, align, font, halo);
+            canvas.DrawText(text, x, y, align, font, label);
         }
     }
 
