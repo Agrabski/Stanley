@@ -135,7 +135,7 @@
         </DockPanel>
         <DockPanel Classes="propertyRow">
           <TextBlock Classes="propertyLabel" Text="Thickness" />
-          <TextBlock Classes="sliderValue" Text="{Binding LimbThickness, StringFormat='{}{0:0}'}" />
+          <TextBlock Classes="sliderValue" Text="{Binding LimbThicknessText}" />
           <Slider Name="LimbThicknessSlider" Classes="inspectorSlider" Minimum="5" Maximum="250" Value="{Binding LimbThickness}" ToolTip.Tip="How thick at the shoulder or hip" />
         </DockPanel>
         <DockPanel Classes="propertyRow" IsVisible="{Binding HasLimbTaper}">

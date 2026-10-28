@@ -70,7 +70,7 @@ public sealed class CharacterFigure : Control
     }
 
     /// <summary>How big a missing part's + is drawn, and how near a click has to be: its radius in pixels.</summary>
-    public const double GhostRadius = 9;
+    public const double GhostRadius = 10;
 
     /// <summary>A corner handle's half size in pixels (drawn and hit alike).</summary>
     public const double HandleRadius = 4.5;
@@ -368,9 +368,9 @@ public sealed class CharacterFigure : Control
             }
             if (!ghosts)
                 return;
-            var ink = (dark ? SKColors.White : SKColors.Black).WithAlpha(120);
+            var ink = new SKColor(0x1E, 0x5A, 0xA8).WithAlpha(170);
             using var ring = new SKPaint { Color = ink, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([3f, 2f], 0) };
-            using var back = new SKPaint { Color = (dark ? SKColors.Black : SKColors.White).WithAlpha(150), Style = SKPaintStyle.Fill, IsAntialias = true };
+            using var back = new SKPaint { Color = (dark ? SKColors.Black : SKColors.White).WithAlpha(190), Style = SKPaintStyle.Fill, IsAntialias = true };
             using var plus = new SKPaint { Color = ink, Style = SKPaintStyle.Stroke, StrokeWidth = 1.8f, IsAntialias = true, StrokeCap = SKStrokeCap.Round };
             var g = (float)GhostRadius;
             foreach (var (_, at) in Ghosts(body, figure, placement))

@@ -71,23 +71,24 @@ public static class FigureModules
         if (body.Head is null)
         {
             var neck = Joint(HumanoidBone.Head);
-            ghosts.Add(new(ModulePart.Head, null, new Point2D(neck.X, neck.Y - 0.12)));
+            ghosts.Add(new(ModulePart.Head, null, new Point2D(neck.X, neck.Y - 0.08)));
         }
         if (body.Torso is null && body.Head is not null)
             ghosts.Add(new(ModulePart.Torso, null, Joint(HumanoidBone.Hips)));
-        void Limb(LimbModule? limb, ModulePart part, HumanoidBone left, HumanoidBone right, double drop)
+        void Limb(LimbModule? limb, ModulePart part, HumanoidBone left, HumanoidBone right, double outwards, double drop)
         {
             foreach (var (side, bone) in new[] { (LimbSide.Left, left), (LimbSide.Right, right) })
             {
                 if (limb is not null && limb.Has(side))
                     continue;
                 var at = Joint(bone);
-                var outward = figure.Angle == ViewAngle.Profile ? 0 : side == LimbSide.Left ? 0.03 : -0.03;
+                var outward = figure.Angle == ViewAngle.Profile ? 0 : side == LimbSide.Left ? outwards : -outwards;
                 ghosts.Add(new(part, limb is null ? null : side, new Point2D(at.X + outward, at.Y + drop)));
             }
         }
-        Limb(body.Arms, ModulePart.Arms, HumanoidBone.LeftUpperArm, HumanoidBone.RightUpperArm, 0.06);
-        Limb(body.Legs, ModulePart.Legs, HumanoidBone.LeftUpperLeg, HumanoidBone.RightUpperLeg, 0.06);
+        // Arms just outside the shoulders; legs just under the hips, on the body's bottom edge.
+        Limb(body.Arms, ModulePart.Arms, HumanoidBone.LeftUpperArm, HumanoidBone.RightUpperArm, 0.04, 0.02);
+        Limb(body.Legs, ModulePart.Legs, HumanoidBone.LeftUpperLeg, HumanoidBone.RightUpperLeg, 0, 0.025);
         return ghosts;
     }
 

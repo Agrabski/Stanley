@@ -282,6 +282,9 @@ public sealed partial class CharacterEditorViewModel
         set => EditSelectedModule((body, part) => ModuleEditing.SetThickness(body, part, value / 1000));
     }
 
+    /// <summary>The thickness as a user reads it: percent of an adult's height, to a tenth.</summary>
+    public string LimbThicknessText => SelectedLimb is { } l ? $"{l.Thickness * 100:0.#}%" : "";
+
     /// <summary>How much thinner the end is than the root, percent.</summary>
     public double LimbTaper
     {
@@ -552,10 +555,10 @@ public sealed partial class CharacterEditorViewModel
             if (!IsModular)
                 return null;
             if (SelectedModuleIsShape)
-                return $"{SelectedModuleName}: pick another shape {Where("on the Module tab", "under " + SelectedModuleName)}, drag it to move it off its place, or drag a corner to resize it. " +
+                return $"{SelectedModuleName}: pick another shape {Where($"on the {SelectedModuleName} tab", "under " + SelectedModuleName)}, drag it to move it off its place, or drag a corner to resize it. " +
                        "Click the background when you're done.";
             if (SelectedModuleIsLimb)
-                return $"{SelectedModuleName}: pick a style and {(SelectedModule == ModulePart.Legs ? "feet" : "hands")}, and set how long and thick they are {Where("on the Module tab", "under " + SelectedModuleName)}. " +
+                return $"{SelectedModuleName}: pick a style and {(SelectedModule == ModulePart.Legs ? "feet" : "hands")}, and set how long and thick they are {Where($"on the {SelectedModuleName} tab", "under " + SelectedModuleName)}. " +
                        "Pose them on the page by dragging their ends.";
             var missing = Working.Modules is { } body && ModuleParts.All.Any(p => !ModuleEditing.Has(body, p)) ? " A faint + puts a missing part back." : "";
             return $"Click a part of the body to change it, or pick a creature {Where("on the Shapes tab", "under Shapes")}.{missing} " +
@@ -631,6 +634,7 @@ public sealed partial class CharacterEditorViewModel
         OnPropertyChanged(nameof(HasLimbPieces));
         OnPropertyChanged(nameof(LimbLength));
         OnPropertyChanged(nameof(LimbThickness));
+        OnPropertyChanged(nameof(LimbThicknessText));
         OnPropertyChanged(nameof(LimbTaper));
         OnPropertyChanged(nameof(LimbBend));
         OnPropertyChanged(nameof(LimbEndSize));

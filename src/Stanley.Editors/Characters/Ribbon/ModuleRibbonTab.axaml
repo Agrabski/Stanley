@@ -114,7 +114,7 @@
           <TextBlock Grid.Row="1" Text="Thickness" FontSize="12" VerticalAlignment="Center" />
           <Slider Name="LimbThicknessSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="5" Maximum="250" Value="{Binding LimbThickness}"
                   ToolTip.Tip="How thick at the shoulder or hip" />
-          <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding LimbThickness, StringFormat='{}{0:0}'}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding LimbThicknessText}" FontSize="12" VerticalAlignment="Center" />
           <TextBlock Grid.Row="2" Text="{Binding LimbEndName}" FontSize="12" VerticalAlignment="Center" />
           <Slider Name="LimbEndSizeSlider" Grid.Row="2" Grid.Column="1" Classes="body" Minimum="1" Maximum="{Binding MaxLimbEndSize}" Value="{Binding LimbEndSize}"
                   ToolTip.Tip="How big the hand or foot is" />
