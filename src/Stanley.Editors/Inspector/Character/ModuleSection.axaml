@@ -167,6 +167,9 @@
         </DockPanel>
       </StackPanel>
 
+      <!-- A shape of your own - imported, drawn, kept in My Assets (docs/shape-characters.md §9.3). -->
+      <local:OwnShapeRow Name="OwnShapeRow" />
+
       <DockPanel Classes="propertyRow">
         <TextBlock Classes="propertyLabel" Text="Colour" ToolTip.Tip="{Binding ModuleColorNote}" />
         <Button Name="ModuleSameAsSkinButton" DockPanel.Dock="Right" Classes="inspectorButton" Margin="4,0,0,0" Command="{Binding ModuleSameAsSkinCommand}"

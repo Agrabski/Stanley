@@ -148,6 +148,10 @@
     </DockPanel>
     <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsLimb}" />
 
+    <!-- Either kind: a shape of your own - imported, drawn, kept in My Assets (docs/shape-characters.md §9.3). -->
+    <local:OwnShapeRibbonGroup Name="OwnShapeGroup" />
+    <Rectangle Classes="divider" />
+
     <!-- Either kind: its colour (the skin's until one's picked), and taking it off. -->
     <DockPanel Classes="group">
       <StackPanel Spacing="4" Margin="0,4,0,0">

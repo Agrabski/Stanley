@@ -252,9 +252,11 @@ public sealed partial class CharacterEditorViewModel
                 .Select(category => new ModuleShapeSection(ShapeLibrary.DisplayName(category), ShapeLibrary.ForKind(kind, category).Select(Choice).ToList()))
                 .Where(s => s.Choices.Count > 0)
                 .ToList();
+            if (MyShapesSection(part, null, module.Shape, aspect, fill, $"the {part.Noun()}", module.FlipX == true, module.FlipY == true) is { } mine)
+                sections.Add(mine);
             var other = kind == ShapeLibrary.Head ? ShapeLibrary.Torso : ShapeLibrary.Head;
             sections.Add(new ModuleShapeSection(other == ShapeLibrary.Head ? "Head shapes" : "Torso shapes", ShapeLibrary.ForKind(other).Select(Choice).ToList()));
-            return new ModuleShapeGallery("Shape", current?.DisplayName ?? "Your own",
+            return new ModuleShapeGallery("Shape", current?.DisplayName ?? KeptShapeName(module.Shape) ?? "Your own",
                 ModuleSockets.Flipped(module.Shape, module.FlipX == true, module.FlipY == true), aspect, fill, sections,
                 $"The {part.Noun()}'s shape - pick another; its size, colour and place stay", SwapModuleShapeCommand);
         }
@@ -351,7 +353,9 @@ public sealed partial class CharacterEditorViewModel
             if (items.Count > 0)
                 sections.Add(new ModuleShapeSection(ShapeLibrary.DisplayName(category), items));
         }
-        return new ModuleShapeGallery(label, shape is null ? none : current?.DisplayName ?? "Your own", shape ?? noneIcon, aspect, fill, sections,
+        if (MyShapesSection(part, piece, shape, aspect, fill, $"their {noun}") is { } mine)
+            sections.Add(mine);
+        return new ModuleShapeGallery(label, shape is null ? none : current?.DisplayName ?? KeptShapeName(shape) ?? "Your own", shape ?? noneIcon, aspect, fill, sections,
             $"The {part.Noun()}' {noun} - pick another shape", SwapModuleShapeCommand);
     }
 
@@ -490,7 +494,9 @@ public sealed partial class CharacterEditorViewModel
     {
         if (choice.IsCurrent || Working.Modules is not { } body)
             return;
-        if (choice.Piece is { } piece)
+        if (choice.Kept is { } kept)
+            PickKeptShape(choice, kept);
+        else if (choice.Piece is { } piece)
             EditModules(ModuleEditing.SwapShape(body, choice.Part, piece, choice.Library?.Instantiate()));
         else if (choice.Library is { } library)
             EditModules(ModuleEditing.SwapShape(body, choice.Part, library.Instantiate()));

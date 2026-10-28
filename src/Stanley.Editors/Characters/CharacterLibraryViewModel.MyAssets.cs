@@ -104,7 +104,10 @@ public sealed partial class CharacterLibraryViewModel
             _keptIds = [];
         }
         foreach (var item in Items)
+        {
             item.IsKept = IsKept(item.Editor.Committed);
+            item.Editor.OnMyAssetsChanged();
+        }
         OnPropertyChanged(nameof(HasMyAssets));
         KeepInMyAssetsCommand?.NotifyCanExecuteChanged();
     }

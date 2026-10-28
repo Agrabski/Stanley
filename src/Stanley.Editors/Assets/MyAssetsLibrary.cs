@@ -30,6 +30,7 @@ public sealed class MyAssetsLibrary
         if (string.Equals(Path.GetFullPath(rootDirectory), RootDirectory, StringComparison.Ordinal))
             return;
         _store = new MyAssets(rootDirectory);
+        _shapes = null;
         Changed?.Invoke();
     }
 
@@ -87,6 +88,66 @@ public sealed class MyAssetsLibrary
     public void RemoveObjectGroup(ObjectGroupId id)
     {
         _store.RemoveObjectGroup(id);
+        Changed?.Invoke();
+    }
+
+    // ---------------------------------------------------------------- shapes
+
+    // Read once and kept until something is written here (or the folder moves): every shape
+    // gallery lists them, and those are rebuilt on every step of a slider drag.
+    private IReadOnlyList<ShapeAsset>? _shapes;
+
+    /// <summary>Every kept shape (docs/shape-characters.md §9.3), by name - what every comic's shape galleries list under My shapes. A file that can't be read is left out.</summary>
+    public IReadOnlyList<ShapeAsset> Shapes() => _shapes ??= _store.ListShapes();
+
+    /// <summary>The kept shape with <paramref name="id"/>, or null if My Assets doesn't have it (or can't read it).</summary>
+    public ShapeAsset? FindShape(ShapeAssetId id) => Shapes().FirstOrDefault(s => s.Id == id);
+
+    /// <summary>
+    /// Keeps <paramref name="outline"/> (in its own proportions, <see cref="ShapeAsset.Shape"/>)
+    /// in My Assets as a new shape called <paramref name="name"/>, and returns it - a comic's
+    /// copy records <see cref="AssetFingerprint.ShapeFingerprint"/> of it.
+    /// </summary>
+    public ShapeAsset KeepShape(string name, ModuleShape outline)
+    {
+        var kept = new ShapeAsset(ShapeAssetId.New(), name.Trim(), outline with { Source = null, MyAssetsVersion = null });
+        SaveShape(kept);
+        return kept;
+    }
+
+    /// <summary>Renames a kept shape. Its fingerprint leaves the name out, so the characters that use it don't see a change.</summary>
+    public void RenameShape(ShapeAssetId id, string name)
+    {
+        if (FindShape(id) is not { } shape || string.IsNullOrWhiteSpace(name) || shape.Name == name.Trim())
+            return;
+        SaveShape(shape with { Name = name.Trim() });
+    }
+
+    /// <summary>Takes a shape out of My Assets (and out of every pack). Characters that use it keep their own copy.</summary>
+    public void RemoveShape(ShapeAssetId id)
+    {
+        _shapes = null;
+        _store.RemoveShape(id);
+        Changed?.Invoke();
+    }
+
+    /// <summary><paramref name="name"/>, or "<paramref name="name"/> 2", "... 3" - the first that no kept shape has yet.</summary>
+    public string NextShapeName(string name)
+    {
+        var taken = Shapes().Select(s => s.Name).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        if (!taken.Contains(name))
+            return name;
+        for (var n = 2; ; n++)
+        {
+            if (!taken.Contains($"{name} {n}"))
+                return $"{name} {n}";
+        }
+    }
+
+    private void SaveShape(ShapeAsset shape)
+    {
+        _shapes = null;
+        _store.SaveShape(shape);
         Changed?.Invoke();
     }
 

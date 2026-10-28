@@ -1,0 +1,25 @@
+<!--
+  The Module section's "Your own" row (docs/shape-characters.md §9.3): Import shape, Draw shape
+  and Keep in My Assets for the picked head or torso - or the picked arms' or legs' hands or
+  feet - as the ribbon's Module tab has them (OwnShapeRibbonGroup).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.OwnShapeRow"
+             x:DataType="local:CharacterEditorViewModel">
+  <DockPanel Classes="propertyRow">
+    <TextBlock Classes="propertyLabel" Text="Your own" />
+    <StackPanel Classes="iconRow">
+      <Button Name="ImportShapeButton" Classes="iconButton" Command="{Binding ImportShapeCommand}" ToolTip.Tip="{Binding ImportShapeTip}">
+        <PathIcon Data="{StaticResource FolderIcon}" />
+      </Button>
+      <ToggleButton Name="DrawShapeButton" Classes="iconButton" IsChecked="{Binding IsDrawingShape, Mode=OneWay}" Command="{Binding DrawShapeCommand}" ToolTip.Tip="{Binding DrawShapeTip}">
+        <PathIcon Data="{StaticResource FreeformIcon}" />
+      </ToggleButton>
+      <Button Name="KeepShapeButton" Classes="iconButton" Command="{Binding KeepShapeInMyAssetsCommand}" ToolTip.Tip="{Binding KeepShapeTip}" ToolTip.ShowOnDisabled="True">
+        <PathIcon Data="{StaticResource StarIcon}" />
+      </Button>
+    </StackPanel>
+  </DockPanel>
+</UserControl>

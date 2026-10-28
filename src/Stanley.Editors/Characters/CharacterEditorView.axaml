@@ -28,6 +28,8 @@
                                Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}"
                                ModuleHighlight="{Binding SelectedModule}" ShowModuleGhosts="{Binding IsModular}" />
       </Border>
+      <!-- Draw shape (docs/shape-characters.md §9.3): over the stage, taking its clicks, only while drawing. -->
+      <local:ShapeDrawOverlay Name="DrawOverlay" Stage="{Binding #Stage}" />
       <!-- Two small notes about the hair, over the foot of the stage like the export note over the page; neither is ever a dialog. -->
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="16,0,16,12" Spacing="6">
         <!-- After a hairstyle click threw away your own mix. Any other edit, or leaving the editor, takes it down. -->

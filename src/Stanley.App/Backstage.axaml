@@ -219,11 +219,12 @@
           <StackPanel Name="MyAssetsPanel" DataContext="{Binding MyAssetsPage}" x:DataType="editors:MyAssetsPageViewModel">
             <TextBlock Classes="backstageHeading" Text="My Assets" />
             <TextBlock TextWrapping="Wrap" Opacity="0.7" MaxWidth="640" Margin="0,0,0,16"
-                       Text="Things you keep here can go into any comic: right-click a group on a page or a character in the Characters pane and choose Keep in My Assets. Each comic keeps its own copy, so nothing here is needed to open one." />
+                       Text="Things you keep here can go into any comic: right-click a group on a page, a character in the Characters pane or a part of a character built from shapes and choose Keep in My Assets. Each comic keeps its own copy, so nothing here is needed to open one." />
             <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,12">
               <RadioButton Name="MyAssetsAllChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsAll}" Content="{Binding AllText}" />
               <RadioButton Name="MyAssetsObjectGroupsChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsObjectGroups}" Content="{Binding ObjectGroupsText}" />
               <RadioButton Name="MyAssetsCharactersChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsCharacters}" Content="{Binding CharactersText}" />
+              <RadioButton Name="MyAssetsShapesChip" Classes="chip" GroupName="MyAssetsKind" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsShapes}" Content="{Binding ShapesText}" />
             </StackPanel>
             <TextBlock Text="{Binding Problem}" IsVisible="{Binding Problem, Converter={x:Static ObjectConverters.IsNotNull}}"
                        Foreground="{DynamicResource StanleyErrorBrush}" TextWrapping="Wrap" Margin="0,0,0,12" />
@@ -267,6 +268,7 @@
                         <Panel>
                           <editors:CharacterFigure Character="{Binding Character}" IsVisible="{Binding IsCharacter}" />
                           <editors:ObjectGroupPreview Group="{Binding ObjectGroup}" IsVisible="{Binding IsObjectGroup}" />
+                          <editors:ModuleShapeIcon Shape="{Binding ShapeOutline}" Fill="{Binding ShapeFill}" IsVisible="{Binding IsShape}" Margin="14" />
                         </Panel>
                       </Border>
                     </DockPanel>

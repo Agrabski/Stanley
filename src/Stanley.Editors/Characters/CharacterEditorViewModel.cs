@@ -55,6 +55,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		InitializeArt();
 		InitializeLooks();
 		InitializeModules();
+		InitializeOwnShapes();
 		PropertyChanged += (_, e) =>
 		{
 			if (e.PropertyName == nameof(Working))
@@ -241,6 +242,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
 	public string Hint => _message ??
+		DrawShapeHint ??
 		ExpressionWarning ??
 		(SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
 		ModuleHint ??

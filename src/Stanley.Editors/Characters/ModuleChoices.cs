@@ -46,10 +46,12 @@ public sealed record ModuleShapeGallery(string Label, string Current, ModuleShap
 public sealed record ModuleShapeSection(string Label, IReadOnlyList<ModuleShapeChoice> Choices);
 
 /// <summary>
-/// A shape on offer: a library shape (<paramref name="Library"/>), or none - a limb's own
-/// round end or a plain capsule piece. <paramref name="Icon"/> is what the button draws.
+/// A shape on offer: a library shape (<paramref name="Library"/>), one kept in My Assets
+/// (<paramref name="Kept"/>, the gallery's My shapes), or none - a limb's own round end or a
+/// plain capsule piece. <paramref name="Icon"/> is what the button draws.
 /// </summary>
-public sealed record ModuleShapeChoice(string Label, ModulePart Part, LimbPiece? Piece, LibraryShape? Library, ModuleShape Icon, double Aspect, IBrush Fill, bool IsCurrent, string Tip);
+public sealed record ModuleShapeChoice(string Label, ModulePart Part, LimbPiece? Piece, LibraryShape? Library, ModuleShape Icon, double Aspect, IBrush Fill, bool IsCurrent, string Tip,
+    Stanley.ProjectModel.Objects.ShapeAsset? Kept = null);
 
 /// <summary>A limb style on the Module tab (Tube, Taper, Pieces, Stick).</summary>
 public sealed record LimbStyleChoice(LimbStyle Style, bool IsCurrent)

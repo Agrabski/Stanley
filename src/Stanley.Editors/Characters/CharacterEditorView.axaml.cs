@@ -32,6 +32,7 @@ public partial class CharacterEditorView : UserControl
     public CharacterEditorView()
     {
         InitializeComponent();
+        WireOwnShapes();
         // Click a garment on the character to work on it (the Sticker tab); click skin or
         // the background to let it go. Drawn art, once selected, drags to move it.
         // Clicking a compared (faded) character switches to it.

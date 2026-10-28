@@ -1,0 +1,27 @@
+<!--
+  The Module tab's "Your own" group (docs/shape-characters.md §9.3): a shape of the user's own
+  for the picked head or torso - or the picked arms' or legs' hands or feet. Import shape takes
+  an SVG's first closed path; Draw shape builds one point by point on the stage, with the page's
+  Freeform gestures; Keep in My Assets puts the part's shape under My shapes in every comic's
+  shape galleries. The inspector's Module section has the same (OwnShapeRow).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.OwnShapeRibbonGroup"
+             x:DataType="local:CharacterEditorViewModel">
+  <DockPanel Classes="group">
+    <StackPanel Orientation="Horizontal">
+      <Button Name="ImportShapeButton" Classes="tool" Command="{Binding ImportShapeCommand}" ToolTip.Tip="{Binding ImportShapeTip}">
+        <StackPanel><PathIcon Data="{StaticResource FolderIcon}" /><TextBlock Text="Import shape..." /></StackPanel>
+      </Button>
+      <ToggleButton Name="DrawShapeButton" Classes="tool" IsChecked="{Binding IsDrawingShape, Mode=OneWay}" Command="{Binding DrawShapeCommand}" ToolTip.Tip="{Binding DrawShapeTip}">
+        <StackPanel><PathIcon Data="{StaticResource FreeformIcon}" /><TextBlock Text="Draw shape" /></StackPanel>
+      </ToggleButton>
+      <Button Name="KeepShapeButton" Classes="tool" Command="{Binding KeepShapeInMyAssetsCommand}" ToolTip.Tip="{Binding KeepShapeTip}" ToolTip.ShowOnDisabled="True">
+        <StackPanel><PathIcon Data="{StaticResource StarIcon}" /><TextBlock Text="Keep in My Assets" /></StackPanel>
+      </Button>
+    </StackPanel>
+    <TextBlock Classes="groupLabel" Text="Your own" />
+  </DockPanel>
+</UserControl>

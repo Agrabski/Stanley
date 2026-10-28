@@ -12,10 +12,11 @@ public enum MyAssetsFilter
 {
     All,
     ObjectGroups,
-    Characters
+    Characters,
+    Shapes
 }
 
-/// <summary>One tile on File › My Assets: a kept character or object group.</summary>
+/// <summary>One tile on File › My Assets: a kept character, object group or shape.</summary>
 public sealed partial class MyAssetTile : ObservableObject
 {
     private readonly Action<MyAssetTile, string>? _rename;
@@ -37,6 +38,15 @@ public sealed partial class MyAssetTile : ObservableObject
         _rename = rename;
     }
 
+    public MyAssetTile(ShapeAsset shape, Action<MyAssetTile, string> rename)
+    {
+        Kind = AssetKind.Shape;
+        Id = shape.Id.Value;
+        Shape = shape;
+        _name = shape.Name;
+        _rename = rename;
+    }
+
     public AssetKind Kind { get; }
 
     /// <summary>The asset's id token, unique within its kind.</summary>
@@ -44,13 +54,26 @@ public sealed partial class MyAssetTile : ObservableObject
 
     public CharacterDefinition? Character { get; }
     public ObjectGroup? ObjectGroup { get; }
+    public ShapeAsset? Shape { get; }
 
     public bool IsCharacter => Character != null;
     public bool IsObjectGroup => ObjectGroup != null;
+    public bool IsShape => Shape != null;
 
-    public string KindText => Kind == AssetKind.Character ? "Character" : "Object group";
+    /// <summary>A kept shape's outline, for its preview (drawn in its own proportions).</summary>
+    public ModuleShape? ShapeOutline => Shape?.Shape;
 
-    /// <summary>Only an object group is renamed here - a character's name is changed in a comic, then saved to My Assets.</summary>
+    /// <summary>What a kept shape's preview is filled with: the default skin, like a new character's.</summary>
+    public Avalonia.Media.IBrush ShapeFill { get; } = ModuleNames.Brush(CharacterDefinition.DefaultSkin);
+
+    public string KindText => Kind switch
+    {
+        AssetKind.Character => "Character",
+        AssetKind.Shape => "Shape",
+        _ => "Object group"
+    };
+
+    /// <summary>An object group or a shape is renamed here - a character's name is changed in a comic, then saved to My Assets.</summary>
     public bool CanRename => _rename != null;
 
     /// <summary>The name shown; setting it (from the rename box) renames the asset in My Assets.</summary>
@@ -106,24 +129,27 @@ public sealed partial class MyAssetsPageViewModel : ObservableObject
     public string FolderText => _library.RootDirectory;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Tiles), nameof(IsAll), nameof(IsObjectGroups), nameof(IsCharacters), nameof(IsFilteredEmpty))]
+    [NotifyPropertyChangedFor(nameof(Tiles), nameof(IsAll), nameof(IsObjectGroups), nameof(IsCharacters), nameof(IsShapes), nameof(IsFilteredEmpty))]
     public partial MyAssetsFilter Filter { get; set; }
 
     public bool IsAll { get => Filter == MyAssetsFilter.All; set { if (value) Filter = MyAssetsFilter.All; } }
     public bool IsObjectGroups { get => Filter == MyAssetsFilter.ObjectGroups; set { if (value) Filter = MyAssetsFilter.ObjectGroups; } }
     public bool IsCharacters { get => Filter == MyAssetsFilter.Characters; set { if (value) Filter = MyAssetsFilter.Characters; } }
+    public bool IsShapes { get => Filter == MyAssetsFilter.Shapes; set { if (value) Filter = MyAssetsFilter.Shapes; } }
 
-    /// <summary>What the grid shows under the current chip, object groups first, then characters, each by name.</summary>
+    /// <summary>What the grid shows under the current chip, object groups first, then characters, then shapes, each by name.</summary>
     public IReadOnlyList<MyAssetTile> Tiles => Filter switch
     {
         MyAssetsFilter.ObjectGroups => _all.Where(t => t.IsObjectGroup).ToList(),
         MyAssetsFilter.Characters => _all.Where(t => t.IsCharacter).ToList(),
+        MyAssetsFilter.Shapes => _all.Where(t => t.IsShape).ToList(),
         _ => _all
     };
 
     public string AllText => $"All ({_all.Count})";
     public string ObjectGroupsText => $"Object groups ({_all.Count(t => t.IsObjectGroup)})";
     public string CharactersText => $"Characters ({_all.Count(t => t.IsCharacter)})";
+    public string ShapesText => $"Shapes ({_all.Count(t => t.IsShape)})";
 
     /// <summary>Nothing kept yet at all: the page explains how things get here instead of showing a grid.</summary>
     public bool IsEmpty => _all.Count == 0;
@@ -139,7 +165,7 @@ public sealed partial class MyAssetsPageViewModel : ObservableObject
     public bool HasPendingRemoval => PendingRemoval != null;
 
     public string RemovalQuestion => PendingRemoval is { } tile
-        ? $"Remove {tile.Name} from My Assets? Comics that use {(tile.IsCharacter ? "them" : "it")} keep their own copy."
+        ? $"Remove {tile.Name} from My Assets? {(tile.IsShape ? "Characters" : "Comics")} that use {(tile.IsCharacter ? "them" : "it")} keep their own copy."
         : "";
 
     public IRelayCommand<MyAssetTile?> RemoveCommand { get; }
@@ -158,6 +184,7 @@ public sealed partial class MyAssetsPageViewModel : ObservableObject
         {
             _all = _library.ObjectGroups().Select(g => new MyAssetTile(g, Rename))
                 .Concat(_library.Characters().Select(c => new MyAssetTile(c)))
+                .Concat(_library.Shapes().Select(s => new MyAssetTile(s, Rename)))
                 .ToList();
             Problem = null;
         }
@@ -172,6 +199,7 @@ public sealed partial class MyAssetsPageViewModel : ObservableObject
         OnPropertyChanged(nameof(AllText));
         OnPropertyChanged(nameof(ObjectGroupsText));
         OnPropertyChanged(nameof(CharactersText));
+        OnPropertyChanged(nameof(ShapesText));
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(IsFilteredEmpty));
         OnPropertyChanged(nameof(FolderText));
@@ -186,13 +214,21 @@ public sealed partial class MyAssetsPageViewModel : ObservableObject
         {
             if (tile.IsCharacter)
                 _library.RemoveCharacter(CharacterId.FromValue(tile.Id));
+            else if (tile.IsShape)
+                _library.RemoveShape(ShapeAssetId.FromValue(tile.Id));
             else
                 _library.RemoveObjectGroup(ObjectGroupId.FromValue(tile.Id));
         });
     }
 
     private void Rename(MyAssetTile tile, string name) =>
-        Write(() => _library.RenameObjectGroup(ObjectGroupId.FromValue(tile.Id), name));
+        Write(() =>
+        {
+            if (tile.IsShape)
+                _library.RenameShape(ShapeAssetId.FromValue(tile.Id), name);
+            else
+                _library.RenameObjectGroup(ObjectGroupId.FromValue(tile.Id), name);
+        });
 
     private void Write(Action write)
     {
