@@ -20,7 +20,7 @@ namespace Stanley.Editors;
 /// adult) run behind them. Small ones are the thumbnails in the Characters pane and the
 /// Insert tab's gallery; the big one is the character editor.
 /// </summary>
-public sealed class CharacterFigure : Control
+public sealed partial class CharacterFigure : Control
 {
     public static readonly StyledProperty<CharacterDefinition?> CharacterProperty =
         AvaloniaProperty.Register<CharacterFigure, CharacterDefinition?>(nameof(Character));
@@ -52,7 +52,7 @@ public sealed class CharacterFigure : Control
     static CharacterFigure()
     {
         AffectsRender<CharacterFigure>(CharacterProperty, LineUpProperty, ShowGuidesProperty, AngleProperty, PoseProperty, HighlightProperty, CloseupProperty,
-            ModuleHighlightProperty, ShowModuleGhostsProperty);
+            ModuleHighlightProperty, ShowModuleGhostsProperty, EditMarksProperty);
     }
 
     /// <summary>A part of the main character's body built from shapes to outline - with corner handles for a head or torso (the character editor's selection).</summary>
@@ -99,7 +99,7 @@ public sealed class CharacterFigure : Control
     /// <summary>Which corner handle of the highlighted head or torso is under <paramref name="point"/> - 0 top left, then clockwise - or null.</summary>
     public int? ModuleHandleAt(Point point)
     {
-        if (ModuleHighlight is not { } part || !part.IsShape() || ModuleBounds(part) is not { } box)
+        if (ModuleHighlight is not { } part || !part.IsShape() || EditMarks is not null || ModuleBounds(part) is not { } box)
             return null;
         var corners = Corners(box);
         for (var i = 0; i < corners.Length; i++)
@@ -277,11 +277,12 @@ public sealed class CharacterFigure : Control
             return;
         var dark = ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
         context.Custom(new FigureDrawOperation(new(Bounds.Size), character, LineUp ?? [], ShowGuides, dark, Pose?.ViewAngle ?? Angle, Pose, Highlight, Closeup,
-            ModuleHighlight, ShowModuleGhosts));
+            ModuleHighlight, ShowModuleGhosts, EditMarks, PointGhost));
     }
 
     private sealed class FigureDrawOperation(Rect bounds, CharacterDefinition main, IReadOnlyList<CharacterDefinition> others, bool guides, bool dark, ViewAngle angle,
-        ProjectModel.Poses.PoseData? pose, ProjectModel.Ids.StickerId? highlight, bool closeup, ModulePart? moduleHighlight = null, bool ghosts = false)
+        ProjectModel.Poses.PoseData? pose, ProjectModel.Ids.StickerId? highlight, bool closeup, ModulePart? moduleHighlight = null, bool ghosts = false,
+        ModuleEditMarks? editMarks = null, Point2D? pointGhost = null)
         : ICustomDrawOperation
     {
         public Rect Bounds => bounds;
@@ -333,7 +334,11 @@ public sealed class CharacterFigure : Control
                     canvas.DrawPath(outline, selection);
                 }
                 if (!faded && character.Modules is { } body && !closeup)
+                {
                     DrawModules(canvas, character, body, placement);
+                    if (editMarks is not null)
+                        DrawEditMarks(canvas, placement, editMarks, pointGhost, dark);
+                }
             }
             canvas.Restore();
         }
@@ -345,12 +350,13 @@ public sealed class CharacterFigure : Control
                 return;
             var figure = CharacterRig.Build(character, angle, pose);
             var accent = new SKColor(0x1E, 0x5A, 0xA8);
-            if (moduleHighlight is { } part)
+            // While its points are edited the part shows them instead of its outline and corners.
+            if (moduleHighlight is { } part && editMarks?.Outline is null)
             {
                 using var outline = FigureModules.OutlineOf(figure, part, placement);
                 using var selection = new SKPaint { Color = accent, Style = SKPaintStyle.Stroke, StrokeWidth = 2.5f, IsAntialias = true, PathEffect = SKPathEffect.CreateDash([6f, 3f], 0) };
                 canvas.DrawPath(outline, selection);
-                if (part.IsShape() && !outline.IsEmpty)
+                if (part.IsShape() && !outline.IsEmpty && editMarks is null)
                 {
                     var box = outline.TightBounds;
                     using var fill = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill, IsAntialias = true };

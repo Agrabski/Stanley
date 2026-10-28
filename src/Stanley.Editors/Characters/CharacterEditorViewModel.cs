@@ -56,6 +56,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		InitializeLooks();
 		InitializeModules();
 		InitializeOwnShapes();
+		InitializePoints();
 		PropertyChanged += (_, e) =>
 		{
 			if (e.PropertyName == nameof(Working))
@@ -245,6 +246,7 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		DrawShapeHint ??
 		ExpressionWarning ??
 		(SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
+		PointsHint ??
 		ModuleHint ??
 		$"Pick a body type and fine-tune it with the sliders; dress them {Where("on the Look tab", "under Look")}, and click something they wear to adjust it. " +
 		"Every panel this character is in updates as you go.";

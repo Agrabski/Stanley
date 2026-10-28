@@ -57,6 +57,46 @@
     </DockPanel>
     <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
 
+    <!-- A head or torso: its outline point by point (Edit Points, as for a drawn shape), and where the other parts attach (Edit Sockets, the escape hatch). -->
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton Name="EditPointsButton" Classes="tool" IsChecked="{Binding IsEditingPoints}" IsEnabled="{Binding CanEditPoints}"
+                      ToolTip.Tip="Edit Points - drag the outline's points to reshape it, drag the outline to add a point, drag a point's round handles to bend the curve, double-click a point to make it smooth or sharp (or double-click the part)"
+                      local:Shortcut.Keys="Enter">
+          <StackPanel><PathIcon Data="{StaticResource EditPointsIcon}" /><TextBlock Text="Edit Points" /></StackPanel>
+        </ToggleButton>
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <RadioButton Name="SmoothPointButton" Classes="small" GroupName="ModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsSelectedPointSmooth}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Smooth point - the outline curves through it" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Smooth</RadioButton>
+          <RadioButton Name="CornerPointButton" Classes="small" GroupName="ModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsSelectedPointCorner}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Corner point - the outline turns sharply there" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Corner</RadioButton>
+          <Button Name="DeletePointButton" Classes="small" Command="{Binding DeletePointCommand}"
+                  ToolTip.Tip="Delete the selected point (the Delete key does too, while editing points) - a shape keeps at least three"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Delete point</Button>
+        </StackPanel>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Points" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton Name="EditSocketsButton" Classes="tool" IsChecked="{Binding IsEditingSockets}" IsEnabled="{Binding CanEditPoints}"
+                      ToolTip.Tip="Edit Sockets - show where the neck, shoulders, hips and face attach, and drag them where they should be (left and right are the character's own)">
+          <StackPanel>
+            <PathIcon Data="F1 M5,7 L19,7 L19,21 L5,21 Z M6.8,8.8 L6.8,19.2 L17.2,19.2 L17.2,8.8 Z M9.5,7 A2.5,2.5 0 1 1 14.5,7 A2.5,2.5 0 1 1 9.5,7 Z M2.5,10 A2.5,2.5 0 1 1 7.5,10 A2.5,2.5 0 1 1 2.5,10 Z M16.5,10 A2.5,2.5 0 1 1 21.5,10 A2.5,2.5 0 1 1 16.5,10 Z" />
+            <TextBlock Text="Edit Sockets" />
+          </StackPanel>
+        </ToggleButton>
+        <Button Name="ResetSocketsButton" Classes="small" Command="{Binding ResetSocketsCommand}" VerticalAlignment="Center"
+                ToolTip.Tip="Reset Sockets - put every socket dragged by hand back where the shape puts it" ToolTip.ShowOnDisabled="True">Reset Sockets</Button>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Sockets" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
     <!-- Arms or legs: how they're drawn, and their hands or feet. -->
     <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsLimb}">
       <ItemsControl Name="LimbStyles" ItemsSource="{Binding LimbStyleChoices}" Margin="0,4,0,0">

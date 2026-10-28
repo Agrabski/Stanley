@@ -26,7 +26,8 @@
       <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" Padding="24,16">
         <local:CharacterFigure Name="Stage" Character="{Binding LookWorking}" LineUp="{Binding ShownLineUp}" ShowGuides="True" Angle="{Binding PreviewAngle}"
                                Pose="{Binding StagePose}" Highlight="{Binding SelectedStickerId}"
-                               ModuleHighlight="{Binding SelectedModule}" ShowModuleGhosts="{Binding IsModular}" />
+                               ModuleHighlight="{Binding SelectedModule}" ShowModuleGhosts="{Binding IsModular}"
+                               EditMarks="{Binding StageEditMarks}" Focusable="True" />
       </Border>
       <!-- Draw shape (docs/shape-characters.md §9.3): over the stage, taking its clicks, only while drawing. -->
       <local:ShapeDrawOverlay Name="DrawOverlay" Stage="{Binding #Stage}" />
