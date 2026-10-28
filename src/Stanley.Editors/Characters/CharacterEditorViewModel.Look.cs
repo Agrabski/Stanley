@@ -406,7 +406,9 @@ public sealed partial class CharacterEditorViewModel
         var character = LookWorking;
         var look = CharacterLooks.Resolve(character);
         // A hair piece is listed once it has a colour of its own (docs: modular hair); a streak never is.
-        var slots = HairEditing.ColorGroupSlots(character, LookEditing.ColorSlotsInUse(character));
+        // The parts of a body built from shapes that have a colour of their own come after the skin.
+        var inUse = LookEditing.ColorSlotsInUse(character);
+        var slots = HairEditing.ColorGroupSlots(character, inUse.Take(1).Concat(ModuleColorSlots(character)).Concat(inUse.Skip(1)).Distinct().ToList());
         var changed = !slots.SequenceEqual(_colorEditors.Select(e => e.Slot));
         if (changed)
             _colorEditors = slots.Select(NewColorEditor).ToList();
@@ -420,11 +422,17 @@ public sealed partial class CharacterEditorViewModel
 
     private static void RefreshColorEditor(ColorSlotEditor editor, CharacterDefinition character, CharacterLook look)
     {
-        editor.Refresh(look.Color(editor.Slot, editor.Slot == CharacterDefinition.SkinSlot ? character.Skin : ColorValue.FromHex("#9a9a9a")), look.FabricOf(editor.Slot));
+        // A part's own colour starts as the skin it followed.
+        var fallback = editor.Slot == CharacterDefinition.SkinSlot || ModuleNames.PartOfColorSlot(editor.Slot) is not null ? character.Skin : ColorValue.FromHex("#9a9a9a");
+        editor.Refresh(look.Color(editor.Slot, fallback), look.FabricOf(editor.Slot));
         editor.RefreshSchemes(); // the previews show the whole head, which any edit may have changed
     }
 
-    internal void SetSlotColor(string slot, ColorValue color) => ApplyLook(c => LookEditing.SetColor(c, slot, color));
+    internal void SetSlotColor(string slot, ColorValue color)
+    {
+        if (!SetModuleColor(slot, color))
+            ApplyLook(c => LookEditing.SetColor(c, slot, color));
+    }
 
     /// <summary>Changes a colour slot's fabric, starting from what it wears now: a live preview inside a slider drag, otherwise one undo step.</summary>
     internal void EditFabric(string slot, Func<Fabric, Fabric> edit)
@@ -512,6 +520,7 @@ public sealed partial class CharacterEditorViewModel
     public static string ColorSlotLabel(string slot) => slot switch
     {
         CharacterDefinition.SkinSlot => "Skin",
+        _ when ModuleNames.PartOfColorSlot(slot) is { } part => ModuleNames.Title(part),
         "accent" => "Accents",
         StickerSlots.EyesLeft => "Left eye",
         StickerSlots.EyesRight => "Right eye",
@@ -528,6 +537,7 @@ public sealed partial class CharacterEditorViewModel
     internal static IReadOnlyList<(string Name, ColorValue Color)> Palette(string slot) => slot switch
     {
         CharacterDefinition.SkinSlot => Swatches.Select(s => (s.Name, s.Color)).ToList(),
+        _ when ModuleNames.PartOfColorSlot(slot) is not null => Swatches.Select(s => (s.Name, s.Color)).Concat(ClothColors).ToList(),
         "hair" or "brows" => HairColors,
         _ when IsHairColorKey(slot) => HairColors,
         _ when StickerSlots.IsStickerColorKey(slot) => Palette(StickerSlots.SharedColorOf(slot)),
@@ -613,6 +623,12 @@ public sealed partial class CharacterEditorViewModel
             return;
         _selectedSticker = id;
         ShowMessage(null); // a message about the last thing worked on is stale now
+        if (id is not null && _selectedModule is not null)
+        {
+            // One thing picked at a time: a sticker or a part of a body built from shapes.
+            _selectedModule = null;
+            RaiseSelectedModuleChanged();
+        }
         RaiseSelectedStickerChanged();
     }
 

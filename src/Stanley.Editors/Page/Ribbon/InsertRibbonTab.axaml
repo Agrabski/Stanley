@@ -334,6 +334,13 @@
                       <PathIcon Data="{StaticResource CharacterIcon}" /><TextBlock Text="New character" />
                   </StackPanel>
               </Button>
+              <!-- The other way to make one (docs/shape-characters.md §9.1): opens it straight away, on the creature presets. -->
+              <Button Name="NewShapeCharacterButton" Classes="tool" Command="{Binding NewShapeCharacterCommand}"
+                      ToolTip.Tip="Build a new character from shapes - a head, a body, arms and legs, each swapped in a click - put it in the selected panel and open it">
+                  <StackPanel>
+                      <PathIcon Data="{StaticResource ShapesCharacterIcon}" /><TextBlock Text="From shapes" />
+                  </StackPanel>
+              </Button>
           </StackPanel>
           <TextBlock Classes="groupLabel" Text="Characters" />
       </DockPanel>

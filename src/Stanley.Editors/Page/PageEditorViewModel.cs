@@ -307,6 +307,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         UngroupSelectionCommand.NotifyCanExecuteChanged();
         InsertCharacterCommand.NotifyCanExecuteChanged();
         NewCharacterCommand.NotifyCanExecuteChanged();
+        _newShapeCharacterCommand?.NotifyCanExecuteChanged();
         FlipCharacterCommand.NotifyCanExecuteChanged();
         BiggerCharacterCommand.NotifyCanExecuteChanged();
         SmallerCharacterCommand.NotifyCanExecuteChanged();
