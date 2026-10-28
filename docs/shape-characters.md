@@ -1,6 +1,6 @@
 # Characters built from shapes — design
 
-**Status: in progress** (issue #173). Slices 1–4 and 6 are built (§14 records how); the rest
+**Status: in progress** (issue #173). Slices 1–6 are built; Edit Points on a part (7), custom shapes (8) and the later items (9) are not (§14 records how); the rest
 is the working plan. This is the design for a
 second way to build a character: by snapping together ready-made shapes instead of
 moving body sliders. It builds on the character POC (`docs/character-authoring-poc.md`)
@@ -558,4 +558,41 @@ shapes*, then grow the editor in 5.
 - A shape body builds in ~1.5 ms against the mannequin's ~0.3 (Release): `ModularRig.Build`
   draws twice (standing, to find the ground; then posed), and `Recognize`, the pose gallery
   and `Turn` apply all 11 presets. Caching the standing pass is the cheap fix if it shows.
+
+### 14.6 Character editor (slice 5)
+
+- **Creating**: `ICharacterCatalog.CreateCharacter(fromShapes: true)` makes
+  `CreaturePresets.Default` with the library's default face. It is the Characters pane's
+  *New from shapes* (stacked under *New character*: the pane is too narrow for two side by
+  side), Insert › Characters › *From shapes* and the canvas `PageToolbar`'s Insert menu; the
+  page's command (`PageEditorViewModel.ShapeCharacters.cs`) also places it in the selected panel.
+- **Tabs**: `BodyTab` and `ShapesTab` toggle on `IsGeneratedBody` / `IsModular`. The ribbon is
+  re-pointed from one character to the next, so on that change it moves off whichever is
+  hidden. The contextual `ModuleTab` falls back to Shapes when the part is let go. Inspector
+  order: Body, Shapes, Module, Look, Sticker (`ShapesSection`, `ModuleSection`); the Module
+  section sits under the part buttons so its appearing never moves them.
+- **Picking on the stage**: a sticker under the pointer wins, else the part
+  (`FigureModules.At`, Rendering). `FigureShape.Part` tags outlines, pieces and end shapes;
+  tubes and round ends carry no part and are known by their layer (arm layers - LeftArm,
+  RightArm, FarArm, NearArm - are Arms; every other layer is Legs: Torso and Head layers hold
+  no tubes, and side on the Body layer's tubes are legs). One thing is picked at a time.
+- **Ghosts**: `FigureModules.Ghosts` puts a + where a missing part would attach - head 0.08
+  above the neck, torso at the hips joint, arms 0.04 outside each shoulder, legs just under
+  the hips - and merges two closer than two radii on screen (which happens side on).
+- **Drags**: stage moves/resizes and the Height % slider work from `Committed.Modules` (the
+  body as the drag started), so they don't compound; absolute sliders (Width...) work from
+  `Working`. The placement and the part's box are frozen at the press, or the stage re-fitting
+  around a growing body would feed back into the drag (the same trick as art drags). Creature
+  previews are rebuilt only when no drag is in progress (`EndSliderDrag`, `EndModuleDrag`).
+- **Colours**: a part's own colour is a colour slot named by `ModuleNames.ColorSlot(part)`
+  (`bodyHead`, `bodyTorso`, `bodyArms`, `bodyLegs`), listed in the Look tab's colours. They
+  take no fabrics, because body fills don't draw fabric. "Same as skin" clears the module's
+  `Color`.
+- **Comparing bodies**: records holding lists compare by reference, so two `ModularBody`
+  values built alike aren't `==`. The view model compares `ProjectJson.Serialize`
+  fingerprints to decide which preset is current (and to make clicking it a no-op).
+- **Galleries**: each `ModuleShapeGallery` carries its own `Pick` command, like `SlotGallery`,
+  shared by ribbon and inspector through `ModuleShapeDropdown`. The head/torso dropdown lists
+  the part's own kind by category, then the other kind's shapes.
+- Not built yet: the rotation handle (the Rotate slider covers it), Edit Points, Edit sockets.
 
