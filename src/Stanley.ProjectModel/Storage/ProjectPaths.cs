@@ -24,6 +24,7 @@ internal static class ProjectPaths
     public const string IssuesDirName = "issues";
     public const string ObjectsDirName = "objects";
     public const string PacksDirName = "packs";
+    public const string ShapesDirName = "shapes";
 
     /// <summary>The comic's title page, which every issue opens with unless it has its own: <c>title-page/page.json</c>, <c>panels/</c> and <c>art/</c>.</summary>
     public const string TitlePageDirName = "title-page";

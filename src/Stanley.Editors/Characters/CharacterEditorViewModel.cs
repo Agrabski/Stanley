@@ -54,12 +54,16 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		InitializeHair();
 		InitializeArt();
 		InitializeLooks();
+		InitializeModules();
+		InitializeOwnShapes();
+		InitializePoints();
 		PropertyChanged += (_, e) =>
 		{
 			if (e.PropertyName == nameof(Working))
 			{
 				RaiseBodyChanged();
 				RaiseLookChanged();
+				RaiseModulesChanged();
 			}
 		};
 		if (library != null)
@@ -141,7 +145,8 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		set => EditBody(b => b with { Frame = value / 100 });
 	}
 
-	public string HeightText => $"{HeightPercent:0}%";
+	/// <summary>How tall, either kind of body: the status bar, and the Height sliders.</summary>
+	public string HeightText => $"{Math.Round(CharacterRig.Height(Working) * 100):0}%";
 	public string HeadsTallText => $"{HeadsTall:0.#} heads";
 
 	public double MinHeightPercent => BodyShape.MinHeight * 100;
@@ -151,7 +156,12 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 
 	public void BeginSliderDrag() => BeginGesture();
 
-	public void EndSliderDrag() => CommitGesture();
+	public void EndSliderDrag()
+	{
+		CommitGesture();
+		if (IsModular)
+			OnPropertyChanged(nameof(CreatureChoices));
+	}
 
 	/// <summary>Applies <paramref name="edit"/> (which sets one value) to the body: a live preview inside a slider drag, otherwise one undo step.</summary>
 	private void EditBody(Func<BodyShape, BodyShape> edit)
@@ -233,8 +243,11 @@ public sealed partial class CharacterEditorViewModel : EditorViewModel<Character
 		Library?.InOrder.Where(c => c.Id != CharacterId).ToList() ?? [];
 
 	public string Hint => _message ??
+		DrawShapeHint ??
 		ExpressionWarning ??
 		(SelectedStickerWarning is { } gaps ? $"{SelectedStickerName}: {gaps}" : null) ??
+		PointsHint ??
+		ModuleHint ??
 		$"Pick a body type and fine-tune it with the sliders; dress them {Where("on the Look tab", "under Look")}, and click something they wear to adjust it. " +
 		"Every panel this character is in updates as you go.";
 

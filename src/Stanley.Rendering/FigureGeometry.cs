@@ -49,9 +49,17 @@ internal static class FigureGeometry
         return merged;
     }
 
-    /// <summary>Whether <paramref name="union"/> contains <paramref name="part"/>, going by a 3 x 3 grid of sample points inside it.</summary>
+    /// <summary>
+    /// Whether <paramref name="union"/> contains <paramref name="part"/>, going by its bounds
+    /// (which catch a thin part dropped whole - a stick leg the grid's points all miss) and
+    /// a 3 x 3 grid of sample points inside it (which catch a dropped inside).
+    /// </summary>
     private static bool Covers(SKPath union, SKPath part)
     {
+        var (outer, inner) = (union.TightBounds, part.TightBounds);
+        var slack = 1e-3f * Math.Max(Math.Max(outer.Width, outer.Height), Math.Max(inner.Width, inner.Height));
+        if (inner.Left < outer.Left - slack || inner.Top < outer.Top - slack || inner.Right > outer.Right + slack || inner.Bottom > outer.Bottom + slack)
+            return false;
         var box = part.Bounds;
         for (var i = 1; i <= 3; i++)
         {
@@ -177,15 +185,50 @@ internal static class FigureGeometry
         return builder.Detach();
     }
 
-    /// <summary>Everything a layer's skin covers: its torso outline (smoothed), capsules and ellipses, as one path.</summary>
+    /// <summary>Everything a layer's body covers, whatever its colour: its torso outline (smoothed), capsules, ellipses and shapes, as one path.</summary>
     public static SKPath LayerSkin(FigureLayer layer)
+    {
+        var all = Empty();
+        foreach (var (_, path) in LayerFills(layer))
+            all = Union(all, path);
+        return all;
+    }
+
+    /// <summary>
+    /// A layer's body split by the colour slot it's filled with, each as one path: first
+    /// <see cref="CharacterDefinition.SkinSlot"/> - the torso outline (smoothed), capsules,
+    /// ellipses and the shapes left in the skin colour - then every other slot its shapes
+    /// use, in the order they first appear (docs/shape-characters.md §6). A generated body
+    /// is all skin, so it comes out as one path. Slots that cover nothing are left out; the
+    /// caller disposes the paths.
+    /// </summary>
+    public static List<(string Slot, SKPath Path)> LayerFills(FigureLayer layer)
     {
         var skin = layer.Torso is { Count: >= 3 } torso ? SmoothClosed(torso) : Empty();
         foreach (var capsule in layer.Capsules)
             skin = Union(skin, Capsule(capsule));
         foreach (var ellipse in layer.Ellipses)
             skin = Union(skin, Oval(ellipse));
-        return skin;
+        var fills = new List<(string Slot, SKPath Path)> { (CharacterDefinition.SkinSlot, skin) };
+        foreach (var shape in layer.Shapes ?? [])
+        {
+            if (shape.Anchors.Count < 2)
+                continue;
+            var outline = AnchorRingPath.ToSkPath(shape.Anchors);
+            var i = fills.FindIndex(f => f.Slot == shape.ColorSlot);
+            if (i < 0)
+                fills.Add((shape.ColorSlot, outline));
+            else
+                fills[i] = (shape.ColorSlot, Union(fills[i].Path, outline));
+        }
+        for (var i = fills.Count - 1; i >= 0; i--)
+        {
+            if (!fills[i].Path.IsEmpty)
+                continue;
+            fills[i].Path.Dispose();
+            fills.RemoveAt(i);
+        }
+        return fills;
     }
 
     /// <summary>The union of the discs <paramref name="seams"/>.</summary>

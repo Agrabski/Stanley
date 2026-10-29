@@ -307,6 +307,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         UngroupSelectionCommand.NotifyCanExecuteChanged();
         InsertCharacterCommand.NotifyCanExecuteChanged();
         NewCharacterCommand.NotifyCanExecuteChanged();
+        _newShapeCharacterCommand?.NotifyCanExecuteChanged();
         FlipCharacterCommand.NotifyCanExecuteChanged();
         BiggerCharacterCommand.NotifyCanExecuteChanged();
         SmallerCharacterCommand.NotifyCanExecuteChanged();
@@ -1191,7 +1192,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when IsPictureContext => $"Drag to move the picture · drag a handle to resize it (it keeps its shape) · {Where("Picture tab", "the inspector")}: behind or in front of the characters · Delete removes it.",
         _ when IsSpeedLinesContext => $"Drag the clear circle to move where the lines radiate from · drag a handle to resize it · {Where("Speed Lines tab", "the inspector")} for colour, count and thickness · Delete removes it.",
         _ when HasSelectedText => $"Drag to move the text (Alt+drag drags off a copy) · drag a handle to resize its box · double-click or Enter to edit · {Where("Text tab", "the inspector")} for size and style · Delete removes it.",
-        _ when HasSelectedCharacter => $"Pick a pose {Where("on the Character tab", "in the inspector")}, or drag the dots: hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt · drag the body to move (Alt+drag for a copy).",
+        _ when HasSelectedCharacter => $"Pick a pose {Where("on the Character tab", "in the inspector")}, or drag the dots: {PoseDots()} · drag the body to move (Alt+drag for a copy).",
         _ when SelectedBubble is { Tails.Count: > 1 } => "Remove tail takes off the ringed tail - click another tail's orange dot to pick it · drag a dot to aim its tail · drag the bubble to move it (Ctrl takes the tails along) · Enter edits text · Delete removes the bubble.",
         _ when HasSelectedBubble => "Drag to move the bubble (hold Ctrl to take its tail along, Alt to drag off a copy) · drag the orange dot to aim a tail · double-click or Enter to edit text · Delete removes it.",
         _ when HasSelectedPanel && Working.LayoutLocked => $"Layout is locked - this panel can't be moved or resized. Double-click inside it to add a bubble, or double-click a character in the Characters pane to put it here. Unlock {Where("on the Layout tab", "in the menu's View › Lock layout")}.",
@@ -1201,6 +1202,27 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         _ when Working.LayoutLocked => $"Layout is locked - click a panel to select it (or a bubble or character to edit it). Double-click inside a panel to add a bubble. Unlock {Where("on the Layout tab", "in the inspector")}.",
         _ => $"Pick a page layout {Where("from the ribbon", "in the inspector")}, or click a panel to select it. Double-click inside a panel to add a speech bubble; {Where("Insert › Character", "the toolbar's Insert menu")} adds a character. Hold Ctrl to see every button's shortcut."
     };
+
+    /// <summary>What the selected character's posing dots do, naming only the parts it has (a body built from shapes may leave some out).</summary>
+    private string PoseDots()
+    {
+        if (SelectedCharacter is not { } instance || !CharacterSnapshot.TryGetValue(instance.CharacterId, out var character))
+            return "hands/feet to reach, hips to crouch (feet stay put), chest to lean, head to tilt";
+        var limbs = CharacterPosing.Limbs(character, instance);
+        var (arms, legs) = (limbs.Any(l => !IsLeg(l)), limbs.Any(IsLeg));
+        var trunk = CharacterPosing.TrunkParts(character);
+        var dots = new List<string>();
+        if (arms || legs)
+            dots.Add((arms && legs ? "hands/feet" : arms ? "hands" : "feet") + " to reach");
+        dots.Add(legs ? "hips to crouch (feet stay put)" : "hips to lift or shift it");
+        if (trunk.Contains(TrunkPart.Chest))
+            dots.Add("chest to lean");
+        if (trunk.Contains(TrunkPart.Head))
+            dots.Add("head to tilt");
+        return string.Join(", ", dots);
+
+        static bool IsLeg(Limb limb) => limb is Limb.LeftLeg or Limb.RightLeg;
+    }
 
     public Rect2D PanelBounds(PanelId id) => AnchorRing.BoundingBox(Working.Panels[id].Shape.Anchors);
 
@@ -1933,7 +1955,7 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     /// <summary>A character's figure-space bounding box; a default body's for a character missing from the catalog (it draws as a placeholder that size).</summary>
     public Rect2D FigureExtent(CharacterId id, ViewAngle angle = ViewAngle.Front) =>
         CharacterSnapshot.TryGetValue(id, out var character)
-            ? BodyRig.Extent(character.Body, angle, character.Skeleton)
+            ? CharacterRig.Extent(character, angle)
             : BodyRig.Extent(BodyShape.Default, angle);
 
     /// <summary>A placed character's bounding box on the page.</summary>
@@ -2061,10 +2083,15 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
     private (CharacterId, ViewAngle) _poseChoicesKey;
     private string _expressionChoicesKey = "";
 
-    /// <summary>The hand and foot handles of a placed character, on the page - none for a character missing from the catalog.</summary>
+    /// <summary>
+    /// The hand and foot handles of a placed character, on the page - one per limb it has
+    /// (<see cref="CharacterPosing.Limbs"/>: a body built from shapes may leave some out),
+    /// none for a character missing from the catalog. Drawing, hit-testing and the cursor
+    /// all go by this list, so a missing limb has nothing to grab.
+    /// </summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> LimbHandles(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
-            ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.EndPoint(character, instance, limb))).ToList()
+            ? CharacterPosing.Limbs(character, instance).Select(limb => (limb, CharacterPosing.EndPoint(character, instance, limb))).ToList()
             : [];
 
     /// <summary>Starts dragging a hand or foot; the elbow/knee keeps bending the way it bends now for the whole drag.</summary>
@@ -2076,10 +2103,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
             _bendSign = CharacterPosing.BendSign(character, panel.CharacterInstances[index], limb);
     }
 
-    /// <summary>The elbow/knee handles of a placed character, on the page - a second drag handle per limb that swings the upper arm or thigh.</summary>
+    /// <summary>The elbow/knee handles of a placed character, on the page - a second drag handle per limb it has, that swings the upper arm or thigh.</summary>
     public IReadOnlyList<(Limb Limb, Point2D Point)> BendHandles(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
-            ? Enum.GetValues<Limb>().Select(limb => (limb, CharacterPosing.BendPoint(character, instance, limb))).ToList()
+            ? CharacterPosing.Limbs(character, instance).Select(limb => (limb, CharacterPosing.BendPoint(character, instance, limb))).ToList()
             : [];
 
     public void BeginPoseBend(PanelId panelId, int index, Limb limb) => BeginGesture();
@@ -2093,10 +2120,10 @@ public sealed partial class PageEditorViewModel : EditorViewModel<PageDocument>,
         UpdateGesture(EditCharacterInPanel(Committed, panelId, index, c => CharacterPosing.Bend(character, c, limb, target)));
     }
 
-    /// <summary>The hips, chest and head handles of a placed character, on the page.</summary>
+    /// <summary>The hips, chest and head handles of a placed character, on the page - the chest only with a torso, the head only with a head (<see cref="CharacterPosing.TrunkParts"/>).</summary>
     public IReadOnlyList<(TrunkPart Part, Point2D Point)> TrunkHandles(CharacterInstance instance) =>
         CharacterSnapshot.TryGetValue(instance.CharacterId, out var character)
-            ? Enum.GetValues<TrunkPart>().Select(part => (part, CharacterPosing.TrunkPoint(character, instance, part))).ToList()
+            ? CharacterPosing.TrunkParts(character).Select(part => (part, CharacterPosing.TrunkPoint(character, instance, part))).ToList()
             : [];
 
     public void BeginPoseTrunk(PanelId panelId, int index, TrunkPart part) => BeginGesture();

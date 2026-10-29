@@ -23,6 +23,7 @@ namespace Stanley.ProjectModel.Serialization;
 [JsonSerializable(typeof(CharacterDefinition))]
 [JsonSerializable(typeof(CharacterRevision))]
 [JsonSerializable(typeof(Sticker))]
+[JsonSerializable(typeof(ModuleShape))]
 [JsonSerializable(typeof(CharacterInstanceOverrides))]
 [JsonSerializable(typeof(Pose))]
 [JsonSerializable(typeof(Prop))]
@@ -33,4 +34,5 @@ namespace Stanley.ProjectModel.Serialization;
 [JsonSerializable(typeof(Panel))]
 [JsonSerializable(typeof(ObjectGroup))]
 [JsonSerializable(typeof(AssetPack))]
+[JsonSerializable(typeof(ShapeAsset))]
 public sealed partial class StanleyJsonContext : JsonSerializerContext;

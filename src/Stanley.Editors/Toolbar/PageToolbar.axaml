@@ -334,13 +334,22 @@
               </ScrollViewer>
               <TextBlock Classes="insertHint" IsVisible="{Binding !HasCharacterChoices}" MaxWidth="360" HorizontalAlignment="Left"
                          Text="No characters yet. Make one here, then shape its body - double-click it on the page." />
-              <Button Name="NewCharacterButton" Classes="small" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Left"
-                      ToolTip.Tip="Create a new character and put it in the selected panel - double-click it to shape its body">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <PathIcon Data="{StaticResource CharacterIcon}" />
-                  <TextBlock Text="New character" />
-                </StackPanel>
-              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Name="NewCharacterButton" Classes="small" Command="{Binding NewCharacterCommand}" HorizontalAlignment="Left"
+                        ToolTip.Tip="Create a new character and put it in the selected panel - double-click it to shape its body">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <PathIcon Data="{StaticResource CharacterIcon}" />
+                    <TextBlock Text="New character" />
+                  </StackPanel>
+                </Button>
+                <Button Name="NewShapeCharacterButton" Classes="small" Command="{Binding NewShapeCharacterCommand}" HorizontalAlignment="Left"
+                        ToolTip.Tip="Build a new character from shapes - a head, a body, arms and legs, each swapped in a click - put it in the selected panel and open it">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <PathIcon Data="{StaticResource ShapesCharacterIcon}" />
+                    <TextBlock Text="From shapes" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
             </StackPanel>
 
             <!-- Background: fills the selected panel. Stays open, so a few can be tried in turn. -->

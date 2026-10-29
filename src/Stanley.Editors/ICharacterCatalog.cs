@@ -21,7 +21,8 @@ public interface ICharacterCatalog
     event Action? CharactersChanged;
 
     /// <summary>Adds a brand-new character (undoable) and returns it. Doesn't open it.</summary>
-    CharacterDefinition CreateCharacter();
+    /// <param name="fromShapes">Built from shapes (docs/shape-characters.md) rather than a generated human body.</param>
+    CharacterDefinition CreateCharacter(bool fromShapes = false);
 
     /// <summary>Shows the character's editor in place of the page.</summary>
     void OpenCharacter(CharacterId id);

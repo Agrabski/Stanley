@@ -79,7 +79,7 @@ given its own (`hairFringe`, ...), with hairstyles as one-click presets of piece
 (`StickerLibrary.Hairstyles`), dyes fitted to each piece (tips, roots, ombré, streaks,
 rainbow), hand-placed streaks clipped to the hair (`clip: hair`), one-click colour schemes,
 and a switch for characters still wearing an old whole hairstyle - all behind one Hair
-button. No three-quarter view yet. Panels also hold **drawn shapes, free
+button. No three-quarter view yet. A character can instead be **built from shapes** (#173, docs/shape-characters.md): a head, torso, arms and legs picked from a CC0 shape library (`ShapeLibrary`, `CreaturePresets`), any of them left out, swapped, resized, flipped and recoloured on the Shapes and Module tabs or by clicking and dragging them on the stage (New character › From shapes); `CharacterDefinition.Modules` holds it, `CharacterRig` is the one place that picks `BodyRig` or `ModularRig`, and the same posing handles, stickers and pose presets work on it. Panels also hold **drawn shapes, free
 text, pictures and speed lines** (focus lines radiating from a point you drag)
 behind or in front of the characters, over a colour, gradient or picture
 **background** — see "Panel elements and backgrounds (implemented)" below. A drawn

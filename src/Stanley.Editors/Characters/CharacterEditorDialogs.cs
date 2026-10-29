@@ -25,6 +25,7 @@ internal sealed class CharacterEditorDialogs(Control host)
             _editor.TileImportRequested -= OnTileImportRequested;
             _editor.ArtImportRequested -= OnArtImportRequested;
             _editor.SvgEditorConfigurationRequested -= OnSvgEditorConfigurationRequested;
+            _editor.ShapeImportRequested -= OnShapeImportRequested;
         }
         _editor = editor;
         if (_editor != null)
@@ -32,6 +33,7 @@ internal sealed class CharacterEditorDialogs(Control host)
             _editor.TileImportRequested += OnTileImportRequested;
             _editor.ArtImportRequested += OnArtImportRequested;
             _editor.SvgEditorConfigurationRequested += OnSvgEditorConfigurationRequested;
+            _editor.ShapeImportRequested += OnShapeImportRequested;
         }
     }
 
@@ -49,6 +51,13 @@ internal sealed class CharacterEditorDialogs(Control host)
             editor.ImportArt(request.Slot, picked.Name, picked.File);
     }
 
+    /// <summary>"Import shape..." on the Module tab: pick an SVG and make its outline the part's shape.</summary>
+    private async void OnShapeImportRequested(object? sender, ShapeImportRequest request)
+    {
+        if (sender is CharacterEditorViewModel editor && await PickArt(editor, "Import a shape (an SVG drawing - its first closed path)", svgOnly: true) is { } picked)
+            editor.ImportShape(request.Part, request.Piece, picked.Name, picked.File);
+    }
+
     /// <summary>No SVG editor is set up yet: ask, and pick up drawing again if one was chosen.</summary>
     private async void OnSvgEditorConfigurationRequested(object? sender, SvgEditorConfigurationRequest request)
     {
@@ -61,7 +70,7 @@ internal sealed class CharacterEditorDialogs(Control host)
         }
     }
 
-    private async Task<(string Name, ArtFile File)?> PickArt(CharacterEditorViewModel editor, string title)
+    private async Task<(string Name, ArtFile File)?> PickArt(CharacterEditorViewModel editor, string title, bool svgOnly = false)
     {
         if (TopLevel.GetTopLevel(host) is not { } top)
             return null;
@@ -69,7 +78,7 @@ internal sealed class CharacterEditorDialogs(Control host)
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
+            FileTypeFilter = svgOnly ? [new("SVG drawing") { Patterns = ["*.svg"] }] : [new("SVG or PNG") { Patterns = ["*.svg", "*.png"] }],
         });
         if (files is not [var picked])
             return null;

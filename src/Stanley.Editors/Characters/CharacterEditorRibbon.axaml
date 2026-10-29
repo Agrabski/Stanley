@@ -1,10 +1,11 @@
 <!--
   The character editor's ribbon: the Body tab - body-type gallery, the five body
   sliders, skin colour, name, the line-up toggle and Close (back to the page); the Look
-  tab - what the character wears (a gallery per slot - hair and face, clothes,
+  tab (the Shapes tab instead, for a character built from shapes: creatures, parts, Height %) - what the character wears (a gallery per slot - hair and face, clothes,
   accessories - previewed on the character) and
   the colours of the slots in use; and the contextual Sticker tab for the worn sticker
-  picked on the stage (with its styles, when it has some). Shown in the window's ribbon bar whenever a character editor is
+  picked on the stage (with its styles, when it has some), and the contextual Module tab for the part of a
+  body built from shapes picked there. Shown in the window's ribbon bar whenever a character editor is
   the active pane.
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -20,9 +21,15 @@
       </ItemsPanelTemplate>
     </TabControl.ItemsPanel>
 
-    <TabItem Name="BodyTab" Classes="contextual character">
+    <TabItem Name="BodyTab" Classes="contextual character" IsVisible="{Binding IsGeneratedBody}">
       <TabItem.Header><TextBlock Classes="characterHeader" Text="Body" /></TabItem.Header>
       <local:BodyRibbonTab />
+    </TabItem>
+
+    <!-- In the Body tab's place for a character built from shapes (docs/shape-characters.md §9.2). -->
+    <TabItem Name="ShapesTab" Classes="contextual character" IsVisible="{Binding IsModular}">
+      <TabItem.Header><TextBlock Classes="characterHeader" Text="Shapes" /></TabItem.Header>
+      <local:ShapesRibbonTab />
     </TabItem>
 
     <TabItem Name="LookTab" Classes="contextual character">
@@ -33,6 +40,12 @@
     <TabItem Name="StickerTab" Classes="contextual sticker" IsVisible="{Binding HasSelectedSticker}">
       <TabItem.Header><TextBlock Classes="stickerHeader" Text="Sticker" /></TabItem.Header>
       <local:StickerRibbonTab />
+    </TabItem>
+
+    <!-- The part of a body built from shapes picked on the stage or the Shapes tab, titled with it. -->
+    <TabItem Name="ModuleTab" Classes="contextual shape" IsVisible="{Binding HasSelectedModule}">
+      <TabItem.Header><TextBlock Classes="shapeHeader" Text="{Binding SelectedModuleName}" /></TabItem.Header>
+      <local:ModuleRibbonTab />
     </TabItem>
   </TabControl>
 </UserControl>

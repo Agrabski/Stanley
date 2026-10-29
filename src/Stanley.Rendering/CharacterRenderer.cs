@@ -230,11 +230,12 @@ internal sealed class FabricFill
 }
 
 /// <summary>
-/// The V1 renderer: the body <see cref="BodyRig"/> generates, painted layer by layer
-/// (<see cref="BodyFigure.Layers"/>) - legs, torso, head, arms in a front view; far arm,
-/// body, head, near foot, near arm side on - each filled with the skin colour and inked,
-/// with the ink left out at the seams where a layer joins the ones behind it. So an arm
-/// crossing the chest keeps its outline, while shoulders and hips read as one body.
+/// The V1 renderer: the body <see cref="CharacterRig"/> builds (generated, or built from
+/// shapes), painted layer by layer (<see cref="BodyFigure.Layers"/>) - legs, torso, head,
+/// arms in a front view; far arm, body, head, near foot, near arm side on - each filled
+/// with the skin colour (or a shape's own) and inked, with the ink left out at the seams
+/// where a layer joins the ones behind it. So an arm crossing the chest keeps its outline,
+/// while shoulders and hips read as one body.
 /// </summary>
 public sealed class FigureRenderer : ICharacterRenderer
 {
@@ -265,7 +266,7 @@ public sealed class FigureRenderer : ICharacterRenderer
     public Rect2D Extent(CharacterDefinition character, ViewAngle angle = ViewAngle.Front, PoseData? pose = null,
         CharacterInstanceOverrides? overrides = null, CharacterRevisionId? revision = null)
     {
-        var body = BodyRig.Extent(character.Body, angle, character.Skeleton, pose);
+        var body = CharacterRig.Extent(character, angle, pose);
         if (character.Wardrobe.Stickers.Count == 0)
             return body;
         var drawing = Drawing(character, angle, pose, overrides, revision);
@@ -301,7 +302,7 @@ public sealed class FigureRenderer : ICharacterRenderer
                 return cached;
             if (cache.Count >= MaxPosesPerCharacter)
                 cache.Clear();
-            var figure = BodyRig.Build(character.Body, angle, character.Skeleton, pose);
+            var figure = CharacterRig.Build(character, angle, pose);
             return cache[key] = Build(character, figure, CharacterLooks.Resolve(character, look, overrides), pose);
         }
     }
@@ -311,17 +312,21 @@ public sealed class FigureRenderer : ICharacterRenderer
         Build(character, figure, new CharacterLook([], new Dictionary<string, ColorValue>(), new Dictionary<string, Fabric>()), null);
 
     /// <summary>
-    /// Paints the figure's layers back to front: each layer's skin, then - in the look's
-    /// order (slot z-order, then stacking) - every worn sticker's pieces that belong in
-    /// that layer: its covers merged per colour, then its drawn parts, with the sticker's
-    /// cut parts taken out and its clipped parts clipped. Skin and covers are inked on
-    /// their own outline, except in the layer's seams where they lie over the layers before
-    /// it; drawn art brings its own lines.
+    /// Paints the figure's layers back to front: each layer's body - the skin, then each
+    /// other colour a body built from shapes gives its shapes (<see cref="FigureGeometry.LayerFills"/>;
+    /// a slot the character never set is the skin colour) - then, in the look's order (slot
+    /// z-order, then stacking), every worn sticker's pieces that belong in that layer: its
+    /// covers merged per colour, then its drawn parts, with the sticker's cut parts taken
+    /// out and its clipped parts clipped. Body colours and covers are inked on their own
+    /// outline, except in the layer's seams where they lie over the layers before it; drawn
+    /// art brings its own lines. Sticker parts on a region the figure leaves out
+    /// (<see cref="BodyFigure.Absent"/>) aren't drawn.
     /// </summary>
     public static FigureDrawing Build(CharacterDefinition character, BodyFigure figure, CharacterLook look, PoseData? pose)
     {
-        var height = character.Body.Normalized().Height;
-        var skin = FigureGeometry.ToSk(look.Color(CharacterDefinition.SkinSlot, character.Skin));
+        var height = CharacterRig.Height(character);
+        var skinColor = look.Color(CharacterDefinition.SkinSlot, character.Skin);
+        var skin = FigureGeometry.ToSk(skinColor);
         var tiles = TileLookup(character);
         var stickers = Geometry(figure, look, pose, height, tiles);
         var bodySkin = FigureGeometry.Empty();
@@ -339,9 +344,15 @@ public sealed class FigureRenderer : ICharacterRenderer
             var painted = FigureGeometry.Empty();
             if (layer.HasBody)
             {
-                var path = FigureGeometry.LayerSkin(layer);
-                items.Add(new ShapeItem(path, skin, SeamMask(layer, below)));
-                painted = FigureGeometry.Union(painted, FigureGeometry.Copy(path));
+                // One item per colour, each inked on its own outline: where two colours meet
+                // in a layer there's a line, while the seams still hide the joints.
+                var seams = SeamMask(layer, below);
+                foreach (var (slot, path) in FigureGeometry.LayerFills(layer))
+                {
+                    var fill = slot == CharacterDefinition.SkinSlot ? skin : FigureGeometry.ToSk(look.Color(slot, skinColor));
+                    items.Add(new ShapeItem(path, fill, seams));
+                    painted = FigureGeometry.Union(painted, FigureGeometry.Copy(path));
+                }
             }
             for (var i = 0; i < stickers.Count; i++)
             {

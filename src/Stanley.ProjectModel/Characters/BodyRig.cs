@@ -24,6 +24,11 @@ public sealed record BodyEllipse(Point2D Center, double RadiusX, double RadiusY,
 /// <param name="NearLimbs">The parts nearest the viewer in a side view (the near arm, with <paramref name="NearBlobs"/> its hand and foot): drawn on top as their own outlined shape, so they still read against the body behind them. Empty in the front view.</param>
 /// <param name="Layers">The same shapes sorted into depth layers, back to front - what the renderer paints (docs/sticker-system.md §4.2).</param>
 /// <param name="Regions">Where each body region is, for attaching sticker parts.</param>
+/// <param name="Absent">
+/// The regions a body built from shapes leaves out (no torso, one arm, ...): each still has a
+/// small frame in <paramref name="Regions"/> at its socket so nothing downstream breaks, but
+/// sticker parts on it aren't drawn and posing offers no handle for it. Null = none absent.
+/// </param>
 public sealed record BodyFigure(
     ViewAngle Angle,
     ViewAngleRestLayout RestLayout,
@@ -36,8 +41,13 @@ public sealed record BodyFigure(
     IReadOnlyList<BodyEllipse> NearBlobs,
     Rect2D Extent,
     IReadOnlyList<FigureLayer> Layers,
-    FigureRegions Regions)
+    FigureRegions Regions,
+    IReadOnlySet<FigurePart>? Absent = null)
 {
+    /// <summary>Whether the figure has <paramref name="region"/> (on the character's <paramref name="side"/>, for a limb region) at all.</summary>
+    public bool Has(BodyRegion region, LimbSide side = LimbSide.Left) =>
+        Absent is null || (!Absent.Contains(new FigurePart(region)) && !Absent.Contains(new FigurePart(region, side)));
+
     /// <summary>
     /// The layer a region is painted in: front view - legs and feet behind the torso (and
     /// neck, and skirt), then the head, then the arms and hands in front, each limb in a
@@ -133,26 +143,33 @@ public static class BodyRig
     /// at the chin. The upper body's outline and the arms' roots follow the bend smoothly
     /// (<see cref="TrunkBend"/>); each arm turns with the body at its shoulder, rigidly.
     /// </summary>
-    private sealed class Trunk
+    internal sealed class Trunk
     {
-        public Trunk(Measures m, ViewAngleRestLayout rest, PoseData? pose)
+        /// <summary>
+        /// The trunk of any figure (a body built from shapes too, docs/shape-characters.md §5):
+        /// <paramref name="height"/> is what <see cref="PoseData.HipsShift"/> is a fraction of;
+        /// the hips, spine, chest and neck joints and the chin are read from
+        /// <paramref name="rest"/>, or <paramref name="fallbackKnots"/> and
+        /// <paramref name="fallbackChin"/> where it has none.
+        /// </summary>
+        internal Trunk(double height, ViewAngleRestLayout rest, PoseData? pose, IReadOnlyList<Point2D> fallbackKnots, Point2D fallbackChin)
         {
             var rotations = pose?.BoneRotations ?? [];
             var shift = pose?.HipsShift ?? default;
             Shift = new Point2D(
-                Math.Clamp(shift.X, HipsShiftRange.Left, HipsShiftRange.Right) * m.Height,
-                Math.Clamp(shift.Y, HipsShiftRange.Top, HipsShiftRange.Bottom) * m.Height);
+                Math.Clamp(shift.X, HipsShiftRange.Left, HipsShiftRange.Right) * height,
+                Math.Clamp(shift.Y, HipsShiftRange.Top, HipsShiftRange.Bottom) * height);
             Point2D RestAt(HumanoidBone bone, Point2D fallback) => rest.Bones.FirstOrDefault(b => b.Bone == bone)?.Position ?? fallback;
 
             // Knots up the spine: hips, spine, chest, neck base.
             var knots = new[]
             {
-                RestAt(HumanoidBone.Hips, new Point2D(0, m.HipY)),
-                RestAt(HumanoidBone.Spine, new Point2D(0, m.HipY - m.TorsoLength * 0.3)),
-                RestAt(HumanoidBone.Chest, new Point2D(0, m.HipY - m.TorsoLength * 0.65)),
-                RestAt(HumanoidBone.Neck, new Point2D(0, m.ShoulderY)),
+                RestAt(HumanoidBone.Hips, fallbackKnots[0]),
+                RestAt(HumanoidBone.Spine, fallbackKnots[1]),
+                RestAt(HumanoidBone.Chest, fallbackKnots[2]),
+                RestAt(HumanoidBone.Neck, fallbackKnots[3]),
             };
-            var chin = RestAt(HumanoidBone.Head, new Point2D(0, m.ChinY));
+            var chin = RestAt(HumanoidBone.Head, fallbackChin);
 
             // Each joint turns everything above it; the segment ending at knot i+1 is turned by the sum below.
             var joints = new List<Point2D> { knots[0] };
@@ -226,6 +243,11 @@ public static class BodyRig
         private static bool IsLeg(HumanoidBone bone) => LimbChains.Skip(2).Any(c => c.Root == bone || c.Middle == bone || c.End == bone);
     }
 
+    private static Trunk TrunkOf(Measures m, ViewAngleRestLayout rest, PoseData? pose) =>
+        new(m.Height, rest, pose,
+            [new Point2D(0, m.HipY), new Point2D(0, m.HipY - m.TorsoLength * 0.3), new Point2D(0, m.HipY - m.TorsoLength * 0.65), new Point2D(0, m.ShoulderY)],
+            new Point2D(0, m.ChinY));
+
     private static double Degrees(IReadOnlyList<BoneRotation> rotations, HumanoidBone bone) =>
         rotations.LastOrDefault(r => r.Bone == bone)?.Degrees ?? 0;
 
@@ -238,16 +260,20 @@ public static class BodyRig
     /// How much a foot tips with its shin: a foot on the floor stays flat (a crouch keeps
     /// the soles down); a lifted one turns with the shin, as feet do mid-step.
     /// </summary>
-    private static double FootTilt(Measures m, ViewAngleRestLayout rest, Point2D knee, Point2D ankle, HumanoidBone kneeBone, HumanoidBone ankleBone)
+    private static double FootTilt(Measures m, ViewAngleRestLayout rest, Point2D knee, Point2D ankle, HumanoidBone kneeBone, HumanoidBone ankleBone) =>
+        FootTilt(m.Height, rest, knee, ankle, kneeBone, ankleBone);
+
+    /// <summary>The same for any figure <paramref name="height"/> tall (a body built from shapes too).</summary>
+    internal static double FootTilt(double height, ViewAngleRestLayout rest, Point2D knee, Point2D ankle, HumanoidBone kneeBone, HumanoidBone ankleBone)
     {
         var restAnkle = rest.Bones.First(b => b.Bone == ankleBone).Position;
         var lifted = restAnkle.Y - ankle.Y; // figure space: y grows downwards
-        if (lifted < m.Height * 0.02)
+        if (lifted < height * 0.02)
             return 0;
         var restKnee = rest.Bones.First(b => b.Bone == kneeBone).Position;
         var turn = Math.IEEERemainder(AngleOf(knee, ankle) - AngleOf(restKnee, restAnkle), 360);
         // Ease in over the first few centimetres of lift so the foot doesn't snap.
-        return turn * Math.Min(1, lifted / (m.Height * 0.06));
+        return turn * Math.Min(1, lifted / (height * 0.06));
     }
 
     /// <summary>The four limbs a pose moves, each a root joint, a middle joint and an end joint.</summary>
@@ -382,7 +408,7 @@ public static class BodyRig
             bones.Add(new(side.Foot, Mirror(ankleJoint, sign)));
         }
         var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Front, bones), overrides);
-        var trunk = new Trunk(m, rest, pose);
+        var trunk = TrunkOf(m, rest, pose);
         var baseLayout = trunk.Apply(rest);
         var layout = ApplyPose(baseLayout, pose?.BoneRotations);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;
@@ -510,7 +536,7 @@ public static class BodyRig
         bones.Add(new(HumanoidBone.LeftLowerLeg, Offset(nearKnee, farLeg)));
         bones.Add(new(HumanoidBone.LeftFoot, Offset(nearAnkle, farLeg)));
         var rest = ApplyOverrides(new ViewAngleRestLayout(ViewAngle.Profile, bones), overrides);
-        var trunk = new Trunk(m, rest, pose);
+        var trunk = TrunkOf(m, rest, pose);
         var baseLayout = trunk.Apply(rest);
         var layout = ApplyPose(baseLayout, pose?.BoneRotations);
         Point2D At(HumanoidBone bone) => layout.Bones.First(p => p.Bone == bone).Position;

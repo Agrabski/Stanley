@@ -5,15 +5,17 @@ using Stanley.ProjectModel.Serialization;
 namespace Stanley.ProjectModel.Objects;
 
 /// <summary>
-/// A kind of asset My Assets can hold (docs/asset-packs.md §5). Only the two kinds #99 and
-/// the original "My Characters" ask need are usable yet (<see cref="MyAssets"/> only stores
-/// these); the rest are added one at a time in a later slice (§10 item 8).
+/// A kind of asset My Assets can hold (docs/asset-packs.md §5). Object groups and characters
+/// (what #99 and the original "My Characters" ask needed), and the outlines of parts of
+/// characters built from shapes (docs/shape-characters.md §9.3); the rest are added one at a
+/// time in a later slice (§10 item 8).
 /// </summary>
 [JsonConverter(typeof(CamelCaseEnumConverter<AssetKind>))]
 public enum AssetKind
 {
     ObjectGroup,
-    Character
+    Character,
+    Shape
 }
 
 /// <summary>One asset in a pack: its kind (so a pack can freely mix kinds, docs/asset-packs.md §6.2) and its id's raw token.</summary>

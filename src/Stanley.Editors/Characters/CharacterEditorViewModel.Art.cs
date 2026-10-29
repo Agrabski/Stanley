@@ -214,7 +214,7 @@ public sealed partial class CharacterEditorViewModel
         if (_dragBaseline is not { } asset || !IsGestureActive)
             return;
         var character = Committed;
-        var figure = BodyRig.Build(character.Body, PreviewAngle, character.Skeleton, StagePose);
+        var figure = CharacterRig.Build(character, PreviewAngle, StagePose);
         var parts = asset.Sticker.Parts.Select(p =>
         {
             if (p.Art is not { } art)

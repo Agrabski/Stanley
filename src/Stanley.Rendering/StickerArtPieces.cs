@@ -343,6 +343,25 @@ internal static class StickerArtPieces
     public static string VariantFor(Sticker sticker, string slot, IReadOnlyDictionary<string, string>? expression, string? chosen = null) =>
         sticker.VariantFor(slot, expression, chosen);
 
+    /// <summary>
+    /// The sides a part is drawn on: both limbs (or the one it's restricted to) for a part
+    /// on an arm, hand, leg or foot, once otherwise - minus any the figure leaves out
+    /// (<see cref="BodyFigure.Absent"/>, docs/shape-characters.md §6), so a part on a region a
+    /// body built from shapes doesn't have isn't drawn at all. A skirt hangs from the legs,
+    /// so it goes too when both are left out.
+    /// </summary>
+    public static IReadOnlyList<LimbSide> Sides(BodyFigure figure, StickerPart part)
+    {
+        if (part.Region is not (BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot))
+        {
+            var present = figure.Has(part.Region)
+                && (part.Region != BodyRegion.Skirt || figure.Has(BodyRegion.Leg, LimbSide.Left) || figure.Has(BodyRegion.Leg, LimbSide.Right));
+            return present ? [LimbSide.Left] : [];
+        }
+        IReadOnlyList<LimbSide> sides = part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right];
+        return figure.Absent is null ? sides : sides.Where(side => figure.Has(part.Region, side)).ToList();
+    }
+
     /// <summary>The views to try, nearest first (§6.3): a missing view falls back to the nearest drawn one.</summary>
     public static IEnumerable<ViewAngle> ViewFallback(ViewAngle view) => view switch
     {
@@ -385,9 +404,7 @@ internal static class StickerArtPieces
             .PostConcat(SKMatrix.CreateTranslation(centre.X + (float)(art.Offset?.X ?? 0), centre.Y + (float)(art.Offset?.Y ?? 0)));
         var pinned = new Point2D(centre.X + (art.Offset?.X ?? 0), centre.Y + (art.Offset?.Y ?? 0));
 
-        IEnumerable<LimbSide> sides = part.Region is BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot
-            ? part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right]
-            : [LimbSide.Left];
+        var sides = Sides(figure, part);
         // Raster art can't bend: it's always pinned.
         var pin = art.Mapping == ArtMapping.Pin || elements.Any(e => e.Image is not null);
         foreach (var side in sides)
@@ -494,9 +511,7 @@ internal static class StickerArtPieces
             .PostConcat(SKMatrix.CreateTranslation(centre.X + (float)(art.Offset?.X ?? 0), centre.Y + (float)(art.Offset?.Y ?? 0)));
         var pinned = new Point2D(centre.X + (art.Offset?.X ?? 0), centre.Y + (art.Offset?.Y ?? 0));
 
-        IEnumerable<LimbSide> sides = part.Region is BodyRegion.Arm or BodyRegion.Leg or BodyRegion.Hand or BodyRegion.Foot
-            ? part.Side is { } only ? [only] : [LimbSide.Left, LimbSide.Right]
-            : [LimbSide.Left];
+        var sides = Sides(figure, part);
         foreach (var side in sides)
         {
             var pinMatrix = adjust.PostConcat(RegionMapping.Pin(figure, part.Region, side, part.Side, pinned));

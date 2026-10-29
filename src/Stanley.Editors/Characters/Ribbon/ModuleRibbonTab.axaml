@@ -1,0 +1,222 @@
+<!--
+  The character ribbon's contextual Module tab (docs/shape-characters.md §9.2), titled with the
+  part picked on the stage or the Shapes tab: a head's or torso's shape, size, turn and flips;
+  a limb's style, hand or foot, pieces, proportions and sides; then its colour (the skin, or its
+  own) and Remove. Every change is one undo step; a slider drag is one gesture.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Stanley.Editors"
+             x:Class="Stanley.Editors.ModuleRibbonTab"
+             x:DataType="local:CharacterEditorViewModel">
+  <StackPanel Classes="tabContent">
+    <!-- A head or torso: its outline, then its size and turn. -->
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <ContentControl Name="ShapeGallery" Content="{Binding ModuleShapeGallery}" Margin="0,4,0,0" Width="120" VerticalAlignment="Top">
+        <ContentControl.ContentTemplate>
+          <DataTemplate x:DataType="local:ModuleShapeGallery">
+            <local:ModuleShapeDropdown />
+          </DataTemplate>
+        </ContentControl.ContentTemplate>
+      </ContentControl>
+      <TextBlock Classes="groupLabel" Text="Shape" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <Grid ColumnDefinitions="Auto,Auto,40" RowDefinitions="24,24,24" ColumnSpacing="6">
+        <TextBlock Text="Width" FontSize="12" VerticalAlignment="Center" />
+        <Slider Name="ModuleWidthSlider" Grid.Column="1" Classes="body" Minimum="5" Maximum="120" Value="{Binding ModuleWidth}"
+                ToolTip.Tip="How wide, as a share of an average adult's height - or drag a corner on the character" />
+        <TextBlock Grid.Column="2" Text="{Binding ModuleWidth, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+        <TextBlock Grid.Row="1" Text="Height" FontSize="12" VerticalAlignment="Center" />
+        <Slider Name="ModuleHeightSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="5" Maximum="120" Value="{Binding ModuleHeight}"
+                ToolTip.Tip="How tall, as a share of an average adult's height - or drag a corner on the character" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ModuleHeight, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+        <TextBlock Grid.Row="2" Text="Rotate" FontSize="12" VerticalAlignment="Center" />
+        <Slider Name="ModuleRotationSlider" Grid.Row="2" Grid.Column="1" Classes="body" Minimum="-180" Maximum="180" Value="{Binding ModuleRotation}"
+                ToolTip.Tip="Turn it about its middle" />
+        <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding ModuleRotation, StringFormat='{}{0:0}°'}" FontSize="12" VerticalAlignment="Center" />
+      </Grid>
+      <TextBlock Classes="groupLabel" Text="Size" ToolTip.Tip="Drag it on the character to move it off its place" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton Name="FlipModuleHorizontalButton" Classes="tool" IsChecked="{Binding IsModuleFlippedHorizontally, Mode=OneWay}" Command="{Binding FlipModuleHorizontallyCommand}"
+                      ToolTip.Tip="Flip Horizontal - mirror it left to right">
+          <StackPanel><PathIcon Data="{StaticResource FlipIcon}" /><TextBlock Text="Horizontal" /></StackPanel>
+        </ToggleButton>
+        <ToggleButton Name="FlipModuleVerticalButton" Classes="tool" IsChecked="{Binding IsModuleFlippedVertically, Mode=OneWay}" Command="{Binding FlipModuleVerticallyCommand}"
+                      ToolTip.Tip="Flip Vertical - upside down (a triangle torso standing on its point)">
+          <StackPanel><PathIcon Data="{StaticResource FlipVerticalIcon}" /><TextBlock Text="Vertical" /></StackPanel>
+        </ToggleButton>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Flip" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <!-- A head or torso: its outline point by point (Edit Points, as for a drawn shape), and where the other parts attach (Edit Sockets, the escape hatch). -->
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton Name="EditPointsButton" Classes="tool" IsChecked="{Binding IsEditingPoints}" IsEnabled="{Binding CanEditPoints}"
+                      ToolTip.Tip="Edit Points - drag the outline's points to reshape it, drag the outline to add a point, drag a point's round handles to bend the curve, double-click a point to make it smooth or sharp (or double-click the part)"
+                      local:Shortcut.Keys="Enter">
+          <StackPanel><PathIcon Data="{StaticResource EditPointsIcon}" /><TextBlock Text="Edit Points" /></StackPanel>
+        </ToggleButton>
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <RadioButton Name="SmoothPointButton" Classes="small" GroupName="ModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsSelectedPointSmooth}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Smooth point - the outline curves through it" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Smooth</RadioButton>
+          <RadioButton Name="CornerPointButton" Classes="small" GroupName="ModulePointKind" Theme="{StaticResource {x:Type ToggleButton}}"
+                       IsChecked="{Binding IsSelectedPointCorner}" IsEnabled="{Binding HasSelectedPoint}"
+                       ToolTip.Tip="Corner point - the outline turns sharply there" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Corner</RadioButton>
+          <Button Name="DeletePointButton" Classes="small" Command="{Binding DeletePointCommand}"
+                  ToolTip.Tip="Delete the selected point (the Delete key does too, while editing points) - a shape keeps at least three"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">Delete point</Button>
+        </StackPanel>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Points" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsShape}">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton Name="EditSocketsButton" Classes="tool" IsChecked="{Binding IsEditingSockets}" IsEnabled="{Binding CanEditPoints}"
+                      ToolTip.Tip="Edit Sockets - show where the neck, shoulders, hips and face attach, and drag them where they should be (left and right are the character's own)">
+          <StackPanel>
+            <PathIcon Data="F1 M5,7 L19,7 L19,21 L5,21 Z M6.8,8.8 L6.8,19.2 L17.2,19.2 L17.2,8.8 Z M9.5,7 A2.5,2.5 0 1 1 14.5,7 A2.5,2.5 0 1 1 9.5,7 Z M2.5,10 A2.5,2.5 0 1 1 7.5,10 A2.5,2.5 0 1 1 2.5,10 Z M16.5,10 A2.5,2.5 0 1 1 21.5,10 A2.5,2.5 0 1 1 16.5,10 Z" />
+            <TextBlock Text="Edit Sockets" />
+          </StackPanel>
+        </ToggleButton>
+        <Button Name="ResetSocketsButton" Classes="small" Command="{Binding ResetSocketsCommand}" VerticalAlignment="Center"
+                ToolTip.Tip="Reset Sockets - put every socket dragged by hand back where the shape puts it" ToolTip.ShowOnDisabled="True">Reset Sockets</Button>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Sockets" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsShape}" />
+
+    <!-- Arms or legs: how they're drawn, and their hands or feet. -->
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsLimb}">
+      <ItemsControl Name="LimbStyles" ItemsSource="{Binding LimbStyleChoices}" Margin="0,4,0,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:LimbStyleChoice">
+            <Button Classes="small choice noCheck" Classes.worn="{Binding IsCurrent}" Margin="1" HorizontalAlignment="Stretch" Content="{Binding Label}"
+                    Command="{Binding $parent[ItemsControl].((local:CharacterEditorViewModel)DataContext).SetLimbStyleCommand}" CommandParameter="{Binding}" ToolTip.Tip="{Binding Tip}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="groupLabel" Text="Style" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsLimb}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsLimb}">
+      <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0" VerticalAlignment="Top">
+        <ContentControl Name="EndGallery" Content="{Binding LimbEndGallery}" Width="110">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="local:ModuleShapeGallery">
+              <local:ModuleShapeDropdown />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+        <StackPanel Spacing="2" IsVisible="{Binding HasLimbPieces}">
+          <ContentControl Name="UpperGallery" Content="{Binding LimbUpperGallery}" Width="110">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="local:ModuleShapeGallery">
+                <local:ModuleShapeDropdown />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+          <ContentControl Name="LowerGallery" Content="{Binding LimbLowerGallery}" Width="110">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="local:ModuleShapeGallery">
+                <local:ModuleShapeDropdown />
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </StackPanel>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Shapes" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsLimb}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsLimb}">
+      <StackPanel Orientation="Horizontal" Spacing="14">
+        <Grid ColumnDefinitions="Auto,Auto,36" RowDefinitions="24,24,24" ColumnSpacing="6">
+          <TextBlock Text="Length" FontSize="12" VerticalAlignment="Center" />
+          <Slider Name="LimbLengthSlider" Grid.Column="1" Classes="body" Minimum="3" Maximum="100" Value="{Binding LimbLength}"
+                  ToolTip.Tip="Shoulder or hip to the end, as a share of an average adult's height" />
+          <TextBlock Grid.Column="2" Text="{Binding LimbLength, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="1" Text="Thickness" FontSize="12" VerticalAlignment="Center" />
+          <Slider Name="LimbThicknessSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="5" Maximum="250" Value="{Binding LimbThickness}"
+                  ToolTip.Tip="How thick at the shoulder or hip" />
+          <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding LimbThicknessText}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="2" Text="{Binding LimbEndName}" FontSize="12" VerticalAlignment="Center" />
+          <Slider Name="LimbEndSizeSlider" Grid.Row="2" Grid.Column="1" Classes="body" Minimum="1" Maximum="{Binding MaxLimbEndSize}" Value="{Binding LimbEndSize}"
+                  ToolTip.Tip="How big the hand or foot is" />
+          <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding LimbEndSize, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+        </Grid>
+        <Grid ColumnDefinitions="Auto,Auto,36" RowDefinitions="24,24" ColumnSpacing="6">
+          <TextBlock Text="Bend" FontSize="12" VerticalAlignment="Center" />
+          <Slider Name="LimbBendSlider" Grid.Column="1" Classes="body" Minimum="20" Maximum="80" Value="{Binding LimbBend}"
+                  ToolTip.Tip="Where the elbow or knee is, from near the shoulder or hip to near the end" />
+          <TextBlock Grid.Column="2" Text="{Binding LimbBend, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="1" Text="Taper" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLimbTaper}" />
+          <Slider Name="LimbTaperSlider" Grid.Row="1" Grid.Column="1" Classes="body" Minimum="0" Maximum="90" Value="{Binding LimbTaper}" IsVisible="{Binding HasLimbTaper}"
+                  ToolTip.Tip="How much thinner the end is than the root" />
+          <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding LimbTaper, StringFormat='{}{0:0}%'}" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasLimbTaper}" />
+        </Grid>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Proportions" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsLimb}" />
+
+    <DockPanel Classes="group" IsVisible="{Binding SelectedModuleIsLimb}">
+      <StackPanel Spacing="1" Margin="0,4,0,0">
+        <RadioButton Name="BothSidesButton" Classes="small" GroupName="ModuleSides" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsBothSides}"
+                     HorizontalAlignment="Stretch" ToolTip.Tip="Both of them">Both</RadioButton>
+        <RadioButton Name="LeftSideButton" Classes="small" GroupName="ModuleSides" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsLeftSideOnly}"
+                     HorizontalAlignment="Stretch" ToolTip.Tip="Only their own left one - on the right as you look at them">Left only</RadioButton>
+        <RadioButton Name="RightSideButton" Classes="small" GroupName="ModuleSides" Theme="{StaticResource {x:Type ToggleButton}}" IsChecked="{Binding IsRightSideOnly}"
+                     HorizontalAlignment="Stretch" ToolTip.Tip="Only their own right one - on the left as you look at them">Right only</RadioButton>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Sides" />
+    </DockPanel>
+    <Rectangle Classes="divider" IsVisible="{Binding SelectedModuleIsLimb}" />
+
+    <!-- Either kind: a shape of your own - imported, drawn, kept in My Assets (docs/shape-characters.md §9.3). -->
+    <local:OwnShapeRibbonGroup Name="OwnShapeGroup" />
+    <Rectangle Classes="divider" />
+
+    <!-- Either kind: its colour (the skin's until one's picked), and taking it off. -->
+    <DockPanel Classes="group">
+      <StackPanel Spacing="4" Margin="0,4,0,0">
+        <ContentControl Name="ModuleColor" Content="{Binding SelectedModuleColorEditor}" HorizontalAlignment="Left">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="local:ColorSlotEditor">
+              <local:ColorSlotDropdown />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+        <Button Name="ModuleSameAsSkinButton" Classes="small" Command="{Binding ModuleSameAsSkinCommand}" HorizontalAlignment="Left"
+                ToolTip.Tip="Fill it with the skin colour again, like the rest">Same as skin</Button>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="Colour" ToolTip.Tip="{Binding ModuleColorNote}" />
+    </DockPanel>
+    <Rectangle Classes="divider" />
+
+    <DockPanel Classes="group">
+      <StackPanel VerticalAlignment="Center" Spacing="1">
+        <Button Name="RemoveModuleButton" Classes="small" Command="{Binding RemoveModuleCommand}" HorizontalAlignment="Stretch"
+                ToolTip.Tip="{Binding RemoveModuleTip}" ToolTip.ShowOnDisabled="True">Remove</Button>
+        <Button Name="DeselectModuleButton" Classes="small" Command="{Binding DeselectModuleCommand}" HorizontalAlignment="Stretch"
+                ToolTip.Tip="Done with it - back to the whole character">Done</Button>
+      </StackPanel>
+      <TextBlock Classes="groupLabel" Text="{Binding SelectedModuleName}" />
+    </DockPanel>
+  </StackPanel>
+</UserControl>
